@@ -34,19 +34,24 @@ const Settings = () => {
       );
 
       if (functionError) {
-        const detailedMessage = (functionError as any).context?.error || functionError.message;
-        throw new Error(detailedMessage);
+        // Cải tiến: Cố gắng đọc lỗi chi tiết từ phản hồi của function
+        if (functionError.context && typeof functionError.context.json === 'function') {
+            const errorData = await functionError.context.json();
+            throw new Error(errorData.error || functionError.message);
+        }
+        // Nếu không có, dùng lỗi mặc định
+        throw new Error(functionError.message);
       }
       
-      if (data.error) {
+      if (data && data.error) {
         throw new Error(data.error);
       }
 
-      if (data.choices && data.choices.length > 0) {
+      if (data && data.choices && data.choices.length > 0) {
         setStatus("success");
         showSuccess("Kết nối API thành công!");
       } else {
-        throw new Error("Phản hồi từ API không hợp lệ.");
+        throw new Error("Phản hồi từ API không hợp lệ hoặc không chứa nội dung.");
       }
     } catch (err: any) {
       setStatus("error");

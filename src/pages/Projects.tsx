@@ -40,24 +40,33 @@ const Projects = () => {
     const apiMessages = [systemPrompt, { role: "user", content: currentPrompt }];
 
     try {
-      const { data, error } = await supabase.functions.invoke(
+      const { data, error: functionError } = await supabase.functions.invoke(
         "multi-ai-proxy",
         {
           body: { messages: apiMessages },
         }
       );
 
-      if (error) {
-        const detailedMessage = (error as any).context?.error || error.message;
-        throw new Error(detailedMessage);
+      if (functionError) {
+        // Cải tiến: Cố gắng đọc lỗi chi tiết từ phản hồi của function
+        if (functionError.context && typeof functionError.context.json === 'function') {
+            const errorData = await functionError.context.json();
+            throw new Error(errorData.error || functionError.message);
+        }
+        // Nếu không có, dùng lỗi mặc định
+        throw new Error(functionError.message);
       }
       
-      if (data.error) {
+      if (data && data.error) {
         throw new Error(data.error);
       }
 
-      const aiResponse = data.choices[0].message.content;
-      setMessages([...newMessages, { role: "ai", content: aiResponse }]);
+      if (data && data.choices && data.choices.length > 0) {
+        const aiResponse = data.choices[0].message.content;
+        setMessages([...newMessages, { role: "ai", content: aiResponse }]);
+      } else {
+        throw new Error("Phản hồi từ API không hợp lệ hoặc không chứa nội dung.");
+      }
     } catch (err: any) {
       const errorMessage = `Đã xảy ra lỗi: ${err.message}.`;
       showError(errorMessage);
