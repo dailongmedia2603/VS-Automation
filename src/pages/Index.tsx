@@ -1,129 +1,237 @@
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Send, Sparkles } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { BarChart, FileText, Users, Zap } from "lucide-react";
+import {
+  Bar,
+  BarChart as RechartsBarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  Pie,
+  PieChart,
+  Cell,
+} from "recharts";
+
+// Dữ liệu mẫu
+const stats = [
+  { title: "Tổng số dự án", value: "128", icon: FileText, change: "+12.5%" },
+  {
+    title: "Từ đã tạo (Tháng này)",
+    value: "1.2M",
+    icon: Zap,
+    change: "+20.1%",
+  },
+  {
+    title: "Người dùng hoạt động",
+    value: "86",
+    icon: Users,
+    change: "-2.4%",
+  },
+  {
+    title: "Tỷ lệ hoàn thành",
+    value: "92.8%",
+    icon: BarChart,
+    change: "+5.2%",
+  },
+];
+
+const chartData = [
+  { month: "Tháng 1", words: 45000 },
+  { month: "Tháng 2", words: 62000 },
+  { month: "Tháng 3", words: 81000 },
+  { month: "Tháng 4", words: 74000 },
+  { month: "Tháng 5", words: 98000 },
+  { month: "Tháng 6", words: 112000 },
+];
+
+const pieData = [
+  { name: "Bài đăng Blog", value: 400 },
+  { name: "Mạng xã hội", value: 300 },
+  { name: "Email Marketing", value: 300 },
+  { name: "Mô tả sản phẩm", value: 200 },
+];
+const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
+
+const recentProjects = [
+  {
+    id: "PROJ-001",
+    name: "Chiến dịch Marketing Mùa Hè",
+    status: "Hoàn thành",
+    words: "15,200",
+  },
+  {
+    id: "PROJ-002",
+    name: "Bài viết Blog hàng tuần",
+    status: "Đang tiến hành",
+    words: "8,500",
+  },
+  {
+    id: "PROJ-003",
+    name: "Nội dung cho Website mới",
+    status: "Hoàn thành",
+    words: "25,000",
+  },
+  {
+    id: "PROJ-004",
+    name: "Kịch bản Video Giới thiệu",
+    status: "Đang xét duyệt",
+    words: "3,100",
+  },
+  {
+    id: "PROJ-005",
+    name: "Email cho Khách hàng mới",
+    status: "Đang tiến hành",
+    words: "1,800",
+  },
+];
 
 const Index = () => {
-  const [prompt, setPrompt] = useState("");
-  const [messages, setMessages] = useState<
-    { role: "user" | "ai"; content: string }[]
-  >([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, isLoading]);
-
-  const handleGenerate = () => {
-    if (!prompt.trim() || isLoading) return;
-
-    const userMessage = { role: "user" as const, content: prompt.trim() };
-    const newMessages = [...messages, userMessage];
-    setMessages(newMessages);
-    setPrompt("");
-    setIsLoading(true);
-
-    setTimeout(() => {
-      const aiResponse = `Đây là nội dung mẫu được tạo ra dựa trên yêu cầu của bạn: "${prompt.trim()}".\n\nTrong một ứng dụng thực tế, chúng ta sẽ gọi một API AI để nhận về kết quả thực sự.`;
-      setMessages([...newMessages, { role: "ai", content: aiResponse }]);
-      setIsLoading(false);
-    }, 1500);
-  };
-
   return (
-    <div className="flex flex-col h-full">
-      <header className="border-b p-4 flex items-center justify-between h-16">
-        <h1 className="text-xl font-bold">New Chat</h1>
-        {/* Các nút hành động có thể được thêm vào đây trong tương lai */}
-      </header>
-      <main className="flex-1 overflow-y-auto p-6">
-        <div className="space-y-6">
-          {messages.length === 0 && !isLoading && (
-            <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
-              <Sparkles className="w-16 h-16 mb-4" />
-              <h2 className="text-2xl font-bold text-foreground">
-                Bắt đầu cuộc trò chuyện
-              </h2>
-              <p className="mt-2">
-                Tôi có thể giúp gì cho bạn hôm nay?
+    <main className="flex-1 space-y-4 p-4 sm:p-6 md:p-8 bg-zinc-100 dark:bg-background">
+      <div className="flex items-center justify-between space-y-2">
+        <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {stats.map((stat, index) => (
+          <Card key={index}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                {stat.title}
+              </CardTitle>
+              <stat.icon className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stat.value}</div>
+              <p className="text-xs text-muted-foreground">
+                {stat.change} so với tháng trước
               </p>
-            </div>
-          )}
-          {messages.map((message, index) => (
-            <div
-              key={index}
-              className={`flex items-start gap-4 ${
-                message.role === "user" ? "justify-end" : ""
-              }`}
-            >
-              {message.role === "ai" && (
-                <Avatar>
-                  <AvatarFallback>AI</AvatarFallback>
-                </Avatar>
-              )}
-              <div
-                className={`rounded-lg p-3 max-w-[80%] break-words ${
-                  message.role === "user"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted"
-                }`}
-              >
-                <p className="whitespace-pre-wrap">{message.content}</p>
-              </div>
-              {message.role === "user" && (
-                <Avatar>
-                  <AvatarFallback>BẠN</AvatarFallback>
-                </Avatar>
-              )}
-            </div>
-          ))}
-          {isLoading && (
-            <div className="flex items-start gap-4">
-              <Avatar>
-                <AvatarFallback>AI</AvatarFallback>
-              </Avatar>
-              <div className="rounded-lg p-3 max-w-[80%] bg-muted flex items-center space-x-2">
-                 <span className="w-2 h-2 bg-foreground rounded-full animate-pulse delay-0"></span>
-                 <span className="w-2 h-2 bg-foreground rounded-full animate-pulse delay-200"></span>
-                 <span className="w-2 h-2 bg-foreground rounded-full animate-pulse delay-400"></span>
-              </div>
-            </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
-      </main>
-      <footer className="p-4 border-t">
-        <div className="relative">
-          <Textarea
-            placeholder="Ví dụ: Viết một bài đăng blog về 5 lợi ích của việc đọc sách mỗi ngày."
-            className="pr-16 min-h-[52px] resize-none"
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleGenerate();
-              }
-            }}
-          />
-          <Button
-            type="submit"
-            size="icon"
-            className="absolute top-1/2 right-3 -translate-y-1/2"
-            onClick={handleGenerate}
-            disabled={isLoading || !prompt.trim()}
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
-      </footer>
-    </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+        <Card className="col-span-4">
+          <CardHeader>
+            <CardTitle>Tổng quan số từ đã tạo</CardTitle>
+          </CardHeader>
+          <CardContent className="pl-2">
+            <ResponsiveContainer width="100%" height={350}>
+              <RechartsBarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="month"
+                  stroke="#888888"
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  stroke="#888888"
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(value) => `${Number(value) / 1000}k`}
+                />
+                <Tooltip />
+                <Legend />
+                <Bar
+                  dataKey="words"
+                  fill="hsl(var(--primary))"
+                  name="Số từ"
+                  radius={[4, 4, 0, 0]}
+                />
+              </RechartsBarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+        <Card className="col-span-4 lg:col-span-3">
+          <CardHeader>
+            <CardTitle>Phân loại nội dung</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={350}>
+              <PieChart>
+                <Pie
+                  data={pieData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  outerRadius={120}
+                  fill="#8884d8"
+                  dataKey="value"
+                  label={({ name, percent }) =>
+                    `${name} ${(percent * 100).toFixed(0)}%`
+                  }
+                >
+                  {pieData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={COLORS[index % COLORS.length]}
+                    />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Dự án gần đây</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Mã dự án</TableHead>
+                <TableHead>Tên dự án</TableHead>
+                <TableHead>Trạng thái</TableHead>
+                <TableHead className="text-right">Số từ</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {recentProjects.map((project) => (
+                <TableRow key={project.id}>
+                  <TableCell className="font-medium">{project.id}</TableCell>
+                  <TableCell>{project.name}</TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={
+                        project.status === "Hoàn thành"
+                          ? "default"
+                          : project.status === "Đang tiến hành"
+                          ? "secondary"
+                          : "outline"
+                      }
+                    >
+                      {project.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">{project.words}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </main>
   );
 };
 
