@@ -34,7 +34,8 @@ const Settings = () => {
       );
 
       if (functionError) {
-        throw new Error(functionError.message);
+        const detailedMessage = (functionError as any).context?.error || functionError.message;
+        throw new Error(detailedMessage);
       }
       
       if (data.error) {
@@ -49,8 +50,9 @@ const Settings = () => {
       }
     } catch (err: any) {
       setStatus("error");
-      setError(err.message);
-      showError(`Kiểm tra thất bại: ${err.message}`);
+      const errorMessage = err.message || "Đã xảy ra lỗi không xác định.";
+      setError(errorMessage);
+      showError(`Kiểm tra thất bại: ${errorMessage}`);
     }
   };
 

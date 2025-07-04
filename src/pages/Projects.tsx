@@ -48,7 +48,8 @@ const Projects = () => {
       );
 
       if (error) {
-        throw new Error(error.message);
+        const detailedMessage = (error as any).context?.error || error.message;
+        throw new Error(detailedMessage);
       }
       
       if (data.error) {
@@ -58,7 +59,7 @@ const Projects = () => {
       const aiResponse = data.choices[0].message.content;
       setMessages([...newMessages, { role: "ai", content: aiResponse }]);
     } catch (err: any) {
-      const errorMessage = `Đã xảy ra lỗi: ${err.message}. Vui lòng kiểm tra lại API Key trong phần Cài đặt và thử lại.`;
+      const errorMessage = `Đã xảy ra lỗi: ${err.message}.`;
       showError(errorMessage);
       setMessages([...newMessages, { role: "ai", content: errorMessage }]);
     } finally {

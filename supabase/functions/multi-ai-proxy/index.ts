@@ -31,7 +31,7 @@ serve(async (req) => {
             'Authorization': `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-            model: 'gpt-4-turbo', // Bạn có thể thay đổi model ở đây
+            model: 'gpt-4-turbo',
             messages: messages,
             max_tokens: 2048,
             stream: false,
@@ -39,9 +39,16 @@ serve(async (req) => {
     });
 
     if (!response.ok) {
-        const errorBody = await response.text();
-        console.error(`API Error: ${errorBody}`);
-        throw new Error(`API request failed with status ${response.status}.`);
+        let errorBody;
+        try {
+            errorBody = await response.json();
+        } catch {
+            errorBody = await response.text();
+        }
+        
+        const errorMessage = errorBody?.error?.message || (typeof errorBody === 'string' ? errorBody : `API request failed with status ${response.status}`);
+        console.error(`Upstream API Error:`, errorBody);
+        throw new Error(errorMessage);
     }
 
     const data = await response.json();
@@ -51,7 +58,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
-    console.error(error);
+    console.error(`Edge Function Error: ${error.message}`);
     return new Response(
         JSON.stringify({ error: error.message }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
