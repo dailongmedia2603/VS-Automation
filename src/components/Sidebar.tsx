@@ -3,8 +3,10 @@ import {
   Pencil,
   Plus,
   LayoutDashboard,
-  ListPlus,
-  BookText,
+  Briefcase,
+  GraduationCap,
+  BarChart3,
+  Users,
   Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,19 +19,31 @@ const navItems = [
     active: true,
   },
   {
-    name: "Request Feature",
-    icon: ListPlus,
+    name: "Dự án",
+    icon: Briefcase,
     href: "#",
     active: false,
   },
   {
-    name: "Guides",
-    icon: BookText,
+    name: "Training",
+    icon: GraduationCap,
     href: "#",
     active: false,
   },
   {
-    name: "Settings",
+    name: "Báo cáo",
+    icon: BarChart3,
+    href: "#",
+    active: false,
+  },
+  {
+    name: "Nhân sự",
+    icon: Users,
+    href: "#",
+    active: false,
+  },
+  {
+    name: "Cài đặt",
     icon: Settings,
     href: "#",
     active: false,
@@ -68,8 +82,8 @@ export function Sidebar({ className }: { className?: string }) {
             key={item.name}
             href={item.href}
             className={cn(
-              "flex items-center rounded-lg px-3 py-2.5 text-md font-medium text-zinc-600 hover:bg-zinc-200 hover:text-blue-600",
-              item.active && "text-blue-600 bg-zinc-200"
+              "flex items-center rounded-lg px-3 py-2.5 text-md font-medium text-zinc-600 hover:bg-blue-50 hover:text-blue-600",
+              item.active && "text-blue-600 bg-blue-100"
             )}
           >
             <item.icon className="mr-3 h-5 w-5" />
