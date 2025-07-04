@@ -1,46 +1,82 @@
 import { Button } from "@/components/ui/button";
-import { PlusCircle, MessageSquare } from "lucide-react";
+import {
+  Pencil,
+  Plus,
+  LayoutDashboard,
+  ListPlus,
+  BookText,
+  Settings,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Dữ liệu mẫu cho lịch sử chat
-const chatHistory = [
-  { id: 1, title: "Lợi ích của việc đọc sách" },
-  { id: 2, title: "Làm thế nào để học React" },
-  { id: 3, title: "Tương lai của AI" },
-  { id: 4, title: "Công thức bữa tối chay" },
+const navItems = [
+  {
+    name: "Dashboard",
+    icon: LayoutDashboard,
+    href: "#",
+    active: true,
+  },
+  {
+    name: "Request Feature",
+    icon: ListPlus,
+    href: "#",
+    active: false,
+  },
+  {
+    name: "Guides",
+    icon: BookText,
+    href: "#",
+    active: false,
+  },
+  {
+    name: "Settings",
+    icon: Settings,
+    href: "#",
+    active: false,
+  },
 ];
 
 export function Sidebar({ className }: { className?: string }) {
   return (
-    <div className={cn("h-full flex flex-col", className)}>
-      <div className="px-3 py-4">
-        <h2 className="mb-2 px-4 text-xl font-semibold tracking-tight">
-          AI Content Writer
-        </h2>
-        <div className="space-y-1">
-          <Button variant="secondary" className="w-full justify-start">
-            <PlusCircle className="mr-2 h-4 w-4" />
-            New Chat
-          </Button>
+    <div
+      className={cn(
+        "h-full flex flex-col bg-zinc-50 text-zinc-800 p-4 lg:p-6 space-y-8",
+        className
+      )}
+    >
+      {/* Logo */}
+      <div className="flex items-center space-x-3">
+        <div className="bg-blue-600 rounded-full p-2">
+          <Pencil className="h-6 w-6 text-white" />
         </div>
+        <span className="text-2xl font-bold text-blue-600">ava</span>
       </div>
-      <div className="flex-1 overflow-y-auto px-3 py-2">
-        <h2 className="mb-2 px-4 text-lg font-semibold tracking-tight">
-          Lịch sử
-        </h2>
-        <div className="space-y-1">
-          {chatHistory.map((chat) => (
-            <Button
-              key={chat.id}
-              variant="ghost"
-              className="w-full justify-start"
-            >
-              <MessageSquare className="mr-2 h-4 w-4" />
-              <span className="truncate">{chat.title}</span>
-            </Button>
-          ))}
-        </div>
-      </div>
+
+      {/* New Project Button */}
+      <Button
+        size="lg"
+        className="w-full text-md font-semibold bg-blue-600 hover:bg-blue-700 rounded-xl"
+      >
+        <Plus className="mr-2 h-5 w-5" />
+        New Project
+      </Button>
+
+      {/* Navigation */}
+      <nav className="flex flex-col space-y-1">
+        {navItems.map((item) => (
+          <a
+            key={item.name}
+            href={item.href}
+            className={cn(
+              "flex items-center rounded-lg px-3 py-2.5 text-md font-medium text-zinc-600 hover:bg-zinc-200 hover:text-blue-600",
+              item.active && "text-blue-600 bg-zinc-200"
+            )}
+          >
+            <item.icon className="mr-3 h-5 w-5" />
+            <span>{item.name}</span>
+          </a>
+        ))}
+      </nav>
     </div>
   );
 }
