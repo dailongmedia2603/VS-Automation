@@ -103,7 +103,7 @@ const recentProjects = [
 
 const Index = () => {
   return (
-    <main className="flex-1 space-y-4 p-4 sm:p-6 md:p-8 bg-zinc-100 dark:bg-background">
+    <main className="flex-1 space-y-4 p-4 sm:p-6 md:p-8 bg-zinc-100">
       <div className="flex items-center justify-between space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
       </div>
@@ -136,13 +136,13 @@ const Index = () => {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
                   dataKey="month"
-                  stroke="#888888"
+                  stroke="#94a3b8"
                   fontSize={12}
                   tickLine={false}
                   axisLine={false}
                 />
                 <YAxis
-                  stroke="#888888"
+                  stroke="#94a3b8"
                   fontSize={12}
                   tickLine={false}
                   axisLine={false}
