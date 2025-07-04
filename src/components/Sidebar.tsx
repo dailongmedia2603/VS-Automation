@@ -10,47 +10,44 @@ import {
   Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Link, useLocation } from "react-router-dom";
 
 const navItems = [
   {
     name: "Dashboard",
     icon: LayoutDashboard,
-    href: "#",
-    active: true,
+    href: "/",
   },
   {
     name: "Dự án",
     icon: Briefcase,
-    href: "#",
-    active: false,
+    href: "/projects",
   },
   {
     name: "Training",
     icon: GraduationCap,
-    href: "#",
-    active: false,
+    href: "/training",
   },
   {
     name: "Báo cáo",
     icon: BarChart3,
-    href: "#",
-    active: false,
+    href: "/reports",
   },
   {
     name: "Nhân sự",
     icon: Users,
-    href: "#",
-    active: false,
+    href: "/staff",
   },
   {
     name: "Cài đặt",
     icon: Settings,
-    href: "#",
-    active: false,
+    href: "/settings",
   },
 ];
 
 export function Sidebar({ className }: { className?: string }) {
+  const location = useLocation();
+
   return (
     <div
       className={cn(
@@ -68,27 +65,30 @@ export function Sidebar({ className }: { className?: string }) {
 
       {/* New Project Button */}
       <Button
+        asChild
         size="lg"
         className="w-full text-md font-semibold bg-blue-600 hover:bg-blue-700 rounded-xl"
       >
-        <Plus className="mr-2 h-5 w-5" />
-        New Project
+        <Link to="/projects">
+          <Plus className="mr-2 h-5 w-5" />
+          New Project
+        </Link>
       </Button>
 
       {/* Navigation */}
       <nav className="flex flex-col space-y-1">
         {navItems.map((item) => (
-          <a
+          <Link
             key={item.name}
-            href={item.href}
+            to={item.href}
             className={cn(
               "flex items-center rounded-lg px-3 py-2.5 text-md font-medium text-zinc-600 hover:bg-blue-50 hover:text-blue-600",
-              item.active && "text-blue-600 bg-blue-100"
+              location.pathname === item.href && "text-blue-600 bg-blue-100"
             )}
           >
             <item.icon className="mr-3 h-5 w-5" />
             <span>{item.name}</span>
-          </a>
+          </Link>
         ))}
       </nav>
     </div>
