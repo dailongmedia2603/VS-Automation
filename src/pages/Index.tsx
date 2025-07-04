@@ -1,82 +1,128 @@
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useState } from "react";
+import { Send, Sparkles } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const Index = () => {
   const [prompt, setPrompt] = useState("");
-  const [generatedContent, setGeneratedContent] = useState("");
+  const [messages, setMessages] = useState<
+    { role: "user" | "ai"; content: string }[]
+  >([]);
   const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isLoading]);
 
   const handleGenerate = () => {
-    if (!prompt) return;
+    if (!prompt.trim() || isLoading) return;
 
+    const userMessage = { role: "user" as const, content: prompt.trim() };
+    const newMessages = [...messages, userMessage];
+    setMessages(newMessages);
+    setPrompt("");
     setIsLoading(true);
-    // Chú ý: Đây chỉ là một ví dụ mô phỏng.
-    // Để có chức năng AI thực sự, bạn cần kết nối với một API của mô hình ngôn ngữ.
+
     setTimeout(() => {
-      setGeneratedContent(
-        `Đây là nội dung mẫu được tạo ra dựa trên yêu cầu của bạn: "${prompt}".\n\nTrong một ứng dụng thực tế, chúng ta sẽ gọi một API AI để nhận về kết quả thực sự. Bạn có thể thử nhập các yêu cầu khác nhau để xem giao diện hoạt động như thế nào.`
-      );
+      const aiResponse = `Đây là nội dung mẫu được tạo ra dựa trên yêu cầu của bạn: "${prompt.trim()}".\n\nTrong một ứng dụng thực tế, chúng ta sẽ gọi một API AI để nhận về kết quả thực sự.`;
+      setMessages([...newMessages, { role: "ai", content: aiResponse }]);
       setIsLoading(false);
     }, 1500);
   };
 
   return (
-    <div className="container mx-auto p-4 sm:p-6 md:p-8">
-      <Card className="max-w-4xl mx-auto">
-        <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-bold">
-            Trình Tạo Nội Dung AI
-          </CardTitle>
-          <CardDescription>
-            Nhập chủ đề hoặc yêu cầu của bạn bên dưới và để AI viết nội dung cho
-            bạn.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-6">
-            <div className="grid gap-2">
-              <Label htmlFor="prompt" className="text-lg font-semibold">
-                Yêu cầu của bạn
-              </Label>
-              <Textarea
-                id="prompt"
-                placeholder="Ví dụ: Viết một bài đăng blog về 5 lợi ích của việc đọc sách mỗi ngày."
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                className="min-h-[120px] text-base"
-              />
+    <div className="flex flex-col h-full">
+      <header className="border-b p-4 flex items-center justify-between h-16">
+        <h1 className="text-xl font-bold">New Chat</h1>
+        {/* Các nút hành động có thể được thêm vào đây trong tương lai */}
+      </header>
+      <main className="flex-1 overflow-y-auto p-6">
+        <div className="space-y-6">
+          {messages.length === 0 && !isLoading && (
+            <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
+              <Sparkles className="w-16 h-16 mb-4" />
+              <h2 className="text-2xl font-bold text-foreground">
+                Bắt đầu cuộc trò chuyện
+              </h2>
+              <p className="mt-2">
+                Tôi có thể giúp gì cho bạn hôm nay?
+              </p>
             </div>
-            <Button
-              onClick={handleGenerate}
-              disabled={isLoading || !prompt}
-              size="lg"
+          )}
+          {messages.map((message, index) => (
+            <div
+              key={index}
+              className={`flex items-start gap-4 ${
+                message.role === "user" ? "justify-end" : ""
+              }`}
             >
-              {isLoading ? "Đang tạo..." : "Tạo Nội Dung"}
-            </Button>
-            {generatedContent && (
-              <div className="grid gap-2 pt-4">
-                <Label htmlFor="content" className="text-lg font-semibold">
-                  Kết quả
-                </Label>
-                <div className="p-4 border rounded-md bg-secondary min-h-[250px]">
-                  <p className="text-left whitespace-pre-wrap text-secondary-foreground">
-                    {generatedContent}
-                  </p>
-                </div>
+              {message.role === "ai" && (
+                <Avatar>
+                  <AvatarFallback>AI</AvatarFallback>
+                </Avatar>
+              )}
+              <div
+                className={`rounded-lg p-3 max-w-[80%] break-words ${
+                  message.role === "user"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted"
+                }`}
+              >
+                <p className="whitespace-pre-wrap">{message.content}</p>
               </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+              {message.role === "user" && (
+                <Avatar>
+                  <AvatarFallback>BẠN</AvatarFallback>
+                </Avatar>
+              )}
+            </div>
+          ))}
+          {isLoading && (
+            <div className="flex items-start gap-4">
+              <Avatar>
+                <AvatarFallback>AI</AvatarFallback>
+              </Avatar>
+              <div className="rounded-lg p-3 max-w-[80%] bg-muted flex items-center space-x-2">
+                 <span className="w-2 h-2 bg-foreground rounded-full animate-pulse delay-0"></span>
+                 <span className="w-2 h-2 bg-foreground rounded-full animate-pulse delay-200"></span>
+                 <span className="w-2 h-2 bg-foreground rounded-full animate-pulse delay-400"></span>
+              </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+      </main>
+      <footer className="p-4 border-t">
+        <div className="relative">
+          <Textarea
+            placeholder="Ví dụ: Viết một bài đăng blog về 5 lợi ích của việc đọc sách mỗi ngày."
+            className="pr-16 min-h-[52px] resize-none"
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleGenerate();
+              }
+            }}
+          />
+          <Button
+            type="submit"
+            size="icon"
+            className="absolute top-1/2 right-3 -translate-y-1/2"
+            onClick={handleGenerate}
+            disabled={isLoading || !prompt.trim()}
+          >
+            <Send className="h-4 w-4" />
+          </Button>
+        </div>
+      </footer>
     </div>
   );
 };
