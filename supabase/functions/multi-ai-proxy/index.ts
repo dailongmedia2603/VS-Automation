@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const API_URL = 'https://multiappai.itmovnteam.com/api/v1/chat/completions';
+const API_URL = 'https://multiappai-api.itmovnteam.com/api/v1/chat/completions';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
