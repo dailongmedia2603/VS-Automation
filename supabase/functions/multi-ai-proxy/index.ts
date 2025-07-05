@@ -39,23 +39,42 @@ serve(async (req) => {
         }),
     });
 
-    // Đọc phản hồi MỘT LẦN DUY NHẤT và lưu vào biến 'data'
-    const data = await response.json();
-
-    // Bây giờ, kiểm tra lỗi DỰA TRÊN PHẢN HỒI ĐÃ ĐỌC
+    // Logic xử lý lỗi mạnh mẽ
     if (!response.ok) {
-        // Lấy thông báo lỗi từ biến 'data' đã có
-        const errorMessage = data?.error?.message || `API request failed with status ${response.status}`;
-        console.error(`Upstream API Error:`, data);
+        let errorBody;
+        try {
+            // Ưu tiên đọc lỗi dạng JSON
+            errorBody = await response.json();
+        } catch {
+            // Nếu thất bại, đọc lỗi dạng văn bản thuần
+            errorBody = await response.text();
+        }
+        
+        const errorMessage = (typeof errorBody === 'object' && errorBody?.error?.message) 
+                           ? errorBody.error.message 
+                           : (typeof errorBody === 'string' && errorBody.trim() !== '')
+                           ? errorBody
+                           : `API request failed with status ${response.status}`;
+
+        console.error(`Upstream API Error (${response.status}):`, errorBody);
         throw new Error(errorMessage);
     }
 
-    // Nếu không có lỗi, trả về dữ liệu đã đọc
+    // Nếu thành công, chúng ta vẫn cần đảm bảo phản hồi là JSON hợp lệ
+    let data;
+    try {
+        data = await response.json();
+    } catch (e) {
+        console.error("Failed to parse successful response as JSON:", e);
+        throw new Error("Received a successful but invalid response from the API.");
+    }
+
     return new Response(
       JSON.stringify(data),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
+    // Khối catch này sẽ bắt tất cả các lỗi và luôn trả về một JSON hợp lệ
     console.error(`Edge Function Error: ${error.message}`);
     return new Response(
         JSON.stringify({ error: error.message }),
