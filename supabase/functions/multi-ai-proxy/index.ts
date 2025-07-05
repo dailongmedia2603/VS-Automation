@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 
 const corsHeaders = {
@@ -38,21 +39,18 @@ serve(async (req) => {
         }),
     });
 
+    // Đọc phản hồi MỘT LẦN DUY NHẤT và lưu vào biến 'data'
+    const data = await response.json();
+
+    // Bây giờ, kiểm tra lỗi DỰA TRÊN PHẢN HỒI ĐÃ ĐỌC
     if (!response.ok) {
-        let errorBody;
-        try {
-            errorBody = await response.json();
-        } catch {
-            errorBody = await response.text();
-        }
-        
-        const errorMessage = errorBody?.error?.message || (typeof errorBody === 'string' ? errorBody : `API request failed with status ${response.status}`);
-        console.error(`Upstream API Error:`, errorBody);
+        // Lấy thông báo lỗi từ biến 'data' đã có
+        const errorMessage = data?.error?.message || `API request failed with status ${response.status}`;
+        console.error(`Upstream API Error:`, data);
         throw new Error(errorMessage);
     }
 
-    const data = await response.json();
-
+    // Nếu không có lỗi, trả về dữ liệu đã đọc
     return new Response(
       JSON.stringify(data),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
