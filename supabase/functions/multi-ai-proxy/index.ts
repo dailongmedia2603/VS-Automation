@@ -25,7 +25,7 @@ serve(async (req) => {
         throw new Error('Missing or invalid "messages" in request body.');
     }
 
-    const response = await fetch(API_URL, {
+    const upstreamResponse = await fetch(API_URL, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -39,42 +39,39 @@ serve(async (req) => {
         }),
     });
 
-    // Logic xử lý lỗi mạnh mẽ
-    if (!response.ok) {
-        let errorBody;
-        try {
-            // Ưu tiên đọc lỗi dạng JSON
-            errorBody = await response.json();
-        } catch {
-            // Nếu thất bại, đọc lỗi dạng văn bản thuần
-            errorBody = await response.text();
+    // Đọc toàn bộ nội dung phản hồi dưới dạng văn bản MỘT LẦN DUY NHẤT.
+    const responseText = await upstreamResponse.text();
+    
+    let data;
+    try {
+        // Cố gắng phân tích văn bản đã đọc thành JSON.
+        data = JSON.parse(responseText);
+    } catch (e) {
+        // Nếu thất bại, có nghĩa là phản hồi không phải là JSON hợp lệ.
+        console.error("Failed to parse response as JSON. Raw response text:", responseText);
+        // Chúng ta vẫn trả về lỗi dựa trên mã trạng thái gốc.
+        if (!upstreamResponse.ok) {
+             throw new Error(`API request failed with status ${upstreamResponse.status}: ${responseText}`);
         }
-        
-        const errorMessage = (typeof errorBody === 'object' && errorBody?.error?.message) 
-                           ? errorBody.error.message 
-                           : (typeof errorBody === 'string' && errorBody.trim() !== '')
-                           ? errorBody
-                           : `API request failed with status ${response.status}`;
+        // Trường hợp hiếm: mã trạng thái thành công nhưng nội dung không phải JSON.
+        throw new Error("Received a successful but non-JSON response from the API.");
+    }
 
-        console.error(`Upstream API Error (${response.status}):`, errorBody);
+    // Bây giờ, kiểm tra mã trạng thái của phản hồi gốc.
+    if (!upstreamResponse.ok) {
+        const errorMessage = data?.error?.message || `API request failed with status ${upstreamResponse.status}`;
+        console.error(`Upstream API Error (${upstreamResponse.status}):`, data);
         throw new Error(errorMessage);
     }
 
-    // Nếu thành công, chúng ta vẫn cần đảm bảo phản hồi là JSON hợp lệ
-    let data;
-    try {
-        data = await response.json();
-    } catch (e) {
-        console.error("Failed to parse successful response as JSON:", e);
-        throw new Error("Received a successful but invalid response from the API.");
-    }
-
+    // Nếu mọi thứ ổn, trả về dữ liệu đã phân tích.
     return new Response(
       JSON.stringify(data),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
+
   } catch (error) {
-    // Khối catch này sẽ bắt tất cả các lỗi và luôn trả về một JSON hợp lệ
+    // Khối catch này sẽ bắt tất cả các lỗi và luôn trả về một JSON hợp lệ.
     console.error(`Edge Function Error: ${error.message}`);
     return new Response(
         JSON.stringify({ error: error.message }),
