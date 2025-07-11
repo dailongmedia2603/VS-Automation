@@ -12,13 +12,12 @@ serve(async (req) => {
   }
 
   try {
-    const apiKey = Deno.env.get('MULTI_APP_AI_KEY');
+    // Nhận API Key từ body của request, không dùng Supabase secrets nữa
+    const { messages, apiUrl, apiKey } = await req.json();
+
     if (!apiKey) {
-      throw new Error('API key (MULTI_APP_AI_KEY) is not set in Supabase secrets.');
+      throw new Error('Missing "apiKey" in request body. Please provide it in the Settings page.');
     }
-
-    const { messages, apiUrl } = await req.json();
-
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
         throw new Error('Missing or invalid "messages" in request body.');
     }
@@ -30,7 +29,7 @@ serve(async (req) => {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`,
+            'Authorization': `Bearer ${apiKey}`, // Sử dụng API Key từ client
         },
         body: JSON.stringify({
             model: 'gpt-4o',

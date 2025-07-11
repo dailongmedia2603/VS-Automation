@@ -14,21 +14,22 @@ import { useState, useEffect } from "react";
 import { showSuccess, showError } from "@/utils/toast";
 import { useApiSettings } from "@/contexts/ApiSettingsContext";
 
-const API_KEY_PROVIDED = "sk-EWcoOk8zZtfGel2Utawq3Y09Wrf9m6A3u1XzvtafHDaEPJhX";
-
 const Settings = () => {
-  const { apiUrl, setApiUrl } = useApiSettings();
+  const { apiUrl, setApiUrl, apiKey, setApiKey } = useApiSettings();
   const [localApiUrl, setLocalApiUrl] = useState(apiUrl);
+  const [localApiKey, setLocalApiKey] = useState(apiKey);
   const [status, setStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setLocalApiUrl(apiUrl);
-  }, [apiUrl]);
+    setLocalApiKey(apiKey);
+  }, [apiUrl, apiKey]);
 
   const handleSave = () => {
     setApiUrl(localApiUrl);
-    showSuccess("API Endpoint URL đã được cập nhật!");
+    setApiKey(localApiKey);
+    showSuccess("Cấu hình API đã được cập nhật!");
   };
 
   const handleTestConnection = async () => {
@@ -41,7 +42,8 @@ const Settings = () => {
         {
           body: {
             messages: [{ role: "user", content: "Hello" }],
-            apiUrl: localApiUrl, // Gửi URL đang được kiểm tra
+            apiUrl: localApiUrl,
+            apiKey: localApiKey, // Gửi API Key đang được kiểm tra
           },
         }
       );
@@ -87,16 +89,18 @@ const Settings = () => {
               value={localApiUrl}
               onChange={(e) => setLocalApiUrl(e.target.value)}
             />
-            <Button onClick={handleSave}>Lưu thay đổi</Button>
           </div>
-          <div className="flex items-center justify-between p-4 border rounded-lg">
-            <div>
-              <p className="font-medium">API Key (được lấy từ máy chủ)</p>
-              <p className="text-sm text-muted-foreground font-mono">
-                ...bí mật...
-              </p>
-            </div>
+           <div className="space-y-2">
+            <Label htmlFor="api-key">API Key</Label>
+            <Input
+              id="api-key"
+              type="password"
+              value={localApiKey}
+              onChange={(e) => setLocalApiKey(e.target.value)}
+            />
           </div>
+          <Button onClick={handleSave}>Lưu thay đổi</Button>
+          
           <div className="border-t pt-6">
             <div className="flex items-center justify-between">
                 <p className="font-medium">Kiểm tra kết nối</p>
