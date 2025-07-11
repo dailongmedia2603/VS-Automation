@@ -12,6 +12,7 @@ import { useState } from "react";
 import { showSuccess, showError } from "@/utils/toast";
 
 const API_KEY_PROVIDED = "sk-EWcoOk8zZtfGel2Utawq3Y09Wrf9m6A3u1XzvtafHDaEPJhX";
+const API_URL = "https://multiappai-api.itmovnteam.com/api/v1/chat/completions";
 
 const Settings = () => {
   const [status, setStatus] = useState<
@@ -87,6 +88,14 @@ const Settings = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          <div className="flex items-center justify-between p-4 border rounded-lg">
+            <div>
+              <p className="font-medium">API Endpoint URL</p>
+              <p className="text-sm text-muted-foreground font-mono">
+                {API_URL}
+              </p>
+            </div>
+          </div>
           <div className="flex items-center justify-between p-4 border rounded-lg">
             <div>
               <p className="font-medium">API Key</p>
