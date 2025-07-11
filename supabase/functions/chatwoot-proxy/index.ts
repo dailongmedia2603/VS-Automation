@@ -25,8 +25,8 @@ serve(async (req) => {
     
     switch (action) {
       case 'list_conversations':
-        // Lấy tất cả cuộc trò chuyện trong tài khoản theo yêu cầu, không lọc theo inbox cụ thể.
-        endpoint = `/api/v1/accounts/${settings.accountId}/conversations`;
+        // Thêm các tham số truy vấn quan trọng để lấy đúng danh sách cuộc trò chuyện
+        endpoint = `/api/v1/accounts/${settings.accountId}/conversations?assignee_type=all&status=open&page=1`;
         method = 'GET';
         break;
       
