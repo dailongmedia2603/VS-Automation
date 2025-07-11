@@ -1,10 +1,10 @@
-import React, { createContext, useState, useContext, ReactNode } from 'react';
+import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 
 interface ChatwootSettings {
   chatwootUrl: string;
   accountId: string;
   inboxId: string;
-  apiToken: string; // Lưu ý: Chỉ lưu ở client-side, không commit
+  apiToken: string;
 }
 
 interface ChatwootContextType {
@@ -14,13 +14,35 @@ interface ChatwootContextType {
 
 const ChatwootContext = createContext<ChatwootContextType | undefined>(undefined);
 
+const CHATWOOT_SETTINGS_KEY = 'chatwootSettings';
+
 export const ChatwootProvider = ({ children }: { children: ReactNode }) => {
-  const [settings, setSettings] = useState<ChatwootSettings>({
-    chatwootUrl: 'https://app.chatwoot.com',
-    accountId: '',
-    inboxId: '',
-    apiToken: '',
+  const [settings, setSettings] = useState<ChatwootSettings>(() => {
+    try {
+      const savedSettings = localStorage.getItem(CHATWOOT_SETTINGS_KEY);
+      if (savedSettings) {
+        return JSON.parse(savedSettings);
+      }
+    } catch (error) {
+      console.error("Không thể tải cài đặt Chatwoot từ localStorage", error);
+    }
+    // Giá trị mặc định nếu không có gì được lưu
+    return {
+      chatwootUrl: 'https://app.chatwoot.com',
+      accountId: '',
+      inboxId: '',
+      apiToken: '',
+    };
   });
+
+  // Tự động lưu vào localStorage mỗi khi settings thay đổi
+  useEffect(() => {
+    try {
+      localStorage.setItem(CHATWOOT_SETTINGS_KEY, JSON.stringify(settings));
+    } catch (error) {
+      console.error("Không thể lưu cài đặt Chatwoot vào localStorage", error);
+    }
+  }, [settings]);
 
   return (
     <ChatwootContext.Provider value={{ settings, setSettings }}>
