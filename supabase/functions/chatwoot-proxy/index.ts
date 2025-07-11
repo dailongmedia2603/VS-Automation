@@ -24,8 +24,8 @@ serve(async (req) => {
     switch (action) {
       case 'list_conversations':
         if (!settings.inboxId) throw new Error("Inbox ID is required.");
-        // Sửa lỗi: Sử dụng đúng endpoint để lấy cuộc trò chuyện theo inbox_id theo tài liệu API.
-        endpoint = `/api/v1/accounts/${settings.accountId}/inboxes/${settings.inboxId}/conversations`;
+        // Sửa lỗi: Sử dụng đúng endpoint với inbox_id làm query parameter theo tài liệu API
+        endpoint = `/api/v1/accounts/${settings.accountId}/conversations?inbox_id=${settings.inboxId}`;
         method = 'GET';
         break;
       default:
@@ -48,13 +48,16 @@ serve(async (req) => {
         data = JSON.parse(responseText);
     } catch (e) {
         if (!response.ok) {
-             throw new Error(`API request failed with status ${response.status}: ${responseText}`);
+             // Phản hồi có thể là một trang lỗi HTML (ví dụ: 404 Not Found)
+             throw new Error(`Yêu cầu API thất bại với mã trạng thái ${response.status}. Vui lòng kiểm tra lại Chatwoot URL và Account ID của bạn.`);
         }
-        throw new Error("Received a successful but non-JSON response from the API.");
+        // Phản hồi thành công nhưng không phải JSON, điều này không mong muốn.
+        throw new Error("Đã nhận được phản hồi không phải JSON không mong muốn từ API Chatwoot.");
     }
 
     if (!response.ok) {
-        const errorMessage = data?.message || `API request failed with status ${response.status}`;
+        // Phản hồi là JSON nhưng cho biết có lỗi (ví dụ: token không hợp lệ)
+        const errorMessage = data?.message || `Yêu cầu API thất bại với mã trạng thái ${response.status}`;
         throw new Error(errorMessage);
     }
 
