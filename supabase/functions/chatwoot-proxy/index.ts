@@ -1,6 +1,5 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
-import axios from "https://deno.land/x/axiod@0.26.2/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,42 +12,61 @@ serve(async (req) => {
   }
 
   try {
-    const { action, settings, payload } = await req.json();
+    const { action, settings } = await req.json();
 
     if (!settings || !settings.chatwootUrl || !settings.accountId || !settings.apiToken) {
       throw new Error("Thông tin cấu hình Chatwoot không đầy đủ.");
     }
 
-    const client = axios.create({
-      baseURL: `${settings.chatwootUrl}/api/v1/accounts/${settings.accountId}`,
+    let endpoint = '';
+    let method = 'GET';
+    
+    switch (action) {
+      case 'list_conversations':
+        if (!settings.inboxId) throw new Error("Inbox ID is required.");
+        endpoint = `/api/v1/accounts/${settings.accountId}/inboxes/${settings.inboxId}/conversations`;
+        method = 'GET';
+        break;
+      default:
+        throw new Error(`Hành động không hợp lệ: ${action}`);
+    }
+
+    const upstreamUrl = `${settings.chatwootUrl.replace(/\/$/, '')}${endpoint}`;
+
+    const response = await fetch(upstreamUrl, {
+      method: method,
       headers: {
         'Content-Type': 'application/json',
         'api_access_token': settings.apiToken,
       },
     });
 
-    let response;
+    const responseText = await response.text();
+    let data;
+    try {
+        data = JSON.parse(responseText);
+    } catch (e) {
+        if (!response.ok) {
+             throw new Error(`API request failed with status ${response.status}: ${responseText}`);
+        }
+        throw new Error("Received a successful but non-JSON response from the API.");
+    }
 
-    switch (action) {
-      case 'list_conversations':
-        if (!settings.inboxId) throw new Error("Inbox ID is required.");
-        response = await client.get(`/inboxes/${settings.inboxId}/conversations`);
-        break;
-      // Thêm các action khác ở đây trong tương lai (ví dụ: get_messages, send_message)
-      default:
-        throw new Error(`Hành động không hợp lệ: ${action}`);
+    if (!response.ok) {
+        // Chatwoot thường trả về lỗi trong thuộc tính 'message'
+        const errorMessage = data?.message || `API request failed with status ${response.status}`;
+        throw new Error(errorMessage);
     }
 
     return new Response(
-      JSON.stringify(response.data),
+      JSON.stringify(data),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
-    console.error("Chatwoot Proxy Error:", error.response?.data || error.message);
-    const errorMessage = error.response?.data?.message || error.message;
+    console.error("Chatwoot Proxy Error:", error.message);
     return new Response(
-        JSON.stringify({ error: errorMessage }),
-        { status: error.response?.status || 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: error.message }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 })
