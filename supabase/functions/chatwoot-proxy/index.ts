@@ -25,8 +25,8 @@ serve(async (req) => {
     
     switch (action) {
       case 'list_conversations':
-        if (!settings.inboxId) throw new Error("Inbox ID is required.");
-        endpoint = `/api/v1/accounts/${settings.accountId}/inboxes/${settings.inboxId}/conversations`;
+        // Lấy tất cả cuộc trò chuyện trong tài khoản theo yêu cầu, không lọc theo inbox cụ thể.
+        endpoint = `/api/v1/accounts/${settings.accountId}/conversations`;
         method = 'GET';
         break;
       
