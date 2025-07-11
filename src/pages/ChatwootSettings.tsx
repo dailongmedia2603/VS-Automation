@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -8,15 +9,54 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { useChatwoot } from "@/contexts/ChatwootContext";
-import { showSuccess } from "@/utils/toast";
+import { supabase } from "@/integrations/supabase/client";
+import { showSuccess, showError } from "@/utils/toast";
+import { Terminal } from "lucide-react";
 
 const ChatwootSettings = () => {
   const { settings, setSettings } = useChatwoot();
+  const [status, setStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
+  const [error, setError] = useState<string | null>(null);
 
   const handleSave = () => {
-    // Trong một ứng dụng thực tế, bạn có thể muốn mã hóa token trước khi lưu
     showSuccess("Cấu hình Chatwoot đã được lưu!");
+  };
+
+  const handleTestConnection = async () => {
+    setStatus("testing");
+    setError(null);
+
+    try {
+      const { data, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', {
+        body: {
+          action: 'list_conversations',
+          settings: settings,
+        },
+      });
+
+      if (functionError) {
+        if (functionError.context && typeof functionError.context.json === 'function') {
+            const errorData = await functionError.context.json();
+            throw new Error(errorData.error || functionError.message);
+        }
+        throw functionError;
+      }
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      
+      setStatus("success");
+      showSuccess("Kết nối Chatwoot thành công!");
+
+    } catch (err: any) {
+      setStatus("error");
+      const errorMessage = err.message || 'Đã xảy ra lỗi không xác định.';
+      setError(errorMessage);
+      showError(`Kiểm tra thất bại: ${errorMessage}`);
+    }
   };
 
   return (
@@ -64,6 +104,26 @@ const ChatwootSettings = () => {
             />
           </div>
           <Button onClick={handleSave}>Lưu cấu hình</Button>
+
+          <div className="border-t pt-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="font-medium">Kiểm tra kết nối</p>
+              {status === "idle" && <Badge variant="outline">Chưa kiểm tra</Badge>}
+              {status === "testing" && <Badge variant="secondary">Đang kiểm tra...</Badge>}
+              {status === "success" && <Badge variant="default">Thành công</Badge>}
+              {status === "error" && <Badge variant="destructive">Thất bại</Badge>}
+            </div>
+            <Button onClick={handleTestConnection} disabled={status === "testing"}>
+              {status === "testing" ? "Đang kiểm tra..." : "Kiểm tra kết nối"}
+            </Button>
+            {error && (
+              <div className="mt-4 text-sm text-destructive p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                <Terminal className="h-4 w-4 inline-block mr-2" />
+                <p className="font-bold inline">Chi tiết lỗi:</p>
+                <p className="font-mono break-all mt-2">{error}</p>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
     </main>
