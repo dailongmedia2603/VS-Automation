@@ -20,22 +20,15 @@ export const ChatwootProvider = ({ children }: { children: ReactNode }) => {
   const [settings, setSettings] = useState<ChatwootSettings>(() => {
     try {
       const savedSettings = localStorage.getItem(CHATWOOT_SETTINGS_KEY);
-      if (savedSettings && savedSettings !== 'undefined') {
-        const parsed = JSON.parse(savedSettings);
-        // Đảm bảo dữ liệu đã parse có cấu trúc đúng
-        if (parsed && typeof parsed.chatwootUrl === 'string') {
-          return parsed;
-        }
+      if (savedSettings) {
+        return JSON.parse(savedSettings);
       }
     } catch (error) {
-      console.error("Không thể tải cài đặt Chatwoot từ localStorage, sẽ xóa dữ liệu lỗi.", error);
-      // Nếu có lỗi, xóa dữ liệu không hợp lệ khỏi localStorage
-      localStorage.removeItem(CHATWOOT_SETTINGS_KEY);
+      console.error("Không thể tải cài đặt Chatwoot từ localStorage", error);
     }
-    
-    // Luôn trả về một giá trị mặc định hợp lệ nếu có lỗi hoặc không có dữ liệu
+    // Giá trị mặc định nếu không có gì được lưu
     return {
-      chatwootUrl: 'https://app.chatwoot.com',
+      chatwootUrl: 'https://app.chatwoot.com', // Khôi phục lại URL chính xác
       accountId: '',
       inboxId: '',
       apiToken: '',
