@@ -23,9 +23,9 @@ serve(async (req) => {
     
     switch (action) {
       case 'list_conversations':
-        if (!settings.inboxId) throw new Error("Inbox ID is required.");
-        // Sửa lỗi triệt để: Sử dụng đúng endpoint và thêm inbox_id làm query parameter
-        endpoint = `/api/v1/accounts/${settings.accountId}/conversations?inbox_id=${settings.inboxId}`;
+        // Quay trở lại endpoint gốc đã hoạt động.
+        // Việc lọc theo inbox_id sẽ được thực hiện ở client-side.
+        endpoint = `/api/v1/accounts/${settings.accountId}/conversations`;
         method = 'GET';
         break;
       default:

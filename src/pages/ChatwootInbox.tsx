@@ -41,7 +41,14 @@ const ChatwootInbox = () => {
         }
 
         // API của Chatwoot trả về danh sách trong một thuộc tính 'payload'
-        setConversations(data.payload || []);
+        const allConversations = data.payload || [];
+        
+        // Thêm bộ lọc ở client-side để chỉ hiển thị đúng inbox
+        const filteredConversations = allConversations.filter(
+          (convo: any) => convo.inbox_id == settings.inboxId
+        );
+        setConversations(filteredConversations);
+
       } catch (err: any) {
         setError(err.message || 'Đã xảy ra lỗi không xác định.');
       } finally {
@@ -81,7 +88,7 @@ const ChatwootInbox = () => {
                   </p>
                 </li>
               )) : (
-                <p className="text-sm text-muted-foreground">Không tìm thấy cuộc trò chuyện nào.</p>
+                <p className="text-sm text-muted-foreground">Không tìm thấy cuộc trò chuyện nào trong Inbox này.</p>
               )}
             </ul>
           )}
