@@ -25,8 +25,8 @@ serve(async (req) => {
     
     switch (action) {
       case 'list_conversations':
-        // Thêm các tham số truy vấn quan trọng để lấy đúng danh sách cuộc trò chuyện
-        endpoint = `/api/v1/accounts/${settings.accountId}/conversations?assignee_type=all&status=open&page=1`;
+        // Thay đổi status=open thành status=all để lấy tất cả cuộc trò chuyện
+        endpoint = `/api/v1/accounts/${settings.accountId}/conversations?assignee_type=all&status=all&page=1`;
         method = 'GET';
         break;
       
