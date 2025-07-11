@@ -52,7 +52,8 @@ const Inbox = () => {
         if (error) throw error;
         if (data.error) throw new Error(data.error);
 
-        setConversations(data.payload || []);
+        // Sửa lỗi: API trả về một mảng trực tiếp, không có 'payload'
+        setConversations(data || []);
       } catch (err: any) {
         setConversationsError(err.message || 'Đã xảy ra lỗi không xác định khi tải cuộc trò chuyện.');
       } finally {
