@@ -6,7 +6,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import Projects from "./pages/Projects";
 import Settings from "./pages/Settings";
-import Inbox from "./pages/Inbox";
+import ChatwootSettings from "./pages/ChatwootSettings";
+import ChatwootInbox from "./pages/ChatwootInbox";
 import NotFound from "./pages/NotFound";
 import { AppLayout } from "./components/AppLayout";
 import { ApiSettingsProvider } from "@/contexts/ApiSettingsContext";
@@ -27,7 +28,8 @@ const App = () => (
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/projects" element={<Projects />} />
                 <Route path="/settings" element={<Settings />} />
-                <Route path="/inbox" element={<Inbox />} />
+                <Route path="/chatbot-settings" element={<ChatwootSettings />} />
+                <Route path="/chatbot-inbox" element={<ChatwootInbox />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>

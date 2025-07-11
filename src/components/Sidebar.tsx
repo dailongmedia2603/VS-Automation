@@ -8,7 +8,7 @@ import {
   BarChart3,
   Users,
   Settings,
-  Inbox,
+  MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link, useLocation } from "react-router-dom";
@@ -23,11 +23,15 @@ interface NavItem {
 const navItems: NavItem[] = [
   { name: "Dashboard", icon: LayoutDashboard, href: "/" },
   { name: "Dự án", icon: Briefcase, href: "/projects" },
-  { name: "Inbox", icon: Inbox, href: "/inbox" },
   { name: "Training", icon: GraduationCap, href: "/training" },
   { name: "Báo cáo", icon: BarChart3, href: "/reports" },
   { name: "Nhân sự", icon: Users, href: "/staff" },
 ];
+
+const chatbotNavItems: NavItem[] = [
+    { name: "Hộp thư Chatbot", icon: MessageSquare, href: "/chatbot-inbox" },
+    { name: "Cài đặt Chatbot", icon: Settings, href: "/chatbot-settings" },
+]
 
 const settingsNavItem: NavItem = { name: "Cài đặt", icon: Settings, href: "/settings" };
 
@@ -69,10 +73,15 @@ export function Sidebar({ className }: { className?: string }) {
         </Link>
       </Button>
 
-      <nav className="flex-1 flex flex-col space-y-1">
+      <nav className="flex flex-col space-y-1">
         {navItems.map(renderLink)}
       </nav>
       
+      <div className="mt-auto flex flex-col space-y-1 border-t pt-4">
+         <p className="px-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider">Chatbot</p>
+         {chatbotNavItems.map(renderLink)}
+      </div>
+
        <div className="border-t pt-4">
          {renderLink(settingsNavItem)}
        </div>
