@@ -33,6 +33,8 @@ const chatbotNavItems: NavItem[] = [
     { name: "Cài đặt Chatbot", icon: Settings, href: "/chatbot-settings" },
 ]
 
+const settingsNavItem: NavItem = { name: "Cài đặt", icon: Settings, href: "/settings" };
+
 export function Sidebar({ className }: { className?: string }) {
   const location = useLocation();
 
@@ -81,7 +83,7 @@ export function Sidebar({ className }: { className?: string }) {
       </div>
 
        <div className="border-t pt-4">
-         {renderLink({name: "Cài đặt", icon: Settings, href: "/settings"})}
+         {renderLink(settingsNavItem)}
        </div>
     </div>
   );
