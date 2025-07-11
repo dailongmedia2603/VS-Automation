@@ -23,8 +23,8 @@ serve(async (req) => {
     
     switch (action) {
       case 'list_conversations':
-        if (!settings.inboxId) throw new Error("Inbox ID is required.");
-        endpoint = `/api/v1/accounts/${settings.accountId}/inboxes/${settings.inboxId}/conversations`;
+        // Đã đơn giản hóa đường dẫn, không cần Inbox ID ở đây nữa
+        endpoint = `/api/v1/accounts/${settings.accountId}/conversations`;
         method = 'GET';
         break;
       default:
@@ -53,7 +53,6 @@ serve(async (req) => {
     }
 
     if (!response.ok) {
-        // Chatwoot thường trả về lỗi trong thuộc tính 'message'
         const errorMessage = data?.message || `API request failed with status ${response.status}`;
         throw new Error(errorMessage);
     }

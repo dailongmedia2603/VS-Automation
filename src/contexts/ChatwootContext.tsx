@@ -28,7 +28,7 @@ export const ChatwootProvider = ({ children }: { children: ReactNode }) => {
     }
     // Giá trị mặc định nếu không có gì được lưu
     return {
-      chatwootUrl: 'https://www.chatwoot.com', // Đã sửa lại URL chính xác
+      chatwootUrl: 'https://app.chatwoot.com', // Khôi phục lại URL chính xác
       accountId: '',
       inboxId: '',
       apiToken: '',
