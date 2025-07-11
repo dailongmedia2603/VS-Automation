@@ -40,14 +40,9 @@ const ChatwootInbox = () => {
           throw new Error(data.error);
         }
 
-        // API của Chatwoot trả về danh sách trong một thuộc tính 'payload'
-        const allConversations = data.payload || [];
-        
-        // Thêm bộ lọc ở client-side để chỉ hiển thị đúng inbox
-        const filteredConversations = allConversations.filter(
-          (convo: any) => convo.inbox_id == settings.inboxId
-        );
-        setConversations(filteredConversations);
+        // Sửa lỗi: Hiển thị trực tiếp kết quả từ API mà không cần lọc lại.
+        // API của Chatwoot trả về danh sách trong một thuộc tính 'payload'.
+        setConversations(data.payload || []);
 
       } catch (err: any) {
         setError(err.message || 'Đã xảy ra lỗi không xác định.');
