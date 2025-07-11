@@ -5,8 +5,10 @@ import { useState, useRef, useEffect } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/utils/toast";
+import { useApiSettings } from "@/contexts/ApiSettingsContext";
 
 const Projects = () => {
+  const { apiUrl } = useApiSettings();
   const [prompt, setPrompt] = useState("");
   const [messages, setMessages] = useState<
     { role: "user" | "ai"; content: string }[]
@@ -43,18 +45,13 @@ const Projects = () => {
       const { data, error: functionError } = await supabase.functions.invoke(
         "multi-ai-proxy",
         {
-          body: { messages: apiMessages },
+          body: { messages: apiMessages, apiUrl }, // Gửi kèm apiUrl
         }
       );
 
       if (functionError) {
-        // Cải tiến: Cố gắng đọc lỗi chi tiết từ phản hồi của function
-        if (functionError.context && typeof functionError.context.json === 'function') {
-            const errorData = await functionError.context.json();
-            throw new Error(errorData.error || functionError.message);
-        }
-        // Nếu không có, dùng lỗi mặc định
-        throw new Error(functionError.message);
+        const errorData = await functionError.context.json();
+        throw new Error(errorData.error || functionError.message);
       }
       
       if (data && data.error) {
