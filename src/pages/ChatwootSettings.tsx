@@ -37,11 +37,9 @@ const ChatwootSettings = () => {
       });
 
       if (functionError) {
-        if (functionError.context && typeof functionError.context.json === 'function') {
-            const errorData = await functionError.context.json();
-            throw new Error(errorData.error || functionError.message);
-        }
-        throw functionError;
+        // Logic xử lý lỗi triệt để: Luôn cố gắng đọc context
+        const errorData = await functionError.context.json();
+        throw new Error(errorData.error || functionError.message);
       }
 
       if (data.error) {

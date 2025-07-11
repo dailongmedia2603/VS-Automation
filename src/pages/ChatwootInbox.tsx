@@ -32,13 +32,8 @@ const ChatwootInbox = () => {
         });
 
         if (functionError) {
-          // Cải tiến: Cố gắng đọc lỗi chi tiết từ phản hồi của function
-          if (functionError.context && typeof functionError.context.json === 'function') {
-              const errorData = await functionError.context.json();
-              throw new Error(errorData.error || functionError.message);
-          }
-          // Nếu không có, dùng lỗi mặc định
-          throw functionError;
+          const errorData = await functionError.context.json();
+          throw new Error(errorData.error || functionError.message);
         }
 
         if (data.error) {
