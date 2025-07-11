@@ -12,7 +12,8 @@ serve(async (req) => {
   }
 
   try {
-    const { action, settings } = await req.json();
+    const requestBody = await req.json();
+    const { action, settings, conversationId, content } = requestBody;
 
     if (!settings || !settings.chatwootUrl || !settings.accountId || !settings.apiToken) {
       throw new Error("Thông tin cấu hình Chatwoot không đầy đủ.");
@@ -20,14 +21,33 @@ serve(async (req) => {
 
     let endpoint = '';
     let method = 'GET';
+    let body = null;
     
     switch (action) {
       case 'list_conversations':
         if (!settings.inboxId) throw new Error("Inbox ID is required.");
-        // Sửa lỗi: Sử dụng đúng endpoint để lấy cuộc trò chuyện theo inbox_id theo tài liệu API.
         endpoint = `/api/v1/accounts/${settings.accountId}/inboxes/${settings.inboxId}/conversations`;
         method = 'GET';
         break;
+      
+      case 'list_messages':
+        if (!conversationId) throw new Error("Conversation ID is required.");
+        endpoint = `/api/v1/accounts/${settings.accountId}/conversations/${conversationId}/messages`;
+        method = 'GET';
+        break;
+
+      case 'send_message':
+        if (!conversationId) throw new Error("Conversation ID is required.");
+        if (!content) throw new Error("Message content is required.");
+        endpoint = `/api/v1/accounts/${settings.accountId}/conversations/${conversationId}/messages`;
+        method = 'POST';
+        body = JSON.stringify({
+          content: content,
+          message_type: 'outgoing',
+          private: false,
+        });
+        break;
+
       default:
         throw new Error(`Hành động không hợp lệ: ${action}`);
     }
@@ -40,12 +60,17 @@ serve(async (req) => {
         'Content-Type': 'application/json',
         'api_access_token': settings.apiToken,
       },
+      body: body,
     });
 
     const responseText = await response.text();
     let data;
     try {
-        data = JSON.parse(responseText);
+        if (responseText === '') {
+            data = {};
+        } else {
+            data = JSON.parse(responseText);
+        }
     } catch (e) {
         if (!response.ok) {
              throw new Error(`API request failed with status ${response.status}: ${responseText}`);
