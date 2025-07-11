@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Terminal, Send, Bot, User, Inbox } from 'lucide-react';
+import { Terminal, Send, Bot, User, Inbox as InboxIcon } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 type Conversation = any;
 type Message = any;
 
-const ChatwootInbox = () => {
+const Inbox = () => {
   const { settings } = useChatwoot();
   
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -36,7 +36,7 @@ const ChatwootInbox = () => {
   useEffect(() => {
     const fetchConversations = async () => {
       if (!settings.accountId || !settings.inboxId || !settings.apiToken) {
-        setConversationsError('Vui lòng điền đầy đủ thông tin trong trang Cài đặt Chatbot.');
+        setConversationsError('Vui lòng điền đầy đủ thông tin trong trang Cài đặt > Chatbot.');
         setLoadingConversations(false);
         return;
       }
@@ -132,7 +132,7 @@ const ChatwootInbox = () => {
   return (
     <div className="flex flex-col h-full bg-zinc-100">
         <header className="border-b p-4 flex items-center justify-between h-16 bg-white">
-            <h1 className="text-xl font-bold text-gray-800">Hộp thư Chatbot</h1>
+            <h1 className="text-xl font-bold text-gray-800">Inbox</h1>
         </header>
         <main className="flex-1 p-0 m-0 overflow-hidden">
             {conversationsError ? (
@@ -260,7 +260,7 @@ const ChatwootInbox = () => {
                             </div>
                         ) : (
                             <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 bg-zinc-50">
-                                <Inbox className="w-16 h-16 mb-4 text-gray-400" />
+                                <InboxIcon className="w-16 h-16 mb-4 text-gray-400" />
                                 <h2 className="text-xl font-semibold text-gray-700">Chọn một cuộc trò chuyện</h2>
                                 <p className="mt-1 text-sm">Chọn một cuộc trò chuyện từ danh sách bên trái để xem chi tiết.</p>
                             </div>
@@ -273,4 +273,4 @@ const ChatwootInbox = () => {
   );
 };
 
-export default ChatwootInbox;
+export default Inbox;
