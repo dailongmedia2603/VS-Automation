@@ -141,7 +141,7 @@ const ChatbotSettings = () => {
     try {
       const { data, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', {
         body: {
-          action: 'list_conversations',
+          action: 'test_auth',
           settings: settings,
         },
       });
@@ -155,8 +155,12 @@ const ChatbotSettings = () => {
         throw new Error(data.error);
       }
       
-      setStatus("success");
-      showSuccess("Kết nối Chatwoot thành công!");
+      if (data && Array.isArray(data.payload)) {
+        setStatus("success");
+        showSuccess("Kết nối Chatwoot thành công! Xác thực và quyền truy cập hợp lệ.");
+      } else {
+        throw new Error("Phản hồi từ API không hợp lệ, không chứa danh sách inboxes.");
+      }
 
     } catch (err: any) {
       setStatus("error");

@@ -40,6 +40,10 @@ serve(async (req) => {
         method = 'POST';
         body = JSON.stringify(messagePayload);
         break;
+      case 'test_auth':
+        endpoint = `/api/v1/accounts/${settings.accountId}/inboxes`;
+        method = 'GET';
+        break;
       default:
         throw new Error(`Hành động không hợp lệ: ${action}`);
     }
