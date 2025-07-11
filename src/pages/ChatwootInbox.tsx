@@ -31,10 +31,22 @@ const ChatwootInbox = () => {
           },
         });
 
-        if (functionError) throw functionError;
-        if (data.error) throw new Error(data.error);
+        if (functionError) {
+          // Cải tiến: Cố gắng đọc lỗi chi tiết từ phản hồi của function
+          if (functionError.context && typeof functionError.context.json === 'function') {
+              const errorData = await functionError.context.json();
+              throw new Error(errorData.error || functionError.message);
+          }
+          // Nếu không có, dùng lỗi mặc định
+          throw functionError;
+        }
 
-        setConversations(data.payload);
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        // API của Chatwoot trả về danh sách trong một thuộc tính 'payload'
+        setConversations(data.payload || []);
       } catch (err: any) {
         setError(err.message || 'Đã xảy ra lỗi không xác định.');
       } finally {
@@ -66,14 +78,16 @@ const ChatwootInbox = () => {
             </div>
           ) : (
             <ul className="space-y-2">
-              {conversations.map((convo) => (
+              {conversations.length > 0 ? conversations.map((convo) => (
                 <li key={convo.id} className="p-3 border rounded-md hover:bg-zinc-50 cursor-pointer">
                   <p className="font-semibold">{convo.meta.sender.name}</p>
                   <p className="text-sm text-muted-foreground truncate">
                     {convo.messages[0]?.content || 'Không có tin nhắn'}
                   </p>
                 </li>
-              ))}
+              )) : (
+                <p className="text-sm text-muted-foreground">Không tìm thấy cuộc trò chuyện nào.</p>
+              )}
             </ul>
           )}
         </CardContent>
