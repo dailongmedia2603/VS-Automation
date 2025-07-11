@@ -32,7 +32,7 @@ serve(async (req) => {
             'Authorization': `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-            model: 'gpt-4-turbo',
+            model: 'gpt-4o', // Đã cập nhật model
             messages: messages,
             max_tokens: 2048,
             stream: false,
