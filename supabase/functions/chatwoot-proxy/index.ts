@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { action, settings } = await req.json();
+    const { action, settings, conversationId, messagePayload } = await req.json();
 
     if (!settings || !settings.chatwootUrl || !settings.accountId || !settings.apiToken) {
       throw new Error("Thông tin cấu hình Chatwoot không đầy đủ.");
@@ -20,13 +20,25 @@ serve(async (req) => {
 
     let endpoint = '';
     let method = 'GET';
+    let body = undefined;
     
     switch (action) {
       case 'list_conversations':
         if (!settings.inboxId) throw new Error("Inbox ID is required.");
-        // Sửa lỗi: Sử dụng đúng endpoint với inbox_id làm query parameter theo tài liệu API
         endpoint = `/api/v1/accounts/${settings.accountId}/conversations?inbox_id=${settings.inboxId}`;
         method = 'GET';
+        break;
+      case 'list_messages':
+        if (!conversationId) throw new Error("Conversation ID is required.");
+        endpoint = `/api/v1/accounts/${settings.accountId}/conversations/${conversationId}/messages`;
+        method = 'GET';
+        break;
+      case 'send_message':
+        if (!conversationId) throw new Error("Conversation ID is required.");
+        if (!messagePayload) throw new Error("Message payload is required.");
+        endpoint = `/api/v1/accounts/${settings.accountId}/conversations/${conversationId}/messages`;
+        method = 'POST';
+        body = JSON.stringify(messagePayload);
         break;
       default:
         throw new Error(`Hành động không hợp lệ: ${action}`);
@@ -40,6 +52,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
         'api_access_token': settings.apiToken,
       },
+      body: body,
     });
 
     const responseText = await response.text();
@@ -48,15 +61,12 @@ serve(async (req) => {
         data = JSON.parse(responseText);
     } catch (e) {
         if (!response.ok) {
-             // Phản hồi có thể là một trang lỗi HTML (ví dụ: 404 Not Found)
              throw new Error(`Yêu cầu API thất bại với mã trạng thái ${response.status}. Vui lòng kiểm tra lại Chatwoot URL và Account ID của bạn.`);
         }
-        // Phản hồi thành công nhưng không phải JSON, điều này không mong muốn.
         throw new Error("Đã nhận được phản hồi không phải JSON không mong muốn từ API Chatwoot.");
     }
 
     if (!response.ok) {
-        // Phản hồi là JSON nhưng cho biết có lỗi (ví dụ: token không hợp lệ)
         const errorMessage = data?.message || `Yêu cầu API thất bại với mã trạng thái ${response.status}`;
         throw new Error(errorMessage);
     }
