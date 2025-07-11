@@ -12,8 +12,15 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link, useLocation } from "react-router-dom";
+import React from "react";
 
-const navItems = [
+interface NavItem {
+  name: string;
+  icon: React.ElementType;
+  href: string;
+}
+
+const navItems: NavItem[] = [
   { name: "Dashboard", icon: LayoutDashboard, href: "/" },
   { name: "Dự án", icon: Briefcase, href: "/projects" },
   { name: "Training", icon: GraduationCap, href: "/training" },
@@ -21,7 +28,7 @@ const navItems = [
   { name: "Nhân sự", icon: Users, href: "/staff" },
 ];
 
-const chatbotNavItems = [
+const chatbotNavItems: NavItem[] = [
     { name: "Hộp thư Chatbot", icon: MessageSquare, href: "/chatbot-inbox" },
     { name: "Cài đặt Chatbot", icon: Settings, href: "/chatbot-settings" },
 ]
@@ -29,7 +36,7 @@ const chatbotNavItems = [
 export function Sidebar({ className }: { className?: string }) {
   const location = useLocation();
 
-  const renderLink = (item) => (
+  const renderLink = (item: NavItem) => (
     <Link
       key={item.name}
       to={item.href}
