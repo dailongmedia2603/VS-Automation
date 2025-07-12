@@ -38,7 +38,7 @@ interface Message {
   id: number;
   content: string;
   created_at: number;
-  message_type: 'incoming' | 'outgoing';
+  message_type: number; // 0: incoming, 1: outgoing, 2: activity
   sender?: MessageSender;
   attachments?: Attachment[];
 }
@@ -46,7 +46,7 @@ interface Message {
 const getInitials = (name?: string) => {
   if (!name) return 'U';
   const names = name.trim().split(' ');
-  if (names.length > 1) {
+  if (names.length > 1 && names[names.length - 1]) {
     return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
   }
   return name.substring(0, 2).toUpperCase();
@@ -231,56 +231,69 @@ const ChatwootInbox = () => {
                     <Skeleton className="h-12 w-1/2" />
                 </div>
               ) : (
-                messages.map(msg => (
-                  <div key={msg.id} className={cn("flex items-start gap-3", msg.message_type === 'outgoing' && "justify-end")}>
-                    {msg.message_type === 'incoming' && (
-                        <Avatar className="h-8 w-8">
-                            <AvatarImage src={msg.sender?.thumbnail} alt={msg.sender?.name} />
-                            <AvatarFallback>{getInitials(msg.sender?.name)}</AvatarFallback>
-                        </Avatar>
-                    )}
-                    <div className={cn("flex flex-col gap-1", msg.message_type === 'outgoing' ? 'items-end' : 'items-start')}>
-                        <div className={cn(
-                            "rounded-lg px-3 py-2 max-w-xs md:max-w-md break-words",
-                            msg.message_type === 'outgoing' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-800'
-                        )}>
-                          {msg.attachments && msg.attachments.length > 0 && (
-                            <div className="space-y-2">
-                              {msg.attachments.map(attachment => (
-                                <div key={attachment.id}>
-                                  {attachment.file_type === 'image' && (
-                                    <a href={attachment.data_url} target="_blank" rel="noopener noreferrer">
-                                      <img src={attachment.data_url} alt="Hình ảnh đính kèm" className="rounded-lg max-w-full h-auto" />
-                                    </a>
-                                  )}
-                                  {attachment.file_type === 'video' && (
-                                    <video controls className="rounded-lg max-w-full h-auto">
-                                      <source src={attachment.data_url} />
-                                      Trình duyệt của bạn không hỗ trợ thẻ video.
-                                    </video>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          {msg.content && (
-                            <p className={cn("whitespace-pre-wrap", msg.attachments && msg.attachments.length > 0 && msg.content ? "mt-2" : "")}>
-                              {msg.content}
-                            </p>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground px-1">
-                            {format(new Date(msg.created_at * 1000), 'MMM d, h:mm a', { locale: vi })}
-                        </p>
+                messages.map(msg => {
+                  // Tin nhắn hoạt động (system)
+                  if (msg.message_type === 2) {
+                    return (
+                      <div key={msg.id} className="text-center text-xs text-muted-foreground py-2 italic">
+                        {msg.content}
+                      </div>
+                    );
+                  }
+
+                  const isOutgoing = msg.message_type === 1; // 1 = outgoing, 0 = incoming
+
+                  return (
+                    <div key={msg.id} className={cn("flex items-start gap-3", isOutgoing && "justify-end")}>
+                      {!isOutgoing && (
+                          <Avatar className="h-8 w-8">
+                              <AvatarImage src={msg.sender?.thumbnail} alt={msg.sender?.name} />
+                              <AvatarFallback>{getInitials(msg.sender?.name)}</AvatarFallback>
+                          </Avatar>
+                      )}
+                      <div className={cn("flex flex-col gap-1", isOutgoing ? 'items-end' : 'items-start')}>
+                          <div className={cn(
+                              "rounded-lg px-3 py-2 max-w-xs md:max-w-md break-words",
+                              isOutgoing ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-800'
+                          )}>
+                            {msg.attachments && msg.attachments.length > 0 && (
+                              <div className="space-y-2">
+                                {msg.attachments.map(attachment => (
+                                  <div key={attachment.id}>
+                                    {attachment.file_type === 'image' && (
+                                      <a href={attachment.data_url} target="_blank" rel="noopener noreferrer">
+                                        <img src={attachment.data_url} alt="Hình ảnh đính kèm" className="rounded-lg max-w-full h-auto" />
+                                      </a>
+                                    )}
+                                    {attachment.file_type === 'video' && (
+                                      <video controls className="rounded-lg max-w-full h-auto">
+                                        <source src={attachment.data_url} />
+                                        Trình duyệt của bạn không hỗ trợ thẻ video.
+                                      </video>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {msg.content && (
+                              <p className={cn("whitespace-pre-wrap", msg.attachments && msg.attachments.length > 0 && msg.content ? "mt-2" : "")}>
+                                {msg.content}
+                              </p>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground px-1">
+                              {format(new Date(msg.created_at * 1000), 'MMM d, h:mm a', { locale: vi })}
+                          </p>
+                      </div>
+                       {isOutgoing && (
+                          <Avatar className="h-8 w-8">
+                              <AvatarImage src={msg.sender?.thumbnail} alt={msg.sender?.name} />
+                              <AvatarFallback className="bg-primary text-primary-foreground">{getInitials(msg.sender?.name)}</AvatarFallback>
+                          </Avatar>
+                      )}
                     </div>
-                     {msg.message_type === 'outgoing' && (
-                        <Avatar className="h-8 w-8">
-                            <AvatarImage src={msg.sender?.thumbnail} alt={msg.sender?.name} />
-                            <AvatarFallback className="bg-primary text-primary-foreground">{getInitials(msg.sender?.name)}</AvatarFallback>
-                        </Avatar>
-                    )}
-                  </div>
-                ))
+                  );
+                })
               )}
                {error && (
                  <Alert variant="destructive">
