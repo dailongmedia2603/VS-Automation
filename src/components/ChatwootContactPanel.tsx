@@ -6,14 +6,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Mail, Phone, Building, Send, Loader2, PlusCircle, Calendar, Clock, Trash2, Pencil, ImagePlus } from "lucide-react";
+import { FileText, Mail, Phone, Building, Send, Loader2, PlusCircle, Calendar, Clock, Trash2, Pencil, ImagePlus, Sparkles } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useChatwoot } from '@/contexts/ChatwootContext';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { showSuccess, showError } from '@/utils/toast';
+import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { Badge } from "@/components/ui/badge";
 
 // Interfaces
@@ -44,6 +44,7 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
   const [scriptContent, setScriptContent] = useState('');
   const [scriptDate, setScriptDate] = useState('');
   const [scriptHour, setScriptHour] = useState<number>(9);
+  const [isSuggestingScript, setIsSuggestingScript] = useState(false);
   const notesContainerRef = useRef<HTMLDivElement>(null);
 
   const fetchCareScripts = async (conversationId: number) => {
@@ -110,6 +111,39 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
     else { showSuccess("Đã xóa kịch bản."); fetchCareScripts(selectedConversation!.id); setScriptToDelete(null); }
   };
 
+  const handleSuggestScript = async () => {
+    if (!selectedConversation) return;
+    setIsSuggestingScript(true);
+    const toastId = showLoading("AI đang phân tích và tạo kịch bản...");
+
+    try {
+      const { data, error } = await supabase.functions.invoke('suggest-care-script', {
+        body: { conversationId: selectedConversation.id },
+      });
+
+      if (error) throw new Error(await error.context.json().then((d: any) => d.error).catch(() => error.message));
+      if (data.error) throw new Error(data.error);
+
+      const { content, scheduled_at } = data;
+      const scheduledDate = new Date(scheduled_at);
+
+      setEditingScript(null);
+      setScriptContent(content);
+      setScriptDate(format(scheduledDate, "yyyy-MM-dd"));
+      setScriptHour(scheduledDate.getHours());
+      
+      setIsScriptDialogOpen(true);
+      dismissToast(toastId);
+      showSuccess("AI đã tạo xong kịch bản. Vui lòng xem lại và lưu.");
+
+    } catch (err: any) {
+      dismissToast(toastId);
+      showError(`Lỗi khi tạo kịch bản AI: ${err.message}`);
+    } finally {
+      setIsSuggestingScript(false);
+    }
+  };
+
   const notes = messages.filter(msg => msg.private).sort((a, b) => b.created_at - a.created_at);
 
   if (!selectedConversation) {
@@ -138,7 +172,25 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
           <form onSubmit={handleSendNote} className="p-4 border-t bg-gray-50"><div className="relative"><Input placeholder="Nhập ghi chú (Enter để gửi)" className="pr-10 bg-white" value={note} onChange={e => setNote(e.target.value)} disabled={isSendingNote} /><Button type="submit" size="icon" className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7" disabled={isSendingNote}>{isSendingNote ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}</Button></div></form>
         </TabsContent>
         <TabsContent value="care" className="w-full flex-1 flex flex-col p-4 space-y-4 bg-gray-50">
-          <Button className="w-full" onClick={openCreateDialog}><PlusCircle className="mr-2 h-4 w-4" />Tạo kịch bản chăm sóc</Button>
+          <div className="grid grid-cols-2 gap-2">
+            <Button className="w-full" onClick={openCreateDialog}>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Tạo thủ công
+            </Button>
+            <Button 
+              variant="outline" 
+              className="w-full" 
+              onClick={handleSuggestScript} 
+              disabled={isSuggestingScript}
+            >
+              {isSuggestingScript ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="mr-2 h-4 w-4" />
+              )}
+              AI Gợi ý
+            </Button>
+          </div>
           <div className="flex-1 overflow-y-auto space-y-3 pr-2">{scripts.length === 0 ? (<div className="flex flex-col items-center justify-center text-center text-muted-foreground h-full"><Calendar className="h-10 w-10 mb-3 text-gray-400" /><p className="text-sm font-semibold text-gray-600">Chưa có kịch bản nào</p><p className="text-xs">Hãy tạo kịch bản để chăm sóc khách hàng tự động.</p></div>) : (scripts.map(script => (<div key={script.id} className="bg-white p-3 rounded-lg border shadow-sm"><p className="text-sm text-gray-800 mb-2">{script.content}</p><div className="flex justify-between items-center"><div className="flex items-center gap-2 text-xs text-muted-foreground"><Clock className="h-3 w-3" /><span>{format(new Date(script.scheduled_at), 'dd/MM/yy HH:mm')}</span><Badge variant={statusColorMap[script.status]}>{statusMap[script.status]}</Badge></div><div className="flex items-center gap-2"><Button variant="ghost" size="icon" className="h-6 w-6"><ImagePlus className="h-4 w-4 text-muted-foreground" /></Button><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditDialog(script)}><Pencil className="h-4 w-4 text-muted-foreground" /></Button><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setScriptToDelete(script)}><Trash2 className="h-4 w-4 text-destructive" /></Button></div></div></div>)))}</div>
         </TabsContent>
       </Tabs>
