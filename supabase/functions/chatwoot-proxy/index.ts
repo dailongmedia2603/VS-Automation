@@ -13,7 +13,7 @@ serve(async (req) => {
 
   try {
     const requestBody = await req.json();
-    const { action, settings, conversationId, content } = requestBody;
+    const { action, settings, conversationId, content, isPrivate, labels } = requestBody;
 
     if (!settings || !settings.chatwootUrl || !settings.accountId || !settings.apiToken) {
       throw new Error("Thông tin cấu hình Chatwoot không đầy đủ.");
@@ -25,7 +25,6 @@ serve(async (req) => {
     
     switch (action) {
       case 'list_conversations':
-        // Thay đổi status=open thành status=all để lấy tất cả cuộc trò chuyện
         endpoint = `/api/v1/accounts/${settings.accountId}/conversations?assignee_type=all&status=all&page=1`;
         method = 'GET';
         break;
@@ -44,7 +43,7 @@ serve(async (req) => {
         body = JSON.stringify({
           content: content,
           message_type: 'outgoing',
-          private: false,
+          private: !!isPrivate,
         });
         break;
 
@@ -53,6 +52,14 @@ serve(async (req) => {
         endpoint = `/api/v1/accounts/${settings.accountId}/conversations/${conversationId}/update_last_seen`;
         method = 'POST';
         body = JSON.stringify({});
+        break;
+
+      case 'update_labels':
+        if (!conversationId) throw new Error("Conversation ID is required.");
+        if (labels === undefined) throw new Error("Labels array is required.");
+        endpoint = `/api/v1/accounts/${settings.accountId}/conversations/${conversationId}/labels`;
+        method = 'POST';
+        body = JSON.stringify({ labels });
         break;
 
       default:
@@ -73,15 +80,10 @@ serve(async (req) => {
     const responseText = await response.text();
     let data;
     try {
-        if (responseText === '') {
-            data = {};
-        } else {
-            data = JSON.parse(responseText);
-        }
+        if (responseText === '') { data = {}; } 
+        else { data = JSON.parse(responseText); }
     } catch (e) {
-        if (!response.ok) {
-             throw new Error(`API request failed with status ${response.status}: ${responseText}`);
-        }
+        if (!response.ok) { throw new Error(`API request failed with status ${response.status}: ${responseText}`); }
         throw new Error("Received a successful but non-JSON response from the API.");
     }
 
