@@ -138,6 +138,8 @@ const ChatwootInbox = () => {
     setLoadingMessages(true);
     setMessages([]);
     setError(null);
+
+    // Tải tin nhắn cho cuộc trò chuyện đã chọn
     try {
       const { data, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', {
         body: { action: 'list_messages', settings, conversationId: conversation.id },
@@ -150,14 +152,19 @@ const ChatwootInbox = () => {
     } finally {
       setLoadingMessages(false);
     }
+
+    // Cập nhật trạng thái đã đọc với Optimistic Update
     if (conversation.unread_count > 0) {
-      try {
-        await supabase.functions.invoke('chatwoot-proxy', {
-          body: { action: 'mark_as_read', settings, conversationId: conversation.id },
-        });
-      } catch (err: any) {
-        console.error("Không thể đánh dấu đã đọc:", err.message);
-      }
+      // 1. Cập nhật giao diện ngay lập tức
+      setConversations(convos =>
+        convos.map(c => c.id === conversation.id ? { ...c, unread_count: 0 } : c)
+      );
+      // 2. Gửi yêu cầu trong nền
+      supabase.functions.invoke('chatwoot-proxy', {
+        body: { action: 'mark_as_read', settings, conversationId: conversation.id },
+      }).catch(err => {
+        console.error("Lỗi ngầm khi đánh dấu đã đọc:", err.message);
+      });
     }
   };
 
