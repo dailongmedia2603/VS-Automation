@@ -8,7 +8,7 @@ import { showError } from "@/utils/toast";
 import { useApiSettings } from "@/contexts/ApiSettingsContext";
 
 const Projects = () => {
-  const { apiUrl, apiKey } = useApiSettings();
+  const { settings } = useApiSettings();
   const [prompt, setPrompt] = useState("");
   const [messages, setMessages] = useState<
     { role: "user" | "ai"; content: string }[]
@@ -45,7 +45,7 @@ const Projects = () => {
       const { data, error: functionError } = await supabase.functions.invoke(
         "multi-ai-proxy",
         {
-          body: { messages: apiMessages, apiUrl, apiKey }, // Gửi kèm apiUrl và apiKey
+          body: { messages: apiMessages, apiUrl: settings.apiUrl, apiKey: settings.apiKey },
         }
       );
 

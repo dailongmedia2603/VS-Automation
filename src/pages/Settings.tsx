@@ -13,23 +13,37 @@ import { supabase } from "@/integrations/supabase/client";
 import { useState, useEffect } from "react";
 import { showSuccess, showError } from "@/utils/toast";
 import { useApiSettings } from "@/contexts/ApiSettingsContext";
+import { Loader2, Terminal } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const Settings = () => {
-  const { apiUrl, setApiUrl, apiKey, setApiKey } = useApiSettings();
-  const [localApiUrl, setLocalApiUrl] = useState(apiUrl);
-  const [localApiKey, setLocalApiKey] = useState(apiKey);
+  const { settings, setSettings, isLoading } = useApiSettings();
+  const [localSettings, setLocalSettings] = useState(settings);
+  const [isSaving, setIsSaving] = useState(false);
   const [status, setStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setLocalApiUrl(apiUrl);
-    setLocalApiKey(apiKey);
-  }, [apiUrl, apiKey]);
+    setLocalSettings(settings);
+  }, [settings]);
 
-  const handleSave = () => {
-    setApiUrl(localApiUrl);
-    setApiKey(localApiKey);
-    showSuccess("Cấu hình API đã được cập nhật!");
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const dataToSave = {
+        id: 1,
+        api_url: localSettings.apiUrl,
+        api_key: localSettings.apiKey,
+      };
+      const { error } = await supabase.from('ai_settings').upsert(dataToSave);
+      if (error) throw error;
+      setSettings(localSettings);
+      showSuccess("Cấu hình API đã được lưu!");
+    } catch (error: any) {
+      showError("Lưu cấu hình thất bại: " + error.message);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleTestConnection = async () => {
@@ -42,8 +56,8 @@ const Settings = () => {
         {
           body: {
             messages: [{ role: "user", content: "Hello" }],
-            apiUrl: localApiUrl,
-            apiKey: localApiKey, // Gửi API Key đang được kiểm tra
+            apiUrl: localSettings.apiUrl,
+            apiKey: localSettings.apiKey,
           },
         }
       );
@@ -71,6 +85,31 @@ const Settings = () => {
     }
   };
 
+  if (isLoading) {
+    return (
+      <main className="flex-1 space-y-4 p-4 sm:p-6 md:p-8 bg-zinc-100">
+        <Skeleton className="h-8 w-1/3" />
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-1/4" />
+            <Skeleton className="h-4 w-1/2" />
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+            <Skeleton className="h-10 w-32" />
+          </CardContent>
+        </Card>
+      </main>
+    );
+  }
+
   return (
     <main className="flex-1 space-y-4 p-4 sm:p-6 md:p-8 bg-zinc-100">
       <h2 className="text-3xl font-bold tracking-tight">Cài đặt</h2>
@@ -86,8 +125,8 @@ const Settings = () => {
             <Label htmlFor="api-url">API Endpoint URL</Label>
             <Input
               id="api-url"
-              value={localApiUrl}
-              onChange={(e) => setLocalApiUrl(e.target.value)}
+              value={localSettings.apiUrl}
+              onChange={(e) => setLocalSettings({ ...localSettings, apiUrl: e.target.value })}
             />
           </div>
            <div className="space-y-2">
@@ -95,11 +134,14 @@ const Settings = () => {
             <Input
               id="api-key"
               type="password"
-              value={localApiKey}
-              onChange={(e) => setLocalApiKey(e.target.value)}
+              value={localSettings.apiKey}
+              onChange={(e) => setLocalSettings({ ...localSettings, apiKey: e.target.value })}
             />
           </div>
-          <Button onClick={handleSave}>Lưu thay đổi</Button>
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isSaving ? "Đang lưu..." : "Lưu thay đổi"}
+          </Button>
           
           <div className="border-t pt-6">
             <div className="flex items-center justify-between">

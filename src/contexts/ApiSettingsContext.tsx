@@ -1,20 +1,60 @@
-import React, { createContext, useState, useContext, ReactNode } from 'react';
+import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { showError } from '@/utils/toast';
+
+interface ApiSettings {
+  apiUrl: string;
+  apiKey: string;
+}
 
 interface ApiSettingsContextType {
-  apiUrl: string;
-  setApiUrl: (url: string) => void;
-  apiKey: string;
-  setApiKey: (key: string) => void;
+  settings: ApiSettings;
+  setSettings: (settings: ApiSettings) => void;
+  isLoading: boolean;
 }
 
 const ApiSettingsContext = createContext<ApiSettingsContextType | undefined>(undefined);
 
 export const ApiSettingsProvider = ({ children }: { children: ReactNode }) => {
-  const [apiUrl, setApiUrl] = useState('https://multiappai-api.itmovnteam.com/api/v1/chat/completions');
-  const [apiKey, setApiKey] = useState('sk-EWcoOk8zZtfGel2Utawq3Y09Wrf9m6A3u1XzvtafHDaEPJhX');
+  const [settings, setSettings] = useState<ApiSettings>({
+    apiUrl: '',
+    apiKey: '',
+  });
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('ai_settings')
+          .select('*')
+          .eq('id', 1)
+          .single();
+
+        if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
+          throw error;
+        }
+
+        if (data) {
+          const formattedSettings = {
+            apiUrl: data.api_url || '',
+            apiKey: data.api_key || '',
+          };
+          setSettings(formattedSettings);
+        }
+      } catch (error: any) {
+        showError("Không thể tải cấu hình AI: " + error.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSettings();
+  }, []);
 
   return (
-    <ApiSettingsContext.Provider value={{ apiUrl, setApiUrl, apiKey, setApiKey }}>
+    <ApiSettingsContext.Provider value={{ settings, setSettings, isLoading }}>
       {children}
     </ApiSettingsContext.Provider>
   );
