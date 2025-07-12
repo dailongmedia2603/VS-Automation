@@ -52,7 +52,28 @@ const ChatwootInbox = () => {
       const { data, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', { body: { action: 'list_conversations', settings }, });
       if (functionError) throw new Error((await functionError.context.json()).error || functionError.message);
       if (data.error) throw new Error(data.error);
-      setConversations(data.data.payload || []);
+      
+      const newConversationsFromServer = data.data.payload || [];
+      setConversations(prevConversations => {
+        const prevConversationsMap = new Map(prevConversations.map(c => [c.id, c]));
+        return newConversationsFromServer.map(newConvo => {
+            const prevConvo = prevConversationsMap.get(newConvo.id);
+            if (prevConvo && prevConvo.meta.sender.phone_number && !newConvo.meta.sender.phone_number) {
+                return {
+                    ...newConvo,
+                    meta: {
+                        ...newConvo.meta,
+                        sender: {
+                            ...newConvo.meta.sender,
+                            phone_number: prevConvo.meta.sender.phone_number,
+                        }
+                    }
+                };
+            }
+            return newConvo;
+        });
+      });
+
     } catch (err) { console.error("Lỗi polling cuộc trò chuyện:", err);
     } finally { if (isInitialLoad) setLoadingConversations(false); }
   };
@@ -163,8 +184,8 @@ const ChatwootInbox = () => {
         <div className="flex justify-between items-center"><p className="font-semibold truncate text-sm">{convo.meta.sender.name}</p><p className="text-xs text-muted-foreground whitespace-nowrap">{format(new Date(convo.last_activity_at * 1000), 'HH:mm')}</p></div>
         <div className="flex justify-between items-start mt-1">
           <p className={cn("text-sm truncate flex items-center", convo.unread_count > 0 ? "text-black font-bold" : "text-muted-foreground")}><CornerDownLeft className="h-4 w-4 mr-1 flex-shrink-0" />{convo.messages[0]?.content || '[Media]'}</p>
-          <div className="flex items-center gap-1.5">
-            {convo.meta.sender.phone_number && <Phone className="h-3 w-3 text-green-500" />}
+          <div className="flex items-center gap-2">
+            {convo.meta.sender.phone_number && <Phone className="h-4 w-4 text-green-600" strokeWidth={2} />}
             {convo.labels?.map(label => <Badge key={label} variant="outline" className="text-xs px-1.5 py-0">{label.substring(0, 3)}</Badge>)}
             {convo.unread_count > 0 && <Badge variant="destructive">{convo.unread_count}</Badge>}
           </div>
