@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/utils/toast";
 import { useApiSettings } from "@/contexts/ApiSettingsContext";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const Projects = () => {
   const { settings } = useApiSettings();
@@ -14,6 +15,7 @@ const Projects = () => {
     { role: "user" | "ai"; content: string }[]
   >([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [model, setModel] = useState("gpt-4o");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -45,7 +47,7 @@ const Projects = () => {
       const { data, error: functionError } = await supabase.functions.invoke(
         "multi-ai-proxy",
         {
-          body: { messages: apiMessages, apiUrl: settings.apiUrl, apiKey: settings.apiKey },
+          body: { messages: apiMessages, apiUrl: settings.apiUrl, apiKey: settings.apiKey, model: model },
         }
       );
 
@@ -77,6 +79,17 @@ const Projects = () => {
     <div className="flex flex-col h-full bg-white">
       <header className="border-b p-4 flex items-center justify-between h-16 bg-white">
         <h1 className="text-xl font-bold text-gray-800">New Project</h1>
+        <div className="w-48">
+          <Select value={model} onValueChange={setModel}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select a model" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="gpt-4o">GPT-4o</SelectItem>
+              <SelectItem value="grok-4">Grok 4</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </header>
       <main className="flex-1 overflow-y-auto p-6 bg-gray-50">
         <div className="space-y-6">

@@ -12,8 +12,8 @@ serve(async (req) => {
   }
 
   try {
-    // Nhận API Key từ body của request, không dùng Supabase secrets nữa
-    const { messages, apiUrl, apiKey } = await req.json();
+    // Nhận API Key và model từ body của request
+    const { messages, apiUrl, apiKey, model } = await req.json();
 
     if (!apiKey) {
       throw new Error('Missing "apiKey" in request body. Please provide it in the Settings page.');
@@ -32,7 +32,7 @@ serve(async (req) => {
             'Authorization': `Bearer ${apiKey}`, // Sử dụng API Key từ client
         },
         body: JSON.stringify({
-            model: 'gpt-4o',
+            model: model || 'gpt-4o', // Sử dụng model được truyền vào, mặc định là gpt-4o
             messages: messages,
             max_tokens: 2048,
             stream: false,
