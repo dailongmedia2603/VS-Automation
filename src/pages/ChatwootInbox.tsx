@@ -157,7 +157,6 @@ const ChatwootInbox = () => {
     }
   };
 
-  // ... các hàm xử lý khác giữ nguyên ...
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedConversation) return;
