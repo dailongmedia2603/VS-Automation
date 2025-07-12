@@ -30,9 +30,18 @@ const ChatwootSettings = () => {
   const handleSave = async () => {
     setIsSaving(true);
     try {
+      // SỬA LỖI: Ánh xạ từ camelCase (JS) sang snake_case (DB)
+      const dataToSave = {
+        id: 1, // Luôn cập nhật dòng có id = 1
+        chatwoot_url: localSettings.chatwootUrl,
+        account_id: localSettings.accountId,
+        inbox_id: localSettings.inboxId,
+        api_token: localSettings.apiToken,
+      };
+
       const { error } = await supabase
         .from('chatwoot_settings')
-        .upsert({ ...localSettings, id: 1 }); // Luôn upsert vào dòng có id = 1
+        .upsert(dataToSave);
 
       if (error) throw error;
 
