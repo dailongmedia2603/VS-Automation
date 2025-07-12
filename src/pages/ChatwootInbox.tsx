@@ -37,6 +37,7 @@ const ChatwootInbox = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const POLLING_INTERVAL = 10000;
+  const phoneRegex = /(0[3|5|7|8|9][0-9]{8})\b/;
 
   const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); };
   useEffect(() => { scrollToBottom(); }, [messages]);
@@ -77,6 +78,28 @@ const ChatwootInbox = () => {
     const intervalId = setInterval(() => fetchMessages(selectedConversation.id), POLLING_INTERVAL);
     return () => clearInterval(intervalId);
   }, [selectedConversation]);
+
+  useEffect(() => {
+    if (messages.length > 0 && selectedConversation && !selectedConversation.meta.sender.phone_number) {
+      for (const msg of messages) {
+        if (msg.message_type === 0 && msg.content) {
+          const match = msg.content.match(phoneRegex);
+          if (match && match[0]) {
+            const phoneNumber = match[0];
+            const contactId = selectedConversation.meta.sender.id;
+            const updatedSender = { ...selectedConversation.meta.sender, phone_number: phoneNumber };
+            const updatedConvo = { ...selectedConversation, meta: { ...selectedConversation.meta, sender: updatedSender } };
+            setSelectedConversation(updatedConvo);
+            setConversations(convos => convos.map(c => c.id === updatedConvo.id ? updatedConvo : c));
+            supabase.functions.invoke('chatwoot-proxy', {
+              body: { action: 'update_contact', settings, contactId, payload: { phone_number: phoneNumber } }
+            }).catch(err => console.error("Failed to update contact phone number:", err));
+            break;
+          }
+        }
+      }
+    }
+  }, [messages, selectedConversation, settings]);
 
   const handleSelectConversation = async (conversation: Conversation) => {
     setSelectedConversation(conversation);

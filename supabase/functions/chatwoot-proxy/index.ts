@@ -13,7 +13,7 @@ serve(async (req) => {
 
   try {
     const requestBody = await req.json();
-    const { action, settings, conversationId, content, isPrivate, labels } = requestBody;
+    const { action, settings, conversationId, content, isPrivate, labels, contactId, payload } = requestBody;
 
     if (!settings || !settings.chatwootUrl || !settings.accountId || !settings.apiToken) {
       throw new Error("Thông tin cấu hình Chatwoot không đầy đủ.");
@@ -60,6 +60,14 @@ serve(async (req) => {
         endpoint = `/api/v1/accounts/${settings.accountId}/conversations/${conversationId}/labels`;
         method = 'POST';
         body = JSON.stringify({ labels });
+        break;
+
+      case 'update_contact':
+        if (!contactId) throw new Error("Contact ID is required.");
+        if (!payload) throw new Error("Payload for contact update is required.");
+        endpoint = `/api/v1/accounts/${settings.accountId}/contacts/${contactId}`;
+        method = 'PUT';
+        body = JSON.stringify(payload);
         break;
 
       default:
