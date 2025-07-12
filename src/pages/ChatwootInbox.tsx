@@ -97,7 +97,6 @@ const ChatwootInbox = () => {
     } catch (err: any) { setError(err.message || 'Đã xảy ra lỗi khi tải tin nhắn.'); } finally { setLoadingMessages(false); }
     
     if (conversation.unread_count > 0) {
-      // Chỉ gửi yêu cầu trong nền. Giao diện sẽ cập nhật ở lần poll tiếp theo để tránh "nhảy".
       supabase.functions.invoke('chatwoot-proxy', { body: { action: 'mark_as_read', settings, conversationId: conversation.id }, }).catch(err => { console.error("Lỗi ngầm khi đánh dấu đã đọc:", err.message); });
     }
   };
