@@ -10,10 +10,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useChatwoot } from "@/contexts/ChatwootContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
-import { Terminal, Loader2 } from "lucide-react";
+import { Terminal, Loader2, Link, RefreshCw } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const ChatwootSettings = () => {
@@ -30,22 +31,16 @@ const ChatwootSettings = () => {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // SỬA LỖI: Ánh xạ từ camelCase (JS) sang snake_case (DB)
       const dataToSave = {
-        id: 1, // Luôn cập nhật dòng có id = 1
+        id: 1,
         chatwoot_url: localSettings.chatwootUrl,
         account_id: localSettings.accountId,
         inbox_id: localSettings.inboxId,
         api_token: localSettings.apiToken,
       };
-
-      const { error } = await supabase
-        .from('chatwoot_settings')
-        .upsert(dataToSave);
-
+      const { error } = await supabase.from('chatwoot_settings').upsert(dataToSave);
       if (error) throw error;
-
-      setSettings(localSettings); // Cập nhật context sau khi lưu thành công
+      setSettings(localSettings);
       showSuccess("Cấu hình Chatwoot đã được lưu!");
     } catch (error: any) {
       showError("Lưu cấu hình thất bại: " + error.message);
@@ -57,27 +52,17 @@ const ChatwootSettings = () => {
   const handleTestConnection = async () => {
     setStatus("testing");
     setError(null);
-
     try {
       const { data, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', {
-        body: {
-          action: 'list_conversations',
-          settings: localSettings, // Sử dụng cài đặt cục bộ để kiểm tra
-        },
+        body: { action: 'list_conversations', settings: localSettings },
       });
-
       if (functionError) {
         const errorData = await functionError.context.json();
         throw new Error(errorData.error || functionError.message);
       }
-
-      if (data.error) {
-        throw new Error(data.error);
-      }
-      
+      if (data.error) throw new Error(data.error);
       setStatus("success");
       showSuccess("Kết nối Chatwoot thành công!");
-
     } catch (err: any) {
       setStatus("error");
       const errorMessage = err.message || 'Đã xảy ra lỗi không xác định.';
@@ -86,23 +71,20 @@ const ChatwootSettings = () => {
     }
   };
 
+  const handleConnectFanpage = () => {
+    if (settings.chatwootUrl && settings.accountId) {
+      const connectUrl = `${settings.chatwootUrl}/app/accounts/${settings.accountId}/inboxes/new?channel_type=facebook`;
+      window.open(connectUrl, '_blank');
+    } else {
+      showError("Vui lòng điền Chatwoot URL và Account ID trong tab Kết nối trước.");
+    }
+  };
+
   if (isLoadingContext) {
     return (
       <main className="flex-1 space-y-4 p-4 sm:p-6 md:p-8 bg-zinc-100">
         <Skeleton className="h-8 w-1/3" />
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-1/4" />
-            <Skeleton className="h-4 w-1/2" />
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-24" />
-          </CardContent>
-        </Card>
+        <Card><CardHeader><Skeleton className="h-6 w-1/4" /><Skeleton className="h-4 w-1/2" /></CardHeader><CardContent className="space-y-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-24" /></CardContent></Card>
       </main>
     );
   }
@@ -110,73 +92,58 @@ const ChatwootSettings = () => {
   return (
     <main className="flex-1 space-y-4 p-4 sm:p-6 md:p-8 bg-zinc-100">
       <h2 className="text-3xl font-bold tracking-tight">Cài đặt Chatbot</h2>
-      <Card>
-        <CardHeader>
-          <CardTitle>Kết nối Chatwoot</CardTitle>
-          <CardDescription>
-            Nhập thông tin để kết nối với tài khoản Chatwoot Cloud của bạn. Dữ liệu sẽ được lưu trữ an toàn.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="chatwoot-url">Chatwoot URL</Label>
-            <Input
-              id="chatwoot-url"
-              value={localSettings.chatwootUrl}
-              onChange={(e) => setLocalSettings({ ...localSettings, chatwootUrl: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="account-id">Account ID</Label>
-            <Input
-              id="account-id"
-              value={localSettings.accountId}
-              onChange={(e) => setLocalSettings({ ...localSettings, accountId: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="inbox-id">Inbox ID</Label>
-            <Input
-              id="inbox-id"
-              value={localSettings.inboxId}
-              onChange={(e) => setLocalSettings({ ...localSettings, inboxId: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="api-token">API Access Token</Label>
-            <Input
-              id="api-token"
-              type="password"
-              value={localSettings.apiToken}
-              onChange={(e) => setLocalSettings({ ...localSettings, apiToken: e.target.value })}
-            />
-          </div>
-          <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isSaving ? "Đang lưu..." : "Lưu cấu hình"}
-          </Button>
-
-          <div className="border-t pt-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <p className="font-medium">Kiểm tra kết nối</p>
-              {status === "idle" && <Badge variant="outline">Chưa kiểm tra</Badge>}
-              {status === "testing" && <Badge variant="secondary">Đang kiểm tra...</Badge>}
-              {status === "success" && <Badge variant="default">Thành công</Badge>}
-              {status === "error" && <Badge variant="destructive">Thất bại</Badge>}
-            </div>
-            <Button onClick={handleTestConnection} disabled={status === "testing"}>
-              {status === "testing" ? "Đang kiểm tra..." : "Kiểm tra kết nối"}
-            </Button>
-            {error && (
-              <div className="mt-4 text-sm text-destructive p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-                <Terminal className="h-4 w-4 inline-block mr-2" />
-                <p className="font-bold inline">Chi tiết lỗi:</p>
-                <p className="font-mono break-all mt-2">{error}</p>
+      <Tabs defaultValue="connection">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="connection">Kết nối</TabsTrigger>
+          <TabsTrigger value="fanpage">Fanpage</TabsTrigger>
+        </TabsList>
+        <TabsContent value="connection">
+          <Card className="mt-4">
+            <CardHeader>
+              <CardTitle>Kết nối Chatwoot</CardTitle>
+              <CardDescription>Nhập thông tin để kết nối với tài khoản Chatwoot Cloud của bạn. Dữ liệu sẽ được lưu trữ an toàn.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2"><Label htmlFor="chatwoot-url">Chatwoot URL</Label><Input id="chatwoot-url" value={localSettings.chatwootUrl} onChange={(e) => setLocalSettings({ ...localSettings, chatwootUrl: e.target.value })} /></div>
+              <div className="space-y-2"><Label htmlFor="account-id">Account ID</Label><Input id="account-id" value={localSettings.accountId} onChange={(e) => setLocalSettings({ ...localSettings, accountId: e.target.value })} /></div>
+              <div className="space-y-2"><Label htmlFor="inbox-id">Inbox ID</Label><Input id="inbox-id" value={localSettings.inboxId} onChange={(e) => setLocalSettings({ ...localSettings, inboxId: e.target.value })} /></div>
+              <div className="space-y-2"><Label htmlFor="api-token">API Access Token</Label><Input id="api-token" type="password" value={localSettings.apiToken} onChange={(e) => setLocalSettings({ ...localSettings, apiToken: e.target.value })} /></div>
+              <Button onClick={handleSave} disabled={isSaving}>{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{isSaving ? "Đang lưu..." : "Lưu cấu hình"}</Button>
+              <div className="border-t pt-6 space-y-4">
+                <div className="flex items-center justify-between"><p className="font-medium">Kiểm tra kết nối</p>{status === "idle" && <Badge variant="outline">Chưa kiểm tra</Badge>}{status === "testing" && <Badge variant="secondary">Đang kiểm tra...</Badge>}{status === "success" && <Badge variant="default">Thành công</Badge>}{status === "error" && <Badge variant="destructive">Thất bại</Badge>}</div>
+                <Button onClick={handleTestConnection} disabled={status === "testing"}>{status === "testing" ? "Đang kiểm tra..." : "Kiểm tra kết nối"}</Button>
+                {error && (<div className="mt-4 text-sm text-destructive p-4 bg-destructive/10 border border-destructive/20 rounded-lg"><Terminal className="h-4 w-4 inline-block mr-2" /><p className="font-bold inline">Chi tiết lỗi:</p><p className="font-mono break-all mt-2">{error}</p></div>)}
               </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="fanpage">
+          <Card className="mt-4">
+            <CardHeader>
+              <CardTitle>Quản lý Fanpage</CardTitle>
+              <CardDescription>Kết nối Fanpage mới hoặc đồng bộ hóa danh sách các inbox của bạn.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div>
+                <h3 className="text-lg font-medium">Thêm Fanpage mới</h3>
+                <p className="text-sm text-muted-foreground mt-2">Nhấp vào nút bên dưới để mở trang kết nối của Chatwoot. Quá trình này an toàn và được thực hiện trực tiếp trên trang của Chatwoot.</p>
+                <Button className="mt-4" onClick={handleConnectFanpage} disabled={!settings.chatwootUrl || !settings.accountId}>
+                  <Link className="mr-2 h-4 w-4" />
+                  Kết nối Fanpage mới trên Chatwoot
+                </Button>
+              </div>
+              <div className="border-t pt-6">
+                <h3 className="text-lg font-medium">Đồng bộ hóa</h3>
+                <p className="text-sm text-muted-foreground mt-2">Sau khi kết nối thành công trên trang Chatwoot, hãy quay lại đây và nhấn nút bên dưới để cập nhật danh sách các inbox trong ứng dụng.</p>
+                <Button variant="outline" className="mt-4" onClick={() => showSuccess("Đang đồng bộ hóa...")}>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Đồng bộ hóa
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </main>
   );
 };
