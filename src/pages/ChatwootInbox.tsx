@@ -13,7 +13,7 @@ import { vi } from 'date-fns/locale';
 import { ChatwootContactPanel } from '@/components/ChatwootContactPanel';
 import { Search, Phone, Mail, Link as LinkIcon, Smile, Paperclip, Image as ImageIcon, SendHorizonal, ThumbsUp, Settings2, CornerDownLeft, Eye, RefreshCw, UserPlus, Mic } from 'lucide-react';
 
-// Interfaces (giữ nguyên)
+// Interfaces
 interface Attachment { id: number; file_type: 'image' | 'video' | 'audio' | 'file'; data_url: string; }
 interface MessageSender { name: string; thumbnail?: string; }
 interface Conversation { id: number; meta: { sender: { name: string; thumbnail?: string; }; }; messages: { content: string }[]; last_activity_at: number; unread_count: number; }
@@ -27,7 +27,6 @@ const getInitials = (name?: string) => {
 };
 
 const ChatwootInbox = () => {
-  // State and hooks (giữ nguyên)
   const { settings } = useChatwoot();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loadingConversations, setLoadingConversations] = useState(true);
@@ -37,12 +36,13 @@ const ChatwootInbox = () => {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [newMessage, setNewMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const POLLING_INTERVAL = 10000;
 
-  // Functions (giữ nguyên)
   const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); };
   useEffect(() => { scrollToBottom(); }, [messages]);
+
   useEffect(() => {
     let isMounted = true;
     const fetchData = async (isInitialLoad = false) => {
@@ -68,6 +68,7 @@ const ChatwootInbox = () => {
     const intervalId = setInterval(() => fetchData(false), POLLING_INTERVAL);
     return () => { isMounted = false; clearInterval(intervalId); };
   }, [settings.apiToken, settings.accountId]);
+
   useEffect(() => {
     if (!selectedConversation) return;
     const fetchSelectedMessages = async () => {
@@ -82,6 +83,7 @@ const ChatwootInbox = () => {
     const intervalId = setInterval(fetchSelectedMessages, POLLING_INTERVAL);
     return () => clearInterval(intervalId);
   }, [selectedConversation, settings]);
+
   const handleSelectConversation = async (conversation: Conversation) => {
     setSelectedConversation(conversation);
     setLoadingMessages(true);
@@ -98,6 +100,7 @@ const ChatwootInbox = () => {
       supabase.functions.invoke('chatwoot-proxy', { body: { action: 'mark_as_read', settings, conversationId: conversation.id }, }).catch(err => { console.error("Lỗi ngầm khi đánh dấu đã đọc:", err.message); });
     }
   };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedConversation || sendingMessage) return;
@@ -125,13 +128,22 @@ const ChatwootInbox = () => {
   };
   const groupedMessages = groupMessagesByDate(messages);
 
+  const filteredConversations = conversations.filter(convo =>
+    convo.meta.sender.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div className="flex h-full bg-white border-t">
       <aside className="w-80 border-r flex flex-col">
         <div className="p-3 border-b">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Tìm kiếm" className="pl-9" />
+            <Input
+              placeholder="Tìm kiếm"
+              className="pl-9"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
           </div>
           <div className="flex space-x-1.5 mt-3">
             {['#fde2e4', '#fad2e1', '#e2ece9', '#bee1e6', '#cddafd', '#fcf6bd', '#d0f4de'].map(color => (
@@ -143,7 +155,7 @@ const ChatwootInbox = () => {
           {loadingConversations ? (
             [...Array(10)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)
           ) : (
-            conversations.map((convo) => (
+            filteredConversations.map((convo) => (
               <div key={convo.id} onClick={() => handleSelectConversation(convo)} className={cn("p-2.5 flex space-x-3 cursor-pointer rounded-lg", selectedConversation?.id === convo.id && "bg-blue-100")}>
                 <Avatar className="h-12 w-12">
                   <AvatarImage src={convo.meta.sender.thumbnail} />
@@ -168,7 +180,7 @@ const ChatwootInbox = () => {
         </div>
       </aside>
 
-      <section className="flex-1 flex flex-col bg-slate-50" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23d1d5db' fill-opacity='0.4' fill-rule='evenodd'%3E%3Cpath d='M0 40L40 0H20L0 20M40 40V20L20 40'/%3E%3C/g%3E%3C/svg%3E")` }}>
+      <section className="flex-1 flex flex-col bg-slate-50">
         {selectedConversation ? (
           <>
             <header className="p-3 border-b bg-white flex items-center justify-between shadow-sm">
@@ -180,7 +192,17 @@ const ChatwootInbox = () => {
                 </div>
               </div>
               <div className="flex items-center space-x-4 text-muted-foreground">
-                <LinkIcon className="h-5 w-5 cursor-pointer hover:text-primary" /><RefreshCw className="h-5 w-5 cursor-pointer hover:text-primary" /><Smile className="h-5 w-5 cursor-pointer hover:text-primary" /><UserPlus className="h-5 w-5 cursor-pointer hover:text-primary" />
+                <LinkIcon className="h-5 w-5 cursor-pointer hover:text-primary" />
+                <RefreshCw
+                  className={cn("h-5 w-5 cursor-pointer hover:text-primary", loadingMessages && "animate-spin")}
+                  onClick={() => {
+                    if (selectedConversation && !loadingMessages) {
+                      handleSelectConversation(selectedConversation);
+                    }
+                  }}
+                />
+                <Smile className="h-5 w-5 cursor-pointer hover:text-primary" />
+                <UserPlus className="h-5 w-5 cursor-pointer hover:text-primary" />
               </div>
             </header>
             <div className="flex-1 overflow-y-auto p-4 md:p-6">
