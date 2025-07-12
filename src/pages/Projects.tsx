@@ -86,7 +86,7 @@ const Projects = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="gpt-4o">GPT-4o</SelectItem>
-              <SelectItem value="grok-4">Grok 4</SelectItem>
+              <SelectItem value="grok-1">Grok</SelectItem>
             </SelectContent>
           </Select>
         </div>
