@@ -5,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileText, Mail, Phone, Building, Send, Loader2, PlusCircle, Calendar, Clock, Trash2, Pencil, ImagePlus } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useChatwoot } from '@/contexts/ChatwootContext';
@@ -41,7 +42,8 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
   const [editingScript, setEditingScript] = useState<CareScript | null>(null);
   const [scriptToDelete, setScriptToDelete] = useState<CareScript | null>(null);
   const [scriptContent, setScriptContent] = useState('');
-  const [scriptSchedule, setScriptSchedule] = useState('');
+  const [scriptDate, setScriptDate] = useState('');
+  const [scriptHour, setScriptHour] = useState<number>(9);
   const notesContainerRef = useRef<HTMLDivElement>(null);
 
   const fetchCareScripts = async (conversationId: number) => {
@@ -69,25 +71,30 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
   const openCreateDialog = () => {
     setEditingScript(null);
     setScriptContent('');
-    setScriptSchedule('');
+    setScriptDate(format(new Date(), 'yyyy-MM-dd'));
+    setScriptHour(9);
     setIsScriptDialogOpen(true);
   };
 
   const openEditDialog = (script: CareScript) => {
+    const scheduledDate = new Date(script.scheduled_at);
     setEditingScript(script);
     setScriptContent(script.content);
-    setScriptSchedule(format(new Date(script.scheduled_at), "yyyy-MM-dd'T'HH:mm"));
+    setScriptDate(format(scheduledDate, "yyyy-MM-dd"));
+    setScriptHour(scheduledDate.getHours());
     setIsScriptDialogOpen(true);
   };
 
   const handleSaveScript = async () => {
-    if (!scriptContent || !scriptSchedule || !selectedConversation) { showError("Vui lòng nhập đầy đủ nội dung và lịch gửi."); return; }
+    if (!scriptContent || !scriptDate || !selectedConversation) { showError("Vui lòng nhập đầy đủ nội dung và lịch gửi."); return; }
+    const scheduledDateTime = new Date(scriptDate);
+    scheduledDateTime.setHours(scriptHour, 0, 0, 0);
+
     const scriptData = {
       conversation_id: selectedConversation.id,
       contact_id: selectedConversation.meta.sender.id,
       content: scriptContent,
-      // SỬA LỖI: Chuyển đổi thời gian cục bộ sang chuỗi ISO (UTC) trước khi gửi
-      scheduled_at: new Date(scriptSchedule).toISOString(),
+      scheduled_at: scheduledDateTime.toISOString(),
     };
     const { error } = editingScript
       ? await supabase.from('care_scripts').update(scriptData).eq('id', editingScript.id)
@@ -135,7 +142,7 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
           <div className="flex-1 overflow-y-auto space-y-3 pr-2">{scripts.length === 0 ? (<div className="flex flex-col items-center justify-center text-center text-muted-foreground h-full"><Calendar className="h-10 w-10 mb-3 text-gray-400" /><p className="text-sm font-semibold text-gray-600">Chưa có kịch bản nào</p><p className="text-xs">Hãy tạo kịch bản để chăm sóc khách hàng tự động.</p></div>) : (scripts.map(script => (<div key={script.id} className="bg-white p-3 rounded-lg border shadow-sm"><p className="text-sm text-gray-800 mb-2">{script.content}</p><div className="flex justify-between items-center"><div className="flex items-center gap-2 text-xs text-muted-foreground"><Clock className="h-3 w-3" /><span>{format(new Date(script.scheduled_at), 'dd/MM/yy HH:mm')}</span><Badge variant={statusColorMap[script.status]}>{statusMap[script.status]}</Badge></div><div className="flex items-center gap-2"><Button variant="ghost" size="icon" className="h-6 w-6"><ImagePlus className="h-4 w-4 text-muted-foreground" /></Button><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditDialog(script)}><Pencil className="h-4 w-4 text-muted-foreground" /></Button><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setScriptToDelete(script)}><Trash2 className="h-4 w-4 text-destructive" /></Button></div></div></div>)))}</div>
         </TabsContent>
       </Tabs>
-      <Dialog open={isScriptDialogOpen} onOpenChange={setIsScriptDialogOpen}><DialogContent><DialogHeader><DialogTitle>{editingScript ? 'Sửa kịch bản' : 'Tạo kịch bản mới'}</DialogTitle></DialogHeader><div className="space-y-4 py-4"><Textarea placeholder="Nhập nội dung tin nhắn..." value={scriptContent} onChange={(e) => setScriptContent(e.target.value)} /><Input type="datetime-local" value={scriptSchedule} onChange={(e) => setScriptSchedule(e.target.value)} /></div><DialogFooter><Button variant="outline" onClick={() => setIsScriptDialogOpen(false)}>Hủy</Button><Button onClick={handleSaveScript}>Lưu</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={isScriptDialogOpen} onOpenChange={setIsScriptDialogOpen}><DialogContent><DialogHeader><DialogTitle>{editingScript ? 'Sửa kịch bản' : 'Tạo kịch bản mới'}</DialogTitle></DialogHeader><div className="space-y-4 py-4"><Textarea placeholder="Nhập nội dung tin nhắn..." value={scriptContent} onChange={(e) => setScriptContent(e.target.value)} /><div className="flex items-center gap-2"><Input type="date" value={scriptDate} onChange={(e) => setScriptDate(e.target.value)} className="flex-1" /><Select value={String(scriptHour)} onValueChange={(value) => setScriptHour(Number(value))}><SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger><SelectContent>{Array.from({ length: 24 }, (_, i) => (<SelectItem key={i} value={String(i)}>{String(i).padStart(2, '0')}:00</SelectItem>))}</SelectContent></Select></div></div><DialogFooter><Button variant="outline" onClick={() => setIsScriptDialogOpen(false)}>Hủy</Button><Button onClick={handleSaveScript}>Lưu</Button></DialogFooter></DialogContent></Dialog>
       <AlertDialog open={!!scriptToDelete} onOpenChange={() => setScriptToDelete(null)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Bạn có chắc chắn muốn xóa?</AlertDialogTitle><AlertDialogDescription>Hành động này không thể được hoàn tác. Kịch bản chăm sóc này sẽ bị xóa vĩnh viễn.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Hủy</AlertDialogCancel><AlertDialogAction onClick={handleDeleteScript}>Xóa</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     </aside>
   );
