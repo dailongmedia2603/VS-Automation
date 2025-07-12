@@ -75,7 +75,8 @@ const ChatwootInbox = () => {
         if (functionError) throw new Error((await functionError.context.json()).error || functionError.message);
         if (data.error) throw new Error(data.error);
 
-        setConversations(data.payload || []);
+        // SỬA LỖI: Đọc đúng đường dẫn data.payload từ JSON trả về
+        setConversations(data.data.payload || []);
       } catch (err: any) {
         setError(err.message || 'Đã xảy ra lỗi không xác định.');
       } finally {
