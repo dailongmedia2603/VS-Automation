@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 import { format, formatDistanceToNow, isSameDay } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { ChatwootContactPanel } from '@/components/ChatwootContactPanel';
-import { Search, Link as LinkIcon, Smile, Paperclip, Image as ImageIcon, SendHorizonal, ThumbsUp, Settings2, CornerDownLeft, Eye, RefreshCw, UserPlus } from 'lucide-react';
+import { Search, Phone, Link as LinkIcon, Smile, Paperclip, Image as ImageIcon, SendHorizonal, ThumbsUp, Settings2, CornerDownLeft, Eye, RefreshCw, UserPlus } from 'lucide-react';
 
 // Interfaces
 interface Attachment { id: number; file_type: 'image' | 'video' | 'audio' | 'file'; data_url: string; }
@@ -140,7 +140,11 @@ const ChatwootInbox = () => {
         <div className="flex justify-between items-center"><p className="font-semibold truncate text-sm">{convo.meta.sender.name}</p><p className="text-xs text-muted-foreground whitespace-nowrap">{format(new Date(convo.last_activity_at * 1000), 'HH:mm')}</p></div>
         <div className="flex justify-between items-start mt-1">
           <p className={cn("text-sm truncate flex items-center", convo.unread_count > 0 ? "text-black font-bold" : "text-muted-foreground")}><CornerDownLeft className="h-4 w-4 mr-1 flex-shrink-0" />{convo.messages[0]?.content || '[Media]'}</p>
-          <div className="flex items-center gap-1.5">{convo.labels?.map(label => <Badge key={label} variant="outline" className="text-xs px-1.5 py-0">{label.substring(0, 3)}</Badge>)}{convo.unread_count > 0 && <Badge variant="destructive">{convo.unread_count}</Badge>}</div>
+          <div className="flex items-center gap-1.5">
+            {convo.meta.sender.phone_number && <Phone className="h-3 w-3 text-green-500" />}
+            {convo.labels?.map(label => <Badge key={label} variant="outline" className="text-xs px-1.5 py-0">{label.substring(0, 3)}</Badge>)}
+            {convo.unread_count > 0 && <Badge variant="destructive">{convo.unread_count}</Badge>}
+          </div>
         </div>
       </div>
     </div>

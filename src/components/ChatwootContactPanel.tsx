@@ -8,6 +8,7 @@ import { useChatwoot } from '@/contexts/ChatwootContext';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 
 interface Conversation { id: number; meta: { sender: { id: number; name: string; email?: string; phone_number?: string; thumbnail?: string; additional_attributes?: { company_name?: string; }; }; }; labels: string[]; }
 interface Message { id: number; content: string; created_at: number; private: boolean; sender?: { name: string; thumbnail?: string; }; }
@@ -70,7 +71,12 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
             </div>
             <div className="space-y-2 text-sm text-muted-foreground">
               <div className="flex items-center"><Mail className="h-4 w-4 mr-3" /><span>{contact.email || 'Không có sẵn'}</span></div>
-              <div className="flex items-center"><Phone className="h-4 w-4 mr-3" /><span>{contact.phone_number || 'Không có sẵn'}</span></div>
+              <div className="flex items-center">
+                <Phone className={cn("h-4 w-4 mr-3", contact.phone_number && "text-green-500")} />
+                <span className={cn(contact.phone_number && "text-green-600 font-medium")}>
+                  {contact.phone_number || 'Không có sẵn'}
+                </span>
+              </div>
               <div className="flex items-center"><Building className="h-4 w-4 mr-3" /><span>{contact.additional_attributes?.company_name || 'Không có sẵn'}</span></div>
             </div>
           </div>
