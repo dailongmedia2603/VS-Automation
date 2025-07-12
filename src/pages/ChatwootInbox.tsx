@@ -67,21 +67,31 @@ const ChatwootInbox = () => {
     }
     if (isInitialLoad) setLoadingConversations(true);
     try {
-      const { data, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', { body: { action: 'list_conversations', settings }, });
+      const { data: chatwootData, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', { body: { action: 'list_conversations', settings }, });
       if (functionError) throw new Error((await functionError.context.json()).error || functionError.message);
-      if (data.error) throw new Error(data.error);
-      const newConversationsFromServer = data.data.payload || [];
-      setConversations(prevConversations => {
-        const prevConversationsMap = new Map(prevConversations.map(c => [c.id, c]));
-        return newConversationsFromServer.map(newConvo => {
-            const prevConvo = prevConversationsMap.get(newConvo.id);
-            if (prevConvo && prevConvo.meta.sender.phone_number && !newConvo.meta.sender.phone_number) {
-                return { ...newConvo, meta: { ...newConvo.meta, sender: { ...newConvo.meta.sender, phone_number: prevConvo.meta.sender.phone_number, } } };
-            }
-            return newConvo;
-        });
+      if (chatwootData.error) throw new Error(chatwootData.error);
+      
+      const conversationsFromServer = chatwootData.data.payload || [];
+      if (conversationsFromServer.length === 0) {
+          setConversations([]);
+          return;
+      }
+
+      const contactIds = conversationsFromServer.map(c => c.meta.sender.id);
+      const { data: contactsFromDB } = await supabase.from('chatwoot_contacts').select('id, phone_number').in('id', contactIds);
+      const phoneMap = new Map(contactsFromDB?.map(c => [c.id, c.phone_number]));
+
+      const enrichedConversations = conversationsFromServer.map(convo => {
+          const storedPhoneNumber = phoneMap.get(convo.meta.sender.id);
+          if (storedPhoneNumber && !convo.meta.sender.phone_number) {
+              return { ...convo, meta: { ...convo.meta, sender: { ...convo.meta.sender, phone_number: storedPhoneNumber } } };
+          }
+          return convo;
       });
-      await syncConversationsToDB(newConversationsFromServer);
+
+      setConversations(enrichedConversations);
+      await syncConversationsToDB(enrichedConversations);
+
     } catch (err) { console.error("Lỗi polling cuộc trò chuyện:", err);
     } finally { if (isInitialLoad) setLoadingConversations(false); }
   };
