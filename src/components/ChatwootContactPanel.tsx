@@ -33,7 +33,7 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
 
   useEffect(() => {
     if (notesContainerRef.current) {
-      notesContainerRef.current.scrollTop = notesContainerRef.current.scrollHeight;
+      notesContainerRef.current.scrollTop = 0; // Cuộn lên đầu khi có ghi chú mới
     }
   }, [messages]);
 
@@ -56,7 +56,8 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
     }
   };
 
-  const notes = messages.filter(msg => msg.private);
+  // Sắp xếp ghi chú: mới nhất ở trên cùng
+  const notes = messages.filter(msg => msg.private).sort((a, b) => b.created_at - a.created_at);
 
   if (!selectedConversation) {
     return (
