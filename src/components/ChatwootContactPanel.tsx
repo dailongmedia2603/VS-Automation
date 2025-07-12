@@ -82,7 +82,13 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
 
   const handleSaveScript = async () => {
     if (!scriptContent || !scriptSchedule || !selectedConversation) { showError("Vui lòng nhập đầy đủ nội dung và lịch gửi."); return; }
-    const scriptData = { conversation_id: selectedConversation.id, contact_id: selectedConversation.meta.sender.id, content: scriptContent, scheduled_at: scriptSchedule, };
+    const scriptData = {
+      conversation_id: selectedConversation.id,
+      contact_id: selectedConversation.meta.sender.id,
+      content: scriptContent,
+      // SỬA LỖI: Chuyển đổi thời gian cục bộ sang chuỗi ISO (UTC) trước khi gửi
+      scheduled_at: new Date(scriptSchedule).toISOString(),
+    };
     const { error } = editingScript
       ? await supabase.from('care_scripts').update(scriptData).eq('id', editingScript.id)
       : await supabase.from('care_scripts').insert(scriptData);
