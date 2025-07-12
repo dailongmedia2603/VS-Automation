@@ -33,7 +33,7 @@ const chatbotNavItems: NavItem[] = [
     { name: "Cài đặt Chatbot", icon: Settings, href: "/chatbot-settings" },
 ]
 
-const settingsNavItem: NavItem = { name: "Cài đặt", icon: Settings, href: "/settings" };
+const settingsNavItem: NavItem = { name: "Cài đặt API AI", icon: Settings, href: "/settings" };
 
 export function Sidebar({ className }: { className?: string }) {
   const location = useLocation();
@@ -44,7 +44,7 @@ export function Sidebar({ className }: { className?: string }) {
       to={item.href}
       className={cn(
         "flex items-center rounded-lg px-3 py-2.5 text-md font-medium text-zinc-600 hover:bg-blue-50 hover:text-blue-600",
-        location.pathname === item.href && "text-blue-600 bg-blue-100"
+        location.pathname === item.href && "text-blue-100 text-blue-600"
       )}
     >
       <item.icon className="mr-3 h-5 w-5" />
