@@ -1,100 +1,58 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useChatwoot } from '@/contexts/ChatwootContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Terminal, Send } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow, isSameDay } from 'date-fns';
 import { vi } from 'date-fns/locale';
+import { ChatwootContactPanel } from '@/components/ChatwootContactPanel';
+import { Search, Phone, Mail, Link as LinkIcon, Smile, Paperclip, Image as ImageIcon, SendHorizonal, ThumbsUp, Settings2, CornerDownLeft, Eye, RefreshCw, UserPlus, Mic } from 'lucide-react';
 
-interface Attachment {
-  id: number;
-  file_type: 'image' | 'video' | 'audio' | 'file';
-  data_url: string;
-}
-
-interface MessageSender {
-  name: string;
-  thumbnail?: string;
-}
-
-interface Conversation {
-  id: number;
-  meta: {
-    sender: {
-      name: string;
-      thumbnail?: string;
-    };
-  };
-  messages: { content: string }[];
-  last_activity_at: number;
-  unread_count: number;
-}
-
-interface Message {
-  id: number;
-  content: string;
-  created_at: number;
-  message_type: number; // 0: incoming, 1: outgoing, 2: activity
-  sender?: MessageSender;
-  attachments?: Attachment[];
-}
+// Interfaces (giữ nguyên)
+interface Attachment { id: number; file_type: 'image' | 'video' | 'audio' | 'file'; data_url: string; }
+interface MessageSender { name: string; thumbnail?: string; }
+interface Conversation { id: number; meta: { sender: { name: string; thumbnail?: string; }; }; messages: { content: string }[]; last_activity_at: number; unread_count: number; }
+interface Message { id: number; content: string; created_at: number; message_type: number; sender?: MessageSender; attachments?: Attachment[]; }
 
 const getInitials = (name?: string) => {
   if (!name) return 'U';
   const names = name.trim().split(' ');
-  if (names.length > 1 && names[names.length - 1]) {
-    return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
-  }
+  if (names.length > 1 && names[names.length - 1]) { return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase(); }
   return name.substring(0, 2).toUpperCase();
 };
 
 const ChatwootInbox = () => {
+  // State and hooks (giữ nguyên)
   const { settings } = useChatwoot();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [newMessage, setNewMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
-
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const POLLING_INTERVAL = 10000; // 10 giây
+  const POLLING_INTERVAL = 10000;
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
+  // Functions (giữ nguyên)
+  const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); };
+  useEffect(() => { scrollToBottom(); }, [messages]);
   useEffect(() => {
     let isMounted = true;
     const fetchData = async (isInitialLoad = false) => {
       if (!settings.accountId || !settings.apiToken || !isMounted) {
-        if (isInitialLoad) {
-          setError('Vui lòng điền đầy đủ thông tin trong trang Cài đặt Chatbot.');
-          setLoadingConversations(false);
-        }
+        if (isInitialLoad) { setError('Vui lòng điền đầy đủ thông tin trong trang Cài đặt Chatbot.'); setLoadingConversations(false); }
         return;
       }
-      if (isInitialLoad) {
-        setLoadingConversations(true);
-        setError(null);
-      }
+      if (isInitialLoad) { setLoadingConversations(true); setError(null); }
       try {
-        const { data, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', {
-          body: { action: 'list_conversations', settings },
-        });
+        const { data, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', { body: { action: 'list_conversations', settings }, });
         if (!isMounted) return;
         if (functionError) throw new Error((await functionError.context.json()).error || functionError.message);
         if (data.error) throw new Error(data.error);
@@ -108,282 +66,169 @@ const ChatwootInbox = () => {
     };
     fetchData(true);
     const intervalId = setInterval(() => fetchData(false), POLLING_INTERVAL);
-    return () => {
-      isMounted = false;
-      clearInterval(intervalId);
-    };
+    return () => { isMounted = false; clearInterval(intervalId); };
   }, [settings.apiToken, settings.accountId]);
-
   useEffect(() => {
     if (!selectedConversation) return;
     const fetchSelectedMessages = async () => {
         try {
-            const { data, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', {
-                body: { action: 'list_messages', settings, conversationId: selectedConversation.id },
-            });
+            const { data, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', { body: { action: 'list_messages', settings, conversationId: selectedConversation.id }, });
             if (functionError) throw new Error((await functionError.context.json()).error || functionError.message);
             if (data.error) throw new Error(data.error);
             const newMessages = data.payload.sort((a: Message, b: Message) => a.created_at - b.created_at) || [];
             setMessages(current => newMessages.length > current.length ? newMessages : current);
-        } catch (err) {
-            console.error("Lỗi polling tin nhắn:", err);
-        }
+        } catch (err) { console.error("Lỗi polling tin nhắn:", err); }
     };
     const intervalId = setInterval(fetchSelectedMessages, POLLING_INTERVAL);
     return () => clearInterval(intervalId);
   }, [selectedConversation, settings]);
-
   const handleSelectConversation = async (conversation: Conversation) => {
     setSelectedConversation(conversation);
     setLoadingMessages(true);
     setMessages([]);
     setError(null);
-
-    // Tải tin nhắn cho cuộc trò chuyện đã chọn
     try {
-      const { data, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', {
-        body: { action: 'list_messages', settings, conversationId: conversation.id },
-      });
+      const { data, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', { body: { action: 'list_messages', settings, conversationId: conversation.id }, });
       if (functionError) throw new Error((await functionError.context.json()).error || functionError.message);
       if (data.error) throw new Error(data.error);
       setMessages(data.payload.sort((a: Message, b: Message) => a.created_at - b.created_at) || []);
-    } catch (err: any) {
-      setError(err.message || 'Đã xảy ra lỗi khi tải tin nhắn.');
-    } finally {
-      setLoadingMessages(false);
-    }
-
-    // Cập nhật trạng thái đã đọc với Optimistic Update
+    } catch (err: any) { setError(err.message || 'Đã xảy ra lỗi khi tải tin nhắn.'); } finally { setLoadingMessages(false); }
     if (conversation.unread_count > 0) {
-      // 1. Cập nhật giao diện ngay lập tức
-      setConversations(convos =>
-        convos.map(c => c.id === conversation.id ? { ...c, unread_count: 0 } : c)
-      );
-      // 2. Gửi yêu cầu trong nền
-      supabase.functions.invoke('chatwoot-proxy', {
-        body: { action: 'mark_as_read', settings, conversationId: conversation.id },
-      }).catch(err => {
-        console.error("Lỗi ngầm khi đánh dấu đã đọc:", err.message);
-      });
+      setConversations(convos => convos.map(c => c.id === conversation.id ? { ...c, unread_count: 0 } : c));
+      supabase.functions.invoke('chatwoot-proxy', { body: { action: 'mark_as_read', settings, conversationId: conversation.id }, }).catch(err => { console.error("Lỗi ngầm khi đánh dấu đã đọc:", err.message); });
     }
   };
-
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedConversation || sendingMessage) return;
     setSendingMessage(true);
     try {
-      const { data, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', {
-        body: { action: 'send_message', settings, conversationId: selectedConversation.id, content: newMessage },
-      });
+      const { data, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', { body: { action: 'send_message', settings, conversationId: selectedConversation.id, content: newMessage }, });
       if (functionError) throw new Error((await functionError.context.json()).error || functionError.message);
       if (data.error) throw new Error(data.error);
       setMessages(prev => [...prev, data]);
       setNewMessage('');
-    } catch (err: any) {
-      setError(err.message || 'Gửi tin nhắn thất bại.');
-    } finally {
-      setSendingMessage(false);
-    }
+    } catch (err: any) { setError(err.message || 'Gửi tin nhắn thất bại.'); } finally { setSendingMessage(false); }
   };
 
-  const unreadConversations = conversations.filter(c => c.unread_count > 0);
-  const readConversations = conversations.filter(c => !c.unread_count || c.unread_count === 0);
-
-  const renderConversationItem = (convo: Conversation) => (
-    <li
-      key={convo.id}
-      onClick={() => handleSelectConversation(convo)}
-      className={cn(
-        "p-3 flex items-center space-x-3 cursor-pointer hover:bg-zinc-50 rounded-lg",
-        selectedConversation?.id === convo.id && "bg-blue-50"
-      )}
-    >
-      <Avatar>
-        <AvatarImage src={convo.meta.sender.thumbnail} alt={convo.meta.sender.name} />
-        <AvatarFallback>{getInitials(convo.meta.sender.name)}</AvatarFallback>
-      </Avatar>
-      <div className="flex-1 overflow-hidden">
-        <div className="flex justify-between items-center">
-            <p className="font-semibold truncate">{convo.meta.sender.name}</p>
-            <p className="text-xs text-muted-foreground whitespace-nowrap">
-                {formatDistanceToNow(new Date(convo.last_activity_at * 1000), { addSuffix: true, locale: vi })}
-            </p>
-        </div>
-        <div className="flex justify-between items-center mt-1">
-            <p className={cn("text-sm text-muted-foreground truncate", convo.unread_count > 0 && "font-bold text-primary")}>
-              {convo.messages[0]?.content || 'Chưa có tin nhắn'}
-            </p>
-            {convo.unread_count > 0 && (
-                <Badge variant="destructive" className="h-5 min-w-[1.25rem] p-1 flex items-center justify-center text-xs rounded-full">
-                    {convo.unread_count}
-                </Badge>
-            )}
-        </div>
-      </div>
-    </li>
-  );
+  const groupMessagesByDate = (messages: Message[]) => {
+    return messages.reduce((acc, message, index) => {
+      const messageDate = new Date(message.created_at * 1000);
+      const prevMessage = messages[index - 1];
+      const prevMessageDate = prevMessage ? new Date(prevMessage.created_at * 1000) : null;
+      if (!prevMessageDate || !isSameDay(messageDate, prevMessageDate)) {
+        acc.push({ type: 'date', date: format(messageDate, 'dd MMM yyyy', { locale: vi }) });
+      }
+      acc.push({ type: 'message', data: message });
+      return acc;
+    }, [] as ({ type: 'date'; date: string } | { type: 'message'; data: Message })[]);
+  };
+  const groupedMessages = groupMessagesByDate(messages);
 
   return (
-    <main className="flex h-full bg-white border-t">
-      <aside className="w-1/3 border-r flex flex-col lg:w-1/4">
-        <header className="p-4 border-b">
-          <h2 className="text-xl font-bold">Hộp thư</h2>
-        </header>
-        <div className="flex-1 overflow-y-auto p-2">
+    <div className="flex h-full bg-white border-t">
+      <aside className="w-80 border-r flex flex-col">
+        <div className="p-3 border-b">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Tìm kiếm" className="pl-9" />
+          </div>
+          <div className="flex space-x-1.5 mt-3">
+            {['#fde2e4', '#fad2e1', '#e2ece9', '#bee1e6', '#cddafd', '#fcf6bd', '#d0f4de'].map(color => (
+              <div key={color} style={{ backgroundColor: color }} className="w-5 h-5 rounded-md cursor-pointer flex-1"></div>
+            ))}
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-2 space-y-1">
           {loadingConversations ? (
-            <div className="p-2 space-y-2">
-              {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
-            </div>
-          ) : error && conversations.length === 0 ? (
-             <div className="p-2">
-                <Alert variant="destructive">
-                  <Terminal className="h-4 w-4" />
-                  <AlertTitle>Lỗi!</AlertTitle>
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-             </div>
+            [...Array(10)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)
           ) : (
-            <>
-              {unreadConversations.length > 0 && (
-                <div className="mb-4">
-                  <h3 className="px-3 text-xs font-bold uppercase text-blue-600 tracking-wider">Chưa xem</h3>
-                  <ul className="mt-1 space-y-1">
-                    {unreadConversations.map(renderConversationItem)}
-                  </ul>
+            conversations.map((convo) => (
+              <div key={convo.id} onClick={() => handleSelectConversation(convo)} className={cn("p-2.5 flex space-x-3 cursor-pointer rounded-lg", selectedConversation?.id === convo.id && "bg-blue-100")}>
+                <Avatar className="h-12 w-12">
+                  <AvatarImage src={convo.meta.sender.thumbnail} />
+                  <AvatarFallback>{getInitials(convo.meta.sender.name)}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1 overflow-hidden">
+                  <div className="flex justify-between items-center">
+                    <p className="font-semibold truncate text-sm">{convo.meta.sender.name}</p>
+                    <p className="text-xs text-muted-foreground whitespace-nowrap">{format(new Date(convo.last_activity_at * 1000), 'HH:mm')}</p>
+                  </div>
+                  <div className="flex justify-between items-center mt-1">
+                    <p className={cn("text-sm truncate flex items-center", convo.unread_count > 0 ? "text-black font-bold" : "text-muted-foreground")}>
+                      <CornerDownLeft className="h-4 w-4 mr-1 flex-shrink-0" />
+                      {convo.messages[0]?.content || '[Photo]'}
+                    </p>
+                    {convo.unread_count > 0 && <div className="w-2 h-2 bg-blue-500 rounded-full"></div>}
+                  </div>
                 </div>
-              )}
-              {readConversations.length > 0 && (
-                <div>
-                  <h3 className="px-3 text-xs font-semibold uppercase text-muted-foreground tracking-wider">Đã xem</h3>
-                  <ul className="mt-1 space-y-1">
-                    {readConversations.map(renderConversationItem)}
-                  </ul>
-                </div>
-              )}
-              {conversations.length === 0 && (
-                <p className="p-4 text-sm text-muted-foreground">Không tìm thấy cuộc trò chuyện nào.</p>
-              )}
-            </>
+              </div>
+            ))
           )}
         </div>
       </aside>
 
-      <section className="flex-1 flex flex-col">
+      <section className="flex-1 flex flex-col bg-slate-50" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23d1d5db' fill-opacity='0.4' fill-rule='evenodd'%3E%3Cpath d='M0 40L40 0H20L0 20M40 40V20L20 40'/%3E%3C/g%3E%3C/svg%3E")` }}>
         {selectedConversation ? (
           <>
-            <header className="p-4 border-b flex items-center space-x-3">
-              <Avatar>
-                <AvatarImage src={selectedConversation.meta.sender.thumbnail} alt={selectedConversation.meta.sender.name} />
-                <AvatarFallback>{getInitials(selectedConversation.meta.sender.name)}</AvatarFallback>
-              </Avatar>
-              <h3 className="font-bold">{selectedConversation.meta.sender.name}</h3>
-            </header>
-            <div className="flex-1 overflow-y-auto p-6 bg-zinc-50 space-y-6">
-              {loadingMessages ? (
-                <div className="space-y-4">
-                    <Skeleton className="h-12 w-3/4" />
-                    <Skeleton className="h-12 w-3/4 ml-auto" />
-                    <Skeleton className="h-12 w-1/2" />
+            <header className="p-3 border-b bg-white flex items-center justify-between shadow-sm">
+              <div className="flex items-center space-x-3">
+                <Avatar><AvatarImage src={selectedConversation.meta.sender.thumbnail} /><AvatarFallback>{getInitials(selectedConversation.meta.sender.name)}</AvatarFallback></Avatar>
+                <div>
+                  <h3 className="font-bold">{selectedConversation.meta.sender.name}</h3>
+                  <p className="text-xs text-muted-foreground flex items-center"><Eye className="h-3 w-3 mr-1" />Chưa có người xem</p>
                 </div>
-              ) : (
-                messages.map(msg => {
-                  if (msg.message_type === 2) {
-                    return (
-                      <div key={msg.id} className="text-center text-xs text-muted-foreground py-2 italic">
-                        {msg.content}
-                      </div>
-                    );
-                  }
+              </div>
+              <div className="flex items-center space-x-4 text-muted-foreground">
+                <LinkIcon className="h-5 w-5 cursor-pointer hover:text-primary" /><RefreshCw className="h-5 w-5 cursor-pointer hover:text-primary" /><Smile className="h-5 w-5 cursor-pointer hover:text-primary" /><UserPlus className="h-5 w-5 cursor-pointer hover:text-primary" />
+              </div>
+            </header>
+            <div className="flex-1 overflow-y-auto p-4 md:p-6">
+              <div className="space-y-2">
+                {loadingMessages ? <p>Đang tải...</p> : groupedMessages.map((item, index) => {
+                  if (item.type === 'date') return <div key={index} className="text-center my-4"><span className="text-xs text-muted-foreground bg-white px-3 py-1 rounded-full shadow-sm">{item.date}</span></div>;
+                  const msg = item.data;
                   const isOutgoing = msg.message_type === 1;
+                  if (msg.message_type === 2) return <div key={msg.id} className="text-center text-xs text-muted-foreground py-2 italic">{msg.content}</div>;
                   return (
                     <div key={msg.id} className={cn("flex items-start gap-3", isOutgoing && "justify-end")}>
-                      {!isOutgoing && (
-                          <Avatar className="h-8 w-8">
-                              <AvatarImage src={msg.sender?.thumbnail} alt={msg.sender?.name} />
-                              <AvatarFallback>{getInitials(msg.sender?.name)}</AvatarFallback>
-                          </Avatar>
-                      )}
+                      {!isOutgoing && <Avatar className="h-8 w-8"><AvatarImage src={msg.sender?.thumbnail} /><AvatarFallback>{getInitials(msg.sender?.name)}</AvatarFallback></Avatar>}
                       <div className={cn("flex flex-col gap-1", isOutgoing ? 'items-end' : 'items-start')}>
-                          <div className={cn(
-                              "rounded-lg px-3 py-2 max-w-xs md:max-w-md break-words",
-                              isOutgoing ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-800'
-                          )}>
-                            {msg.attachments && msg.attachments.length > 0 && (
-                              <div className="space-y-2">
-                                {msg.attachments.map(attachment => (
-                                  <div key={attachment.id}>
-                                    {attachment.file_type === 'image' && (
-                                      <a href={attachment.data_url} target="_blank" rel="noopener noreferrer">
-                                        <img src={attachment.data_url} alt="Hình ảnh đính kèm" className="rounded-lg max-w-full h-auto" />
-                                      </a>
-                                    )}
-                                    {attachment.file_type === 'video' && (
-                                      <video controls className="rounded-lg max-w-full h-auto">
-                                        <source src={attachment.data_url} />
-                                        Trình duyệt của bạn không hỗ trợ thẻ video.
-                                      </video>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            {msg.content && (
-                              <p className={cn("whitespace-pre-wrap", msg.attachments && msg.attachments.length > 0 && msg.content ? "mt-2" : "")}>
-                                {msg.content}
-                              </p>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground px-1">
-                              {format(new Date(msg.created_at * 1000), 'MMM d, h:mm a', { locale: vi })}
-                          </p>
+                        <div className={cn("rounded-2xl px-3 py-2 max-w-sm md:max-w-md break-words shadow-sm", isOutgoing ? 'bg-green-100 text-gray-800' : 'bg-white text-gray-800')}>
+                          {msg.attachments?.map(att => <div key={att.id}>{att.file_type === 'image' ? <a href={att.data_url} target="_blank" rel="noopener noreferrer"><img src={att.data_url} alt="Attachment" className="rounded-lg max-w-full h-auto" /></a> : <video controls className="rounded-lg max-w-full h-auto"><source src={att.data_url} /></video>}</div>)}
+                          {msg.content && <p className={cn("whitespace-pre-wrap", msg.attachments && msg.attachments.length > 0 && msg.content ? "mt-2" : "")}>{msg.content}</p>}
+                        </div>
                       </div>
-                       {isOutgoing && (
-                          <Avatar className="h-8 w-8">
-                              <AvatarImage src={msg.sender?.thumbnail} alt={msg.sender?.name} />
-                              <AvatarFallback className="bg-primary text-primary-foreground">{getInitials(msg.sender?.name)}</AvatarFallback>
-                          </Avatar>
-                      )}
                     </div>
                   );
-                })
-              )}
-               {error && (
-                 <Alert variant="destructive">
-                   <Terminal className="h-4 w-4" />
-                   <AlertTitle>Lỗi!</AlertTitle>
-                   <AlertDescription>{error}</AlertDescription>
-                 </Alert>
-               )}
+                })}
+              </div>
               <div ref={messagesEndRef} />
             </div>
-            <footer className="p-4 border-t bg-white">
-              <form onSubmit={handleSendMessage} className="relative">
-                <Input
-                  placeholder="Nhập tin nhắn..."
-                  className="pr-12"
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  disabled={sendingMessage || loadingMessages}
-                />
-                <Button
-                  type="submit"
-                  size="icon"
-                  className="absolute top-1/2 right-2 -translate-y-1/2 h-8 w-8"
-                  disabled={sendingMessage || loadingMessages || !newMessage.trim()}
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </form>
+            <footer className="p-2 border-t bg-white space-y-2">
+              <div className="flex flex-wrap gap-2 px-2">
+                {['Spa & TMV', 'Mỹ phẩm & TPCN', 'Mẹ & Bé', 'Nha khoa'].map(tag => <Button key={tag} variant="outline" size="sm" className="text-xs h-7">{tag}</Button>)}
+              </div>
+              <div className="relative">
+                <Input placeholder="Trả lời..." className="pr-10" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(e); } }} />
+                <SendHorizonal className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground cursor-pointer" onClick={handleSendMessage} />
+              </div>
+              <div className="flex justify-between items-center px-2">
+                <div className="flex items-center space-x-4 text-muted-foreground">
+                  <Phone className="h-5 w-5 cursor-pointer hover:text-primary" /><Mic className="h-5 w-5 cursor-pointer hover:text-primary" /><Paperclip className="h-5 w-5 cursor-pointer hover:text-primary" /><ImageIcon className="h-5 w-5 cursor-pointer hover:text-primary" />
+                </div>
+                <div className="flex items-center space-x-4 text-muted-foreground">
+                  <ThumbsUp className="h-5 w-5 cursor-pointer hover:text-primary" /><Settings2 className="h-5 w-5 cursor-pointer hover:text-primary" />
+                </div>
+              </div>
             </footer>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-center text-muted-foreground">
-            <p>Vui lòng chọn một cuộc trò chuyện để xem tin nhắn.</p>
-          </div>
+          <div className="flex-1 flex items-center justify-center text-center text-muted-foreground"><p>Vui lòng chọn một cuộc trò chuyện để xem tin nhắn.</p></div>
         )}
       </section>
-    </main>
+      <ChatwootContactPanel />
+    </div>
   );
 };
 
