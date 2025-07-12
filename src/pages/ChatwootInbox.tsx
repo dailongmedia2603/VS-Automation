@@ -11,6 +11,12 @@ import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 
+interface Attachment {
+  id: number;
+  file_type: 'image' | 'video' | 'audio' | 'file';
+  data_url: string;
+}
+
 interface Conversation {
   id: number;
   meta: {
@@ -32,6 +38,7 @@ interface Message {
     name: string;
     thumbnail?: string;
   };
+  attachments?: Attachment[];
 }
 
 const ChatwootInbox = () => {
@@ -75,7 +82,6 @@ const ChatwootInbox = () => {
         if (functionError) throw new Error((await functionError.context.json()).error || functionError.message);
         if (data.error) throw new Error(data.error);
 
-        // SỬA LỖI: Đọc đúng đường dẫn data.payload từ JSON trả về
         setConversations(data.data.payload || []);
       } catch (err: any) {
         setError(err.message || 'Đã xảy ra lỗi không xác định.');
@@ -222,10 +228,33 @@ const ChatwootInbox = () => {
                         </Avatar>
                     )}
                     <div className={cn(
-                        "rounded-lg px-3 py-2 max-w-[70%] break-words whitespace-pre-wrap",
+                        "rounded-lg px-3 py-2 max-w-[70%] break-words",
                         msg.message_type === 'outgoing' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-800'
                     )}>
-                      {msg.content}
+                      {msg.attachments && msg.attachments.length > 0 && (
+                        <div className="space-y-2">
+                          {msg.attachments.map(attachment => (
+                            <div key={attachment.id}>
+                              {attachment.file_type === 'image' && (
+                                <a href={attachment.data_url} target="_blank" rel="noopener noreferrer">
+                                  <img src={attachment.data_url} alt="Hình ảnh đính kèm" className="rounded-lg max-w-full h-auto" />
+                                </a>
+                              )}
+                              {attachment.file_type === 'video' && (
+                                <video controls className="rounded-lg max-w-full h-auto">
+                                  <source src={attachment.data_url} />
+                                  Trình duyệt của bạn không hỗ trợ thẻ video.
+                                </video>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {msg.content && (
+                        <p className={cn("whitespace-pre-wrap", msg.attachments && msg.attachments.length > 0 && msg.content ? "mt-2" : "")}>
+                          {msg.content}
+                        </p>
+                      )}
                     </div>
                   </div>
                 ))
