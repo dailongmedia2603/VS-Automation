@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,15 +13,36 @@ import { Badge } from "@/components/ui/badge";
 import { useChatwoot } from "@/contexts/ChatwootContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
-import { Terminal } from "lucide-react";
+import { Terminal, Loader2 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const ChatwootSettings = () => {
-  const { settings, setSettings } = useChatwoot();
+  const { settings, setSettings, isLoading: isLoadingContext } = useChatwoot();
+  const [localSettings, setLocalSettings] = useState(settings);
+  const [isSaving, setIsSaving] = useState(false);
   const [status, setStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
 
-  const handleSave = () => {
-    showSuccess("Cấu hình Chatwoot đã được lưu!");
+  useEffect(() => {
+    setLocalSettings(settings);
+  }, [settings]);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('chatwoot_settings')
+        .upsert({ ...localSettings, id: 1 }); // Luôn upsert vào dòng có id = 1
+
+      if (error) throw error;
+
+      setSettings(localSettings); // Cập nhật context sau khi lưu thành công
+      showSuccess("Cấu hình Chatwoot đã được lưu!");
+    } catch (error: any) {
+      showError("Lưu cấu hình thất bại: " + error.message);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleTestConnection = async () => {
@@ -32,12 +53,11 @@ const ChatwootSettings = () => {
       const { data, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', {
         body: {
           action: 'list_conversations',
-          settings: settings,
+          settings: localSettings, // Sử dụng cài đặt cục bộ để kiểm tra
         },
       });
 
       if (functionError) {
-        // Logic xử lý lỗi triệt để: Luôn cố gắng đọc context
         const errorData = await functionError.context.json();
         throw new Error(errorData.error || functionError.message);
       }
@@ -57,6 +77,27 @@ const ChatwootSettings = () => {
     }
   };
 
+  if (isLoadingContext) {
+    return (
+      <main className="flex-1 space-y-4 p-4 sm:p-6 md:p-8 bg-zinc-100">
+        <Skeleton className="h-8 w-1/3" />
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-1/4" />
+            <Skeleton className="h-4 w-1/2" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-24" />
+          </CardContent>
+        </Card>
+      </main>
+    );
+  }
+
   return (
     <main className="flex-1 space-y-4 p-4 sm:p-6 md:p-8 bg-zinc-100">
       <h2 className="text-3xl font-bold tracking-tight">Cài đặt Chatbot</h2>
@@ -64,7 +105,7 @@ const ChatwootSettings = () => {
         <CardHeader>
           <CardTitle>Kết nối Chatwoot</CardTitle>
           <CardDescription>
-            Nhập thông tin để kết nối với tài khoản Chatwoot Cloud của bạn.
+            Nhập thông tin để kết nối với tài khoản Chatwoot Cloud của bạn. Dữ liệu sẽ được lưu trữ an toàn.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -72,24 +113,24 @@ const ChatwootSettings = () => {
             <Label htmlFor="chatwoot-url">Chatwoot URL</Label>
             <Input
               id="chatwoot-url"
-              value={settings.chatwootUrl}
-              onChange={(e) => setSettings({ ...settings, chatwootUrl: e.target.value })}
+              value={localSettings.chatwootUrl}
+              onChange={(e) => setLocalSettings({ ...localSettings, chatwootUrl: e.target.value })}
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="account-id">Account ID</Label>
             <Input
               id="account-id"
-              value={settings.accountId}
-              onChange={(e) => setSettings({ ...settings, accountId: e.target.value })}
+              value={localSettings.accountId}
+              onChange={(e) => setLocalSettings({ ...localSettings, accountId: e.target.value })}
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="inbox-id">Inbox ID</Label>
             <Input
               id="inbox-id"
-              value={settings.inboxId}
-              onChange={(e) => setSettings({ ...settings, inboxId: e.target.value })}
+              value={localSettings.inboxId}
+              onChange={(e) => setLocalSettings({ ...localSettings, inboxId: e.target.value })}
             />
           </div>
           <div className="space-y-2">
@@ -97,11 +138,14 @@ const ChatwootSettings = () => {
             <Input
               id="api-token"
               type="password"
-              value={settings.apiToken}
-              onChange={(e) => setSettings({ ...settings, apiToken: e.target.value })}
+              value={localSettings.apiToken}
+              onChange={(e) => setLocalSettings({ ...localSettings, apiToken: e.target.value })}
             />
           </div>
-          <Button onClick={handleSave}>Lưu cấu hình</Button>
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isSaving ? "Đang lưu..." : "Lưu cấu hình"}
+          </Button>
 
           <div className="border-t pt-6 space-y-4">
             <div className="flex items-center justify-between">

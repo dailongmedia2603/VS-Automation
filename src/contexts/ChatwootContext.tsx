@@ -1,6 +1,9 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { showError } from '@/utils/toast';
 
 interface ChatwootSettings {
+  id?: number;
   chatwootUrl: string;
   accountId: string;
   inboxId: string;
@@ -10,42 +13,50 @@ interface ChatwootSettings {
 interface ChatwootContextType {
   settings: ChatwootSettings;
   setSettings: (settings: ChatwootSettings) => void;
+  isLoading: boolean;
 }
 
 const ChatwootContext = createContext<ChatwootContextType | undefined>(undefined);
 
-const CHATWOOT_SETTINGS_KEY = 'chatwootSettings';
-
 export const ChatwootProvider = ({ children }: { children: ReactNode }) => {
-  const [settings, setSettings] = useState<ChatwootSettings>(() => {
-    try {
-      const savedSettings = localStorage.getItem(CHATWOOT_SETTINGS_KEY);
-      if (savedSettings) {
-        return JSON.parse(savedSettings);
-      }
-    } catch (error) {
-      console.error("Không thể tải cài đặt Chatwoot từ localStorage", error);
-    }
-    // Giá trị mặc định nếu không có gì được lưu
-    return {
-      chatwootUrl: 'https://app.chatwoot.com', // Khôi phục lại URL chính xác
-      accountId: '',
-      inboxId: '',
-      apiToken: '',
-    };
+  const [settings, setSettings] = useState<ChatwootSettings>({
+    chatwootUrl: 'https://app.chatwoot.com',
+    accountId: '',
+    inboxId: '',
+    apiToken: '',
   });
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Tự động lưu vào localStorage mỗi khi settings thay đổi
   useEffect(() => {
-    try {
-      localStorage.setItem(CHATWOOT_SETTINGS_KEY, JSON.stringify(settings));
-    } catch (error) {
-      console.error("Không thể lưu cài đặt Chatwoot vào localStorage", error);
-    }
-  }, [settings]);
+    const fetchSettings = async () => {
+      setIsLoading(true);
+      try {
+        // Chúng ta chỉ có một dòng cài đặt, với id = 1
+        const { data, error } = await supabase
+          .from('chatwoot_settings')
+          .select('*')
+          .eq('id', 1)
+          .single();
+
+        if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
+          throw error;
+        }
+
+        if (data) {
+          setSettings(data);
+        }
+      } catch (error: any) {
+        showError("Không thể tải cấu hình Chatwoot: " + error.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSettings();
+  }, []);
 
   return (
-    <ChatwootContext.Provider value={{ settings, setSettings }}>
+    <ChatwootContext.Provider value={{ settings, setSettings, isLoading }}>
       {children}
     </ChatwootContext.Provider>
   );
