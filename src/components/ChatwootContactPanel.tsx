@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,9 +10,13 @@ import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
-interface Conversation { id: number; meta: { sender: { id: number; name: string; email?: string; phone_number?: string; thumbnail?: string; additional_attributes?: { company_name?: string; }; }; }; labels: string[]; }
 interface Message { id: number; content: string; created_at: number; private: boolean; sender?: { name: string; thumbnail?: string; }; }
-interface ChatwootContactPanelProps { selectedConversation: Conversation | null; messages: Message[]; onNewNote: () => void; }
+interface Conversation { id: number; meta: { sender: { id: number; name: string; email?: string; phone_number?: string; thumbnail?: string; additional_attributes?: { company_name?: string; }; }; }; labels: string[]; }
+interface ChatwootContactPanelProps {
+  selectedConversation: Conversation | null;
+  messages: Message[];
+  onNewNote: (newNote: Message) => void;
+}
 
 const getInitials = (name?: string) => {
   if (!name) return 'U';
@@ -25,17 +29,26 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
   const { settings } = useChatwoot();
   const [note, setNote] = useState('');
   const [isSendingNote, setIsSendingNote] = useState(false);
+  const notesContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (notesContainerRef.current) {
+      notesContainerRef.current.scrollTop = notesContainerRef.current.scrollHeight;
+    }
+  }, [messages]);
 
   const handleSendNote = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!note.trim() || !selectedConversation) return;
     setIsSendingNote(true);
     try {
-      await supabase.functions.invoke('chatwoot-proxy', {
+      const { data: newNoteMessage } = await supabase.functions.invoke('chatwoot-proxy', {
         body: { action: 'send_message', settings, conversationId: selectedConversation.id, content: note, isPrivate: true },
       });
       setNote('');
-      onNewNote();
+      if (newNoteMessage) {
+        onNewNote(newNoteMessage);
+      }
     } catch (error) {
       console.error("Failed to send note:", error);
     } finally {
@@ -63,37 +76,39 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
           <TabsTrigger value="info" className="text-sm font-semibold">Thông tin</TabsTrigger>
           <TabsTrigger value="order" className="text-sm font-semibold">Tạo đơn</TabsTrigger>
         </TabsList>
-        <TabsContent value="info" className="flex-1 flex flex-col bg-gray-50">
-          <div className="p-4 space-y-4 border-b">
-            <div className="flex items-center space-x-3">
-              <Avatar className="h-12 w-12"><AvatarImage src={contact.thumbnail} /><AvatarFallback>{getInitials(contact.name)}</AvatarFallback></Avatar>
-              <h3 className="font-bold text-lg">{contact.name}</h3>
-            </div>
-            <div className="space-y-2 text-sm text-muted-foreground">
-              <div className="flex items-center"><Mail className="h-4 w-4 mr-3" /><span>{contact.email || 'Không có sẵn'}</span></div>
-              <div className="flex items-center">
-                <Phone className={cn("h-4 w-4 mr-3", contact.phone_number && "text-green-500")} />
-                <span className={cn(contact.phone_number && "text-green-600 font-medium")}>
-                  {contact.phone_number || 'Không có sẵn'}
-                </span>
+        <TabsContent value="info" className="flex-1 flex flex-col justify-between bg-gray-50">
+          <div>
+            <div className="p-4 space-y-4 border-b">
+              <div className="flex items-center space-x-3">
+                <Avatar className="h-12 w-12"><AvatarImage src={contact.thumbnail} /><AvatarFallback>{getInitials(contact.name)}</AvatarFallback></Avatar>
+                <h3 className="font-bold text-lg">{contact.name}</h3>
               </div>
-              <div className="flex items-center"><Building className="h-4 w-4 mr-3" /><span>{contact.additional_attributes?.company_name || 'Không có sẵn'}</span></div>
-            </div>
-          </div>
-          <div className="flex-1 flex flex-col p-4 space-y-4 overflow-y-auto">
-            {notes.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center text-muted-foreground">
-                <FileText className="h-8 w-8 mb-2 text-gray-300" />
-                <p className="text-sm font-semibold text-gray-600">Chưa có ghi chú nào</p>
-              </div>
-            ) : (
-              notes.map(n => (
-                <div key={n.id} className="bg-yellow-100/50 border-l-4 border-yellow-400 p-3 rounded-r-lg">
-                  <p className="text-sm text-gray-800">{n.content}</p>
-                  <p className="text-xs text-gray-500 mt-2 text-right">{n.sender?.name} - {format(new Date(n.created_at * 1000), 'dd/MM/yy HH:mm')}</p>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <div className="flex items-center"><Mail className="h-4 w-4 mr-3" /><span>{contact.email || 'Không có sẵn'}</span></div>
+                <div className="flex items-center">
+                  <Phone className={cn("h-4 w-4 mr-3", contact.phone_number && "text-green-500")} />
+                  <span className={cn(contact.phone_number && "text-green-600 font-medium")}>
+                    {contact.phone_number || 'Không có sẵn'}
+                  </span>
                 </div>
-              ))
-            )}
+                <div className="flex items-center"><Building className="h-4 w-4 mr-3" /><span>{contact.additional_attributes?.company_name || 'Không có sẵn'}</span></div>
+              </div>
+            </div>
+            <div ref={notesContainerRef} className="p-4 space-y-4 overflow-y-auto" style={{ maxHeight: '240px' }}>
+              {notes.length === 0 ? (
+                <div className="flex flex-col items-center justify-center text-center text-muted-foreground py-4">
+                  <FileText className="h-8 w-8 mb-2 text-gray-300" />
+                  <p className="text-sm font-semibold text-gray-600">Chưa có ghi chú nào</p>
+                </div>
+              ) : (
+                notes.map(n => (
+                  <div key={n.id} className="bg-yellow-100/50 border-l-4 border-yellow-400 p-3 rounded-r-lg">
+                    <p className="text-sm text-gray-800">{n.content}</p>
+                    <p className="text-xs text-gray-500 mt-2 text-right">{n.sender?.name} - {format(new Date(n.created_at * 1000), 'dd/MM/yy HH:mm')}</p>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
           <form onSubmit={handleSendNote} className="p-4 border-t bg-gray-50">
             <div className="relative">

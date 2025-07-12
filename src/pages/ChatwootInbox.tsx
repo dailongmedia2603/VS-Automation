@@ -70,17 +70,14 @@ const ChatwootInbox = () => {
       const { data: chatwootData, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', { body: { action: 'list_conversations', settings }, });
       if (functionError) throw new Error((await functionError.context.json()).error || functionError.message);
       if (chatwootData.error) throw new Error(chatwootData.error);
-      
       const conversationsFromServer = chatwootData.data.payload || [];
       if (conversationsFromServer.length === 0) {
           setConversations([]);
           return;
       }
-
       const contactIds = conversationsFromServer.map(c => c.meta.sender.id);
       const { data: contactsFromDB } = await supabase.from('chatwoot_contacts').select('id, phone_number').in('id', contactIds);
       const phoneMap = new Map(contactsFromDB?.map(c => [c.id, c.phone_number]));
-
       const enrichedConversations = conversationsFromServer.map(convo => {
           const storedPhoneNumber = phoneMap.get(convo.meta.sender.id);
           if (storedPhoneNumber && !convo.meta.sender.phone_number) {
@@ -88,10 +85,8 @@ const ChatwootInbox = () => {
           }
           return convo;
       });
-
       setConversations(enrichedConversations);
       await syncConversationsToDB(enrichedConversations);
-
     } catch (err) { console.error("Lỗi polling cuộc trò chuyện:", err);
     } finally { if (isInitialLoad) setLoadingConversations(false); }
   };
@@ -188,6 +183,13 @@ const ChatwootInbox = () => {
     }
   };
 
+  const handleNewNote = (newNote: Message) => {
+    setMessages(prev => [...prev, newNote]);
+    if (selectedConversation) {
+      syncMessagesToDB([newNote], selectedConversation.id);
+    }
+  };
+
   const groupMessagesByDate = (messages: Message[]) => {
     return messages.reduce((acc, message, index) => {
       const messageDate = new Date(message.created_at * 1000);
@@ -250,7 +252,7 @@ const ChatwootInbox = () => {
           </>
         ) : (<div className="flex-1 flex items-center justify-center text-center text-muted-foreground"><p>Vui lòng chọn một cuộc trò chuyện để xem tin nhắn.</p></div>)}
       </section>
-      <ChatwootContactPanel selectedConversation={selectedConversation} messages={messages} onNewNote={() => selectedConversation && fetchMessages(selectedConversation.id)} />
+      <ChatwootContactPanel selectedConversation={selectedConversation} messages={messages} onNewNote={handleNewNote} />
     </div>
   );
 };
