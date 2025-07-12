@@ -43,7 +43,15 @@ export const ChatwootProvider = ({ children }: { children: ReactNode }) => {
         }
 
         if (data) {
-          setSettings(data);
+          // SỬA LỖI: Ánh xạ từ snake_case (DB) sang camelCase (JS) khi tải dữ liệu
+          const formattedSettings = {
+            id: data.id,
+            chatwootUrl: data.chatwoot_url || '',
+            accountId: data.account_id || '',
+            inboxId: data.inbox_id || '',
+            apiToken: data.api_token || '',
+          };
+          setSettings(formattedSettings);
         }
       } catch (error: any) {
         showError("Không thể tải cấu hình Chatwoot: " + error.message);
