@@ -95,8 +95,9 @@ const ChatwootInbox = () => {
       if (data.error) throw new Error(data.error);
       setMessages(data.payload.sort((a: Message, b: Message) => a.created_at - b.created_at) || []);
     } catch (err: any) { setError(err.message || 'Đã xảy ra lỗi khi tải tin nhắn.'); } finally { setLoadingMessages(false); }
+    
     if (conversation.unread_count > 0) {
-      setConversations(convos => convos.map(c => c.id === conversation.id ? { ...c, unread_count: 0 } : c));
+      // Chỉ gửi yêu cầu trong nền. Giao diện sẽ cập nhật ở lần poll tiếp theo để tránh "nhảy".
       supabase.functions.invoke('chatwoot-proxy', { body: { action: 'mark_as_read', settings, conversationId: conversation.id }, }).catch(err => { console.error("Lỗi ngầm khi đánh dấu đã đọc:", err.message); });
     }
   };
@@ -132,6 +133,31 @@ const ChatwootInbox = () => {
     convo.meta.sender.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const unreadConversations = filteredConversations.filter(c => c.unread_count > 0);
+  const readConversations = filteredConversations.filter(c => !c.unread_count || c.unread_count === 0);
+
+  const renderConversationItem = (convo: Conversation) => (
+    <div key={convo.id} onClick={() => handleSelectConversation(convo)} className={cn("p-2.5 flex space-x-3 cursor-pointer rounded-lg", selectedConversation?.id === convo.id && "bg-blue-100")}>
+      <Avatar className="h-12 w-12">
+        <AvatarImage src={convo.meta.sender.thumbnail} />
+        <AvatarFallback>{getInitials(convo.meta.sender.name)}</AvatarFallback>
+      </Avatar>
+      <div className="flex-1 overflow-hidden">
+        <div className="flex justify-between items-center">
+          <p className="font-semibold truncate text-sm">{convo.meta.sender.name}</p>
+          <p className="text-xs text-muted-foreground whitespace-nowrap">{format(new Date(convo.last_activity_at * 1000), 'HH:mm')}</p>
+        </div>
+        <div className="flex justify-between items-center mt-1">
+          <p className={cn("text-sm truncate flex items-center", convo.unread_count > 0 ? "text-black font-bold" : "text-muted-foreground")}>
+            <CornerDownLeft className="h-4 w-4 mr-1 flex-shrink-0" />
+            {convo.messages[0]?.content || '[Media]'}
+          </p>
+          {convo.unread_count > 0 && <Badge variant="destructive">{convo.unread_count}</Badge>}
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex h-full bg-white border-t">
       <aside className="w-80 border-r flex flex-col">
@@ -155,27 +181,24 @@ const ChatwootInbox = () => {
           {loadingConversations ? (
             [...Array(10)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)
           ) : (
-            filteredConversations.map((convo) => (
-              <div key={convo.id} onClick={() => handleSelectConversation(convo)} className={cn("p-2.5 flex space-x-3 cursor-pointer rounded-lg", selectedConversation?.id === convo.id && "bg-blue-100")}>
-                <Avatar className="h-12 w-12">
-                  <AvatarImage src={convo.meta.sender.thumbnail} />
-                  <AvatarFallback>{getInitials(convo.meta.sender.name)}</AvatarFallback>
-                </Avatar>
-                <div className="flex-1 overflow-hidden">
-                  <div className="flex justify-between items-center">
-                    <p className="font-semibold truncate text-sm">{convo.meta.sender.name}</p>
-                    <p className="text-xs text-muted-foreground whitespace-nowrap">{format(new Date(convo.last_activity_at * 1000), 'HH:mm')}</p>
-                  </div>
-                  <div className="flex justify-between items-center mt-1">
-                    <p className={cn("text-sm truncate flex items-center", convo.unread_count > 0 ? "text-black font-bold" : "text-muted-foreground")}>
-                      <CornerDownLeft className="h-4 w-4 mr-1 flex-shrink-0" />
-                      {convo.messages[0]?.content || '[Photo]'}
-                    </p>
-                    {convo.unread_count > 0 && <div className="w-2 h-2 bg-blue-500 rounded-full"></div>}
+            <>
+              {unreadConversations.length > 0 && (
+                <div className="mb-4 p-2 bg-blue-50/50 rounded-lg">
+                  <h3 className="px-1 pb-1 text-xs font-bold uppercase text-blue-600 tracking-wider">Chưa xem</h3>
+                  <div className="space-y-1">
+                    {unreadConversations.map(renderConversationItem)}
                   </div>
                 </div>
-              </div>
-            ))
+              )}
+              {readConversations.length > 0 && (
+                 <div className="space-y-1">
+                    {readConversations.map(renderConversationItem)}
+                  </div>
+              )}
+              {filteredConversations.length === 0 && !loadingConversations && (
+                 <p className="p-4 text-sm text-center text-muted-foreground">Không tìm thấy cuộc trò chuyện nào.</p>
+              )}
+            </>
           )}
         </div>
       </aside>
