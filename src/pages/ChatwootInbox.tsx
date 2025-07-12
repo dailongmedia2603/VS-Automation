@@ -184,12 +184,20 @@ const ChatwootInbox = () => {
         <div className="flex justify-between items-center"><p className="font-semibold truncate text-sm">{convo.meta.sender.name}</p><p className="text-xs text-muted-foreground whitespace-nowrap">{format(new Date(convo.last_activity_at * 1000), 'HH:mm')}</p></div>
         <div className="flex justify-between items-start mt-1">
           <p className={cn("text-sm truncate flex items-center", convo.unread_count > 0 ? "text-black font-bold" : "text-muted-foreground")}><CornerDownLeft className="h-4 w-4 mr-1 flex-shrink-0" />{convo.messages[0]?.content || '[Media]'}</p>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0 ml-2">
             {convo.meta.sender.phone_number && <Phone className="h-4 w-4 text-green-600" strokeWidth={2} />}
-            {convo.labels?.map(label => <Badge key={label} variant="outline" className="text-xs px-1.5 py-0">{label.substring(0, 3)}</Badge>)}
             {convo.unread_count > 0 && <Badge variant="destructive">{convo.unread_count}</Badge>}
           </div>
         </div>
+        {convo.labels && convo.labels.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1.5">
+            {convo.labels.map(label => (
+              <Badge key={label} variant="secondary" className="text-xs font-normal px-2 py-0.5">
+                {label}
+              </Badge>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
