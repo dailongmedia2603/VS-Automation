@@ -7,6 +7,7 @@ import { Terminal, Send } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { format, formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -32,6 +33,7 @@ interface Conversation {
   };
   messages: { content: string }[];
   last_activity_at: number;
+  unread_count: number;
 }
 
 interface Message {
@@ -65,6 +67,7 @@ const ChatwootInbox = () => {
   const [sendingMessage, setSendingMessage] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const POLLING_INTERVAL = 10000; // 10 giây
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -72,37 +75,74 @@ const ChatwootInbox = () => {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, loadingMessages]);
+  }, [messages]);
 
+  // Effect để tải dữ liệu và polling
   useEffect(() => {
-    const fetchConversations = async () => {
-      if (!settings.accountId || !settings.inboxId || !settings.apiToken) {
-        setError('Vui lòng điền đầy đủ thông tin trong trang Cài đặt Chatbot.');
-        setLoadingConversations(false);
+    let isMounted = true;
+
+    const fetchData = async (isInitialLoad = false) => {
+      if (!settings.accountId || !settings.apiToken || !isMounted) {
+        if (isInitialLoad) {
+          setError('Vui lòng điền đầy đủ thông tin trong trang Cài đặt Chatbot.');
+          setLoadingConversations(false);
+        }
         return;
       }
 
-      setLoadingConversations(true);
-      setError(null);
+      if (isInitialLoad) {
+        setLoadingConversations(true);
+        setError(null);
+      }
 
       try {
         const { data, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', {
           body: { action: 'list_conversations', settings },
         });
-
+        if (!isMounted) return;
         if (functionError) throw new Error((await functionError.context.json()).error || functionError.message);
         if (data.error) throw new Error(data.error);
-
         setConversations(data.data.payload || []);
       } catch (err: any) {
-        setError(err.message || 'Đã xảy ra lỗi không xác định.');
+        if (isInitialLoad) setError(err.message || 'Đã xảy ra lỗi không xác định.');
+        else console.error("Lỗi polling cuộc trò chuyện:", err.message);
       } finally {
-        setLoadingConversations(false);
+        if (isInitialLoad && isMounted) setLoadingConversations(false);
       }
     };
 
-    fetchConversations();
-  }, [settings]);
+    fetchData(true); // Tải lần đầu
+    const intervalId = setInterval(() => fetchData(false), POLLING_INTERVAL); // Bắt đầu polling
+
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
+  }, [settings.apiToken, settings.accountId]);
+
+  // Effect để poll tin nhắn của cuộc trò chuyện đang chọn
+  useEffect(() => {
+    if (!selectedConversation) return;
+
+    const fetchSelectedMessages = async () => {
+        try {
+            const { data, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', {
+                body: { action: 'list_messages', settings, conversationId: selectedConversation.id },
+            });
+            if (functionError) throw new Error((await functionError.context.json()).error || functionError.message);
+            if (data.error) throw new Error(data.error);
+            const newMessages = data.payload.sort((a: Message, b: Message) => a.created_at - b.created_at) || [];
+            setMessages(current => newMessages.length > current.length ? newMessages : current);
+        } catch (err) {
+            console.error("Lỗi polling tin nhắn:", err);
+        }
+    };
+    
+    const intervalId = setInterval(fetchSelectedMessages, POLLING_INTERVAL);
+    return () => clearInterval(intervalId);
+
+  }, [selectedConversation, settings]);
+
 
   const handleSelectConversation = async (conversation: Conversation) => {
     setSelectedConversation(conversation);
@@ -112,21 +152,28 @@ const ChatwootInbox = () => {
 
     try {
       const { data, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', {
-        body: {
-          action: 'list_messages',
-          settings,
-          conversationId: conversation.id,
-        },
+        body: { action: 'list_messages', settings, conversationId: conversation.id },
       });
-
       if (functionError) throw new Error((await functionError.context.json()).error || functionError.message);
       if (data.error) throw new Error(data.error);
-
       setMessages(data.payload.sort((a: Message, b: Message) => a.created_at - b.created_at) || []);
     } catch (err: any) {
       setError(err.message || 'Đã xảy ra lỗi khi tải tin nhắn.');
     } finally {
       setLoadingMessages(false);
+    }
+
+    if (conversation.unread_count > 0) {
+      try {
+        await supabase.functions.invoke('chatwoot-proxy', {
+          body: { action: 'mark_as_read', settings, conversationId: conversation.id },
+        });
+        setConversations(convos =>
+          convos.map(c => c.id === conversation.id ? { ...c, unread_count: 0 } : c)
+        );
+      } catch (err: any) {
+        console.error("Không thể đánh dấu đã đọc:", err.message);
+      }
     }
   };
 
@@ -137,22 +184,13 @@ const ChatwootInbox = () => {
     setSendingMessage(true);
     try {
       const { data, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', {
-        body: {
-          action: 'send_message',
-          settings,
-          conversationId: selectedConversation.id,
-          content: newMessage,
-        },
+        body: { action: 'send_message', settings, conversationId: selectedConversation.id, content: newMessage },
       });
-
       if (functionError) throw new Error((await functionError.context.json()).error || functionError.message);
       if (data.error) throw new Error(data.error);
-
       setMessages(prev => [...prev, data]);
       setNewMessage('');
-
-    } catch (err: any)
-{
+    } catch (err: any) {
       setError(err.message || 'Gửi tin nhắn thất bại.');
     } finally {
       setSendingMessage(false);
@@ -200,9 +238,16 @@ const ChatwootInbox = () => {
                             {formatDistanceToNow(new Date(convo.last_activity_at * 1000), { addSuffix: true, locale: vi })}
                         </p>
                     </div>
-                    <p className="text-sm text-muted-foreground truncate">
-                      {convo.messages[0]?.content || 'Chưa có tin nhắn'}
-                    </p>
+                    <div className="flex justify-between items-center mt-1">
+                        <p className="text-sm text-muted-foreground truncate">
+                          {convo.messages[0]?.content || 'Chưa có tin nhắn'}
+                        </p>
+                        {convo.unread_count > 0 && (
+                            <Badge variant="destructive" className="h-5 min-w-[1.25rem] p-1 flex items-center justify-center text-xs rounded-full">
+                                {convo.unread_count}
+                            </Badge>
+                        )}
+                    </div>
                   </div>
                 </li>
               )) : (
@@ -232,7 +277,6 @@ const ChatwootInbox = () => {
                 </div>
               ) : (
                 messages.map(msg => {
-                  // Tin nhắn hoạt động (system)
                   if (msg.message_type === 2) {
                     return (
                       <div key={msg.id} className="text-center text-xs text-muted-foreground py-2 italic">
@@ -240,9 +284,7 @@ const ChatwootInbox = () => {
                       </div>
                     );
                   }
-
-                  const isOutgoing = msg.message_type === 1; // 1 = outgoing, 0 = incoming
-
+                  const isOutgoing = msg.message_type === 1;
                   return (
                     <div key={msg.id} className={cn("flex items-start gap-3", isOutgoing && "justify-end")}>
                       {!isOutgoing && (

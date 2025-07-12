@@ -48,6 +48,13 @@ serve(async (req) => {
         });
         break;
 
+      case 'mark_as_read':
+        if (!conversationId) throw new Error("Conversation ID is required.");
+        endpoint = `/api/v1/accounts/${settings.accountId}/conversations/${conversationId}/update_last_seen`;
+        method = 'POST';
+        body = JSON.stringify({});
+        break;
+
       default:
         throw new Error(`Hành động không hợp lệ: ${action}`);
     }
