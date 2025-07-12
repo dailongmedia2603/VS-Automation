@@ -36,65 +36,29 @@ const ChatwootInbox = () => {
   const [sendingMessage, setSendingMessage] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const POLLING_INTERVAL = 15000; // Tăng thời gian polling để giảm tải
+  const POLLING_INTERVAL = 15000;
   const phoneRegex = /(0[3|5|7|8|9][0-9]{8})\b/;
 
   const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); };
   useEffect(() => { scrollToBottom(); }, [messages]);
 
-  // --- SYNC LOGIC ---
   const syncConversationsToDB = async (convos: Conversation[]) => {
     if (convos.length === 0) return;
-
-    const contactsToUpsert = convos.map(c => ({
-      id: c.meta.sender.id,
-      name: c.meta.sender.name,
-      email: c.meta.sender.email,
-      phone_number: c.meta.sender.phone_number,
-      thumbnail_url: c.meta.sender.thumbnail,
-    }));
-
-    const conversationsToUpsert = convos.map(c => ({
-      id: c.id,
-      contact_id: c.meta.sender.id,
-      status: c.status,
-      last_activity_at: new Date(c.last_activity_at * 1000).toISOString(),
-      unread_count: c.unread_count,
-    }));
-
+    const contactsToUpsert = convos.map(c => ({ id: c.meta.sender.id, name: c.meta.sender.name, email: c.meta.sender.email, phone_number: c.meta.sender.phone_number, thumbnail_url: c.meta.sender.thumbnail, }));
+    const conversationsToUpsert = convos.map(c => ({ id: c.id, contact_id: c.meta.sender.id, status: c.status, last_activity_at: new Date(c.last_activity_at * 1000).toISOString(), unread_count: c.unread_count, }));
     await supabase.from('chatwoot_contacts').upsert(contactsToUpsert, { onConflict: 'id' });
     await supabase.from('chatwoot_conversations').upsert(conversationsToUpsert, { onConflict: 'id' });
   };
 
   const syncMessagesToDB = async (msgs: Message[], convoId: number) => {
     if (msgs.length === 0) return;
-
-    const messagesToUpsert = msgs.map(m => ({
-      id: m.id,
-      conversation_id: convoId,
-      content: m.content,
-      message_type: m.message_type,
-      is_private: m.private,
-      sender_name: m.sender?.name,
-      sender_thumbnail: m.sender?.thumbnail,
-      created_at_chatwoot: new Date(m.created_at * 1000).toISOString(),
-    }));
-
-    const attachmentsToUpsert = msgs.flatMap(m => 
-      m.attachments?.map(a => ({
-        id: a.id,
-        message_id: m.id,
-        file_type: a.file_type,
-        data_url: a.data_url,
-      })) || []
-    );
-
+    const messagesToUpsert = msgs.map(m => ({ id: m.id, conversation_id: convoId, content: m.content, message_type: m.message_type, is_private: m.private, sender_name: m.sender?.name, sender_thumbnail: m.sender?.thumbnail, created_at_chatwoot: new Date(m.created_at * 1000).toISOString(), }));
+    const attachmentsToUpsert = msgs.flatMap(m => m.attachments?.map(a => ({ id: a.id, message_id: m.id, file_type: a.file_type, data_url: a.data_url, })) || []);
     await supabase.from('chatwoot_messages').upsert(messagesToUpsert, { onConflict: 'id' });
     if (attachmentsToUpsert.length > 0) {
       await supabase.from('chatwoot_attachments').upsert(attachmentsToUpsert, { onConflict: 'id' });
     }
   };
-  // --- END SYNC LOGIC ---
 
   const fetchConversations = async (isInitialLoad = false) => {
     if (!settings.accountId || !settings.apiToken) {
@@ -106,11 +70,18 @@ const ChatwootInbox = () => {
       const { data, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', { body: { action: 'list_conversations', settings }, });
       if (functionError) throw new Error((await functionError.context.json()).error || functionError.message);
       if (data.error) throw new Error(data.error);
-      
       const newConversationsFromServer = data.data.payload || [];
-      setConversations(prev => { /* ... logic giữ SĐT ... */ return newConversationsFromServer; });
+      setConversations(prevConversations => {
+        const prevConversationsMap = new Map(prevConversations.map(c => [c.id, c]));
+        return newConversationsFromServer.map(newConvo => {
+            const prevConvo = prevConversationsMap.get(newConvo.id);
+            if (prevConvo && prevConvo.meta.sender.phone_number && !newConvo.meta.sender.phone_number) {
+                return { ...newConvo, meta: { ...newConvo.meta, sender: { ...newConvo.meta.sender, phone_number: prevConvo.meta.sender.phone_number, } } };
+            }
+            return newConvo;
+        });
+      });
       await syncConversationsToDB(newConversationsFromServer);
-
     } catch (err) { console.error("Lỗi polling cuộc trò chuyện:", err);
     } finally { if (isInitialLoad) setLoadingConversations(false); }
   };
@@ -137,6 +108,29 @@ const ChatwootInbox = () => {
     const intervalId = setInterval(() => fetchMessages(selectedConversation.id), POLLING_INTERVAL);
     return () => clearInterval(intervalId);
   }, [selectedConversation]);
+
+  useEffect(() => {
+    if (messages.length > 0 && selectedConversation && !selectedConversation.meta.sender.phone_number) {
+      for (const msg of messages) {
+        // SỬA LỖI: Quét tất cả tin nhắn, không chỉ tin nhắn đến
+        if (msg.content) {
+          const match = msg.content.match(phoneRegex);
+          if (match && match[0]) {
+            const phoneNumber = match[0];
+            const contactId = selectedConversation.meta.sender.id;
+            const updatedSender = { ...selectedConversation.meta.sender, phone_number: phoneNumber };
+            const updatedConvo = { ...selectedConversation, meta: { ...selectedConversation.meta, sender: updatedSender } };
+            setSelectedConversation(updatedConvo);
+            setConversations(convos => convos.map(c => c.id === updatedConvo.id ? updatedConvo : c));
+            supabase.functions.invoke('chatwoot-proxy', {
+              body: { action: 'update_contact', settings, contactId, payload: { phone_number: phoneNumber } }
+            }).catch(err => console.error("Failed to update contact phone number:", err));
+            break;
+          }
+        }
+      }
+    }
+  }, [messages, selectedConversation, settings]);
 
   const handleSelectConversation = async (conversation: Conversation) => {
     setSelectedConversation(conversation);
@@ -178,7 +172,6 @@ const ChatwootInbox = () => {
     setSelectedConversation(optimisticConversation);
     setConversations(convos => convos.map(c => c.id === selectedConversation.id ? optimisticConversation : c));
     await supabase.functions.invoke('chatwoot-proxy', { body: { action: 'update_labels', settings, conversationId: selectedConversation.id, labels: newLabels } });
-    // Sync labels to DB
     const { data: upsertedLabel } = await supabase.from('chatwoot_labels').upsert({ name: label }, { onConflict: 'name' }).select().single();
     if (upsertedLabel) {
       await supabase.from('chatwoot_conversation_labels').upsert({ conversation_id: selectedConversation.id, label_id: upsertedLabel.id });
