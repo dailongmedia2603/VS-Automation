@@ -77,10 +77,8 @@ const ChatwootInbox = () => {
     scrollToBottom();
   }, [messages]);
 
-  // Effect để tải dữ liệu và polling
   useEffect(() => {
     let isMounted = true;
-
     const fetchData = async (isInitialLoad = false) => {
       if (!settings.accountId || !settings.apiToken || !isMounted) {
         if (isInitialLoad) {
@@ -89,12 +87,10 @@ const ChatwootInbox = () => {
         }
         return;
       }
-
       if (isInitialLoad) {
         setLoadingConversations(true);
         setError(null);
       }
-
       try {
         const { data, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', {
           body: { action: 'list_conversations', settings },
@@ -110,20 +106,16 @@ const ChatwootInbox = () => {
         if (isInitialLoad && isMounted) setLoadingConversations(false);
       }
     };
-
-    fetchData(true); // Tải lần đầu
-    const intervalId = setInterval(() => fetchData(false), POLLING_INTERVAL); // Bắt đầu polling
-
+    fetchData(true);
+    const intervalId = setInterval(() => fetchData(false), POLLING_INTERVAL);
     return () => {
       isMounted = false;
       clearInterval(intervalId);
     };
   }, [settings.apiToken, settings.accountId]);
 
-  // Effect để poll tin nhắn của cuộc trò chuyện đang chọn
   useEffect(() => {
     if (!selectedConversation) return;
-
     const fetchSelectedMessages = async () => {
         try {
             const { data, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', {
@@ -137,19 +129,15 @@ const ChatwootInbox = () => {
             console.error("Lỗi polling tin nhắn:", err);
         }
     };
-    
     const intervalId = setInterval(fetchSelectedMessages, POLLING_INTERVAL);
     return () => clearInterval(intervalId);
-
   }, [selectedConversation, settings]);
-
 
   const handleSelectConversation = async (conversation: Conversation) => {
     setSelectedConversation(conversation);
     setLoadingMessages(true);
     setMessages([]);
     setError(null);
-
     try {
       const { data, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', {
         body: { action: 'list_messages', settings, conversationId: conversation.id },
@@ -162,15 +150,11 @@ const ChatwootInbox = () => {
     } finally {
       setLoadingMessages(false);
     }
-
     if (conversation.unread_count > 0) {
       try {
         await supabase.functions.invoke('chatwoot-proxy', {
           body: { action: 'mark_as_read', settings, conversationId: conversation.id },
         });
-        setConversations(convos =>
-          convos.map(c => c.id === conversation.id ? { ...c, unread_count: 0 } : c)
-        );
       } catch (err: any) {
         console.error("Không thể đánh dấu đã đọc:", err.message);
       }
@@ -180,7 +164,6 @@ const ChatwootInbox = () => {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedConversation || sendingMessage) return;
-
     setSendingMessage(true);
     try {
       const { data, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', {
@@ -197,19 +180,56 @@ const ChatwootInbox = () => {
     }
   };
 
+  const unreadConversations = conversations.filter(c => c.unread_count > 0);
+  const readConversations = conversations.filter(c => !c.unread_count || c.unread_count === 0);
+
+  const renderConversationItem = (convo: Conversation) => (
+    <li
+      key={convo.id}
+      onClick={() => handleSelectConversation(convo)}
+      className={cn(
+        "p-3 flex items-center space-x-3 cursor-pointer hover:bg-zinc-50 rounded-lg",
+        selectedConversation?.id === convo.id && "bg-blue-50"
+      )}
+    >
+      <Avatar>
+        <AvatarImage src={convo.meta.sender.thumbnail} alt={convo.meta.sender.name} />
+        <AvatarFallback>{getInitials(convo.meta.sender.name)}</AvatarFallback>
+      </Avatar>
+      <div className="flex-1 overflow-hidden">
+        <div className="flex justify-between items-center">
+            <p className="font-semibold truncate">{convo.meta.sender.name}</p>
+            <p className="text-xs text-muted-foreground whitespace-nowrap">
+                {formatDistanceToNow(new Date(convo.last_activity_at * 1000), { addSuffix: true, locale: vi })}
+            </p>
+        </div>
+        <div className="flex justify-between items-center mt-1">
+            <p className={cn("text-sm text-muted-foreground truncate", convo.unread_count > 0 && "font-bold text-primary")}>
+              {convo.messages[0]?.content || 'Chưa có tin nhắn'}
+            </p>
+            {convo.unread_count > 0 && (
+                <Badge variant="destructive" className="h-5 min-w-[1.25rem] p-1 flex items-center justify-center text-xs rounded-full">
+                    {convo.unread_count}
+                </Badge>
+            )}
+        </div>
+      </div>
+    </li>
+  );
+
   return (
     <main className="flex h-full bg-white border-t">
       <aside className="w-1/3 border-r flex flex-col lg:w-1/4">
         <header className="p-4 border-b">
           <h2 className="text-xl font-bold">Hộp thư</h2>
         </header>
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto p-2">
           {loadingConversations ? (
-            <div className="p-4 space-y-2">
+            <div className="p-2 space-y-2">
               {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
             </div>
           ) : error && conversations.length === 0 ? (
-             <div className="p-4">
+             <div className="p-2">
                 <Alert variant="destructive">
                   <Terminal className="h-4 w-4" />
                   <AlertTitle>Lỗi!</AlertTitle>
@@ -217,43 +237,27 @@ const ChatwootInbox = () => {
                 </Alert>
              </div>
           ) : (
-            <ul className="divide-y">
-              {conversations.length > 0 ? conversations.map((convo) => (
-                <li
-                  key={convo.id}
-                  onClick={() => handleSelectConversation(convo)}
-                  className={cn(
-                    "p-3 flex items-center space-x-3 cursor-pointer hover:bg-zinc-50",
-                    selectedConversation?.id === convo.id && "bg-blue-50"
-                  )}
-                >
-                  <Avatar>
-                    <AvatarImage src={convo.meta.sender.thumbnail} alt={convo.meta.sender.name} />
-                    <AvatarFallback>{getInitials(convo.meta.sender.name)}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 overflow-hidden">
-                    <div className="flex justify-between items-center">
-                        <p className="font-semibold truncate">{convo.meta.sender.name}</p>
-                        <p className="text-xs text-muted-foreground whitespace-nowrap">
-                            {formatDistanceToNow(new Date(convo.last_activity_at * 1000), { addSuffix: true, locale: vi })}
-                        </p>
-                    </div>
-                    <div className="flex justify-between items-center mt-1">
-                        <p className="text-sm text-muted-foreground truncate">
-                          {convo.messages[0]?.content || 'Chưa có tin nhắn'}
-                        </p>
-                        {convo.unread_count > 0 && (
-                            <Badge variant="destructive" className="h-5 min-w-[1.25rem] p-1 flex items-center justify-center text-xs rounded-full">
-                                {convo.unread_count}
-                            </Badge>
-                        )}
-                    </div>
-                  </div>
-                </li>
-              )) : (
+            <>
+              {unreadConversations.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="px-3 text-xs font-bold uppercase text-blue-600 tracking-wider">Chưa xem</h3>
+                  <ul className="mt-1 space-y-1">
+                    {unreadConversations.map(renderConversationItem)}
+                  </ul>
+                </div>
+              )}
+              {readConversations.length > 0 && (
+                <div>
+                  <h3 className="px-3 text-xs font-semibold uppercase text-muted-foreground tracking-wider">Đã xem</h3>
+                  <ul className="mt-1 space-y-1">
+                    {readConversations.map(renderConversationItem)}
+                  </ul>
+                </div>
+              )}
+              {conversations.length === 0 && (
                 <p className="p-4 text-sm text-muted-foreground">Không tìm thấy cuộc trò chuyện nào.</p>
               )}
-            </ul>
+            </>
           )}
         </div>
       </aside>
