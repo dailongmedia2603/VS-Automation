@@ -112,7 +112,6 @@ const ChatwootInbox = () => {
   useEffect(() => {
     if (messages.length > 0 && selectedConversation && !selectedConversation.meta.sender.phone_number) {
       for (const msg of messages) {
-        // SỬA LỖI: Quét tất cả tin nhắn, không chỉ tin nhắn đến
         if (msg.content) {
           const match = msg.content.match(phoneRegex);
           if (match && match[0]) {
@@ -122,6 +121,7 @@ const ChatwootInbox = () => {
             const updatedConvo = { ...selectedConversation, meta: { ...selectedConversation.meta, sender: updatedSender } };
             setSelectedConversation(updatedConvo);
             setConversations(convos => convos.map(c => c.id === updatedConvo.id ? updatedConvo : c));
+            supabase.from('chatwoot_contacts').update({ phone_number: phoneNumber }).eq('id', contactId).then();
             supabase.functions.invoke('chatwoot-proxy', {
               body: { action: 'update_contact', settings, contactId, payload: { phone_number: phoneNumber } }
             }).catch(err => console.error("Failed to update contact phone number:", err));
