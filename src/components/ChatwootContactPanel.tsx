@@ -1,22 +1,24 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, ShoppingBag, Mail, Phone, Building, Send, Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { FileText, Mail, Phone, Building, Send, Loader2, PlusCircle, Calendar, Clock, Trash2, Pencil, ImagePlus } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useChatwoot } from '@/contexts/ChatwootContext';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { showSuccess, showError } from '@/utils/toast';
+import { Badge } from "@/components/ui/badge";
 
+// Interfaces
 interface Message { id: number; content: string; created_at: number; private: boolean; sender?: { name: string; thumbnail?: string; }; }
 interface Conversation { id: number; meta: { sender: { id: number; name: string; email?: string; phone_number?: string; thumbnail?: string; additional_attributes?: { company_name?: string; }; }; }; labels: string[]; }
-interface ChatwootContactPanelProps {
-  selectedConversation: Conversation | null;
-  messages: Message[];
-  onNewNote: (newNote: Message) => void;
-}
+interface CareScript { id: number; content: string; scheduled_at: string; status: 'scheduled' | 'sent' | 'failed'; image_url?: string; }
+interface ChatwootContactPanelProps { selectedConversation: Conversation | null; messages: Message[]; onNewNote: (newNote: Message) => void; }
 
 const getInitials = (name?: string) => {
   if (!name) return 'U';
@@ -29,11 +31,32 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
   const { settings } = useChatwoot();
   const [note, setNote] = useState('');
   const [isSendingNote, setIsSendingNote] = useState(false);
+  const [scripts, setScripts] = useState<CareScript[]>([]);
+  const [isScriptDialogOpen, setIsScriptDialogOpen] = useState(false);
+  const [newScriptContent, setNewScriptContent] = useState('');
+  const [newScriptSchedule, setNewScriptSchedule] = useState('');
   const notesContainerRef = useRef<HTMLDivElement>(null);
+
+  const fetchCareScripts = async (conversationId: number) => {
+    const { data, error } = await supabase.from('care_scripts').select('*').eq('conversation_id', conversationId).order('scheduled_at', { ascending: true });
+    if (error) {
+      showError("Không thể tải kịch bản chăm sóc.");
+    } else {
+      setScripts(data);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedConversation) {
+      fetchCareScripts(selectedConversation.id);
+    } else {
+      setScripts([]);
+    }
+  }, [selectedConversation]);
 
   useEffect(() => {
     if (notesContainerRef.current) {
-      notesContainerRef.current.scrollTop = 0; // Cuộn lên đầu khi có ghi chú mới
+      notesContainerRef.current.scrollTop = 0;
     }
   }, [messages]);
 
@@ -42,21 +65,34 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
     if (!note.trim() || !selectedConversation) return;
     setIsSendingNote(true);
     try {
-      const { data: newNoteMessage } = await supabase.functions.invoke('chatwoot-proxy', {
-        body: { action: 'send_message', settings, conversationId: selectedConversation.id, content: note, isPrivate: true },
-      });
+      const { data: newNoteMessage } = await supabase.functions.invoke('chatwoot-proxy', { body: { action: 'send_message', settings, conversationId: selectedConversation.id, content: note, isPrivate: true }, });
       setNote('');
-      if (newNoteMessage) {
-        onNewNote(newNoteMessage);
-      }
-    } catch (error) {
-      console.error("Failed to send note:", error);
-    } finally {
-      setIsSendingNote(false);
+      if (newNoteMessage) onNewNote(newNoteMessage);
+    } catch (error) { console.error("Failed to send note:", error); } finally { setIsSendingNote(false); }
+  };
+
+  const handleCreateScript = async () => {
+    if (!newScriptContent || !newScriptSchedule || !selectedConversation) {
+      showError("Vui lòng nhập đầy đủ nội dung và lịch gửi.");
+      return;
+    }
+    const { error } = await supabase.from('care_scripts').insert({
+      conversation_id: selectedConversation.id,
+      contact_id: selectedConversation.meta.sender.id,
+      content: newScriptContent,
+      scheduled_at: newScriptSchedule,
+    });
+    if (error) {
+      showError("Tạo kịch bản thất bại: " + error.message);
+    } else {
+      showSuccess("Đã tạo kịch bản chăm sóc mới!");
+      fetchCareScripts(selectedConversation.id);
+      setIsScriptDialogOpen(false);
+      setNewScriptContent('');
+      setNewScriptSchedule('');
     }
   };
 
-  // Sắp xếp ghi chú: mới nhất ở trên cùng
   const notes = messages.filter(msg => msg.private).sort((a, b) => b.created_at - a.created_at);
 
   if (!selectedConversation) {
@@ -75,57 +111,48 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
       <Tabs defaultValue="info" className="flex-1 flex flex-col">
         <TabsList className="grid w-full grid-cols-2 rounded-none h-14">
           <TabsTrigger value="info" className="text-sm font-semibold">Thông tin</TabsTrigger>
-          <TabsTrigger value="order" className="text-sm font-semibold">Tạo đơn</TabsTrigger>
+          <TabsTrigger value="care" className="text-sm font-semibold">Chăm sóc</TabsTrigger>
         </TabsList>
         <TabsContent value="info" className="flex-1 flex flex-col justify-between bg-gray-50">
           <div>
             <div className="p-4 space-y-4 border-b">
-              <div className="flex items-center space-x-3">
-                <Avatar className="h-12 w-12"><AvatarImage src={contact.thumbnail} /><AvatarFallback>{getInitials(contact.name)}</AvatarFallback></Avatar>
-                <h3 className="font-bold text-lg">{contact.name}</h3>
-              </div>
+              <div className="flex items-center space-x-3"><Avatar className="h-12 w-12"><AvatarImage src={contact.thumbnail} /><AvatarFallback>{getInitials(contact.name)}</AvatarFallback></Avatar><h3 className="font-bold text-lg">{contact.name}</h3></div>
               <div className="space-y-2 text-sm text-muted-foreground">
                 <div className="flex items-center"><Mail className="h-4 w-4 mr-3" /><span>{contact.email || 'Không có sẵn'}</span></div>
-                <div className="flex items-center">
-                  <Phone className={cn("h-4 w-4 mr-3", contact.phone_number && "text-green-500")} />
-                  <span className={cn(contact.phone_number && "text-green-600 font-medium")}>
-                    {contact.phone_number || 'Không có sẵn'}
-                  </span>
-                </div>
+                <div className="flex items-center"><Phone className={cn("h-4 w-4 mr-3", contact.phone_number && "text-green-500")} /><span className={cn(contact.phone_number && "text-green-600 font-medium")}>{contact.phone_number || 'Không có sẵn'}</span></div>
                 <div className="flex items-center"><Building className="h-4 w-4 mr-3" /><span>{contact.additional_attributes?.company_name || 'Không có sẵn'}</span></div>
               </div>
             </div>
             <div ref={notesContainerRef} className="p-4 space-y-4 overflow-y-auto" style={{ maxHeight: '240px' }}>
-              {notes.length === 0 ? (
-                <div className="flex flex-col items-center justify-center text-center text-muted-foreground py-4">
-                  <FileText className="h-8 w-8 mb-2 text-gray-300" />
-                  <p className="text-sm font-semibold text-gray-600">Chưa có ghi chú nào</p>
-                </div>
-              ) : (
-                notes.map(n => (
-                  <div key={n.id} className="bg-yellow-100/50 border-l-4 border-yellow-400 p-3 rounded-r-lg">
-                    <p className="text-sm text-gray-800">{n.content}</p>
-                    <p className="text-xs text-gray-500 mt-2 text-right">{n.sender?.name} - {format(new Date(n.created_at * 1000), 'dd/MM/yy HH:mm')}</p>
-                  </div>
-                ))
-              )}
+              {notes.length === 0 ? (<div className="flex flex-col items-center justify-center text-center text-muted-foreground py-4"><FileText className="h-8 w-8 mb-2 text-gray-300" /><p className="text-sm font-semibold text-gray-600">Chưa có ghi chú nào</p></div>) : (notes.map(n => (<div key={n.id} className="bg-yellow-100/50 border-l-4 border-yellow-400 p-3 rounded-r-lg"><p className="text-sm text-gray-800">{n.content}</p><p className="text-xs text-gray-500 mt-2 text-right">{n.sender?.name} - {format(new Date(n.created_at * 1000), 'dd/MM/yy HH:mm')}</p></div>)))}
             </div>
           </div>
-          <form onSubmit={handleSendNote} className="p-4 border-t bg-gray-50">
-            <div className="relative">
-              <Input placeholder="Nhập ghi chú (Enter để gửi)" className="pr-10 bg-white" value={note} onChange={e => setNote(e.target.value)} disabled={isSendingNote} />
-              <Button type="submit" size="icon" className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7" disabled={isSendingNote}>
-                {isSendingNote ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              </Button>
-            </div>
-          </form>
+          <form onSubmit={handleSendNote} className="p-4 border-t bg-gray-50"><div className="relative"><Input placeholder="Nhập ghi chú (Enter để gửi)" className="pr-10 bg-white" value={note} onChange={e => setNote(e.target.value)} disabled={isSendingNote} /><Button type="submit" size="icon" className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7" disabled={isSendingNote}>{isSendingNote ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}</Button></div></form>
         </TabsContent>
-        <TabsContent value="order" className="flex-1 flex flex-col p-4 space-y-4 bg-gray-50">
-          <div className="flex-1 flex flex-col items-center justify-center text-center text-muted-foreground bg-white rounded-lg p-4">
-            <ShoppingBag className="h-10 w-10 mb-3 text-gray-400" />
-            <p className="text-sm font-semibold text-gray-600">Chưa có lịch sử đơn hàng</p>
+        <TabsContent value="care" className="flex-1 flex flex-col p-4 space-y-4 bg-gray-50">
+          <Dialog open={isScriptDialogOpen} onOpenChange={setIsScriptDialogOpen}>
+            <DialogTrigger asChild><Button className="w-full"><PlusCircle className="mr-2 h-4 w-4" />Tạo kịch bản chăm sóc</Button></DialogTrigger>
+            <DialogContent><DialogHeader><DialogTitle>Tạo kịch bản chăm sóc mới</DialogTitle></DialogHeader><div className="space-y-4 py-4"><Textarea placeholder="Nhập nội dung tin nhắn..." value={newScriptContent} onChange={(e) => setNewScriptContent(e.target.value)} /><Input type="datetime-local" value={newScriptSchedule} onChange={(e) => setNewScriptSchedule(e.target.value)} /></div><DialogFooter><Button variant="outline" onClick={() => setIsScriptDialogOpen(false)}>Hủy</Button><Button onClick={handleCreateScript}>Lưu kịch bản</Button></DialogFooter></DialogContent>
+          </Dialog>
+          <div className="flex-1 overflow-y-auto space-y-3 pr-2">
+            {scripts.length === 0 ? (<div className="flex flex-col items-center justify-center text-center text-muted-foreground h-full"><Calendar className="h-10 w-10 mb-3 text-gray-400" /><p className="text-sm font-semibold text-gray-600">Chưa có kịch bản nào</p><p className="text-xs">Hãy tạo kịch bản để chăm sóc khách hàng tự động.</p></div>) : (scripts.map(script => (
+              <div key={script.id} className="bg-white p-3 rounded-lg border shadow-sm">
+                <p className="text-sm text-gray-800 mb-2">{script.content}</p>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Clock className="h-3 w-3" />
+                    <span>{format(new Date(script.scheduled_at), 'dd/MM/yy HH:mm')}</span>
+                    <Badge variant={script.status === 'sent' ? 'default' : 'secondary'}>{script.status}</Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="icon" className="h-6 w-6"><ImagePlus className="h-4 w-4 text-muted-foreground" /></Button>
+                    <Button variant="ghost" size="icon" className="h-6 w-6"><Pencil className="h-4 w-4 text-muted-foreground" /></Button>
+                    <Button variant="ghost" size="icon" className="h-6 w-6"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                  </div>
+                </div>
+              </div>
+            )))}
           </div>
-          <Button className="w-full">+ Tạo đơn</Button>
         </TabsContent>
       </Tabs>
     </aside>
