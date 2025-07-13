@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import { format, isSameDay } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { ChatwootContactPanel } from '@/components/ChatwootContactPanel';
-import { Search, Phone, Link as LinkIcon, Smile, Paperclip, Image as ImageIcon, SendHorizonal, ThumbsUp, Settings2, CornerDownLeft, Eye, RefreshCw, UserPlus, FileText, X, Filter, Check, PlusCircle } from 'lucide-react';
+import { Search, Phone, Link as LinkIcon, Smile, Paperclip, Image as ImageIcon, SendHorizonal, ThumbsUp, Settings2, CornerDownLeft, Eye, RefreshCw, UserPlus, FileText, X, Filter, Check, PlusCircle, Trash2 } from 'lucide-react';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 
 // Interfaces
@@ -61,6 +61,22 @@ const ChatwootInbox = () => {
   const POLLING_INTERVAL = 15000;
   const phoneRegex = /(0[3|5|7|8|9][0-9]{8})\b/;
   const AI_CARE_LABEL = 'AI chăm';
+
+  const handleClearFilters = () => {
+    setFilters({
+      hasPhoneNumber: null,
+      selectedLabels: [],
+      seenNotReplied: false,
+    });
+  };
+
+  const areFiltersActive = useMemo(() => {
+    return (
+      filters.hasPhoneNumber !== null ||
+      filters.selectedLabels.length > 0 ||
+      filters.seenNotReplied
+    );
+  }, [filters]);
 
   const labelColorMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -392,113 +408,120 @@ const ChatwootInbox = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Tìm kiếm" className="pl-9" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
           </div>
-          <Collapsible open={isFilterOpen} onOpenChange={setIsFilterOpen} className="mt-2">
-            <CollapsibleTrigger asChild>
-              <Button variant="outline" className="w-full justify-start px-3 font-normal text-muted-foreground">
-                <Filter className="h-4 w-4 mr-2" />
-                Thêm bộ lọc...
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="pt-2">
-              <div className="border rounded-lg p-3 space-y-3 bg-slate-50/50 text-xs">
-                <div className="space-y-1.5">
-                  <h4 className="font-semibold text-slate-500 uppercase tracking-wider">Số điện thoại</h4>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button size="sm" variant="ghost" className={cn("w-full justify-center h-8 text-xs font-medium", filters.hasPhoneNumber === true ? "bg-blue-100 text-blue-800 hover:bg-blue-100" : "bg-slate-100 hover:bg-slate-200 text-slate-700")} onClick={() => setFilters(f => ({...f, hasPhoneNumber: f.hasPhoneNumber === true ? null : true}))}>
-                      Có SĐT 
-                      <Badge className={cn("ml-1.5 text-xs font-bold", filters.hasPhoneNumber === true ? "bg-blue-200 text-blue-800" : "bg-slate-200 text-slate-700")}>
-                        {countWithPhone}
-                      </Badge>
-                    </Button>
-                    <Button size="sm" variant="ghost" className={cn("w-full justify-center h-8 text-xs font-medium", filters.hasPhoneNumber === false ? "bg-blue-100 text-blue-800 hover:bg-blue-100" : "bg-slate-100 hover:bg-slate-200 text-slate-700")} onClick={() => setFilters(f => ({...f, hasPhoneNumber: f.hasPhoneNumber === false ? null : false}))}>
-                      Không có SĐT 
-                      <Badge className={cn("ml-1.5 text-xs font-bold", filters.hasPhoneNumber === false ? "bg-blue-200 text-blue-800" : "bg-slate-200 text-slate-700")}>
-                        {countWithoutPhone}
-                      </Badge>
-                    </Button>
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <h4 className="font-semibold text-slate-500 uppercase tracking-wider">Trạng thái</h4>
-                  <div className="flex items-center space-x-3 p-2 rounded-lg bg-white hover:bg-slate-100 cursor-pointer" onClick={() => setFilters(f => ({...f, seenNotReplied: !f.seenNotReplied}))}>
-                    <Checkbox id="seenNotReplied" checked={filters.seenNotReplied} />
-                    <label htmlFor="seenNotReplied" className="flex-1 cursor-pointer text-slate-700">Đã xem, chưa trả lời</label>
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <h4 className="font-semibold text-slate-500 uppercase tracking-wider">Tags</h4>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="w-full justify-between bg-white hover:bg-slate-50 h-8 font-normal">
-                        <span className="text-slate-700">
-                          {filters.selectedLabels.length > 0 
-                              ? `${filters.selectedLabels.length} tag đã chọn` 
-                              : "Chọn tags..."}
-                        </span>
-                        <PlusCircle className="ml-2 h-4 w-4 text-slate-400" />
+          <div className="flex items-center gap-2 mt-2">
+            <Collapsible open={isFilterOpen} onOpenChange={setIsFilterOpen} className="flex-grow">
+              <CollapsibleTrigger asChild>
+                <Button variant="outline" className="w-full justify-start px-3 font-normal text-muted-foreground">
+                  <Filter className="h-4 w-4 mr-2" />
+                  Thêm bộ lọc...
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-2">
+                <div className="border rounded-lg p-3 space-y-3 bg-slate-50/50 text-xs">
+                  <div className="space-y-1.5">
+                    <h4 className="font-semibold text-slate-500 uppercase tracking-wider">Số điện thoại</h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button size="sm" variant="ghost" className={cn("w-full justify-center h-8 text-xs font-medium", filters.hasPhoneNumber === true ? "bg-blue-100 text-blue-800 hover:bg-blue-100" : "bg-slate-100 hover:bg-slate-200 text-slate-700")} onClick={() => setFilters(f => ({...f, hasPhoneNumber: f.hasPhoneNumber === true ? null : true}))}>
+                        Có SĐT 
+                        <Badge className={cn("ml-1.5 text-xs font-bold", filters.hasPhoneNumber === true ? "bg-blue-200 text-blue-800" : "bg-slate-200 text-slate-700")}>
+                          {countWithPhone}
+                        </Badge>
                       </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[260px] p-0" align="start">
-                      <Command>
-                        <CommandInput placeholder="Tìm tag..." />
-                        <CommandList>
-                          <CommandEmpty>Không tìm thấy tag.</CommandEmpty>
-                          <CommandGroup>
-                            {suggestedLabels.map((label) => {
-                              const isSelected = filters.selectedLabels.includes(label.name);
-                              return (
-                                <CommandItem
-                                  key={label.id}
-                                  onSelect={() => {
-                                    if (isSelected) {
-                                      setFilters(f => ({ ...f, selectedLabels: f.selectedLabels.filter(l => l !== label.name) }));
-                                    } else {
-                                      setFilters(f => ({ ...f, selectedLabels: [...f.selectedLabels, label.name] }));
-                                    }
-                                  }}
-                                >
-                                  <div className={cn("mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary", isSelected ? "bg-primary text-primary-foreground" : "opacity-50 [&_svg]:invisible")}>
-                                    <Check className={cn("h-4 w-4")} />
-                                  </div>
-                                  <div className="flex items-center">
-                                    <span className="h-2 w-2 rounded-full mr-2" style={{ backgroundColor: label.color }}></span>
-                                    <span className="truncate">{label.name}</span>
-                                  </div>
-                                </CommandItem>
-                              );
-                            })}
-                          </CommandGroup>
-                          {filters.selectedLabels.length > 0 && (
-                            <>
-                              <CommandSeparator />
-                              <CommandGroup>
-                                <CommandItem onSelect={() => setFilters(f => ({ ...f, selectedLabels: [] }))} className="justify-center text-center">Xóa bộ lọc</CommandItem>
-                              </CommandGroup>
-                            </>
-                          )}
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                  {filters.selectedLabels.length > 0 && (
-                    <div className="flex flex-wrap gap-1 pt-2">
-                      {filters.selectedLabels.map(labelName => {
-                        const color = labelColorMap.get(labelName) || '#6B7280';
-                        return (
-                          <Badge key={labelName} variant="outline" className="font-medium" style={{ backgroundColor: `${color}20`, color: color, borderColor: `${color}50` }}>
-                            {labelName}
-                            <button className="ml-1.5 rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2" onClick={() => setFilters(f => ({ ...f, selectedLabels: f.selectedLabels.filter(l => l !== labelName) }))}>
-                              <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
-                            </button>
-                          </Badge>
-                        );
-                      })}
+                      <Button size="sm" variant="ghost" className={cn("w-full justify-center h-8 text-xs font-medium", filters.hasPhoneNumber === false ? "bg-blue-100 text-blue-800 hover:bg-blue-100" : "bg-slate-100 hover:bg-slate-200 text-slate-700")} onClick={() => setFilters(f => ({...f, hasPhoneNumber: f.hasPhoneNumber === false ? null : false}))}>
+                        Không có SĐT 
+                        <Badge className={cn("ml-1.5 text-xs font-bold", filters.hasPhoneNumber === false ? "bg-blue-200 text-blue-800" : "bg-slate-200 text-slate-700")}>
+                          {countWithoutPhone}
+                        </Badge>
+                      </Button>
                     </div>
-                  )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <h4 className="font-semibold text-slate-500 uppercase tracking-wider">Trạng thái</h4>
+                    <div className="flex items-center space-x-3 p-2 rounded-lg bg-white hover:bg-slate-100 cursor-pointer" onClick={() => setFilters(f => ({...f, seenNotReplied: !f.seenNotReplied}))}>
+                      <Checkbox id="seenNotReplied" checked={filters.seenNotReplied} />
+                      <label htmlFor="seenNotReplied" className="flex-1 cursor-pointer text-slate-700">Đã xem, chưa trả lời</label>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <h4 className="font-semibold text-slate-500 uppercase tracking-wider">Tags</h4>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full justify-between bg-white hover:bg-slate-50 h-8 font-normal">
+                          <span className="text-slate-700">
+                            {filters.selectedLabels.length > 0 
+                                ? `${filters.selectedLabels.length} tag đã chọn` 
+                                : "Chọn tags..."}
+                          </span>
+                          <PlusCircle className="ml-2 h-4 w-4 text-slate-400" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[260px] p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Tìm tag..." />
+                          <CommandList>
+                            <CommandEmpty>Không tìm thấy tag.</CommandEmpty>
+                            <CommandGroup>
+                              {suggestedLabels.map((label) => {
+                                const isSelected = filters.selectedLabels.includes(label.name);
+                                return (
+                                  <CommandItem
+                                    key={label.id}
+                                    onSelect={() => {
+                                      if (isSelected) {
+                                        setFilters(f => ({ ...f, selectedLabels: f.selectedLabels.filter(l => l !== label.name) }));
+                                      } else {
+                                        setFilters(f => ({ ...f, selectedLabels: [...f.selectedLabels, label.name] }));
+                                      }
+                                    }}
+                                  >
+                                    <div className={cn("mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary", isSelected ? "bg-primary text-primary-foreground" : "opacity-50 [&_svg]:invisible")}>
+                                      <Check className={cn("h-4 w-4")} />
+                                    </div>
+                                    <div className="flex items-center">
+                                      <span className="h-2 w-2 rounded-full mr-2" style={{ backgroundColor: label.color }}></span>
+                                      <span className="truncate">{label.name}</span>
+                                    </div>
+                                  </CommandItem>
+                                );
+                              })}
+                            </CommandGroup>
+                            {filters.selectedLabels.length > 0 && (
+                              <>
+                                <CommandSeparator />
+                                <CommandGroup>
+                                  <CommandItem onSelect={() => setFilters(f => ({ ...f, selectedLabels: [] }))} className="justify-center text-center">Xóa bộ lọc</CommandItem>
+                                </CommandGroup>
+                              </>
+                            )}
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    {filters.selectedLabels.length > 0 && (
+                      <div className="flex flex-wrap gap-1 pt-2">
+                        {filters.selectedLabels.map(labelName => {
+                          const color = labelColorMap.get(labelName) || '#6B7280';
+                          return (
+                            <Badge key={labelName} variant="outline" className="font-medium" style={{ backgroundColor: `${color}20`, color: color, borderColor: `${color}50` }}>
+                              {labelName}
+                              <button className="ml-1.5 rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2" onClick={() => setFilters(f => ({ ...f, selectedLabels: f.selectedLabels.filter(l => l !== labelName) }))}>
+                                <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
+                              </button>
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
+              </CollapsibleContent>
+            </Collapsible>
+            {areFiltersActive && (
+              <Button variant="ghost" size="icon" onClick={handleClearFilters} className="flex-shrink-0">
+                <Trash2 className="h-4 w-4 text-destructive" />
+              </Button>
+            )}
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-1">{loadingConversations ? ([...Array(10)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)) : (<>{unreadConversations.length > 0 && (<div className="mb-4 p-2 bg-blue-50/50 rounded-lg"><h3 className="px-1 pb-1 text-xs font-bold uppercase text-blue-600 tracking-wider">Chưa xem</h3><div className="space-y-1">{unreadConversations.map(renderConversationItem)}</div></div>)}{readConversations.length > 0 && (<div className="space-y-1">{readConversations.map(renderConversationItem)}</div>)}{filteredConversations.length === 0 && !loadingConversations && (<p className="p-4 text-sm text-center text-muted-foreground">Không tìm thấy cuộc trò chuyện nào.</p>)}</>)}</div>
       </aside>
