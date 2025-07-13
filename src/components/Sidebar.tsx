@@ -44,7 +44,7 @@ export function Sidebar({ className }: { className?: string }) {
       to={item.href}
       className={cn(
         "flex items-center rounded-lg px-3 py-2.5 text-md font-medium text-zinc-600 hover:bg-blue-50 hover:text-blue-600",
-        location.pathname === item.href && "text-blue-100 text-blue-600"
+        location.pathname === item.href && "bg-blue-600 text-white hover:bg-blue-600"
       )}
     >
       <item.icon className="mr-3 h-5 w-5" />
@@ -55,7 +55,7 @@ export function Sidebar({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "h-full flex flex-col bg-zinc-50 text-zinc-800 p-4 lg:p-6 space-y-6",
+        "h-full flex flex-col bg-white text-zinc-800 p-4 lg:p-6 space-y-6",
         className
       )}
     >
