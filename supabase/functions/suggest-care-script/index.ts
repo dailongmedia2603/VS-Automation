@@ -33,7 +33,17 @@ serve(async (req) => {
       .from('ai_settings').select('api_url, api_key').eq('id', 1).single();
     if (aiSettingsError || !aiSettings) throw new Error("Không tìm thấy cấu hình AI.");
 
-    // 2. Lấy dữ liệu cuộc trò chuyện
+    // 2. Lấy prompt huấn luyện
+    const { data: promptData, error: promptError } = await supabaseAdmin
+      .from('ai_training_prompts')
+      .select('prompt_text, is_active')
+      .eq('name', 'care_script_suggestion')
+      .single();
+    if (promptError) throw new Error("Không thể tải prompt huấn luyện: " + promptError.message);
+    if (!promptData.is_active) throw new Error("Tính năng gợi ý kịch bản chăm sóc đang bị tắt. Bạn có thể bật lại trong trang Huấn luyện Chatbot.");
+    if (!promptData.prompt_text) throw new Error("Nội dung huấn luyện cho tính năng này chưa được thiết lập.");
+
+    // 3. Lấy dữ liệu cuộc trò chuyện
     const { data: messages, error: messagesError } = await supabaseAdmin
       .from('chatwoot_messages').select('content, message_type, created_at_chatwoot')
       .eq('conversation_id', conversationId).order('created_at_chatwoot', { ascending: true });
@@ -51,26 +61,13 @@ serve(async (req) => {
     const conversationHistory = messages.map(formatMessage).join('\n');
     const contactName = contactData.name || 'Khách hàng';
 
-    // 3. Xây dựng prompt cho AI
-    const systemPrompt = `Bạn là một trợ lý chăm sóc khách hàng chuyên nghiệp. Nhiệm vụ của bạn là phân tích một cuộc trò chuyện và đề xuất một tin nhắn theo dõi cùng thời gian gửi phù hợp. Mục tiêu là tái tương tác với khách hàng, cung cấp giá trị, hoặc đưa họ đến bước tiếp theo. Ngày hiện tại là ${new Date().toLocaleDateString('vi-VN')}.
+    // 4. Xây dựng prompt cho AI từ template
+    let systemPrompt = promptData.prompt_text;
+    systemPrompt = systemPrompt.replace(/{{current_date}}/g, new Date().toLocaleDateString('vi-VN'));
+    systemPrompt = systemPrompt.replace(/{{contact_name}}/g, contactName);
+    systemPrompt = systemPrompt.replace(/{{conversation_history}}/g, conversationHistory);
 
-Tên khách hàng là ${contactName}.
-
-Hãy phân tích lịch sử trò chuyện sau:
----
-${conversationHistory}
----
-
-Dựa vào cuộc trò chuyện này, hãy đề xuất một tin nhắn theo dõi được cá nhân hóa, không gây khó chịu. Tin nhắn phải thân thiện, hữu ích và viết bằng tiếng Việt.
-Đồng thời, đề xuất một ngày và giờ cụ thể trong tương lai để gửi tin nhắn này. Hãy xem xét giờ hành chính (9h - 17h) và bối cảnh cuộc trò chuyện. Nếu cuộc trò chuyện đã nguội lạnh, một tin nhắn sau 3-5 ngày có thể phù hợp.
-
-Phản hồi của bạn BẮT BUỘC phải là một đối tượng JSON hợp lệ với cấu trúc sau và không có gì khác:
-{
-  "content": "Nội dung tin nhắn đề xuất bằng tiếng Việt.",
-  "scheduled_at": "Một ngày và giờ trong tương lai theo định dạng ISO 8601 (YYYY-MM-DDTHH:mm:ss.sssZ)."
-}`;
-
-    // 4. Gọi proxy AI
+    // 5. Gọi proxy AI
     const { data: proxyResponse, error: proxyError } = await supabaseAdmin.functions.invoke('multi-ai-proxy', {
       body: {
         messages: [{ role: 'system', content: systemPrompt }],
@@ -83,7 +80,7 @@ Phản hồi của bạn BẮT BUỘC phải là một đối tượng JSON hợ
     if (proxyError) throw new Error(proxyError.message || 'Gọi function thất bại');
     if (proxyResponse.error) throw new Error(proxyResponse.error);
 
-    // 5. Xử lý và trả về phản hồi của AI
+    // 6. Xử lý và trả về phản hồi của AI
     const aiContent = proxyResponse.choices[0].message.content;
     const jsonString = aiContent.replace(/```json\n|```/g, '').trim();
     const suggestion = JSON.parse(jsonString);

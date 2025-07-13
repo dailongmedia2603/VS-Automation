@@ -23,7 +23,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { name: "Dashboard", icon: LayoutDashboard, href: "/" },
   { name: "Dự án", icon: Briefcase, href: "/projects" },
-  { name: "Training", icon: GraduationCap, href: "/training" },
+  { name: "Huấn luyện Chatbot", icon: GraduationCap, href: "/training-chatbot" },
   { name: "Báo cáo", icon: BarChart3, href: "/reports" },
   { name: "Nhân sự", icon: Users, href: "/staff" },
 ];
