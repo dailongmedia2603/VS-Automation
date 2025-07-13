@@ -115,6 +115,8 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig, i
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isAddDocDialogOpen, setIsAddDocDialogOpen] = useState(false);
+  const [isEditDocDialogOpen, setIsEditDocDialogOpen] = useState(false);
+  const [editingDoc, setEditingDoc] = useState<TrainingDocument | null>(null);
   const [newDocType, setNewDocType] = useState('');
   const [newDocPurpose, setNewDocPurpose] = useState('');
   const [newDocFile, setNewDocFile] = useState<File | null>(null);
@@ -136,7 +138,6 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig, i
       showError("Vui lòng chọn một tệp tài liệu.");
       return;
     }
-  
     const newDoc: TrainingDocument = {
       id: crypto.randomUUID(),
       name: newDocFile.name,
@@ -146,14 +147,40 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig, i
       url: '',
       file: newDocFile,
     };
-  
     setConfig(prev => ({ ...prev, documents: [...prev.documents, newDoc] }));
-  
-    // Reset dialog state and close
     setIsAddDocDialogOpen(false);
     setNewDocType('');
     setNewDocPurpose('');
     setNewDocFile(null);
+  };
+
+  const handleOpenEditDialog = (doc: TrainingDocument) => {
+    setEditingDoc(doc);
+    setNewDocType(doc.type);
+    setNewDocPurpose(doc.purpose);
+    setIsEditDocDialogOpen(true);
+  };
+
+  const handleUpdateDocument = () => {
+    if (!editingDoc) return;
+    setConfig(prev => ({
+      ...prev,
+      documents: prev.documents.map(d =>
+        d.id === editingDoc.id ? { ...d, type: newDocType, purpose: newDocPurpose } : d
+      ),
+    }));
+    setIsEditDocDialogOpen(false);
+    setEditingDoc(null);
+    setNewDocType('');
+    setNewDocPurpose('');
+  };
+
+  const handleDownloadDocument = (doc: TrainingDocument) => {
+    if (doc.url) {
+      window.open(doc.url, '_blank');
+    } else {
+      showError("Tài liệu chưa được tải lên. Vui lòng lưu thay đổi trước khi tải xuống.");
+    }
   };
 
   return (
@@ -280,8 +307,8 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig, i
                       </TableCell>
                       <TableCell className="px-4 py-3 text-slate-600">{doc.creator}</TableCell>
                       <TableCell className="px-4 py-3 text-right whitespace-nowrap">
-                        <Button variant="ghost" size="icon" className="text-slate-500 hover:text-slate-800"><Download className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" className="text-slate-500 hover:text-slate-800"><Edit className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="text-slate-500 hover:text-slate-800" onClick={() => handleDownloadDocument(doc)}><Download className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="text-slate-500 hover:text-slate-800" onClick={() => handleOpenEditDialog(doc)}><Edit className="h-4 w-4" /></Button>
                         <Button variant="ghost" size="icon" className="text-slate-500 hover:text-destructive hover:bg-destructive/10" onClick={() => handleRemoveDocument(doc.id)}><Trash2 className="h-4 w-4" /></Button>
                       </TableCell>
                     </TableRow>
@@ -308,13 +335,12 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig, i
         </div>
       </div>
 
+      {/* Add Document Dialog */}
       <Dialog open={isAddDocDialogOpen} onOpenChange={setIsAddDocDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Thêm tài liệu mới</DialogTitle>
-            <DialogDescription>
-              Tải lên tài liệu và cung cấp thông tin mô tả để AI hiểu rõ hơn.
-            </DialogDescription>
+            <DialogDescription>Tải lên tài liệu và cung cấp thông tin mô tả để AI hiểu rõ hơn.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -327,32 +353,10 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig, i
             </div>
             <div className="space-y-2">
               <Label>Tệp tài liệu</Label>
-              <div 
-                className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center cursor-pointer hover:border-blue-500 transition-colors"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                {newDocFile ? (
-                  <div className="text-slate-800 font-medium flex items-center justify-center gap-2">
-                    <FileIcon className="h-5 w-5" />
-                    <span>{newDocFile.name}</span>
-                  </div>
-                ) : (
-                  <div className="text-slate-500">
-                    <UploadCloud className="mx-auto h-10 w-10" />
-                    <p className="mt-2 text-sm">Kéo và thả hoặc nhấn để chọn tệp</p>
-                  </div>
-                )}
+              <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center cursor-pointer hover:border-blue-500 transition-colors" onClick={() => fileInputRef.current?.click()}>
+                {newDocFile ? (<div className="text-slate-800 font-medium flex items-center justify-center gap-2"><FileIcon className="h-5 w-5" /><span>{newDocFile.name}</span></div>) : (<div className="text-slate-500"><UploadCloud className="mx-auto h-10 w-10" /><p className="mt-2 text-sm">Kéo và thả hoặc nhấn để chọn tệp</p></div>)}
               </div>
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                className="hidden" 
-                onChange={(e) => {
-                  if (e.target.files && e.target.files[0]) {
-                    setNewDocFile(e.target.files[0]);
-                  }
-                }} 
-              />
+              <input type="file" ref={fileInputRef} className="hidden" onChange={(e) => {if (e.target.files && e.target.files[0]) {setNewDocFile(e.target.files[0]);}}} />
             </div>
           </div>
           <DialogFooter>
@@ -362,17 +366,38 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig, i
         </DialogContent>
       </Dialog>
 
+      {/* Edit Document Dialog */}
+      <Dialog open={isEditDocDialogOpen} onOpenChange={setIsEditDocDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Chỉnh sửa thông tin tài liệu</DialogTitle>
+            <DialogDescription>Cập nhật loại và mục đích cho tệp: <span className="font-medium">{editingDoc?.name}</span></DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-doc-type">Loại tài liệu</Label>
+              <Input id="edit-doc-type" value={newDocType} onChange={(e) => setNewDocType(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-doc-purpose">Mục đích</Label>
+              <Input id="edit-doc-purpose" value={newDocPurpose} onChange={(e) => setNewDocPurpose(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDocDialogOpen(false)}>Hủy</Button>
+            <Button onClick={handleUpdateDocument} className="bg-blue-600 hover:bg-blue-700">Cập nhật</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Preview Dialog */}
       <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
         <DialogContent className="sm:max-w-2xl p-6 rounded-xl">
           <DialogHeader className="text-left">
             <DialogTitle className="text-xl font-bold text-slate-900">Xem trước cấu hình huấn luyện</DialogTitle>
-            <DialogDescription className="text-slate-500 pt-1">
-              Đây là tổng quan dữ liệu bạn đã cấu hình. Dữ liệu này sẽ được sử dụng để huấn luyện AI.
-            </DialogDescription>
+            <DialogDescription className="text-slate-500 pt-1">Đây là tổng quan dữ liệu bạn đã cấu hình. Dữ liệu này sẽ được sử dụng để huấn luyện AI.</DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <TrainingPreview config={config} />
-          </div>
+          <div className="py-4"><TrainingPreview config={config} /></div>
           <DialogFooter>
             <Button onClick={() => setIsPreviewOpen(false)} className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-5">Đóng</Button>
           </DialogFooter>

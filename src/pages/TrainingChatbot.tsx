@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from '@/integrations/supabase/client';
-import { showSuccess, showError } from '@/utils/toast';
+import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { TrainingForm, TrainingConfig, initialConfig } from '@/components/TrainingForm';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -27,7 +27,6 @@ const TrainingChatbot = () => {
           setCareScriptConfig({ ...initialConfig, ...careScriptRes.data.config });
         }
       } catch (error: any) {
-        // Không hiển thị lỗi nếu không tìm thấy bản ghi, vì đây là trường hợp bình thường khi lưu lần đầu
         if (error.code !== 'PGRST116') {
           showError("Không thể tải dữ liệu huấn luyện: " + error.message);
         }
@@ -40,25 +39,52 @@ const TrainingChatbot = () => {
 
   const handleSave = async (name: 'auto_reply' | 'care_script_suggestion') => {
     const configToSave = name === 'auto_reply' ? autoReplyConfig : careScriptConfig;
+    const setConfig = name === 'auto_reply' ? setAutoReplyConfig : setCareScriptConfig;
     const tableName = name === 'auto_reply' ? 'auto_reply_settings' : 'care_script_settings';
-    
-    const sanitizedConfig = {
-      ...configToSave,
-      documents: configToSave.documents.map(({ file, ...doc }) => doc),
-    };
 
     setIsSaving(prev => ({ ...prev, [name]: true }));
+    const toastId = showLoading("Đang lưu và tải lên tài liệu...");
 
-    const { error } = await supabase
-      .from(tableName)
-      .upsert({ id: 1, config: sanitizedConfig });
+    try {
+        const documentsWithUrls = await Promise.all(
+            configToSave.documents.map(async (doc) => {
+                if (doc.file && !doc.url) { // New file to upload
+                    const filePath = `public/${doc.id}-${doc.file.name}`;
+                    const { error: uploadError } = await supabase.storage
+                        .from('training_documents')
+                        .upload(filePath, doc.file, { upsert: true });
 
-    if (error) {
-      showError(`Lưu thất bại: ${error.message}`);
-    } else {
-      showSuccess("Đã lưu thay đổi!");
+                    if (uploadError) {
+                        throw new Error(`Lỗi tải lên tệp ${doc.name}: ${uploadError.message}`);
+                    }
+
+                    const { data: urlData } = supabase.storage.from('training_documents').getPublicUrl(filePath);
+                    return { ...doc, url: urlData.publicUrl, file: undefined };
+                }
+                return { ...doc, file: undefined }; // Return existing doc, ensuring file object is removed
+            })
+        );
+
+        const finalConfig = { ...configToSave, documents: documentsWithUrls };
+
+        const { error } = await supabase
+            .from(tableName)
+            .upsert({ id: 1, config: finalConfig });
+
+        if (error) {
+            throw new Error(`Lưu cấu hình thất bại: ${error.message}`);
+        }
+
+        setConfig(finalConfig);
+
+        dismissToast(toastId);
+        showSuccess("Đã lưu thay đổi thành công!");
+    } catch (error: any) {
+        dismissToast(toastId);
+        showError(error.message);
+    } finally {
+        setIsSaving(prev => ({ ...prev, [name]: false }));
     }
-    setIsSaving(prev => ({ ...prev, [name]: false }));
   };
 
   if (isLoading) {
