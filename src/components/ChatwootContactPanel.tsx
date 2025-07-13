@@ -12,7 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { showSuccess, showError } from '@/utils/toast';
+import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -55,6 +55,9 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
   const [scriptHour, setScriptHour] = useState<number>(9);
   const notesContainerRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<'info' | 'care'>('info');
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const [scriptForImageUpload, setScriptForImageUpload] = useState<CareScript | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   useEffect(() => {
     if (notesContainerRef.current) {
@@ -123,6 +126,45 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
     }
   };
 
+  const handleSelectImageClick = (script: CareScript) => {
+    setScriptForImageUpload(script);
+    imageInputRef.current?.click();
+  };
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!event.target.files || event.target.files.length === 0 || !scriptForImageUpload || !selectedConversation) {
+      return;
+    }
+    const file = event.target.files[0];
+    if (!file.type.startsWith('image/')) {
+      showError("Vui lòng chọn một tệp hình ảnh.");
+      return;
+    }
+    setIsUploadingImage(true);
+    const toastId = showLoading("Đang tải ảnh lên...");
+    try {
+      const filePath = `public/care-scripts/${scriptForImageUpload.id}/${Date.now()}-${file.name}`;
+      const { error: uploadError } = await supabase.storage.from('care_script_attachments').upload(filePath, file);
+      if (uploadError) throw new Error(`Lỗi tải lên: ${uploadError.message}`);
+      const { data: { publicUrl } } = supabase.storage.from('care_script_attachments').getPublicUrl(filePath);
+      if (!publicUrl) throw new Error("Không thể lấy URL công khai của ảnh.");
+      const { error: updateError } = await supabase.from('care_scripts').update({ image_url: publicUrl }).eq('id', scriptForImageUpload.id);
+      if (updateError) throw new Error(`Lỗi cập nhật kịch bản: ${updateError.message}`);
+      dismissToast(toastId);
+      showSuccess("Đã thêm ảnh vào kịch bản!");
+      fetchCareScripts(selectedConversation.id);
+    } catch (error: any) {
+      dismissToast(toastId);
+      showError(error.message);
+    } finally {
+      setIsUploadingImage(false);
+      setScriptForImageUpload(null);
+      if (imageInputRef.current) {
+        imageInputRef.current.value = "";
+      }
+    }
+  };
+
   const notes = messages.filter(msg => msg.private).sort((a, b) => b.created_at - a.created_at);
   const sortedScripts = [...scripts].sort((a, b) => b.id - a.id);
 
@@ -140,30 +182,11 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
 
   return (
     <aside className="hidden lg:flex lg:w-80 border-l bg-white flex-col">
+      <input type="file" ref={imageInputRef} onChange={handleImageUpload} className="hidden" accept="image/*" disabled={isUploadingImage} />
       <div className="p-3 border-b border-slate-100 flex-shrink-0">
         <div className="grid w-full grid-cols-2 bg-slate-100 rounded-lg p-1">
-          <button
-            onClick={() => setActiveTab('info')}
-            className={cn(
-              "w-full rounded-md p-1.5 text-sm font-medium transition-colors",
-              activeTab === 'info'
-                ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-slate-500 hover:bg-slate-200/50'
-            )}
-          >
-            Ghi chú
-          </button>
-          <button
-            onClick={() => setActiveTab('care')}
-            className={cn(
-              "w-full rounded-md p-1.5 text-sm font-medium transition-colors",
-              activeTab === 'care'
-                ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-slate-500 hover:bg-slate-200/50'
-            )}
-          >
-            Chăm sóc
-          </button>
+          <button onClick={() => setActiveTab('info')} className={cn("w-full rounded-md p-1.5 text-sm font-medium transition-colors", activeTab === 'info' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:bg-slate-200/50')}>Ghi chú</button>
+          <button onClick={() => setActiveTab('care')} className={cn("w-full rounded-md p-1.5 text-sm font-medium transition-colors", activeTab === 'care' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:bg-slate-200/50')}>Chăm sóc</button>
         </div>
       </div>
 
@@ -171,10 +194,7 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
         <div className="flex-1 flex flex-col overflow-hidden">
           <div className="p-4 space-y-4 border-b bg-white">
             <div className="flex items-center space-x-3">
-              <Avatar className="h-12 w-12">
-                <AvatarImage src={contact.thumbnail} />
-                <AvatarFallback>{getInitials(contact.name)}</AvatarFallback>
-              </Avatar>
+              <Avatar className="h-12 w-12"><AvatarImage src={contact.thumbnail} /><AvatarFallback>{getInitials(contact.name)}</AvatarFallback></Avatar>
               <h3 className="font-bold text-lg">{contact.name}</h3>
             </div>
             <div className="space-y-2 text-sm text-muted-foreground">
@@ -187,23 +207,15 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
             <div ref={notesContainerRef} className="flex-1 p-4 space-y-3 overflow-y-auto">
               {notes.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center p-6">
-                  <div className="flex items-center justify-center h-16 w-16 bg-slate-200/70 rounded-full mb-4">
-                    <FileText className="h-8 w-8 text-slate-400" />
-                  </div>
+                  <div className="flex items-center justify-center h-16 w-16 bg-slate-200/70 rounded-full mb-4"><FileText className="h-8 w-8 text-slate-400" /></div>
                   <p className="text-md font-semibold text-slate-800">Chưa có ghi chú</p>
                   <p className="text-sm text-slate-500 mt-1">Thêm ghi chú mới để thảo luận nội bộ về cuộc trò chuyện này.</p>
                 </div>
               ) : (
                 notes.map((n, index) => (
-                  <div key={n.id} className={cn(
-                    "bg-white p-4 rounded-xl shadow-sm border border-slate-100 transition-colors",
-                    index === 0 && "bg-blue-50 border-blue-200"
-                  )}>
+                  <div key={n.id} className={cn("bg-white p-4 rounded-xl shadow-sm border border-slate-100 transition-colors", index === 0 && "bg-blue-50 border-blue-200")}>
                     <div className="flex items-start space-x-3">
-                      <Avatar className="h-8 w-8 border">
-                        <AvatarImage src={n.sender?.thumbnail} />
-                        <AvatarFallback>{getInitials(n.sender?.name)}</AvatarFallback>
-                      </Avatar>
+                      <Avatar className="h-8 w-8 border"><AvatarImage src={n.sender?.thumbnail} /><AvatarFallback>{getInitials(n.sender?.name)}</AvatarFallback></Avatar>
                       <div className="flex-1">
                         <div className="flex items-center justify-between">
                           <p className="text-sm font-semibold text-slate-800">{n.sender?.name || 'Hệ thống'}</p>
@@ -219,9 +231,7 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
             <form onSubmit={handleSendNote} className="p-4 border-t bg-white flex-shrink-0">
               <div className="relative">
                 <Input placeholder="Nhập ghi chú (Enter để gửi)" className="pr-12 bg-slate-100 border-slate-200 rounded-lg" value={note} onChange={e => setNote(e.target.value)} disabled={isSendingNote} />
-                <Button type="submit" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-10 rounded-md bg-blue-600 hover:bg-blue-700 text-white" disabled={isSendingNote}>
-                  {isSendingNote ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                </Button>
+                <Button type="submit" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-10 rounded-md bg-blue-600 hover:bg-blue-700 text-white" disabled={isSendingNote}>{isSendingNote ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}</Button>
               </div>
             </form>
           </div>
@@ -236,19 +246,15 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
                 <div className="space-y-3">
                   {sortedScripts.map(script => (
                     <div key={script.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                      {script.image_url && (<div className="mb-3"><img src={script.image_url} alt="Ảnh kịch bản" className="rounded-lg max-w-full h-auto" /></div>)}
                       <p className="text-sm text-slate-700 mb-4 leading-relaxed">{script.content}</p>
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-3 text-xs">
-                          <div className="flex items-center gap-1.5 text-slate-500">
-                            <Clock className="h-3.5 w-3.5" />
-                            <span>{format(new Date(script.scheduled_at), 'dd/MM/yy HH:mm')}</span>
-                          </div>
-                          <Badge className={cn("px-2 py-0.5 text-xs font-medium rounded-full border-none whitespace-nowrap", statusBadgeColors[script.status])}>
-                            {statusMap[script.status]}
-                          </Badge>
+                          <div className="flex items-center gap-1.5 text-slate-500"><Clock className="h-3.5 w-3.5" /><span>{format(new Date(script.scheduled_at), 'dd/MM/yy HH:mm')}</span></div>
+                          <Badge className={cn("px-2 py-0.5 text-xs font-medium rounded-full border-none whitespace-nowrap", statusBadgeColors[script.status])}>{statusMap[script.status]}</Badge>
                         </div>
                         <div className="flex items-center">
-                          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><ImagePlus className="h-4 w-4 text-slate-500" /></Button></TooltipTrigger><TooltipContent><p>Thêm ảnh</p></TooltipContent></Tooltip>
+                          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleSelectImageClick(script)} disabled={isUploadingImage && scriptForImageUpload?.id === script.id}>{isUploadingImage && scriptForImageUpload?.id === script.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4 text-slate-500" />}</Button></TooltipTrigger><TooltipContent><p>Thêm ảnh</p></TooltipContent></Tooltip>
                           <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditDialog(script)}><Pencil className="h-4 w-4 text-slate-500" /></Button></TooltipTrigger><TooltipContent><p>Sửa</p></TooltipContent></Tooltip>
                           <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setScriptToDelete(script)}><Trash2 className="h-4 w-4 text-red-500" /></Button></TooltipTrigger><TooltipContent><p>Xóa</p></TooltipContent></Tooltip>
                         </div>
@@ -260,33 +266,15 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-center p-6">
                 {hasAiCareTag ? (
-                  <>
-                    <div className="relative mb-4">
-                      <div className="absolute -inset-1.5 bg-blue-200 rounded-full animate-ping opacity-60"></div>
-                      <div className="relative flex items-center justify-center h-16 w-16 bg-blue-100 rounded-full">
-                        <Bot className="h-8 w-8 text-blue-600" />
-                      </div>
-                    </div>
-                    <p className="text-md font-semibold text-slate-800">AI đang phân tích</p>
-                    <p className="text-sm text-slate-500 mt-1 max-w-xs">Hệ thống sẽ sớm tự động tạo kịch bản chăm sóc cho cuộc trò chuyện này.</p>
-                  </>
+                  <><div className="relative mb-4"><div className="absolute -inset-1.5 bg-blue-200 rounded-full animate-ping opacity-60"></div><div className="relative flex items-center justify-center h-16 w-16 bg-blue-100 rounded-full"><Bot className="h-8 w-8 text-blue-600" /></div></div><p className="text-md font-semibold text-slate-800">AI đang phân tích</p><p className="text-sm text-slate-500 mt-1 max-w-xs">Hệ thống sẽ sớm tự động tạo kịch bản chăm sóc cho cuộc trò chuyện này.</p></>
                 ) : (
-                  <>
-                    <div className="flex items-center justify-center h-16 w-16 bg-slate-200/70 rounded-full mb-4">
-                      <Calendar className="h-8 w-8 text-slate-400" />
-                    </div>
-                    <p className="text-md font-semibold text-slate-800">Chưa có kịch bản chăm sóc</p>
-                    <p className="text-sm text-slate-500 mt-1">Tạo kịch bản mới để bắt đầu chăm sóc khách hàng tự động.</p>
-                  </>
+                  <><div className="flex items-center justify-center h-16 w-16 bg-slate-200/70 rounded-full mb-4"><Calendar className="h-8 w-8 text-slate-400" /></div><p className="text-md font-semibold text-slate-800">Chưa có kịch bản chăm sóc</p><p className="text-sm text-slate-500 mt-1">Tạo kịch bản mới để bắt đầu chăm sóc khách hàng tự động.</p></>
                 )}
               </div>
             )}
           </div>
           <div className="p-4 border-t border-slate-100 bg-white flex-shrink-0">
-            <Button onClick={openCreateDialog} className="w-full rounded-xl bg-blue-600 hover:bg-blue-700 h-12 text-base font-semibold">
-              <PlusCircle className="mr-2 h-5 w-5" />
-              Tạo kịch bản mới
-            </Button>
+            <Button onClick={openCreateDialog} className="w-full rounded-xl bg-blue-600 hover:bg-blue-700 h-12 text-base font-semibold"><PlusCircle className="mr-2 h-5 w-5" />Tạo kịch bản mới</Button>
           </div>
         </div>
       )}
