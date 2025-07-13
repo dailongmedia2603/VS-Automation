@@ -90,6 +90,7 @@ const ChatwootInbox = () => {
     setLoadingConversations(false);
   };
 
+  // Effect for initial data and subscribing to conversation list changes
   useEffect(() => {
     fetchInitialData();
     const fetchLabels = async () => {
@@ -98,26 +99,44 @@ const ChatwootInbox = () => {
     };
     fetchLabels();
 
-    const channel = supabase
-      .channel('chatwoot-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
-        console.log('Change received!', payload);
-        fetchInitialData();
-        if (selectedConversation && payload.table === 'chatwoot_messages' && (payload.new as any).conversation_id === selectedConversation.id) {
-          handleSelectConversation(selectedConversation, true);
-        }
-      })
+    const conversationsChannel = supabase
+      .channel('public-chatwoot_conversations')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chatwoot_conversations' }, 
+        () => fetchInitialData()
+      )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(conversationsChannel);
+    };
   }, []);
 
+  // Effect for subscribing to messages of the selected conversation
   useEffect(() => {
-    if (selectedConversation) {
-      fetchCareScripts(selectedConversation.id);
-    } else {
+    if (!selectedConversation) {
       setScripts([]);
+      return;
     }
+
+    fetchCareScripts(selectedConversation.id);
+
+    const messagesChannel = supabase
+      .channel(`public-chatwoot_messages-convo-${selectedConversation.id}`)
+      .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'chatwoot_messages',
+          filter: `conversation_id=eq.${selectedConversation.id}`,
+        },
+        () => {
+          handleSelectConversation(selectedConversation, true);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(messagesChannel);
+    };
   }, [selectedConversation]);
 
   const handleSelectConversation = async (conversation: Conversation, forceRefetch = false) => {
