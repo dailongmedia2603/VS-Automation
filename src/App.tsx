@@ -9,6 +9,7 @@ import Settings from "./pages/Settings";
 import ChatwootSettings from "./pages/ChatwootSettings";
 import ChatwootInbox from "./pages/ChatwootInbox";
 import TrainingChatbot from "./pages/TrainingChatbot";
+import Staff from "./pages/Staff";
 import NotFound from "./pages/NotFound";
 import { AppLayout } from "./components/AppLayout";
 import { ApiSettingsProvider } from "@/contexts/ApiSettingsContext";
@@ -32,6 +33,7 @@ const App = () => (
                 <Route path="/chatbot-settings" element={<ChatwootSettings />} />
                 <Route path="/chatbot-inbox" element={<ChatwootInbox />} />
                 <Route path="/training-chatbot" element={<TrainingChatbot />} />
+                <Route path="/staff" element={<Staff />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
