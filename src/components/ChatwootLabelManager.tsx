@@ -167,7 +167,7 @@ export const ChatwootLabelManager = () => {
 
       {/* Add/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>{currentLabel?.id ? 'Sửa thẻ' : 'Thêm thẻ mới'}</DialogTitle>
             <DialogDescription>
@@ -181,6 +181,7 @@ export const ChatwootLabelManager = () => {
                 id="label-name"
                 value={currentLabel?.name || ''}
                 onChange={(e) => setCurrentLabel({ ...currentLabel, name: e.target.value })}
+                className="bg-slate-100 border-none rounded-lg"
               />
             </div>
             <div className="space-y-2">
@@ -189,7 +190,7 @@ export const ChatwootLabelManager = () => {
                 <Input
                   id="label-color-picker"
                   type="color"
-                  className="w-12 h-10 p-1"
+                  className="w-12 h-10 p-1 rounded-lg"
                   value={currentLabel?.color || '#6B7280'}
                   onChange={(e) => setCurrentLabel({ ...currentLabel, color: e.target.value })}
                 />
@@ -198,13 +199,14 @@ export const ChatwootLabelManager = () => {
                   value={currentLabel?.color || ''}
                   onChange={(e) => setCurrentLabel({ ...currentLabel, color: e.target.value })}
                   placeholder="#6B7280"
+                  className="bg-slate-100 border-none rounded-lg"
                 />
               </div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Hủy</Button>
-            <Button onClick={handleSave} disabled={isSaving}>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="rounded-lg">Hủy</Button>
+            <Button onClick={handleSave} disabled={isSaving} className="rounded-lg bg-blue-600 hover:bg-blue-700">
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Lưu
             </Button>
@@ -222,8 +224,8 @@ export const ChatwootLabelManager = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Hủy</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} disabled={isSaving}>
+            <AlertDialogCancel className="rounded-lg">Hủy</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={isSaving} className="rounded-lg bg-red-600 hover:bg-red-700">
               {isSaving ? 'Đang xóa...' : 'Xóa'}
             </AlertDialogAction>
           </AlertDialogFooter>
