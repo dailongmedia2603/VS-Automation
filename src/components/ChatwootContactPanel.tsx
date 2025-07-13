@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -50,8 +49,9 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
   const [scriptDate, setScriptDate] = useState('');
   const [scriptHour, setScriptHour] = useState<number>(9);
   const notesContainerRef = useRef<HTMLDivElement>(null);
+  const [activeTab, setActiveTab] = useState<'info' | 'care'>('info');
 
-  useEffect(() => { if (notesContainerRef.current) { notesContainerRef.current.scrollTop = notesContainerRef.current.scrollHeight; } }, [messages]);
+  useEffect(() => { if (notesContainerRef.current) { notesContainerRef.current.scrollTop = notesContainerRef.current.scrollHeight; } }, [messages, activeTab]);
 
   const handleSendNote = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,53 +130,79 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
 
   return (
     <aside className="hidden lg:flex lg:w-80 border-l bg-white flex-col">
-      <div className="p-4 space-y-4 border-b">
-        <div className="flex items-center space-x-3">
-          <Avatar className="h-12 w-12">
-            <AvatarImage src={contact.thumbnail} />
-            <AvatarFallback>{getInitials(contact.name)}</AvatarFallback>
-          </Avatar>
-          <h3 className="font-bold text-lg">{contact.name}</h3>
-        </div>
-        <div className="space-y-2 text-sm text-muted-foreground">
-          <div className="flex items-center"><Mail className="h-4 w-4 mr-3" /><span>{contact.email || 'Không có sẵn'}</span></div>
-          <div className="flex items-center"><Phone className={cn("h-4 w-4 mr-3", contact.phone_number && "text-green-500")} /><span className={cn(contact.phone_number && "text-green-600 font-medium")}>{contact.phone_number || 'Không có sẵn'}</span></div>
-          <div className="flex items-center"><Building className="h-4 w-4 mr-3" /><span>{contact.additional_attributes?.company_name || 'Không có sẵn'}</span></div>
+      <div className="p-3 border-b flex-shrink-0">
+        <div className="grid w-full grid-cols-2 bg-slate-100 rounded-lg p-1">
+          <button
+            onClick={() => setActiveTab('info')}
+            className={cn(
+              "w-full rounded-md p-1.5 text-sm font-medium transition-colors",
+              activeTab === 'info'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-slate-500 hover:bg-slate-200/50'
+            )}
+          >
+            Ghi chú
+          </button>
+          <button
+            onClick={() => setActiveTab('care')}
+            className={cn(
+              "w-full rounded-md p-1.5 text-sm font-medium transition-colors",
+              activeTab === 'care'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-slate-500 hover:bg-slate-200/50'
+            )}
+          >
+            Chăm sóc
+          </button>
         </div>
       </div>
-      <Tabs defaultValue="info" className="flex-1 flex flex-col overflow-hidden">
-        <div className="p-3 border-b flex-shrink-0">
-          <TabsList className="grid w-full grid-cols-2 bg-slate-100 rounded-lg p-1">
-            <TabsTrigger value="info" className="rounded-md data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm font-medium">Ghi chú</TabsTrigger>
-            <TabsTrigger value="care" className="rounded-md data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm font-medium">Chăm sóc</TabsTrigger>
-          </TabsList>
-        </div>
-        <TabsContent value="info" className="flex-1 flex flex-col bg-gray-50 overflow-hidden">
-          <div ref={notesContainerRef} className="flex-1 p-4 space-y-4 overflow-y-auto">
-            {notes.length === 0 ? (
-              <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-full">
-                <FileText className="h-8 w-8 mb-2 text-gray-300" />
-                <p className="text-sm font-semibold text-gray-600">Chưa có ghi chú nào</p>
-              </div>
-            ) : (
-              notes.map(n => (
-                <div key={n.id} className="bg-yellow-100/50 border-l-4 border-yellow-400 p-3 rounded-r-lg">
-                  <p className="text-sm text-gray-800">{n.content}</p>
-                  <p className="text-xs text-gray-500 mt-2 text-right">{n.sender?.name} - {format(new Date(n.created_at * 1000), 'dd/MM/yy HH:mm', { locale: vi })}</p>
-                </div>
-              ))
-            )}
-          </div>
-          <form onSubmit={handleSendNote} className="p-4 border-t bg-white flex-shrink-0">
-            <div className="relative">
-              <Input placeholder="Nhập ghi chú (Enter để gửi)" className="pr-12 bg-slate-100 border-slate-200 rounded-lg" value={note} onChange={e => setNote(e.target.value)} disabled={isSendingNote} />
-              <Button type="submit" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-10 rounded-md bg-blue-600 hover:bg-blue-700 text-white" disabled={isSendingNote}>
-                {isSendingNote ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              </Button>
+
+      {activeTab === 'info' && (
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="p-4 space-y-4 border-b bg-white">
+            <div className="flex items-center space-x-3">
+              <Avatar className="h-12 w-12">
+                <AvatarImage src={contact.thumbnail} />
+                <AvatarFallback>{getInitials(contact.name)}</AvatarFallback>
+              </Avatar>
+              <h3 className="font-bold text-lg">{contact.name}</h3>
             </div>
-          </form>
-        </TabsContent>
-        <TabsContent value="care" className="flex-1 flex flex-col bg-gray-50 overflow-hidden">
+            <div className="space-y-2 text-sm text-muted-foreground">
+              <div className="flex items-center"><Mail className="h-4 w-4 mr-3" /><span>{contact.email || 'Không có sẵn'}</span></div>
+              <div className="flex items-center"><Phone className={cn("h-4 w-4 mr-3", contact.phone_number && "text-green-500")} /><span className={cn(contact.phone_number && "text-green-600 font-medium")}>{contact.phone_number || 'Không có sẵn'}</span></div>
+              <div className="flex items-center"><Building className="h-4 w-4 mr-3" /><span>{contact.additional_attributes?.company_name || 'Không có sẵn'}</span></div>
+            </div>
+          </div>
+          <div className="flex-1 flex flex-col bg-gray-50 overflow-hidden">
+            <div ref={notesContainerRef} className="flex-1 p-4 space-y-4 overflow-y-auto">
+              {notes.length === 0 ? (
+                <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-full">
+                  <FileText className="h-8 w-8 mb-2 text-gray-300" />
+                  <p className="text-sm font-semibold text-gray-600">Chưa có ghi chú nào</p>
+                </div>
+              ) : (
+                notes.map(n => (
+                  <div key={n.id} className="bg-yellow-100/50 border-l-4 border-yellow-400 p-3 rounded-r-lg">
+                    <p className="text-sm text-gray-800">{n.content}</p>
+                    <p className="text-xs text-gray-500 mt-2 text-right">{n.sender?.name} - {format(new Date(n.created_at * 1000), 'dd/MM/yy HH:mm', { locale: vi })}</p>
+                  </div>
+                ))
+              )}
+            </div>
+            <form onSubmit={handleSendNote} className="p-4 border-t bg-white flex-shrink-0">
+              <div className="relative">
+                <Input placeholder="Nhập ghi chú (Enter để gửi)" className="pr-12 bg-slate-100 border-slate-200 rounded-lg" value={note} onChange={e => setNote(e.target.value)} disabled={isSendingNote} />
+                <Button type="submit" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-10 rounded-md bg-blue-600 hover:bg-blue-700 text-white" disabled={isSendingNote}>
+                  {isSendingNote ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'care' && (
+        <div className="flex-1 flex flex-col bg-gray-50 overflow-hidden">
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {scripts.length > 0 ? (
               <div className="space-y-3">
@@ -216,8 +242,15 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
               </div>
             )}
           </div>
-        </TabsContent>
-      </Tabs>
+          <div className="p-4 border-t bg-white flex-shrink-0">
+            <Button onClick={openCreateDialog} className="w-full rounded-lg bg-blue-600 hover:bg-blue-700">
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Tạo kịch bản mới
+            </Button>
+          </div>
+        </div>
+      )}
+
       <Dialog open={isScriptDialogOpen} onOpenChange={setIsScriptDialogOpen}><DialogContent className="sm:max-w-[425px]"><DialogHeader><DialogTitle>{editingScript ? 'Sửa kịch bản' : 'Tạo kịch bản mới'}</DialogTitle></DialogHeader><div className="space-y-4 py-4"><Textarea placeholder="Nhập nội dung tin nhắn..." value={scriptContent} onChange={(e) => setScriptContent(e.target.value)} className="bg-slate-100 border-none rounded-lg" /><div className="flex items-center gap-2"><Input type="date" value={scriptDate} onChange={(e) => setScriptDate(e.target.value)} className="flex-1 bg-slate-100 border-none rounded-lg" /><Select value={String(scriptHour)} onValueChange={(value) => setScriptHour(Number(value))}><SelectTrigger className="w-[120px] bg-slate-100 border-none rounded-lg"><SelectValue /></SelectTrigger><SelectContent>{Array.from({ length: 15 }, (_, i) => i + 7).map(hour => (<SelectItem key={hour} value={String(hour)}>{String(hour).padStart(2, '0')}:00</SelectItem>))}</SelectContent></Select></div></div><DialogFooter><Button variant="outline" onClick={() => setIsScriptDialogOpen(false)} className="rounded-lg">Hủy</Button><Button onClick={handleSaveScript} className="rounded-lg bg-blue-600 hover:bg-blue-700">Lưu</Button></DialogFooter></DialogContent></Dialog>
       <AlertDialog open={!!scriptToDelete} onOpenChange={() => setScriptToDelete(null)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Bạn có chắc chắn muốn xóa?</AlertDialogTitle><AlertDialogDescription>Hành động này không thể được hoàn tác. Kịch bản chăm sóc này sẽ bị xóa vĩnh viễn.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="rounded-lg">Hủy</AlertDialogCancel><AlertDialogAction onClick={handleDeleteScript} className="rounded-lg bg-red-600 hover:bg-red-700">Xóa</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     </aside>
