@@ -21,46 +21,43 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
-  try {
-    const payload = await req.json();
+  const payload = await req.json();
+  const conversationId = payload?.conversation?.id;
 
+  const supabaseAdmin = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  );
+
+  try {
     // 1. Validate webhook payload from Chatwoot
     if (payload.event !== 'message_created' || payload.private === true || payload.message_type !== 'incoming') {
       return new Response(JSON.stringify({ message: "Ignoring event: Not an incoming public message." }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
-    const conversationId = payload.conversation.id;
+    // Set AI status to typing
+    await supabaseAdmin.from('ai_typing_status').upsert({ conversation_id: conversationId, is_typing: true, updated_at: new Date().toISOString() });
 
     // 2. Check if auto-reply is globally enabled
     const { data: autoReplySettings, error: settingsError } = await supabaseAdmin
       .from('auto_reply_settings').select('config').eq('id', 1).single();
     if (settingsError || !autoReplySettings?.config?.enabled) {
-      return new Response(JSON.stringify({ message: "Auto-reply is disabled globally." }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      throw new Error("Auto-reply is disabled globally.");
     }
 
-    // 3. Get conversation labels from DB
+    // 3. Fetch history and labels
+    const { data: conversationHistory, error: historyError } = await supabaseAdmin
+      .from('chatwoot_messages').select('content, message_type, created_at_chatwoot')
+      .eq('conversation_id', conversationId).order('created_at_chatwoot', { ascending: true });
+    if (historyError) throw historyError;
+
     const { data: labels, error: labelsError } = await supabaseAdmin
-      .from('chatwoot_conversation_labels')
-      .select('chatwoot_labels(name)')
-      .eq('conversation_id', conversationId);
+      .from('chatwoot_conversation_labels').select('chatwoot_labels(name)').eq('conversation_id', conversationId);
     if (labelsError) throw labelsError;
     const labelNames = labels.map(l => l.chatwoot_labels.name);
 
     // 4. Handle new customer tagging
-    const { data: existingMessages, error: countError } = await supabaseAdmin
-      .from('chatwoot_messages')
-      .select('id', { count: 'exact', head: true })
-      .eq('conversation_id', conversationId)
-      .eq('message_type', 0); // Incoming messages
-    if (countError) throw countError;
-    
-    const isNewCustomerMessage = (existingMessages?.length || 0) === 0;
-    
+    const isNewCustomerMessage = (conversationHistory || []).filter(m => m.message_type === 0).length === 0;
     if (isNewCustomerMessage && !labelNames.includes(AI_STAR_LABEL)) {
       const { data: aiStarLabelData } = await supabaseAdmin.from('chatwoot_labels').select('id').eq('name', AI_STAR_LABEL).single();
       if (aiStarLabelData) {
@@ -71,14 +68,8 @@ serve(async (req) => {
 
     // 5. Check if conversation has 'AI Star' tag
     if (!labelNames.includes(AI_STAR_LABEL)) {
-      return new Response(JSON.stringify({ message: "Conversation does not have AI Star label." }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      throw new Error("Conversation does not have AI Star label.");
     }
-
-    // 6. Fetch conversation history
-    const { data: conversationHistory, error: historyError } = await supabaseAdmin
-      .from('chatwoot_messages').select('content, message_type, created_at_chatwoot')
-      .eq('conversation_id', conversationId).order('created_at_chatwoot', { ascending: true });
-    if (historyError) throw historyError;
 
     const fullHistory = [...(conversationHistory || []), {
         content: payload.content,
@@ -88,7 +79,7 @@ serve(async (req) => {
 
     if (fullHistory.length === 0) throw new Error("Could not retrieve conversation history.");
 
-    // 7. Get AI training prompt
+    // 6. Get AI training prompt
     const trainingConfig = autoReplySettings.config;
     if (!trainingConfig) throw new Error("Auto-reply training config not found.");
 
@@ -117,7 +108,7 @@ ${historyText}
 ---
 Hãy tạo ra câu trả lời cho tin nhắn cuối cùng. Chỉ trả lời nội dung tin nhắn, không thêm bất kỳ lời giải thích nào.`;
 
-    // 8. Call AI to get response
+    // 7. Call AI to get response
     const { data: aiSettings } = await supabaseAdmin.from('ai_settings').select('api_url, api_key').eq('id', 1).single();
     if (!aiSettings) throw new Error("AI settings not found.");
 
@@ -129,7 +120,7 @@ Hãy tạo ra câu trả lời cho tin nhắn cuối cùng. Chỉ trả lời n�
 
     const aiReply = proxyResponse.choices[0].message.content;
 
-    // 9. Send reply to Chatwoot
+    // 8. Send reply to Chatwoot
     const { data: chatwootSettings } = await supabaseAdmin.from('chatwoot_settings').select('*').eq('id', 1).single();
     if (!chatwootSettings) throw new Error("Chatwoot settings not found.");
 
@@ -152,9 +143,26 @@ Hãy tạo ra câu trả lời cho tin nhắn cuối cùng. Chỉ trả lời n�
     });
 
   } catch (error) {
-    console.error('Auto-reply webhook error:', error.message);
+    console.error(`Auto-reply webhook error for convo ${conversationId}:`, error.message);
+    // Send a private note to the conversation about the error
+    const errorMessage = `AI Auto-Reply Error: ${error.message}. AI will not reply.`;
+    const { data: chatwootSettings } = await supabaseAdmin.from('chatwoot_settings').select('*').eq('id', 1).single();
+    if (chatwootSettings && conversationId) {
+        const endpoint = `/api/v1/accounts/${chatwootSettings.account_id}/conversations/${conversationId}/messages`;
+        const upstreamUrl = `${chatwootSettings.chatwoot_url.replace(/\/$/, '')}${endpoint}`;
+        await fetch(upstreamUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'api_access_token': chatwootSettings.api_token },
+            body: JSON.stringify({ content: errorMessage, message_type: 'outgoing', private: true }),
+        });
+    }
     return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200, // Return 200 to prevent Chatwoot from retrying
     })
+  } finally {
+    // Set AI status to not typing
+    if (conversationId) {
+      await supabaseAdmin.from('ai_typing_status').upsert({ conversation_id: conversationId, is_typing: false, updated_at: new Date().toISOString() });
+    }
   }
 })

@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import { format, isSameDay } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { ChatwootContactPanel } from '@/components/ChatwootContactPanel';
-import { Search, Phone, Link as LinkIcon, Smile, Paperclip, Image as ImageIcon, SendHorizonal, ThumbsUp, Settings2, CornerDownLeft, Eye, RefreshCw, UserPlus, FileText, X, Filter, Check, PlusCircle, Trash2 } from 'lucide-react';
+import { Search, Phone, Link as LinkIcon, Smile, Paperclip, Image as ImageIcon, SendHorizonal, ThumbsUp, Settings2, CornerDownLeft, Eye, RefreshCw, UserPlus, FileText, X, Filter, Check, PlusCircle, Trash2, Bot, AlertTriangle } from 'lucide-react';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 
 // Interfaces
@@ -56,11 +56,28 @@ const ChatwootInbox = () => {
     selectedLabels: [],
     seenNotReplied: false,
   });
+  const [aiTypingStatus, setAiTypingStatus] = useState<Record<number, boolean>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const POLLING_INTERVAL = 15000;
   const phoneRegex = /(0[3|5|7|8|9][0-9]{8})\b/;
   const AI_CARE_LABEL = 'AI chăm';
+
+  useEffect(() => {
+    const channel = supabase
+        .channel('ai_typing_status_changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_typing_status' }, payload => {
+            const record = payload.new as { conversation_id: number, is_typing: boolean };
+            if (record) {
+                setAiTypingStatus(prev => ({ ...prev, [record.conversation_id]: record.is_typing }));
+            }
+        })
+        .subscribe();
+
+    return () => {
+        supabase.removeChannel(channel);
+    };
+  }, []);
 
   const handleClearFilters = () => {
     setFilters({
@@ -91,7 +108,7 @@ const ChatwootInbox = () => {
   }, [suggestedLabels]);
 
   const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); };
-  useEffect(() => { scrollToBottom(); }, [messages]);
+  useEffect(() => { scrollToBottom(); }, [messages, aiTypingStatus]);
 
   const fetchCareScripts = async (conversationId: number) => {
     const { data, error } = await supabase.from('care_scripts').select('*').eq('conversation_id', conversationId).order('scheduled_at', { ascending: true });
@@ -344,7 +361,7 @@ const ChatwootInbox = () => {
       const prevMessage = messages[index - 1];
       const prevMessageDate = prevMessage ? new Date(prevMessage.created_at * 1000) : null;
       if (!prevMessageDate || !isSameDay(messageDate, prevMessageDate)) { acc.push({ type: 'date', date: format(messageDate, 'dd MMM yyyy', { locale: vi }) }); }
-      if (!message.private) acc.push({ type: 'message', data: message });
+      acc.push({ type: 'message', data: message });
       return acc;
     }, [] as ({ type: 'date'; date: string } | { type: 'message'; data: Message })[]);
   };
@@ -558,7 +575,7 @@ const ChatwootInbox = () => {
               <div className="flex items-center space-x-3"><Avatar><AvatarImage src={selectedConversation.meta.sender.thumbnail} /><AvatarFallback>{getInitials(selectedConversation.meta.sender.name)}</AvatarFallback></Avatar><div><h3 className="font-bold">{selectedConversation.meta.sender.name}</h3><p className="text-xs text-muted-foreground flex items-center"><Eye className="h-3 w-3 mr-1" />Chưa có người xem</p></div></div>
               <div className="flex items-center space-x-4 text-muted-foreground"><LinkIcon className="h-5 w-5 cursor-pointer hover:text-primary" /><RefreshCw className={cn("h-5 w-5 cursor-pointer hover:text-primary", loadingMessages && "animate-spin")} onClick={() => { if (selectedConversation && !loadingMessages) { handleSelectConversation(selectedConversation); } }} /><Smile className="h-5 w-5 cursor-pointer hover:text-primary" /><UserPlus className="h-5 w-5 cursor-pointer hover:text-primary" /></div>
             </header>
-            <div className="flex-1 overflow-y-auto p-4 md:p-6"><div className="space-y-2">{loadingMessages ? <p>Đang tải...</p> : groupedMessages.map((item, index) => { if (item.type === 'date') return <div key={index} className="text-center my-4"><span className="text-xs text-muted-foreground bg-white px-3 py-1 rounded-full shadow-sm">{item.date}</span></div>; const msg = item.data; const isOutgoing = msg.message_type === 1; if (msg.message_type === 2) return <div key={msg.id} className="text-center text-xs text-muted-foreground py-2 italic">{msg.content}</div>; return (<div key={msg.id} className={cn("flex items-start gap-3", isOutgoing && "justify-end")}>{!isOutgoing && <Avatar className="h-8 w-8"><AvatarImage src={msg.sender?.thumbnail} /><AvatarFallback>{getInitials(msg.sender?.name)}</AvatarFallback></Avatar>}<div className={cn("flex flex-col gap-1", isOutgoing ? 'items-end' : 'items-start')}><div className={cn("rounded-2xl px-3 py-2 max-w-sm md:max-w-md break-words shadow-sm", isOutgoing ? 'bg-green-100 text-gray-800' : 'bg-white text-gray-800')}>{msg.attachments?.map(att => <div key={att.id}>{att.file_type === 'image' ? <a href={att.data_url} target="_blank" rel="noopener noreferrer"><img src={att.data_url} alt="Attachment" className="rounded-lg max-w-full h-auto" /></a> : <video controls className="rounded-lg max-w-full h-auto"><source src={att.data_url} /></video>}</div>)}{msg.content && <p className={cn("whitespace-pre-wrap", msg.attachments && msg.attachments.length > 0 && msg.content ? "mt-2" : "")}>{msg.content}</p>}</div></div></div>);})}</div><div ref={messagesEndRef} /></div>
+            <div className="flex-1 overflow-y-auto p-4 md:p-6"><div className="space-y-2">{loadingMessages ? <p>Đang tải...</p> : groupedMessages.map((item, index) => { if (item.type === 'date') return <div key={index} className="text-center my-4"><span className="text-xs text-muted-foreground bg-white px-3 py-1 rounded-full shadow-sm">{item.date}</span></div>; const msg = item.data; const isOutgoing = msg.message_type === 1; if (msg.message_type === 2) return <div key={msg.id} className="text-center text-xs text-muted-foreground py-2 italic">{msg.content}</div>; if (msg.private) { const isErrorNote = msg.content?.startsWith('AI Auto-Reply Error:'); return (<div key={msg.id} className={cn("my-2 mx-auto max-w-md p-3 rounded-lg text-xs flex items-start gap-3", isErrorNote ? "bg-red-100 text-red-900" : "bg-yellow-100 text-yellow-900")}><AlertTriangle className={cn("h-4 w-4 mt-0.5 flex-shrink-0", !isErrorNote && "hidden")} /><div className="flex-1"><p className="font-semibold">{isErrorNote ? "Lỗi AI trả lời tự động" : "Ghi chú riêng tư"}</p><p className="leading-relaxed">{isErrorNote ? msg.content.replace('AI Auto-Reply Error: ', '') : msg.content}</p></div></div>) } return (<div key={msg.id} className={cn("flex items-start gap-3", isOutgoing && "justify-end")}>{!isOutgoing && <Avatar className="h-8 w-8"><AvatarImage src={msg.sender?.thumbnail} /><AvatarFallback>{getInitials(msg.sender?.name)}</AvatarFallback></Avatar>}<div className={cn("flex flex-col gap-1", isOutgoing ? 'items-end' : 'items-start')}><div className={cn("rounded-2xl px-3 py-2 max-w-sm md:max-w-md break-words shadow-sm", isOutgoing ? 'bg-green-100 text-gray-800' : 'bg-white text-gray-800')}>{msg.attachments?.map(att => <div key={att.id}>{att.file_type === 'image' ? <a href={att.data_url} target="_blank" rel="noopener noreferrer"><img src={att.data_url} alt="Attachment" className="rounded-lg max-w-full h-auto" /></a> : <video controls className="rounded-lg max-w-full h-auto"><source src={att.data_url} /></video>}</div>)}{msg.content && <p className={cn("whitespace-pre-wrap", msg.attachments && msg.attachments.length > 0 && msg.content ? "mt-2" : "")}>{msg.content}</p>}</div></div></div>);})} {aiTypingStatus[selectedConversation.id] && (<div className="flex items-start gap-3"><Avatar className="h-8 w-8"><AvatarFallback className="bg-blue-500 text-white"><Bot className="h-5 w-5" /></AvatarFallback></Avatar><div className="rounded-2xl px-3 py-2 max-w-sm md:max-w-md bg-white text-gray-800 shadow-sm"><div className="flex items-center space-x-1.5"><span className="w-2 h-2 bg-slate-400 rounded-full animate-pulse delay-0"></span><span className="w-2 h-2 bg-slate-400 rounded-full animate-pulse delay-200"></span><span className="w-2 h-2 bg-slate-400 rounded-full animate-pulse delay-400"></span></div></div></div>)}</div><div ref={messagesEndRef} /></div>
             <footer className="p-2 border-t bg-white space-y-2">
               {attachment && (
                 <div className="px-2 py-1.5 bg-slate-100 rounded-lg flex items-center justify-between animate-in fade-in">
