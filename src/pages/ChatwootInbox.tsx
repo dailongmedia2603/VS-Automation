@@ -16,7 +16,7 @@ import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast
 // Interfaces
 interface Attachment { id: number; file_type: 'image' | 'video' | 'audio' | 'file'; data_url: string; }
 interface MessageSender { name: string; thumbnail?: string; }
-interface Conversation { id: number; meta: { sender: { id: number; name: string; email?: string; phone_number?: string; thumbnail?: string; additional_attributes?: { company_name?: string; }; }; }; messages: { content: string }[]; last_activity_at: number; unread_count: number; labels: string[]; status: string; }
+interface Conversation { id: number; meta: { sender: { id: number; name: string; email?: string; phone_number?: string; thumbnail?: string; additional_attributes?: { company_name?: string; }; }; }; messages: { content: string }[]; last_activity_at: number; unread_count: number; labels: string[]; status: string; additional_attributes?: { type?: string }; }
 interface Message { id: number; content: string; created_at: number; message_type: number; private: boolean; sender?: MessageSender; attachments?: Attachment[]; }
 interface ChatwootLabel { id: number; name: string; color: string; }
 interface CareScript { id: number; content: string; scheduled_at: string; status: 'scheduled' | 'sent' | 'failed'; image_url?: string; }
@@ -41,6 +41,7 @@ const ChatwootInbox = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestedLabels, setSuggestedLabels] = useState<ChatwootLabel[]>([]);
   const [scripts, setScripts] = useState<CareScript[]>([]);
+  const [view, setView] = useState<'inbox' | 'comments'>('inbox');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const POLLING_INTERVAL = 15000;
@@ -296,7 +297,18 @@ const ChatwootInbox = () => {
     }, [] as ({ type: 'date'; date: string } | { type: 'message'; data: Message })[]);
   };
   const groupedMessages = groupMessagesByDate(messages);
-  const filteredConversations = conversations.filter(convo => convo.meta.sender.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  
+  const filteredConversations = conversations
+    .filter(convo => {
+      if (view === 'comments') {
+        // Assumes comments from Facebook have `type: 'feed'` in additional_attributes
+        return convo.additional_attributes?.type === 'feed';
+      }
+      // Inbox shows everything else (private messages, other channels)
+      return convo.additional_attributes?.type !== 'feed';
+    })
+    .filter(convo => convo.meta.sender.name.toLowerCase().includes(searchQuery.toLowerCase()));
+
   const unreadConversations = filteredConversations.filter(c => c.unread_count > 0);
   const readConversations = filteredConversations.filter(c => !c.unread_count || c.unread_count === 0);
 
@@ -341,7 +353,16 @@ const ChatwootInbox = () => {
     <div className="flex h-full bg-white border-t">
       <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" />
       <aside className="w-80 border-r flex flex-col">
-        <div className="p-3 border-b"><div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Tìm kiếm" className="pl-9" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} /></div><div className="flex space-x-1.5 mt-3">{['#fde2e4', '#fad2e1', '#e2ece9', '#bee1e6', '#cddafd', '#fcf6bd', '#d0f4de'].map(color => (<div key={color} style={{ backgroundColor: color }} className="w-5 h-5 rounded-md cursor-pointer flex-1"></div>))}</div></div>
+        <div className="p-3 border-b">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Tìm kiếm" className="pl-9" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <Button variant={view === 'inbox' ? 'secondary' : 'ghost'} className="w-full" onClick={() => setView('inbox')}>Hộp thư</Button>
+            <Button variant={view === 'comments' ? 'secondary' : 'ghost'} className="w-full" onClick={() => setView('comments')}>Bình luận</Button>
+          </div>
+        </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-1">{loadingConversations ? ([...Array(10)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)) : (<>{unreadConversations.length > 0 && (<div className="mb-4 p-2 bg-blue-50/50 rounded-lg"><h3 className="px-1 pb-1 text-xs font-bold uppercase text-blue-600 tracking-wider">Chưa xem</h3><div className="space-y-1">{unreadConversations.map(renderConversationItem)}</div></div>)}{readConversations.length > 0 && (<div className="space-y-1">{readConversations.map(renderConversationItem)}</div>)}{filteredConversations.length === 0 && !loadingConversations && (<p className="p-4 text-sm text-center text-muted-foreground">Không tìm thấy cuộc trò chuyện nào.</p>)}</>)}</div>
       </aside>
       <section className="flex-1 flex flex-col bg-slate-50">
