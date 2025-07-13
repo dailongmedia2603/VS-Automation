@@ -142,56 +142,50 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
           </div>
           <form onSubmit={handleSendNote} className="p-4 border-t bg-gray-50"><div className="relative"><Input placeholder="Nhập ghi chú (Enter để gửi)" className="pr-10 bg-white" value={note} onChange={e => setNote(e.target.value)} disabled={isSendingNote} /><Button type="submit" size="icon" className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7" disabled={isSendingNote}>{isSendingNote ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}</Button></div></form>
         </TabsContent>
-        <TabsContent value="care" className="w-full flex-1 flex flex-col bg-gray-50">
-          {/* Fixed Header */}
-          <div className="p-4">
-            <Button className="w-full" onClick={openCreateDialog}>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Tạo kịch bản thủ công
-            </Button>
-            <p className="text-xs text-muted-foreground text-center mt-2 px-2">
-              Để AI tự động chăm sóc, thêm nhãn "AI chăm" vào cuộc trò chuyện.
-            </p>
-          </div>
+        <TabsContent value="care" className="w-full flex-1 flex flex-col bg-gray-50 overflow-y-auto p-4">
+          <Button className="w-full flex-shrink-0" onClick={openCreateDialog}>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Tạo kịch bản thủ công
+          </Button>
+          <p className="text-xs text-muted-foreground text-center mt-2 mb-4 px-2 flex-shrink-0">
+            Để AI tự động chăm sóc, thêm nhãn "AI chăm" vào cuộc trò chuyện.
+          </p>
           
-          {/* Scrollable List */}
-          <div className="flex-1 overflow-y-auto px-4 pb-4">
-            {scripts.length > 0 ? (
-              <div className="space-y-3">
-                {scripts.map(script => (
-                  <div key={script.id} className="bg-white p-3 rounded-lg border shadow-sm">
-                    <p className="text-sm text-gray-800 mb-2">{script.content}</p>
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3" />
-                        <span>{format(new Date(script.scheduled_at), 'dd/MM/yy HH:mm')}</span>
-                        <Badge variant={statusColorMap[script.status]}>{statusMap[script.status]}</Badge>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="icon" className="h-6 w-6"><ImagePlus className="h-4 w-4 text-muted-foreground" /></Button>
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditDialog(script)}><Pencil className="h-4 w-4 text-muted-foreground" /></Button>
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setScriptToDelete(script)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                      </div>
+          {scripts.length > 0 ? (
+            <div className="space-y-3">
+              {scripts.map(script => (
+                <div key={script.id} className="bg-white p-3 rounded-lg border shadow-sm">
+                  <p className="text-sm text-gray-800 mb-2">{script.content}</p>
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Clock className="h-3 w-3" />
+                      <span>{format(new Date(script.scheduled_at), 'dd/MM/yy HH:mm')}</span>
+                      <Badge variant={statusColorMap[script.status]}>{statusMap[script.status]}</Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="ghost" size="icon" className="h-6 w-6"><ImagePlus className="h-4 w-4 text-muted-foreground" /></Button>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditDialog(script)}><Pencil className="h-4 w-4 text-muted-foreground" /></Button>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setScriptToDelete(script)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                     </div>
                   </div>
-                ))}
-              </div>
-            ) : hasAiCareTag ? (
-              <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-full p-4">
-                <Bot className="h-10 w-10 mb-3 text-blue-500 animate-pulse" />
-                <p className="text-sm font-semibold text-gray-700">AI đang phân tích...</p>
-                <p className="text-xs mt-1">
-                  Hệ thống đã ghi nhận và sẽ sớm tự động tạo kịch bản chăm sóc cho cuộc trò chuyện này.
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-full">
-                <Calendar className="h-10 w-10 mb-3 text-gray-400" />
-                <p className="text-sm font-semibold text-gray-600">Chưa có kịch bản nào</p>
-                <p className="text-xs">Hãy tạo kịch bản để chăm sóc khách hàng tự động.</p>
-              </div>
-            )}
-          </div>
+                </div>
+              ))}
+            </div>
+          ) : hasAiCareTag ? (
+            <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-full">
+              <Bot className="h-10 w-10 mb-3 text-blue-500 animate-pulse" />
+              <p className="text-sm font-semibold text-gray-700">AI đang phân tích...</p>
+              <p className="text-xs mt-1">
+                Hệ thống đã ghi nhận và sẽ sớm tự động tạo kịch bản chăm sóc cho cuộc trò chuyện này.
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-full">
+              <Calendar className="h-10 w-10 mb-3 text-gray-400" />
+              <p className="text-sm font-semibold text-gray-600">Chưa có kịch bản nào</p>
+              <p className="text-xs">Hãy tạo kịch bản để chăm sóc khách hàng tự động.</p>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
       <Dialog open={isScriptDialogOpen} onOpenChange={setIsScriptDialogOpen}><DialogContent><DialogHeader><DialogTitle>{editingScript ? 'Sửa kịch bản' : 'Tạo kịch bản mới'}</DialogTitle></DialogHeader><div className="space-y-4 py-4"><Textarea placeholder="Nhập nội dung tin nhắn..." value={scriptContent} onChange={(e) => setScriptContent(e.target.value)} /><div className="flex items-center gap-2"><Input type="date" value={scriptDate} onChange={(e) => setScriptDate(e.target.value)} className="flex-1" /><Select value={String(scriptHour)} onValueChange={(value) => setScriptHour(Number(value))}><SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger><SelectContent>{Array.from({ length: 15 }, (_, i) => i + 7).map(hour => (<SelectItem key={hour} value={String(hour)}>{String(hour).padStart(2, '0')}:00</SelectItem>))}</SelectContent></Select></div></div><DialogFooter><Button variant="outline" onClick={() => setIsScriptDialogOpen(false)}>Hủy</Button><Button onClick={handleSaveScript}>Lưu</Button></DialogFooter></DialogContent></Dialog>
