@@ -1,39 +1,11 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
-import { createHmac } from "https://deno.land/std@0.190.0/crypto/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-chatwoot-hmac-sha256',
 }
-
-// Function to verify the HMAC signature from Chatwoot
-const verifySignature = async (req, rawBody) => {
-  const chatwootHmac = req.headers.get('x-chatwoot-hmac-sha256');
-  const secret = Deno.env.get('CHATWOOT_WEBHOOK_SECRET');
-
-  if (!chatwootHmac || !secret) {
-    console.warn("Webhook security warning: Missing HMAC signature or secret key.");
-    // In a production environment, you might want to strictly return false here.
-    // For now, we can allow it to pass for easier debugging if not configured.
-    return true; 
-  }
-
-  const encoder = new TextEncoder();
-  const key = encoder.encode(secret);
-  const hmac = createHmac("sha256", key);
-  hmac.update(encoder.encode(rawBody));
-  const generatedHmac = hmac.toString();
-
-  if (generatedHmac !== chatwootHmac) {
-    console.error("HMAC verification failed. Request might be tampered or secret is wrong.");
-    return false;
-  }
-
-  return true;
-};
-
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -41,17 +13,9 @@ serve(async (req) => {
   }
 
   try {
-    const rawBody = await req.text();
+    console.log("Webhook received! Processing payload...");
     
-    // Verify the signature before processing
-    const isVerified = await verifySignature(req, rawBody);
-    if (!isVerified) {
-      return new Response(JSON.stringify({ error: "Invalid signature" }), { status: 401, headers: corsHeaders });
-    }
-    
-    console.log("Webhook received and verified! Processing payload...");
-    
-    const payload = JSON.parse(rawBody);
+    const payload = await req.json();
     const event = payload.event;
 
     console.log(`Received event: ${event}`);
