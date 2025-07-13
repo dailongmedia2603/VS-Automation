@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PlusCircle, Trash2, File as FileIcon, Download, Edit, Loader2, Eye } from 'lucide-react';
+import { PlusCircle, Trash2, File as FileIcon, Download, Edit, Loader2, Eye, UploadCloud } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import TrainingPreview from './TrainingPreview';
+import { showError } from '@/utils/toast';
 
 // Type definitions
 export type TrainingItem = { id: string; value: string };
@@ -113,6 +114,10 @@ const DynamicPrefixedList = ({ title, description, items, setItems, prefix, butt
 export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig, isSaving, onSave }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isAddDocDialogOpen, setIsAddDocDialogOpen] = useState(false);
+  const [newDocType, setNewDocType] = useState('');
+  const [newDocPurpose, setNewDocPurpose] = useState('');
+  const [newDocFile, setNewDocFile] = useState<File | null>(null);
 
   const handleFieldChange = (field: keyof Omit<TrainingConfig, 'products' | 'processSteps' | 'conditions' | 'documents'>, value: string) => {
     setConfig(prev => ({ ...prev, [field]: value }));
@@ -122,24 +127,33 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig, i
     setConfig(prev => ({ ...prev, [field]: items }));
   };
   
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const newDoc: TrainingDocument = {
-        id: crypto.randomUUID(),
-        name: file.name,
-        type: file.type.split('/')[1] || 'file',
-        purpose: '',
-        creator: 'Admin',
-        url: '',
-        file: file,
-      };
-      setConfig(prev => ({ ...prev, documents: [...prev.documents, newDoc] }));
-    }
-  };
-
   const handleRemoveDocument = (id: string) => {
     setConfig(prev => ({ ...prev, documents: prev.documents.filter(doc => doc.id !== id) }));
+  };
+
+  const handleAddNewDocument = () => {
+    if (!newDocFile) {
+      showError("Vui lòng chọn một tệp tài liệu.");
+      return;
+    }
+  
+    const newDoc: TrainingDocument = {
+      id: crypto.randomUUID(),
+      name: newDocFile.name,
+      type: newDocType || newDocFile.type.split('/')[1] || 'file',
+      purpose: newDocPurpose,
+      creator: 'Admin',
+      url: '',
+      file: newDocFile,
+    };
+  
+    setConfig(prev => ({ ...prev, documents: [...prev.documents, newDoc] }));
+  
+    // Reset dialog state and close
+    setIsAddDocDialogOpen(false);
+    setNewDocType('');
+    setNewDocPurpose('');
+    setNewDocFile(null);
   };
 
   return (
@@ -236,11 +250,10 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig, i
               <CardTitle className="text-xl font-bold text-slate-900">Bảng tài liệu</CardTitle>
               <CardDescription className="text-sm text-slate-500 pt-1">Tải lên các tài liệu để AI học hỏi và tham khảo.</CardDescription>
             </div>
-            <Button onClick={() => fileInputRef.current?.click()} className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold">
+            <Button onClick={() => setIsAddDocDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold">
               <PlusCircle className="h-4 w-4 mr-2" />
               Thêm tài liệu
             </Button>
-            <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
           </CardHeader>
           <CardContent className="p-6 pt-0">
             <div className="border rounded-lg overflow-hidden">
@@ -292,6 +305,60 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig, i
           </Button>
         </div>
       </div>
+
+      <Dialog open={isAddDocDialogOpen} onOpenChange={setIsAddDocDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Thêm tài liệu mới</DialogTitle>
+            <DialogDescription>
+              Tải lên tài liệu và cung cấp thông tin mô tả để AI hiểu rõ hơn.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="doc-type">Loại tài liệu</Label>
+              <Input id="doc-type" placeholder="VD: Bảng giá, Chính sách" value={newDocType} onChange={(e) => setNewDocType(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="doc-purpose">Mục đích</Label>
+              <Input id="doc-purpose" placeholder="VD: Cung cấp thông tin khuyến mãi tháng 7" value={newDocPurpose} onChange={(e) => setNewDocPurpose(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Tệp tài liệu</Label>
+              <div 
+                className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center cursor-pointer hover:border-blue-500 transition-colors"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {newDocFile ? (
+                  <div className="text-slate-800 font-medium flex items-center justify-center gap-2">
+                    <FileIcon className="h-5 w-5" />
+                    <span>{newDocFile.name}</span>
+                  </div>
+                ) : (
+                  <div className="text-slate-500">
+                    <UploadCloud className="mx-auto h-10 w-10" />
+                    <p className="mt-2 text-sm">Kéo và thả hoặc nhấn để chọn tệp</p>
+                  </div>
+                )}
+              </div>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    setNewDocFile(e.target.files[0]);
+                  }
+                }} 
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddDocDialogOpen(false)}>Hủy</Button>
+            <Button onClick={handleAddNewDocument} className="bg-blue-600 hover:bg-blue-700">Thêm</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
         <DialogContent className="sm:max-w-2xl p-6 rounded-xl">
