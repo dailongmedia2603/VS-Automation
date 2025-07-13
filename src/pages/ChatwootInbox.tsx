@@ -93,6 +93,9 @@ const ChatwootInbox = () => {
       if (functionError) throw new Error((await functionError.context.json()).error || functionError.message);
       if (chatwootData.error) throw new Error(chatwootData.error);
       const conversationsFromServer = chatwootData.data.payload || [];
+      
+      console.log("Raw conversations from Chatwoot:", conversationsFromServer);
+
       if (conversationsFromServer.length === 0) {
           setConversations([]);
           return;
