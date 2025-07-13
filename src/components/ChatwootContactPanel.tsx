@@ -144,8 +144,8 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
           <div className="flex items-center"><Building className="h-4 w-4 mr-3" /><span>{contact.additional_attributes?.company_name || 'Không có sẵn'}</span></div>
         </div>
       </div>
-      <Tabs defaultValue="info" className="flex-1 flex flex-col">
-        <div className="p-3">
+      <Tabs defaultValue="info" className="flex-1 flex flex-col overflow-hidden">
+        <div className="p-3 border-b flex-shrink-0">
           <TabsList className="grid w-full grid-cols-2 bg-slate-100 rounded-lg p-1">
             <TabsTrigger value="info" className="rounded-md data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm font-medium">Ghi chú</TabsTrigger>
             <TabsTrigger value="care" className="rounded-md data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm font-medium">Chăm sóc</TabsTrigger>
@@ -167,59 +167,63 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
               ))
             )}
           </div>
-          <form onSubmit={handleSendNote} className="p-4 border-t bg-gray-50 flex-shrink-0">
+          <form onSubmit={handleSendNote} className="p-4 border-t bg-white flex-shrink-0">
             <div className="relative">
-              <Input placeholder="Nhập ghi chú (Enter để gửi)" className="pr-12 bg-white rounded-lg" value={note} onChange={e => setNote(e.target.value)} disabled={isSendingNote} />
+              <Input placeholder="Nhập ghi chú (Enter để gửi)" className="pr-12 bg-slate-100 border-slate-200 rounded-lg" value={note} onChange={e => setNote(e.target.value)} disabled={isSendingNote} />
               <Button type="submit" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-10 rounded-md bg-blue-600 hover:bg-blue-700 text-white" disabled={isSendingNote}>
                 {isSendingNote ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               </Button>
             </div>
           </form>
         </TabsContent>
-        <TabsContent value="care" className="w-full flex-1 flex flex-col bg-gray-50 overflow-y-auto p-4">
+        <TabsContent value="care" className="flex-1 flex flex-col bg-gray-50 overflow-y-auto p-4 space-y-4">
           <Button className="w-full flex-shrink-0 rounded-lg bg-blue-600 hover:bg-blue-700" onClick={openCreateDialog}>
             <PlusCircle className="mr-2 h-4 w-4" />
             Tạo kịch bản thủ công
           </Button>
-          <p className="text-xs text-muted-foreground text-center mt-2 mb-4 px-2 flex-shrink-0">
+          <p className="text-xs text-muted-foreground text-center px-2 flex-shrink-0">
             Để AI tự động chăm sóc, thêm nhãn "AI chăm" vào cuộc trò chuyện.
           </p>
           
-          {scripts.length > 0 ? (
-            <div className="space-y-3">
-              {scripts.map(script => (
-                <div key={script.id} className="bg-white p-3 rounded-lg border shadow-sm">
-                  <p className="text-sm text-gray-800 mb-2">{script.content}</p>
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Clock className="h-3 w-3" />
-                      <span>{format(new Date(script.scheduled_at), 'dd/MM/yy HH:mm')}</span>
-                      <Badge variant={statusColorMap[script.status]}>{statusMap[script.status]}</Badge>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="icon" className="h-6 w-6"><ImagePlus className="h-4 w-4 text-muted-foreground" /></Button>
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditDialog(script)}><Pencil className="h-4 w-4 text-muted-foreground" /></Button>
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setScriptToDelete(script)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+          <div className="flex-1">
+            {scripts.length > 0 ? (
+              <div className="space-y-3">
+                {scripts.map(script => (
+                  <div key={script.id} className="bg-white p-3 rounded-lg border shadow-sm">
+                    <p className="text-sm text-gray-800 mb-2">{script.content}</p>
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        <span>{format(new Date(script.scheduled_at), 'dd/MM/yy HH:mm')}</span>
+                        <Badge variant={statusColorMap[script.status]}>{statusMap[script.status]}</Badge>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="icon" className="h-6 w-6"><ImagePlus className="h-4 w-4 text-muted-foreground" /></Button>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditDialog(script)}><Pencil className="h-4 w-4 text-muted-foreground" /></Button>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setScriptToDelete(script)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : hasAiCareTag ? (
-            <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-full">
-              <Bot className="h-10 w-10 mb-3 text-blue-500 animate-pulse" />
-              <p className="text-sm font-semibold text-gray-700">AI đang phân tích...</p>
-              <p className="text-xs mt-1">
-                Hệ thống đã ghi nhận và sẽ sớm tự động tạo kịch bản chăm sóc cho cuộc trò chuyện này.
-              </p>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-full">
-              <Calendar className="h-10 w-10 mb-3 text-gray-400" />
-              <p className="text-sm font-semibold text-gray-600">Chưa có kịch bản nào</p>
-              <p className="text-xs">Hãy tạo kịch bản để chăm sóc khách hàng tự động.</p>
-            </div>
-          )}
+                ))}
+              </div>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-center text-muted-foreground">
+                {hasAiCareTag ? (
+                  <>
+                    <Bot className="h-10 w-10 mb-3 text-blue-500 animate-pulse" />
+                    <p className="text-sm font-semibold text-gray-700">AI đang phân tích...</p>
+                    <p className="text-xs mt-1">Hệ thống đã ghi nhận và sẽ sớm tự động tạo kịch bản chăm sóc cho cuộc trò chuyện này.</p>
+                  </>
+                ) : (
+                  <>
+                    <Calendar className="h-10 w-10 mb-3 text-gray-400" />
+                    <p className="text-sm font-semibold text-gray-600">Chưa có kịch bản nào</p>
+                    <p className="text-xs">Hãy tạo kịch bản để chăm sóc khách hàng tự động.</p>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </TabsContent>
       </Tabs>
       <Dialog open={isScriptDialogOpen} onOpenChange={setIsScriptDialogOpen}><DialogContent className="sm:max-w-[425px]"><DialogHeader><DialogTitle>{editingScript ? 'Sửa kịch bản' : 'Tạo kịch bản mới'}</DialogTitle></DialogHeader><div className="space-y-4 py-4"><Textarea placeholder="Nhập nội dung tin nhắn..." value={scriptContent} onChange={(e) => setScriptContent(e.target.value)} className="bg-slate-100 border-none rounded-lg" /><div className="flex items-center gap-2"><Input type="date" value={scriptDate} onChange={(e) => setScriptDate(e.target.value)} className="flex-1 bg-slate-100 border-none rounded-lg" /><Select value={String(scriptHour)} onValueChange={(value) => setScriptHour(Number(value))}><SelectTrigger className="w-[120px] bg-slate-100 border-none rounded-lg"><SelectValue /></SelectTrigger><SelectContent>{Array.from({ length: 15 }, (_, i) => i + 7).map(hour => (<SelectItem key={hour} value={String(hour)}>{String(hour).padStart(2, '0')}:00</SelectItem>))}</SelectContent></Select></div></div><DialogFooter><Button variant="outline" onClick={() => setIsScriptDialogOpen(false)} className="rounded-lg">Hủy</Button><Button onClick={handleSaveScript} className="rounded-lg bg-blue-600 hover:bg-blue-700">Lưu</Button></DialogFooter></DialogContent></Dialog>
