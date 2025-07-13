@@ -385,27 +385,6 @@ const ChatwootInbox = () => {
             {convo.unread_count > 0 && <Badge variant="destructive">{convo.unread_count}</Badge>}
           </div>
         </div>
-        {convo.labels && convo.labels.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-1.5">
-            {convo.labels.map(labelName => {
-              const color = labelColorMap.get(labelName) || '#6B7280';
-              return (
-                <Badge
-                  key={labelName}
-                  variant="outline"
-                  className="text-xs font-normal px-2 py-0.5"
-                  style={{
-                    backgroundColor: `${color}20`,
-                    color: color,
-                    borderColor: color,
-                  }}
-                >
-                  {labelName}
-                </Badge>
-              )
-            })}
-          </div>
-        )}
       </div>
     </div>
   );
