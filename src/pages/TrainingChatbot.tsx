@@ -94,12 +94,12 @@ const TrainingChatbot = () => {
             placeholder="Nhập nội dung huấn luyện cho AI..."
             value={prompt.prompt_text || ''}
             onChange={(e) => handlePromptChange(name, { ...prompt, prompt_text: e.target.value })}
-            className="h-full min-h-[300px] resize-none border rounded-lg bg-gray-50/70 p-4 text-sm focus:bg-white focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="h-full min-h-[300px] resize-none border rounded-lg bg-slate-100 p-4 text-sm focus:bg-white focus-visible:ring-2 focus-visible:ring-blue-500"
             disabled={!prompt.is_active}
           />
         </CardContent>
         <CardFooter className="p-0 pt-6">
-          <Button onClick={() => handleSave(name)} disabled={saving} size="lg" className="rounded-lg">
+          <Button onClick={() => handleSave(name)} disabled={saving} size="lg" className="rounded-lg bg-blue-600 hover:bg-blue-700">
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Lưu thay đổi
           </Button>
@@ -109,7 +109,7 @@ const TrainingChatbot = () => {
   };
 
   return (
-    <main className="flex-1 space-y-8 p-6 sm:p-8 md:p-10 bg-gray-50/50">
+    <main className="flex-1 space-y-8 p-6 sm:p-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Training Chatbot</h1>
         <p className="text-muted-foreground mt-2">
@@ -123,13 +123,13 @@ const TrainingChatbot = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
-          {renderPromptCard(
+          {prompts['auto_reply'] && renderPromptCard(
             'auto_reply',
             'Tự động trả lời',
             'Cấu hình tin nhắn tự động khi có khách hàng mới.',
             MessageSquare
           )}
-          {renderPromptCard(
+          {prompts['care_script_suggestion'] && renderPromptCard(
             'care_script_suggestion',
             'Kịch bản chăm sóc',
             'Dạy AI cách đề xuất nội dung chăm sóc khách hàng.',

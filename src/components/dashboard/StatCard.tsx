@@ -1,4 +1,4 @@
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 
 interface StatCardProps {
@@ -16,7 +16,7 @@ export const StatCard = ({ title, value, total, progress, color }: StatCardProps
   ];
 
   return (
-    <Card className="p-4 flex items-center space-x-4 bg-gray-100/80 rounded-xl border-none shadow-none">
+    <Card className="p-4 flex items-center space-x-4 bg-slate-100 rounded-xl border-none shadow-none">
       <div className="w-12 h-12">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>

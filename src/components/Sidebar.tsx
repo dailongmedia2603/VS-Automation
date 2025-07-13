@@ -1,6 +1,4 @@
 import {
-  Pencil,
-  LayoutDashboard,
   Briefcase,
   BarChart3,
   Users,
@@ -8,7 +6,8 @@ import {
   MessageSquare,
   GraduationCap,
   Search,
-  LogOut,
+  ArrowRight,
+  LayoutDashboard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link, useLocation } from "react-router-dom";
@@ -47,11 +46,11 @@ export function Sidebar({ className }: { className?: string }) {
       key={item.name}
       to={item.href}
       className={cn(
-        "flex items-center rounded-lg px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-blue-100 hover:text-blue-700",
+        "flex items-center rounded-lg px-4 py-2.5 text-sm font-medium text-gray-500 hover:bg-blue-50 hover:text-blue-600",
         location.pathname === item.href && "bg-blue-600 text-white hover:bg-blue-600 hover:text-white"
       )}
     >
-      <item.icon className="mr-4 h-5 w-5" />
+      <item.icon className="mr-3 h-5 w-5" />
       <span>{item.name}</span>
     </Link>
   );
@@ -59,20 +58,20 @@ export function Sidebar({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "h-full flex flex-col bg-white text-zinc-800 p-6 space-y-6",
+        "h-full flex flex-col bg-white text-zinc-800 p-6 space-y-8 border-r border-slate-100",
         className
       )}
     >
       {/* Logo */}
       <div className="flex items-center space-x-3 px-2">
-        <div className="bg-blue-600 rounded-full p-2">
-          <Pencil className="h-6 w-6 text-white" />
+        <div className="bg-blue-600 rounded-lg p-2 flex items-center justify-center">
+          <Briefcase className="h-5 w-5 text-white" />
         </div>
-        <span className="text-2xl font-bold text-gray-800">ava</span>
+        <span className="text-2xl font-bold text-gray-800">HEXO</span>
       </div>
 
       {/* User Profile */}
-      <div className="flex items-center justify-between rounded-lg bg-gray-50 p-3">
+      <div className="flex items-center justify-between rounded-lg bg-white p-2">
         <div className="flex items-center space-x-3">
             <Avatar className="h-10 w-10">
                 <AvatarImage src="https://i.pravatar.cc/150?u=dough" />
@@ -83,17 +82,17 @@ export function Sidebar({ className }: { className?: string }) {
                 <p className="text-xs text-gray-500">HyperDrive Plus</p>
             </div>
         </div>
-        <LogOut className="h-5 w-5 text-gray-400 cursor-pointer hover:text-gray-600" />
+        <ArrowRight className="h-5 w-5 text-gray-400 cursor-pointer hover:text-gray-600" />
       </div>
 
       {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <Input placeholder="Search" className="bg-gray-100 border-none pl-9 rounded-lg focus-visible:ring-blue-500" />
+        <Input placeholder="Search" className="bg-slate-100 border-none pl-9 rounded-lg focus-visible:ring-blue-500" />
       </div>
 
       {/* Navigation */}
-      <div className="flex-1 flex flex-col space-y-6 overflow-y-auto">
+      <div className="flex-1 flex flex-col space-y-6 overflow-y-auto -mr-3 pr-3">
         <div>
             <p className="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">General</p>
             <nav className="flex flex-col space-y-1">

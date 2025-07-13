@@ -87,23 +87,23 @@ const Settings = () => {
 
   if (isLoading) {
     return (
-      <main className="flex-1 space-y-4 p-4 sm:p-6 md:p-8 bg-zinc-100">
-        <Skeleton className="h-8 w-1/3" />
-        <Card>
+      <main className="flex-1 space-y-6 p-6 sm:p-8">
+        <Skeleton className="h-8 w-1/3 rounded-lg" />
+        <Card className="shadow-sm rounded-2xl bg-white">
           <CardHeader>
-            <Skeleton className="h-6 w-1/4" />
-            <Skeleton className="h-4 w-1/2" />
+            <Skeleton className="h-6 w-1/4 rounded-md" />
+            <Skeleton className="h-4 w-1/2 rounded-md" />
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-4 w-24 rounded-md" />
+              <Skeleton className="h-10 w-full rounded-lg" />
             </div>
             <div className="space-y-2">
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-4 w-24 rounded-md" />
+              <Skeleton className="h-10 w-full rounded-lg" />
             </div>
-            <Skeleton className="h-10 w-32" />
+            <Skeleton className="h-10 w-32 rounded-lg" />
           </CardContent>
         </Card>
       </main>
@@ -111,9 +111,9 @@ const Settings = () => {
   }
 
   return (
-    <main className="flex-1 space-y-4 p-4 sm:p-6 md:p-8 bg-zinc-100">
+    <main className="flex-1 space-y-6 p-6 sm:p-8">
       <h2 className="text-3xl font-bold tracking-tight">Cài đặt API AI</h2>
-      <Card>
+      <Card className="shadow-sm rounded-2xl bg-white">
         <CardHeader>
           <CardTitle>Kết nối API</CardTitle>
           <CardDescription>
@@ -127,6 +127,7 @@ const Settings = () => {
               id="api-url"
               value={localSettings.apiUrl}
               onChange={(e) => setLocalSettings({ ...localSettings, apiUrl: e.target.value })}
+              className="bg-slate-100 border-none rounded-lg"
             />
           </div>
            <div className="space-y-2">
@@ -136,9 +137,10 @@ const Settings = () => {
               type="password"
               value={localSettings.apiKey}
               onChange={(e) => setLocalSettings({ ...localSettings, apiKey: e.target.value })}
+              className="bg-slate-100 border-none rounded-lg"
             />
           </div>
-          <Button onClick={handleSave} disabled={isSaving}>
+          <Button onClick={handleSave} disabled={isSaving} className="rounded-lg bg-blue-600 hover:bg-blue-700">
             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isSaving ? "Đang lưu..." : "Lưu thay đổi"}
           </Button>
@@ -148,10 +150,10 @@ const Settings = () => {
                 <p className="font-medium">Kiểm tra kết nối</p>
                 {status === "idle" && <Badge variant="outline">Chưa kiểm tra</Badge>}
                 {status === "testing" && <Badge variant="secondary">Đang kiểm tra...</Badge>}
-                {status === "success" && <Badge variant="default">Thành công</Badge>}
+                {status === "success" && <Badge variant="default" className="bg-green-100 text-green-800">Thành công</Badge>}
                 {status === "error" && <Badge variant="destructive">Thất bại</Badge>}
             </div>
-            <Button onClick={handleTestConnection} disabled={status === "testing"} className="mt-4">
+            <Button onClick={handleTestConnection} disabled={status === "testing"} className="mt-4 rounded-lg">
               {status === "testing" ? "Đang kiểm tra..." : "Kiểm tra kết nối"}
             </Button>
             {error && (

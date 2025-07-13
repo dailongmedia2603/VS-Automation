@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   Bar,
   BarChart as RechartsBarChart,
@@ -30,9 +31,10 @@ const CustomTooltip = ({ active, payload }: any) => {
 
 export const AnalyticsChart = () => {
   return (
-    <Card className="shadow-sm rounded-2xl">
-      <CardHeader>
+    <Card className="shadow-sm rounded-2xl bg-white">
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Analytic</CardTitle>
+        <Button variant="link" className="text-blue-600">View All</Button>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
@@ -51,7 +53,7 @@ export const AnalyticsChart = () => {
               axisLine={false}
               tickFormatter={(value) => `$${value / 1000}k`}
             />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'transparent' }} />
+            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(59, 130, 246, 0.1)', radius: 10 }} />
             <Bar dataKey="value" fill="#3B82F6" radius={[10, 10, 10, 10]} />
           </RechartsBarChart>
         </ResponsiveContainer>

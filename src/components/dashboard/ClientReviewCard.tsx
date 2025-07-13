@@ -26,10 +26,10 @@ const reviews = [
 
 export const ClientReviewCard = () => {
   return (
-    <Card className="shadow-sm rounded-2xl">
+    <Card className="shadow-sm rounded-2xl bg-white">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle>Client Review</CardTitle>
-        <Button variant="link" className="text-primary">View All</Button>
+        <Button variant="link" className="text-blue-600">View All</Button>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
@@ -45,13 +45,11 @@ export const ClientReviewCard = () => {
                   <p className="text-sm text-muted-foreground">{review.handle}</p>
                 </div>
               </div>
-              <Button variant="ghost" size="icon">
-                {review.review === "positive" ? (
-                  <ThumbsUp className="h-5 w-5 text-green-500" />
-                ) : (
-                  <ThumbsDown className="h-5 w-5 text-red-500" />
-                )}
-              </Button>
+              {review.review === "positive" ? (
+                <ThumbsUp className="h-5 w-5 text-green-500" />
+              ) : (
+                <ThumbsDown className="h-5 w-5 text-red-500" />
+              )}
             </div>
           ))}
         </div>

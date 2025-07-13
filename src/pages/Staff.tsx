@@ -107,8 +107,8 @@ const Staff = () => {
   }, [staffList, searchTerm]);
 
   return (
-    <main className="flex-1 space-y-6 p-6 bg-gray-50/50">
-      <Card className="shadow-sm rounded-2xl">
+    <main className="flex-1 space-y-6 p-6 sm:p-8">
+      <Card className="shadow-sm rounded-2xl bg-white">
         <CardHeader>
           <CardTitle className="text-2xl font-bold">Quản lý nhân sự</CardTitle>
           <CardDescription>Thêm, sửa, xóa và quản lý thông tin các thành viên trong nhóm của bạn.</CardDescription>
@@ -119,12 +119,12 @@ const Staff = () => {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Tìm kiếm nhân sự..."
-                className="pl-9 rounded-lg"
+                className="pl-9 rounded-lg bg-slate-100 border-none"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Button onClick={handleAddNew} className="rounded-lg">
+            <Button onClick={handleAddNew} className="rounded-lg bg-blue-600 hover:bg-blue-700">
               <PlusCircle className="mr-2 h-4 w-4" />
               Thêm nhân viên
             </Button>
@@ -166,7 +166,7 @@ const Staff = () => {
                       </TableCell>
                       <TableCell>{staff.role}</TableCell>
                       <TableCell>
-                        <Badge variant={staff.status === 'active' ? 'default' : 'outline'} className={cn(staff.status === 'active' && 'bg-green-100 text-green-800')}>
+                        <Badge variant={staff.status === 'active' ? 'default' : 'outline'} className={cn(staff.status === 'active' && 'bg-green-100 text-green-800 border-green-200')}>
                           {staff.status === 'active' ? 'Hoạt động' : 'Tạm nghỉ'}
                         </Badge>
                       </TableCell>
@@ -198,14 +198,17 @@ const Staff = () => {
             <DialogDescription>Điền thông tin chi tiết cho nhân viên.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2"><Label htmlFor="name">Tên nhân viên</Label><Input id="name" value={selectedStaff?.name || ''} onChange={(e) => setSelectedStaff({ ...selectedStaff, name: e.target.value })} /></div>
-            <div className="space-y-2"><Label htmlFor="email">Email</Label><Input id="email" type="email" value={selectedStaff?.email || ''} onChange={(e) => setSelectedStaff({ ...selectedStaff, email: e.target.value })} /></div>
-            <div className="space-y-2"><Label htmlFor="role">Chức vụ</Label><Input id="role" value={selectedStaff?.role || ''} onChange={(e) => setSelectedStaff({ ...selectedStaff, role: e.target.value })} /></div>
-            <div className="space-y-2"><Label htmlFor="status">Trạng thái</Label><Select value={selectedStaff?.status || 'active'} onValueChange={(value) => setSelectedStaff({ ...selectedStaff, status: value as 'active' | 'inactive' })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Hoạt động</SelectItem><SelectItem value="inactive">Tạm nghỉ</SelectItem></SelectContent></Select></div>
+            <div className="space-y-2"><Label htmlFor="name">Tên nhân viên</Label><Input id="name" value={selectedStaff?.name || ''} onChange={(e) => setSelectedStaff({ ...selectedStaff, name: e.target.value })} className="bg-slate-100 border-none rounded-lg" /></div>
+            <div className="space-y-2"><Label htmlFor="email">Email</Label><Input id="email" type="email" value={selectedStaff?.email || ''} onChange={(e) => setSelectedStaff({ ...selectedStaff, email: e.target.value })} className="bg-slate-100 border-none rounded-lg" /></div>
+            <div className="space-y-2"><Label htmlFor="role">Chức vụ</Label><Input id="role" value={selectedStaff?.role || ''} onChange={(e) => setSelectedStaff({ ...selectedStaff, role: e.target.value })} className="bg-slate-100 border-none rounded-lg" /></div>
+            <div className="space-y-2"><Label htmlFor="status">Trạng thái</Label><Select value={selectedStaff?.status || 'active'} onValueChange={(value) => setSelectedStaff({ ...selectedStaff, status: value as 'active' | 'inactive' })}><SelectTrigger className="bg-slate-100 border-none rounded-lg"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Hoạt động</SelectItem><SelectItem value="inactive">Tạm nghỉ</SelectItem></SelectContent></Select></div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Hủy</Button>
-            <Button onClick={handleSave} disabled={isSaving}>{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Lưu</Button>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="rounded-lg">Hủy</Button>
+            <Button onClick={handleSave} disabled={isSaving} className="rounded-lg bg-blue-600 hover:bg-blue-700">
+                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Lưu
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -213,7 +216,7 @@ const Staff = () => {
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>Bạn có chắc chắn muốn xóa?</AlertDialogTitle><AlertDialogDescription>Hành động này không thể hoàn tác. Nhân sự "{staffToDelete?.name}" sẽ bị xóa vĩnh viễn.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel onClick={() => setStaffToDelete(null)}>Hủy</AlertDialogCancel><AlertDialogAction onClick={handleDelete} disabled={isSaving}>{isSaving ? 'Đang xóa...' : 'Xóa'}</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogFooter><AlertDialogCancel onClick={() => setStaffToDelete(null)} className="rounded-lg">Hủy</AlertDialogCancel><AlertDialogAction onClick={handleDelete} disabled={isSaving} className="rounded-lg bg-red-600 hover:bg-red-700">{isSaving ? 'Đang xóa...' : 'Xóa'}</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </main>
