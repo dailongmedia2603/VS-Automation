@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2, Bot, MessageSquare } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
@@ -41,7 +40,7 @@ const TrainingChatbot = () => {
   }, []);
 
   const handlePromptChange = (name: string, newPrompt: Partial<AIPrompt>) => {
-    setPrompts(prev => ({ ...prev, [name]: newPrompt }));
+    setPrompts(prev => ({ ...prev, [name]: { ...(prev[name] || {}), ...newPrompt } }));
   };
 
   const handleSave = async (name: string) => {
@@ -71,49 +70,35 @@ const TrainingChatbot = () => {
     const saving = isSaving[name];
     const Icon = icon;
 
-    if (isLoading) {
-      return (
-        <Card>
-          <CardHeader><Skeleton className="h-6 w-1/2" /><Skeleton className="h-4 w-3/4 mt-2" /></CardHeader>
-          <CardContent><Skeleton className="h-48 w-full" /></CardContent>
-          <CardFooter><Skeleton className="h-10 w-28" /></CardFooter>
-        </Card>
-      );
-    }
-
     if (!prompt) return null;
 
     return (
-      <Card>
-        <CardHeader>
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-4">
-              <Icon className="h-8 w-8 text-primary" />
-              <div>
-                <CardTitle className="text-lg">{title}</CardTitle>
-                <CardDescription>{description}</CardDescription>
-              </div>
+      <Card className="bg-white rounded-xl shadow-sm p-6 flex flex-col h-full">
+        <CardHeader className="flex flex-row items-start justify-between p-0 pb-4">
+          <div className="flex items-center gap-4">
+            <div className="bg-blue-100 p-3 rounded-lg">
+              <Icon className="h-6 w-6 text-blue-600" />
             </div>
-            <div className="flex items-center space-x-2">
-              <span className="text-sm font-medium">{prompt.is_active ? 'Bật' : 'Tắt'}</span>
-              <Switch
-                checked={prompt.is_active}
-                onCheckedChange={(checked) => handlePromptChange(name, { ...prompt, is_active: checked })}
-              />
+            <div>
+              <CardTitle className="text-lg">{title}</CardTitle>
+              <CardDescription className="text-sm text-muted-foreground">{description}</CardDescription>
             </div>
           </div>
+          <Switch
+            checked={!!prompt.is_active}
+            onCheckedChange={(checked) => handlePromptChange(name, { ...prompt, is_active: checked })}
+          />
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex-grow p-0">
           <Textarea
             placeholder="Nhập nội dung huấn luyện cho AI..."
             value={prompt.prompt_text || ''}
             onChange={(e) => handlePromptChange(name, { ...prompt, prompt_text: e.target.value })}
-            rows={15}
-            className="font-mono text-sm leading-6"
+            className="h-full min-h-[300px] resize-none border-2 border-dashed bg-zinc-50/50 font-mono text-sm focus:bg-white"
             disabled={!prompt.is_active}
           />
         </CardContent>
-        <CardFooter>
+        <CardFooter className="p-0 pt-4">
           <Button onClick={() => handleSave(name)} disabled={saving}>
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Lưu thay đổi
@@ -124,32 +109,34 @@ const TrainingChatbot = () => {
   };
 
   return (
-    <main className="flex-1 space-y-4 p-4 sm:p-6 md:p-8 bg-zinc-100">
-      <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold tracking-tight">Huấn luyện AI cho Chatbot</h2>
+    <main className="flex-1 space-y-6 p-4 sm:p-6 md:p-8 bg-zinc-50">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Training Chatbot</h1>
+        <p className="text-muted-foreground mt-1">
+          Dạy cho AI cách trả lời và tương tác trong các tình huống cụ thể.
+        </p>
       </div>
-      <Tabs defaultValue="auto-reply">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="auto-reply">Tự động trả lời</TabsTrigger>
-          <TabsTrigger value="care-scenario">Kịch bản chăm sóc</TabsTrigger>
-        </TabsList>
-        <TabsContent value="auto-reply" className="mt-4">
+      {isLoading ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Skeleton className="h-[500px] w-full rounded-xl" />
+          <Skeleton className="h-[500px] w-full rounded-xl" />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
           {renderPromptCard(
             'auto_reply',
-            'Tự động trả lời tin nhắn đầu tiên',
-            'Cấu hình nội dung AI sẽ tự động gửi khi có khách hàng mới nhắn tin.',
+            'Tự động trả lời',
+            'Cấu hình tin nhắn tự động khi có khách hàng mới.',
             MessageSquare
           )}
-        </TabsContent>
-        <TabsContent value="care-scenario" className="mt-4">
           {renderPromptCard(
             'care_script_suggestion',
-            'Gợi ý kịch bản chăm sóc khách hàng',
-            'Dạy AI cách phân tích và đề xuất nội dung chăm sóc khách hàng tự động.',
+            'Kịch bản chăm sóc',
+            'Dạy AI cách đề xuất nội dung chăm sóc khách hàng.',
             Bot
           )}
-        </TabsContent>
-      </Tabs>
+        </div>
+      )}
     </main>
   );
 };
