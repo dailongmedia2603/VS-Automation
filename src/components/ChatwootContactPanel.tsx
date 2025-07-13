@@ -21,7 +21,13 @@ interface Message { id: number; content: string; created_at: number; private: bo
 interface Conversation { id: number; meta: { sender: { id: number; name: string; email?: string; phone_number?: string; thumbnail?: string; additional_attributes?: { company_name?: string; }; }; }; labels: string[]; }
 type CareScriptStatus = 'scheduled' | 'sent' | 'failed';
 interface CareScript { id: number; content: string; scheduled_at: string; status: CareScriptStatus; image_url?: string; }
-interface ChatwootContactPanelProps { selectedConversation: Conversation | null; messages: Message[]; onNewNote: (newNote: Message) => void; }
+interface ChatwootContactPanelProps { 
+  selectedConversation: Conversation | null; 
+  messages: Message[]; 
+  onNewNote: (newNote: Message) => void;
+  scripts: CareScript[];
+  fetchCareScripts: (conversationId: number) => Promise<void>;
+}
 
 const getInitials = (name?: string) => {
   if (!name) return 'U';
@@ -33,11 +39,10 @@ const getInitials = (name?: string) => {
 const statusMap: Record<CareScriptStatus, string> = { scheduled: 'Đã lên lịch', sent: 'Đã gửi', failed: 'Thất bại' };
 const statusColorMap: Record<CareScriptStatus, "default" | "secondary" | "destructive"> = { scheduled: 'secondary', sent: 'default', failed: 'destructive' };
 
-export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote }: ChatwootContactPanelProps) => {
+export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote, scripts, fetchCareScripts }: ChatwootContactPanelProps) => {
   const { settings } = useChatwoot();
   const [note, setNote] = useState('');
   const [isSendingNote, setIsSendingNote] = useState(false);
-  const [scripts, setScripts] = useState<CareScript[]>([]);
   const [isScriptDialogOpen, setIsScriptDialogOpen] = useState(false);
   const [editingScript, setEditingScript] = useState<CareScript | null>(null);
   const [scriptToDelete, setScriptToDelete] = useState<CareScript | null>(null);
@@ -45,15 +50,6 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
   const [scriptDate, setScriptDate] = useState('');
   const [scriptHour, setScriptHour] = useState<number>(9);
   const notesContainerRef = useRef<HTMLDivElement>(null);
-
-  const fetchCareScripts = async (conversationId: number) => {
-    const { data, error } = await supabase.from('care_scripts').select('*').eq('conversation_id', conversationId).order('scheduled_at', { ascending: true });
-    if (error) { showError("Không thể tải kịch bản chăm sóc."); } else { setScripts(data); }
-  };
-
-  useEffect(() => {
-    if (selectedConversation) { fetchCareScripts(selectedConversation.id); } else { setScripts([]); }
-  }, [selectedConversation]);
 
   useEffect(() => { if (notesContainerRef.current) { notesContainerRef.current.scrollTop = 0; } }, [messages]);
 
@@ -100,14 +96,22 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
       ? await supabase.from('care_scripts').update(scriptData).eq('id', editingScript.id)
       : await supabase.from('care_scripts').insert(scriptData);
     if (error) { showError("Lưu kịch bản thất bại: " + error.message); } 
-    else { showSuccess(`Đã ${editingScript ? 'cập nhật' : 'tạo'} kịch bản!`); fetchCareScripts(selectedConversation.id); setIsScriptDialogOpen(false); }
+    else { 
+      showSuccess(`Đã ${editingScript ? 'cập nhật' : 'tạo'} kịch bản!`); 
+      fetchCareScripts(selectedConversation.id); 
+      setIsScriptDialogOpen(false); 
+    }
   };
 
   const handleDeleteScript = async () => {
     if (!scriptToDelete) return;
     const { error } = await supabase.from('care_scripts').delete().eq('id', scriptToDelete.id);
     if (error) { showError("Xóa kịch bản thất bại: " + error.message); } 
-    else { showSuccess("Đã xóa kịch bản."); fetchCareScripts(selectedConversation!.id); setScriptToDelete(null); }
+    else { 
+      showSuccess("Đã xóa kịch bản."); 
+      fetchCareScripts(selectedConversation!.id); 
+      setScriptToDelete(null); 
+    }
   };
 
   const notes = messages.filter(msg => msg.private).sort((a, b) => b.created_at - a.created_at);

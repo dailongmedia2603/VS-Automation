@@ -11,6 +11,7 @@ import { format, formatDistanceToNow, isSameDay } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { ChatwootContactPanel } from '@/components/ChatwootContactPanel';
 import { Search, Phone, Link as LinkIcon, Smile, Paperclip, Image as ImageIcon, SendHorizonal, ThumbsUp, Settings2, CornerDownLeft, Eye, RefreshCw, UserPlus } from 'lucide-react';
+import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 
 // Interfaces
 interface Attachment { id: number; file_type: 'image' | 'video' | 'audio' | 'file'; data_url: string; }
@@ -18,6 +19,7 @@ interface MessageSender { name: string; thumbnail?: string; }
 interface Conversation { id: number; meta: { sender: { id: number; name: string; email?: string; phone_number?: string; thumbnail?: string; additional_attributes?: { company_name?: string; }; }; }; messages: { content: string }[]; last_activity_at: number; unread_count: number; labels: string[]; status: string; }
 interface Message { id: number; content: string; created_at: number; message_type: number; private: boolean; sender?: MessageSender; attachments?: Attachment[]; }
 interface ChatwootLabel { id: number; name: string; color: string; }
+interface CareScript { id: number; content: string; scheduled_at: string; status: 'scheduled' | 'sent' | 'failed'; image_url?: string; }
 
 const getInitials = (name?: string) => {
   if (!name) return 'U';
@@ -37,9 +39,11 @@ const ChatwootInbox = () => {
   const [sendingMessage, setSendingMessage] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestedLabels, setSuggestedLabels] = useState<ChatwootLabel[]>([]);
+  const [scripts, setScripts] = useState<CareScript[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const POLLING_INTERVAL = 15000;
   const phoneRegex = /(0[3|5|7|8|9][0-9]{8})\b/;
+  const AI_CARE_LABEL = 'AI chăm';
 
   const labelColorMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -51,6 +55,11 @@ const ChatwootInbox = () => {
 
   const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); };
   useEffect(() => { scrollToBottom(); }, [messages]);
+
+  const fetchCareScripts = async (conversationId: number) => {
+    const { data, error } = await supabase.from('care_scripts').select('*').eq('conversation_id', conversationId).order('scheduled_at', { ascending: true });
+    if (error) { showError("Không thể tải kịch bản chăm sóc."); } else { setScripts(data || []); }
+  };
 
   const syncConversationsToDB = async (convos: Conversation[]) => {
     if (convos.length === 0) return;
@@ -126,9 +135,14 @@ const ChatwootInbox = () => {
   }, [settings.apiToken, settings.accountId]);
 
   useEffect(() => {
-    if (!selectedConversation) return;
-    const intervalId = setInterval(() => fetchMessages(selectedConversation.id), POLLING_INTERVAL);
-    return () => clearInterval(intervalId);
+    if (selectedConversation) {
+      fetchMessages(selectedConversation.id);
+      fetchCareScripts(selectedConversation.id);
+      const intervalId = setInterval(() => fetchMessages(selectedConversation.id), POLLING_INTERVAL);
+      return () => clearInterval(intervalId);
+    } else {
+      setScripts([]);
+    }
   }, [selectedConversation]);
 
   useEffect(() => {
@@ -197,6 +211,25 @@ const ChatwootInbox = () => {
     const { data: upsertedLabel } = await supabase.from('chatwoot_labels').upsert({ name: label }, { onConflict: 'name' }).select().single();
     if (upsertedLabel) {
       await supabase.from('chatwoot_conversation_labels').upsert({ conversation_id: selectedConversation.id, label_id: upsertedLabel.id });
+    }
+    if (label === AI_CARE_LABEL) {
+      const toastId = showLoading("AI đang bắt đầu phân tích...");
+      try {
+        const { error } = await supabase.functions.invoke('trigger-ai-care-script', {
+          body: {
+            conversationId: selectedConversation.id,
+            contactId: selectedConversation.meta.sender.id,
+          }
+        });
+        if (error) throw error;
+        dismissToast(toastId);
+        showSuccess("AI đã tạo xong kịch bản. Đang làm mới...");
+        await fetchCareScripts(selectedConversation.id);
+      } catch (err: any) {
+        dismissToast(toastId);
+        const errorMessage = err.context ? (await err.context.json()).error : err.message;
+        showError(`Kích hoạt AI thất bại: ${errorMessage}`);
+      }
     }
   };
 
@@ -298,7 +331,7 @@ const ChatwootInbox = () => {
           </>
         ) : (<div className="flex-1 flex items-center justify-center text-center text-muted-foreground"><p>Vui lòng chọn một cuộc trò chuyện để xem tin nhắn.</p></div>)}
       </section>
-      <ChatwootContactPanel selectedConversation={selectedConversation} messages={messages} onNewNote={handleNewNote} />
+      <ChatwootContactPanel selectedConversation={selectedConversation} messages={messages} onNewNote={handleNewNote} scripts={scripts} fetchCareScripts={fetchCareScripts} />
     </div>
   );
 };

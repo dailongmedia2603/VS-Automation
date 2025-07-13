@@ -69,46 +69,14 @@ serve(async (req) => {
     // 4. Xử lý từng cuộc trò chuyện đã lọc
     for (const convo of conversationsToProcess) {
         try {
-            // Kiểm tra xem đã có kịch bản nào đang được lên lịch chưa
-            const { data: existingScripts, error: existingScriptError } = await supabaseAdmin
-                .from('care_scripts')
-                .select('id')
-                .eq('conversation_id', convo.id)
-                .eq('status', 'scheduled');
-
-            if (existingScriptError) {
-                console.error(`Lỗi khi kiểm tra kịch bản cho hội thoại ${convo.id}:`, existingScriptError.message);
-                continue;
-            }
-
-            // Nếu đã có, bỏ qua và xử lý hội thoại tiếp theo
-            if (existingScripts && existingScripts.length > 0) {
-                continue;
-            }
-
-            // 5. Nếu chưa có, bắt đầu tạo kịch bản mới
-            const { data: suggestion, error: suggestionError } = await supabaseAdmin.functions.invoke('suggest-care-script', {
-                body: { conversationId: convo.id },
+            const { error } = await supabaseAdmin.functions.invoke('trigger-ai-care-script', {
+                body: { 
+                    conversationId: convo.id,
+                    contactId: convo.meta.sender.id,
+                },
             });
-
-            if (suggestionError) throw new Error(`Gợi ý thất bại cho hội thoại ${convo.id}: ${(await suggestionError.context.json()).error || suggestionError.message}`);
-            if (suggestion.error) throw new Error(`Lỗi từ function gợi ý: ${suggestion.error}`);
-
-            const { content, scheduled_at } = suggestion;
-
-            // 6. Lưu kịch bản mới vào cơ sở dữ liệu
-            const { error: insertError } = await supabaseAdmin
-                .from('care_scripts')
-                .insert({
-                    conversation_id: convo.id,
-                    contact_id: convo.meta.sender.id,
-                    content: content,
-                    scheduled_at: scheduled_at,
-                    status: 'scheduled',
-                });
-
-            if (insertError) {
-                console.error(`Lưu kịch bản mới thất bại cho hội thoại ${convo.id}:`, insertError.message);
+            if (error) {
+                console.error(`Lỗi khi trigger kịch bản cho hội thoại ${convo.id}:`, (await error.context.json()).error || error.message);
             } else {
                 scriptsCreated++;
             }
