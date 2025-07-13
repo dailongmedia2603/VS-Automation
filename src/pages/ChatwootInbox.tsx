@@ -275,20 +275,31 @@ const ChatwootInbox = () => {
     }
   };
 
-  const handleAddLabel = async (label: string) => {
+  const handleToggleLabel = async (label: string) => {
     if (!selectedConversation) return;
+
     const currentLabels = selectedConversation.labels || [];
-    if (currentLabels.includes(label)) return;
-    const newLabels = [...currentLabels, label];
+    const isLabelApplied = currentLabels.includes(label);
+    const newLabels = isLabelApplied
+      ? currentLabels.filter(l => l !== label)
+      : [...currentLabels, label];
+
     const optimisticConversation = { ...selectedConversation, labels: newLabels };
     setSelectedConversation(optimisticConversation);
     setConversations(convos => convos.map(c => c.id === selectedConversation.id ? optimisticConversation : c));
+
     await supabase.functions.invoke('chatwoot-proxy', { body: { action: 'update_labels', settings, conversationId: selectedConversation.id, labels: newLabels } });
-    const { data: upsertedLabel } = await supabase.from('chatwoot_labels').upsert({ name: label }, { onConflict: 'name' }).select().single();
-    if (upsertedLabel) {
-      await supabase.from('chatwoot_conversation_labels').upsert({ conversation_id: selectedConversation.id, label_id: upsertedLabel.id });
+    
+    const { data: labelData } = await supabase.from('chatwoot_labels').select('id').eq('name', label).single();
+    if (labelData) {
+      if (isLabelApplied) {
+        await supabase.from('chatwoot_conversation_labels').delete().match({ conversation_id: selectedConversation.id, label_id: labelData.id });
+      } else {
+        await supabase.from('chatwoot_conversation_labels').upsert({ conversation_id: selectedConversation.id, label_id: labelData.id });
+      }
     }
-    if (label === AI_CARE_LABEL) {
+
+    if (label === AI_CARE_LABEL && !isLabelApplied) {
       const toastId = showLoading("AI đang bắt đầu phân tích...");
       try {
         const { error } = await supabase.functions.invoke('trigger-ai-care-script', {
@@ -547,22 +558,29 @@ const ChatwootInbox = () => {
                 </div>
               )}
               <div className="flex flex-wrap gap-2 px-2">
-                {suggestedLabels.map(label => (
-                  <Button
-                    key={label.id}
-                    variant="outline"
-                    size="sm"
-                    className="text-xs h-7"
-                    style={{
-                      backgroundColor: `${label.color}20`,
-                      borderColor: label.color,
-                      color: label.color,
-                    }}
-                    onClick={() => handleAddLabel(label.name)}
-                  >
-                    {label.name}
-                  </Button>
-                ))}
+                {suggestedLabels.map(label => {
+                  const isApplied = selectedConversation?.labels.includes(label.name);
+                  return (
+                    <Button
+                      key={label.id}
+                      variant="outline"
+                      size="sm"
+                      className={cn(
+                        "text-xs h-7 transition-all",
+                        isApplied ? "text-white" : "text-foreground"
+                      )}
+                      style={{
+                        backgroundColor: isApplied ? label.color : `${label.color}20`,
+                        borderColor: isApplied ? label.color : `${label.color}50`,
+                        color: isApplied ? 'white' : label.color,
+                      }}
+                      onClick={() => handleToggleLabel(label.name)}
+                    >
+                      {isApplied && <Check className="h-3 w-3 mr-1.5" />}
+                      {label.name}
+                    </Button>
+                  )
+                })}
               </div>
               <div className="relative"><Input placeholder="Trả lời..." className="pr-10" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(e); } }} /><SendHorizonal className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground cursor-pointer" onClick={handleSendMessage} /></div>
               <div className="flex justify-between items-center px-2"><div className="flex items-center space-x-4 text-muted-foreground"><Paperclip className="h-5 w-5 cursor-pointer hover:text-primary" onClick={() => fileInputRef.current?.click()} /><ImageIcon className="h-5 w-5 cursor-pointer hover:text-primary" onClick={() => fileInputRef.current?.click()} /></div><div className="flex items-center space-x-4 text-muted-foreground"><ThumbsUp className="h-5 w-5 cursor-pointer hover:text-primary" /><Settings2 className="h-5 w-5 cursor-pointer hover:text-primary" /></div></div>
