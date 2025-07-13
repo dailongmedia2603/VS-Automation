@@ -14,6 +14,7 @@ import { vi } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { showSuccess, showError } from '@/utils/toast';
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // Interfaces
 interface Message { id: number; content: string; created_at: number; private: boolean; sender?: { name: string; thumbnail?: string; }; }
@@ -36,7 +37,7 @@ const getInitials = (name?: string) => {
 };
 
 const statusMap: Record<CareScriptStatus, string> = { scheduled: 'Đã lên lịch', sent: 'Đã gửi', failed: 'Thất bại' };
-const statusColorMap: Record<CareScriptStatus, "default" | "secondary" | "destructive"> = { scheduled: 'secondary', sent: 'default', failed: 'destructive' };
+const statusBadgeColors: Record<CareScriptStatus, string> = { scheduled: 'bg-blue-100 text-blue-600', sent: 'bg-green-100 text-green-600', failed: 'bg-red-100 text-red-600' };
 
 export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote, scripts, fetchCareScripts }: ChatwootContactPanelProps) => {
   const { settings } = useChatwoot();
@@ -130,7 +131,7 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
 
   return (
     <aside className="hidden lg:flex lg:w-80 border-l bg-white flex-col">
-      <div className="p-3 border-b flex-shrink-0">
+      <div className="p-3 border-b border-slate-100 flex-shrink-0">
         <div className="grid w-full grid-cols-2 bg-slate-100 rounded-lg p-1">
           <button
             onClick={() => setActiveTab('info')}
@@ -202,57 +203,70 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
       )}
 
       {activeTab === 'care' && (
-        <div className="flex-1 flex flex-col bg-gray-50 overflow-hidden">
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 flex flex-col bg-slate-50 overflow-hidden">
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {scripts.length > 0 ? (
-              <div className="space-y-3">
-                {scripts.map(script => (
-                  <div key={script.id} className="bg-white p-3 rounded-lg border shadow-sm">
-                    <p className="text-sm text-gray-800 mb-2">{script.content}</p>
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3" />
-                        <span>{format(new Date(script.scheduled_at), 'dd/MM/yy HH:mm')}</span>
-                        <Badge variant={statusColorMap[script.status]}>{statusMap[script.status]}</Badge>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="icon" className="h-6 w-6"><ImagePlus className="h-4 w-4 text-muted-foreground" /></Button>
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditDialog(script)}><Pencil className="h-4 w-4 text-muted-foreground" /></Button>
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setScriptToDelete(script)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+              <TooltipProvider>
+                <div className="space-y-3">
+                  {scripts.map(script => (
+                    <div key={script.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                      <p className="text-sm text-slate-700 mb-4 leading-relaxed">{script.content}</p>
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-3 text-xs">
+                          <div className="flex items-center gap-1.5 text-slate-500">
+                            <Clock className="h-3.5 w-3.5" />
+                            <span>{format(new Date(script.scheduled_at), 'dd/MM/yy HH:mm')}</span>
+                          </div>
+                          <Badge className={cn("px-2 py-0.5 text-xs font-medium rounded-full border-none", statusBadgeColors[script.status])}>
+                            {statusMap[script.status]}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center">
+                          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><ImagePlus className="h-4 w-4 text-slate-500" /></Button></TooltipTrigger><TooltipContent><p>Thêm ảnh</p></TooltipContent></Tooltip>
+                          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditDialog(script)}><Pencil className="h-4 w-4 text-slate-500" /></Button></TooltipTrigger><TooltipContent><p>Sửa</p></TooltipContent></Tooltip>
+                          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setScriptToDelete(script)}><Trash2 className="h-4 w-4 text-red-500" /></Button></TooltipTrigger><TooltipContent><p>Xóa</p></TooltipContent></Tooltip>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </TooltipProvider>
             ) : (
-              <div className="h-full flex flex-col items-center justify-center text-center text-muted-foreground">
+              <div className="h-full flex flex-col items-center justify-center text-center p-6">
                 {hasAiCareTag ? (
                   <>
-                    <Bot className="h-10 w-10 mb-3 text-blue-500 animate-pulse" />
-                    <p className="text-sm font-semibold text-gray-700">AI đang phân tích...</p>
-                    <p className="text-xs mt-1">Hệ thống đã ghi nhận và sẽ sớm tự động tạo kịch bản chăm sóc cho cuộc trò chuyện này.</p>
+                    <div className="relative mb-4">
+                      <div className="absolute -inset-1.5 bg-blue-200 rounded-full animate-ping opacity-60"></div>
+                      <div className="relative flex items-center justify-center h-16 w-16 bg-blue-100 rounded-full">
+                        <Bot className="h-8 w-8 text-blue-600" />
+                      </div>
+                    </div>
+                    <p className="text-md font-semibold text-slate-800">AI đang phân tích</p>
+                    <p className="text-sm text-slate-500 mt-1 max-w-xs">Hệ thống sẽ sớm tự động tạo kịch bản chăm sóc cho cuộc trò chuyện này.</p>
                   </>
                 ) : (
                   <>
-                    <Calendar className="h-10 w-10 mb-3 text-gray-400" />
-                    <p className="text-sm font-semibold text-gray-600">Chưa có kịch bản nào</p>
-                    <p className="text-xs">Hãy tạo kịch bản để chăm sóc khách hàng tự động.</p>
+                    <div className="flex items-center justify-center h-16 w-16 bg-slate-200/70 rounded-full mb-4">
+                      <Calendar className="h-8 w-8 text-slate-400" />
+                    </div>
+                    <p className="text-md font-semibold text-slate-800">Chưa có kịch bản chăm sóc</p>
+                    <p className="text-sm text-slate-500 mt-1">Tạo kịch bản mới để bắt đầu chăm sóc khách hàng tự động.</p>
                   </>
                 )}
               </div>
             )}
           </div>
-          <div className="p-4 border-t bg-white flex-shrink-0">
-            <Button onClick={openCreateDialog} className="w-full rounded-lg bg-blue-600 hover:bg-blue-700">
-              <PlusCircle className="mr-2 h-4 w-4" />
+          <div className="p-4 border-t border-slate-100 bg-white flex-shrink-0">
+            <Button onClick={openCreateDialog} className="w-full rounded-xl bg-blue-600 hover:bg-blue-700 h-12 text-base font-semibold">
+              <PlusCircle className="mr-2 h-5 w-5" />
               Tạo kịch bản mới
             </Button>
           </div>
         </div>
       )}
 
-      <Dialog open={isScriptDialogOpen} onOpenChange={setIsScriptDialogOpen}><DialogContent className="sm:max-w-[425px]"><DialogHeader><DialogTitle>{editingScript ? 'Sửa kịch bản' : 'Tạo kịch bản mới'}</DialogTitle></DialogHeader><div className="space-y-4 py-4"><Textarea placeholder="Nhập nội dung tin nhắn..." value={scriptContent} onChange={(e) => setScriptContent(e.target.value)} className="bg-slate-100 border-none rounded-lg" /><div className="flex items-center gap-2"><Input type="date" value={scriptDate} onChange={(e) => setScriptDate(e.target.value)} className="flex-1 bg-slate-100 border-none rounded-lg" /><Select value={String(scriptHour)} onValueChange={(value) => setScriptHour(Number(value))}><SelectTrigger className="w-[120px] bg-slate-100 border-none rounded-lg"><SelectValue /></SelectTrigger><SelectContent>{Array.from({ length: 15 }, (_, i) => i + 7).map(hour => (<SelectItem key={hour} value={String(hour)}>{String(hour).padStart(2, '0')}:00</SelectItem>))}</SelectContent></Select></div></div><DialogFooter><Button variant="outline" onClick={() => setIsScriptDialogOpen(false)} className="rounded-lg">Hủy</Button><Button onClick={handleSaveScript} className="rounded-lg bg-blue-600 hover:bg-blue-700">Lưu</Button></DialogFooter></DialogContent></Dialog>
-      <AlertDialog open={!!scriptToDelete} onOpenChange={() => setScriptToDelete(null)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Bạn có chắc chắn muốn xóa?</AlertDialogTitle><AlertDialogDescription>Hành động này không thể được hoàn tác. Kịch bản chăm sóc này sẽ bị xóa vĩnh viễn.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="rounded-lg">Hủy</AlertDialogCancel><AlertDialogAction onClick={handleDeleteScript} className="rounded-lg bg-red-600 hover:bg-red-700">Xóa</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+      <Dialog open={isScriptDialogOpen} onOpenChange={setIsScriptDialogOpen}><DialogContent className="sm:max-w-[425px] rounded-xl"><DialogHeader><DialogTitle>{editingScript ? 'Sửa kịch bản' : 'Tạo kịch bản mới'}</DialogTitle></DialogHeader><div className="space-y-4 py-4"><Textarea placeholder="Nhập nội dung tin nhắn..." value={scriptContent} onChange={(e) => setScriptContent(e.target.value)} className="bg-slate-100 border-none rounded-lg min-h-[100px]" /><div className="flex items-center gap-2"><Input type="date" value={scriptDate} onChange={(e) => setScriptDate(e.target.value)} className="flex-1 bg-slate-100 border-none rounded-lg h-10" /><Select value={String(scriptHour)} onValueChange={(value) => setScriptHour(Number(value))}><SelectTrigger className="w-[120px] bg-slate-100 border-none rounded-lg h-10"><SelectValue /></SelectTrigger><SelectContent>{Array.from({ length: 15 }, (_, i) => i + 7).map(hour => (<SelectItem key={hour} value={String(hour)}>{String(hour).padStart(2, '0')}:00</SelectItem>))}</SelectContent></Select></div></div><DialogFooter><Button variant="outline" onClick={() => setIsScriptDialogOpen(false)} className="rounded-xl">Hủy</Button><Button onClick={handleSaveScript} className="rounded-xl bg-blue-600 hover:bg-blue-700">Lưu</Button></DialogFooter></DialogContent></Dialog>
+      <AlertDialog open={!!scriptToDelete} onOpenChange={() => setScriptToDelete(null)}><AlertDialogContent className="rounded-xl"><AlertDialogHeader><AlertDialogTitle>Bạn có chắc chắn muốn xóa?</AlertDialogTitle><AlertDialogDescription>Hành động này không thể được hoàn tác. Kịch bản chăm sóc này sẽ bị xóa vĩnh viễn.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="rounded-xl">Hủy</AlertDialogCancel><AlertDialogAction onClick={handleDeleteScript} className="rounded-xl bg-red-600 hover:bg-red-700">Xóa</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     </aside>
   );
 };
