@@ -52,7 +52,11 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
   const notesContainerRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<'info' | 'care'>('info');
 
-  useEffect(() => { if (notesContainerRef.current) { notesContainerRef.current.scrollTop = notesContainerRef.current.scrollHeight; } }, [messages, activeTab]);
+  useEffect(() => {
+    if (notesContainerRef.current) {
+      notesContainerRef.current.scrollTop = 0;
+    }
+  }, [messages, activeTab, selectedConversation]);
 
   const handleSendNote = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,7 +119,7 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
     }
   };
 
-  const notes = messages.filter(msg => msg.private).sort((a, b) => a.created_at - b.created_at);
+  const notes = messages.filter(msg => msg.private).sort((a, b) => b.created_at - a.created_at);
 
   if (!selectedConversation) {
     return (
@@ -185,8 +189,11 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
                   <p className="text-sm text-slate-500 mt-1">Thêm ghi chú mới để thảo luận nội bộ về cuộc trò chuyện này.</p>
                 </div>
               ) : (
-                notes.map(n => (
-                  <div key={n.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                notes.map((n, index) => (
+                  <div key={n.id} className={cn(
+                    "bg-white p-4 rounded-xl shadow-sm border border-slate-100 transition-colors",
+                    index === 0 && "bg-blue-50 border-blue-200"
+                  )}>
                     <div className="flex items-start space-x-3">
                       <Avatar className="h-8 w-8 border">
                         <AvatarImage src={n.sender?.thumbnail} />
