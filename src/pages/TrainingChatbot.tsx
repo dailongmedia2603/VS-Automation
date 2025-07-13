@@ -6,92 +6,57 @@ import { TrainingForm, TrainingConfig, initialConfig } from '@/components/Traini
 import { Skeleton } from '@/components/ui/skeleton';
 
 const TrainingChatbot = () => {
-  const [autoReplyData, setAutoReplyData] = useState<{ id: number | null; config: TrainingConfig }>({ id: null, config: initialConfig });
-  const [careScriptData, setCareScriptData] = useState<{ id: number | null; config: TrainingConfig }>({ id: null, config: initialConfig });
+  const [autoReplyConfig, setAutoReplyConfig] = useState<TrainingConfig>(initialConfig);
+  const [careScriptConfig, setCareScriptConfig] = useState<TrainingConfig>(initialConfig);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const fetchPrompts = async () => {
       setIsLoading(true);
-      const { data, error } = await supabase
-        .from('ai_training_prompts')
-        .select('id, name, prompt_text')
-        .in('name', ['auto_reply', 'care_script_suggestion']);
+      try {
+        const [autoReplyRes, careScriptRes] = await Promise.all([
+          supabase.from('auto_reply_settings').select('config').eq('id', 1).single(),
+          supabase.from('care_script_settings').select('config').eq('id', 1).single()
+        ]);
 
-      if (error) {
-        showError("Không thể tải dữ liệu huấn luyện: " + error.message);
-      } else if (data) {
-        const configs = {
-          auto_reply: { id: null, config: initialConfig },
-          care_script_suggestion: { id: null, config: initialConfig },
-        };
-
-        data.forEach(prompt => {
-          let config = initialConfig;
-          if (prompt.prompt_text) {
-            try {
-              const parsedConfig = JSON.parse(prompt.prompt_text);
-              if (typeof parsedConfig === 'object' && parsedConfig !== null) {
-                config = { ...initialConfig, ...parsedConfig };
-              }
-            } catch (e) {
-              console.error(`Failed to parse config for ${prompt.name}:`, e);
-            }
-          }
-          if (prompt.name === 'auto_reply') {
-            configs.auto_reply = { id: prompt.id, config };
-          } else if (prompt.name === 'care_script_suggestion') {
-            configs.care_script_suggestion = { id: prompt.id, config };
-          }
-        });
-        setAutoReplyData(configs.auto_reply);
-        setCareScriptData(configs.care_script_suggestion);
+        if (autoReplyRes.data?.config && typeof autoReplyRes.data.config === 'object') {
+          setAutoReplyConfig({ ...initialConfig, ...autoReplyRes.data.config });
+        }
+        if (careScriptRes.data?.config && typeof careScriptRes.data.config === 'object') {
+          setCareScriptConfig({ ...initialConfig, ...careScriptRes.data.config });
+        }
+      } catch (error: any) {
+        // Không hiển thị lỗi nếu không tìm thấy bản ghi, vì đây là trường hợp bình thường khi lưu lần đầu
+        if (error.code !== 'PGRST116') {
+          showError("Không thể tải dữ liệu huấn luyện: " + error.message);
+        }
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
     fetchPrompts();
   }, []);
 
   const handleSave = async (name: 'auto_reply' | 'care_script_suggestion') => {
-    const dataToSave = name === 'auto_reply' ? autoReplyData : careScriptData;
-    const configToSave = dataToSave.config;
+    const configToSave = name === 'auto_reply' ? autoReplyConfig : careScriptConfig;
+    const tableName = name === 'auto_reply' ? 'auto_reply_settings' : 'care_script_settings';
     
     const sanitizedConfig = {
       ...configToSave,
       documents: configToSave.documents.map(({ file, ...doc }) => doc),
     };
 
-    const prompt_text = JSON.stringify(sanitizedConfig);
-
     setIsSaving(prev => ({ ...prev, [name]: true }));
-    
-    const payload: any = {
-        name: name,
-        prompt_text: prompt_text,
-        is_active: true,
-    };
-    if (dataToSave.id) {
-        payload.id = dataToSave.id;
-    }
 
-    const { data, error } = await supabase
-      .from('ai_training_prompts')
-      .upsert(payload)
-      .select()
-      .single();
-    
+    const { error } = await supabase
+      .from(tableName)
+      .upsert({ id: 1, config: sanitizedConfig });
+
     if (error) {
       showError(`Lưu thất bại: ${error.message}`);
     } else {
       showSuccess("Đã lưu thay đổi!");
-      if (data) {
-        if (name === 'auto_reply') {
-          setAutoReplyData(prev => ({ ...prev, id: data.id }));
-        } else {
-          setCareScriptData(prev => ({ ...prev, id: data.id }));
-        }
-      }
     }
     setIsSaving(prev => ({ ...prev, [name]: false }));
   };
@@ -127,16 +92,16 @@ const TrainingChatbot = () => {
         </TabsList>
         <TabsContent value="auto_reply">
           <TrainingForm
-            config={autoReplyData.config}
-            setConfig={(newConfig) => setAutoReplyData(prev => ({ ...prev, config: newConfig }))}
+            config={autoReplyConfig}
+            setConfig={setAutoReplyConfig}
             isSaving={!!isSaving['auto_reply']}
             onSave={() => handleSave('auto_reply')}
           />
         </TabsContent>
         <TabsContent value="care_script_suggestion">
           <TrainingForm
-            config={careScriptData.config}
-            setConfig={(newConfig) => setCareScriptData(prev => ({ ...prev, config: newConfig }))}
+            config={careScriptConfig}
+            setConfig={setCareScriptConfig}
             isSaving={!!isSaving['care_script_suggestion']}
             onSave={() => handleSave('care_script_suggestion')}
           />

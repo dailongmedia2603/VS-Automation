@@ -49,7 +49,7 @@ export const initialConfig: TrainingConfig = {
 
 interface TrainingFormProps {
   config: TrainingConfig;
-  setConfig: (config: TrainingConfig) => void;
+  setConfig: React.Dispatch<React.SetStateAction<TrainingConfig>>;
   isSaving: boolean;
   onSave: () => void;
 }
@@ -115,11 +115,11 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig, i
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   const handleFieldChange = (field: keyof Omit<TrainingConfig, 'products' | 'processSteps' | 'conditions' | 'documents'>, value: string) => {
-    setConfig({ ...config, [field]: value });
+    setConfig(prev => ({ ...prev, [field]: value }));
   };
 
   const handleDynamicListChange = (field: 'products' | 'processSteps' | 'conditions', items: TrainingItem[]) => {
-    setConfig({ ...config, [field]: items });
+    setConfig(prev => ({ ...prev, [field]: items }));
   };
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -134,12 +134,12 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig, i
         url: '',
         file: file,
       };
-      setConfig({ ...config, documents: [...config.documents, newDoc] });
+      setConfig(prev => ({ ...prev, documents: [...prev.documents, newDoc] }));
     }
   };
 
   const handleRemoveDocument = (id: string) => {
-    setConfig({ ...config, documents: config.documents.filter(doc => doc.id !== id) });
+    setConfig(prev => ({ ...prev, documents: prev.documents.filter(doc => doc.id !== id) }));
   };
 
   return (
