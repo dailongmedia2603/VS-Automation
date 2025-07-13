@@ -8,11 +8,13 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Command, CommandInput, CommandEmpty, CommandGroup, CommandItem, CommandList, CommandSeparator } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
 import { format, isSameDay } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { ChatwootContactPanel } from '@/components/ChatwootContactPanel';
-import { Search, Phone, Link as LinkIcon, Smile, Paperclip, Image as ImageIcon, SendHorizonal, ThumbsUp, Settings2, CornerDownLeft, Eye, RefreshCw, UserPlus, FileText, X, Filter } from 'lucide-react';
+import { Search, Phone, Link as LinkIcon, Smile, Paperclip, Image as ImageIcon, SendHorizonal, ThumbsUp, Settings2, CornerDownLeft, Eye, RefreshCw, UserPlus, FileText, X, Filter, Check, PlusCircle } from 'lucide-react';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 
 // Interfaces
@@ -414,14 +416,92 @@ const ChatwootInbox = () => {
               </div>
               <div className="space-y-2">
                 <h4 className="font-semibold px-1">Tags</h4>
-                <div className="space-y-1 max-h-32 overflow-y-auto pr-2">
-                  {suggestedLabels.map(label => (
-                    <div key={label.id} className="flex items-center space-x-2 p-2 rounded-md hover:bg-accent">
-                      <Checkbox id={`label-${label.id}`} checked={filters.selectedLabels.includes(label.name)} onCheckedChange={(checked) => { setFilters(f => ({ ...f, selectedLabels: checked ? [...f.selectedLabels, label.name] : f.selectedLabels.filter(l => l !== label.name) })) }} />
-                      <label htmlFor={`label-${label.id}`} className="flex-1 cursor-pointer">{label.name}</label>
-                    </div>
-                  ))}
-                </div>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start">
+                      <div className="flex-1 text-left">
+                        {filters.selectedLabels.length > 0 
+                            ? `${filters.selectedLabels.length} tag đã chọn` 
+                            : "Chọn tags..."}
+                      </div>
+                      <PlusCircle className="ml-2 h-4 w-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[240px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Tìm tag..." />
+                      <CommandList>
+                        <CommandEmpty>Không tìm thấy tag.</CommandEmpty>
+                        <CommandGroup>
+                          {suggestedLabels.map((label) => {
+                            const isSelected = filters.selectedLabels.includes(label.name);
+                            return (
+                              <CommandItem
+                                key={label.id}
+                                onSelect={() => {
+                                  if (isSelected) {
+                                    setFilters(f => ({ ...f, selectedLabels: f.selectedLabels.filter(l => l !== label.name) }));
+                                  } else {
+                                    setFilters(f => ({ ...f, selectedLabels: [...f.selectedLabels, label.name] }));
+                                  }
+                                }}
+                              >
+                                <div
+                                  className={cn(
+                                    "mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+                                    isSelected
+                                      ? "bg-primary text-primary-foreground"
+                                      : "opacity-50 [&_svg]:invisible"
+                                  )}
+                                >
+                                  <Check className={cn("h-4 w-4")} />
+                                </div>
+                                <div className="flex items-center">
+                                  <span className="h-2 w-2 rounded-full mr-2" style={{ backgroundColor: label.color }}></span>
+                                  <span className="truncate">{label.name}</span>
+                                </div>
+                              </CommandItem>
+                            );
+                          })}
+                        </CommandGroup>
+                        {filters.selectedLabels.length > 0 && (
+                          <>
+                            <CommandSeparator />
+                            <CommandGroup>
+                              <CommandItem
+                                onSelect={() => setFilters(f => ({ ...f, selectedLabels: [] }))}
+                                className="justify-center text-center"
+                              >
+                                Xóa bộ lọc
+                              </CommandItem>
+                            </CommandGroup>
+                          </>
+                        )}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                {filters.selectedLabels.length > 0 && (
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {filters.selectedLabels.map(labelName => {
+                      return (
+                        <Badge
+                          key={labelName}
+                          variant="secondary"
+                          className="font-normal"
+                        >
+                          {labelName}
+                          <button
+                            className="ml-1 rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                            onClick={() => setFilters(f => ({ ...f, selectedLabels: f.selectedLabels.filter(l => l !== labelName) }))}
+                          >
+                            <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
+                          </button>
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </CollapsibleContent>
           </Collapsible>
