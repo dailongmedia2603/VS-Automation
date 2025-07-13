@@ -23,7 +23,6 @@ interface NavItem {
 const navItems: NavItem[] = [
   { name: "Dashboard", icon: LayoutDashboard, href: "/" },
   { name: "Dự án", icon: Briefcase, href: "/projects" },
-  { name: "Huấn luyện Chatbot", icon: GraduationCap, href: "/training-chatbot" },
   { name: "Báo cáo", icon: BarChart3, href: "/reports" },
   { name: "Nhân sự", icon: Users, href: "/staff" },
 ];
@@ -31,6 +30,7 @@ const navItems: NavItem[] = [
 const chatbotNavItems: NavItem[] = [
     { name: "Hộp thư Chatbot", icon: MessageSquare, href: "/chatbot-inbox" },
     { name: "Cài đặt Chatbot", icon: Settings, href: "/chatbot-settings" },
+    { name: "Training Chatbot", icon: GraduationCap, href: "/training-chatbot" },
 ]
 
 const settingsNavItem: NavItem = { name: "Cài đặt API AI", icon: Settings, href: "/settings" };
