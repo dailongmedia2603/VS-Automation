@@ -140,7 +140,7 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig, i
     const newDoc: TrainingDocument = {
       id: crypto.randomUUID(),
       name: newDocFile.name,
-      type: newDocType || newDocFile.type.split('/')[1] || 'file',
+      type: newDocType || 'Chưa phân loại',
       purpose: newDocPurpose,
       creator: 'Admin',
       url: '',
@@ -260,6 +260,7 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig, i
               <Table>
                 <TableHeader className="bg-slate-100/80">
                   <TableRow>
+                    <TableHead className="px-4 py-3 text-xs font-semibold uppercase text-slate-500">Tài liệu</TableHead>
                     <TableHead className="px-4 py-3 text-xs font-semibold uppercase text-slate-500">Loại tài liệu</TableHead>
                     <TableHead className="px-4 py-3 text-xs font-semibold uppercase text-slate-500">Mục đích</TableHead>
                     <TableHead className="px-4 py-3 text-xs font-semibold uppercase text-slate-500">Người tạo</TableHead>
@@ -275,6 +276,7 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig, i
                           <span className="truncate">{doc.name}</span>
                         </div>
                       </TableCell>
+                      <TableCell className="px-4 py-3 text-slate-600">{doc.type}</TableCell>
                       <TableCell className="px-4 py-3 text-slate-600">{doc.purpose || 'Chưa có'}</TableCell>
                       <TableCell className="px-4 py-3 text-slate-600">{doc.creator}</TableCell>
                       <TableCell className="px-4 py-3 text-right">
@@ -285,7 +287,7 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig, i
                     </TableRow>
                   )) : (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center h-24 text-slate-500">Chưa có tài liệu nào.</TableCell>
+                      <TableCell colSpan={5} className="text-center h-24 text-slate-500">Chưa có tài liệu nào.</TableCell>
                     </TableRow>
                   )}
                 </TableBody>
