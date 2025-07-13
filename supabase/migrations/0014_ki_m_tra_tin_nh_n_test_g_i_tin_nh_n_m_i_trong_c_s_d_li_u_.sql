@@ -1,0 +1,1 @@
+SELECT * FROM public.chatwoot_messages WHERE content = 'test gởi tin nhắn mới';
