@@ -404,11 +404,17 @@ const ChatwootInbox = () => {
                 <div className="space-y-1.5">
                   <h4 className="font-semibold text-slate-500 uppercase tracking-wider">Số điện thoại</h4>
                   <div className="grid grid-cols-2 gap-2">
-                    <Button size="sm" variant="ghost" className={cn("w-full justify-center h-8", filters.hasPhoneNumber === true ? "bg-blue-100 text-blue-700 hover:bg-blue-100" : "bg-slate-200 hover:bg-slate-300")} onClick={() => setFilters(f => ({...f, hasPhoneNumber: f.hasPhoneNumber === true ? null : true}))}>
-                      Có SĐT <Badge variant="secondary" className="ml-1.5">{countWithPhone}</Badge>
+                    <Button size="sm" variant="ghost" className={cn("w-full justify-center h-8 text-xs font-medium", filters.hasPhoneNumber === true ? "bg-blue-100 text-blue-800 hover:bg-blue-100" : "bg-slate-100 hover:bg-slate-200 text-slate-700")} onClick={() => setFilters(f => ({...f, hasPhoneNumber: f.hasPhoneNumber === true ? null : true}))}>
+                      Có SĐT 
+                      <Badge className={cn("ml-1.5 text-xs font-bold", filters.hasPhoneNumber === true ? "bg-blue-200 text-blue-800" : "bg-slate-200 text-slate-700")}>
+                        {countWithPhone}
+                      </Badge>
                     </Button>
-                    <Button size="sm" variant="ghost" className={cn("w-full justify-center h-8", filters.hasPhoneNumber === false ? "bg-blue-100 text-blue-700 hover:bg-blue-100" : "bg-slate-200 hover:bg-slate-300")} onClick={() => setFilters(f => ({...f, hasPhoneNumber: f.hasPhoneNumber === false ? null : false}))}>
-                      Không có SĐT <Badge variant="secondary" className="ml-1.5">{countWithoutPhone}</Badge>
+                    <Button size="sm" variant="ghost" className={cn("w-full justify-center h-8 text-xs font-medium", filters.hasPhoneNumber === false ? "bg-blue-100 text-blue-800 hover:bg-blue-100" : "bg-slate-100 hover:bg-slate-200 text-slate-700")} onClick={() => setFilters(f => ({...f, hasPhoneNumber: f.hasPhoneNumber === false ? null : false}))}>
+                      Không có SĐT 
+                      <Badge className={cn("ml-1.5 text-xs font-bold", filters.hasPhoneNumber === false ? "bg-blue-200 text-blue-800" : "bg-slate-200 text-slate-700")}>
+                        {countWithoutPhone}
+                      </Badge>
                     </Button>
                   </div>
                 </div>
