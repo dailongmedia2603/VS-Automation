@@ -43,6 +43,8 @@ const ChatwootInbox = () => {
   const [scripts, setScripts] = useState<CareScript[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const selectedConversationRef = useRef<Conversation | null>();
+  selectedConversationRef.current = selectedConversation;
   const AI_CARE_LABEL = 'AI chăm';
 
   const labelColorMap = useMemo(() => {
@@ -90,7 +92,6 @@ const ChatwootInbox = () => {
     setLoadingConversations(false);
   };
 
-  // Effect for initial data and subscribing to conversation list changes
   useEffect(() => {
     fetchInitialData();
     const fetchLabels = async () => {
@@ -99,44 +100,26 @@ const ChatwootInbox = () => {
     };
     fetchLabels();
 
-    const conversationsChannel = supabase
-      .channel('public-chatwoot_conversations')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chatwoot_conversations' }, 
-        () => fetchInitialData()
-      )
+    const channel = supabase
+      .channel('chatwoot-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
+        fetchInitialData();
+        const currentConvo = selectedConversationRef.current;
+        if (currentConvo && payload.table === 'chatwoot_messages' && (payload.new as any).conversation_id === currentConvo.id) {
+          handleSelectConversation(currentConvo, true);
+        }
+      })
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(conversationsChannel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
-  // Effect for subscribing to messages of the selected conversation
   useEffect(() => {
-    if (!selectedConversation) {
+    if (selectedConversation) {
+      fetchCareScripts(selectedConversation.id);
+    } else {
       setScripts([]);
-      return;
     }
-
-    fetchCareScripts(selectedConversation.id);
-
-    const messagesChannel = supabase
-      .channel(`public-chatwoot_messages-convo-${selectedConversation.id}`)
-      .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'chatwoot_messages',
-          filter: `conversation_id=eq.${selectedConversation.id}`,
-        },
-        () => {
-          handleSelectConversation(selectedConversation, true);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(messagesChannel);
-    };
   }, [selectedConversation]);
 
   const handleSelectConversation = async (conversation: Conversation, forceRefetch = false) => {
