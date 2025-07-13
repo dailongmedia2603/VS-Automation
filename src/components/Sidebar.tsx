@@ -5,7 +5,6 @@ import {
   Settings,
   MessageSquare,
   GraduationCap,
-  Search,
   ArrowRight,
   LayoutDashboard,
   ChevronLeft,
@@ -14,7 +13,6 @@ import { cn } from "@/lib/utils";
 import { Link, useLocation } from "react-router-dom";
 import React from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "./ui/button";
 
@@ -120,12 +118,6 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
             </div>
         </div>
         <ArrowRight className="h-5 w-5 text-gray-400 cursor-pointer hover:text-gray-600" />
-      </div>
-
-      {/* Search */}
-      <div className={cn("relative transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <Input placeholder="Search" className="bg-slate-100 border-none pl-9 rounded-lg focus-visible:ring-blue-500" />
       </div>
 
       {/* Navigation */}
