@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 import { Terminal, Loader2, Link, RefreshCw } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ChatwootLabelManager } from "@/components/ChatwootLabelManager";
 
 const ChatwootSettings = () => {
   const { settings, setSettings, isLoading: isLoadingContext } = useChatwoot();
@@ -93,9 +94,10 @@ const ChatwootSettings = () => {
     <main className="flex-1 space-y-4 p-4 sm:p-6 md:p-8 bg-zinc-100">
       <h2 className="text-3xl font-bold tracking-tight">Cài đặt Chatbot</h2>
       <Tabs defaultValue="connection">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="connection">Kết nối</TabsTrigger>
           <TabsTrigger value="fanpage">Fanpage</TabsTrigger>
+          <TabsTrigger value="inbox-config">Cấu hình hộp thư</TabsTrigger>
         </TabsList>
         <TabsContent value="connection">
           <Card className="mt-4">
@@ -142,6 +144,9 @@ const ChatwootSettings = () => {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+        <TabsContent value="inbox-config" className="mt-4">
+          <ChatwootLabelManager />
         </TabsContent>
       </Tabs>
     </main>

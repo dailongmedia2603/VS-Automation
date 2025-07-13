@@ -17,6 +17,7 @@ interface Attachment { id: number; file_type: 'image' | 'video' | 'audio' | 'fil
 interface MessageSender { name: string; thumbnail?: string; }
 interface Conversation { id: number; meta: { sender: { id: number; name: string; email?: string; phone_number?: string; thumbnail?: string; additional_attributes?: { company_name?: string; }; }; }; messages: { content: string }[]; last_activity_at: number; unread_count: number; labels: string[]; status: string; }
 interface Message { id: number; content: string; created_at: number; message_type: number; private: boolean; sender?: MessageSender; attachments?: Attachment[]; }
+interface ChatwootLabel { id: number; name: string; color: string; }
 
 const getInitials = (name?: string) => {
   if (!name) return 'U';
@@ -35,6 +36,7 @@ const ChatwootInbox = () => {
   const [newMessage, setNewMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [suggestedLabels, setSuggestedLabels] = useState<ChatwootLabel[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const POLLING_INTERVAL = 15000;
   const phoneRegex = /(0[3|5|7|8|9][0-9]{8})\b/;
@@ -103,6 +105,13 @@ const ChatwootInbox = () => {
   };
 
   useEffect(() => {
+    const fetchLabels = async () => {
+      const { data, error } = await supabase.from('chatwoot_labels').select('*').order('name', { ascending: true });
+      if (!error && data) {
+        setSuggestedLabels(data);
+      }
+    };
+    fetchLabels();
     fetchConversations(true);
     const intervalId = setInterval(() => fetchConversations(false), POLLING_INTERVAL);
     return () => clearInterval(intervalId);
@@ -245,7 +254,19 @@ const ChatwootInbox = () => {
             </header>
             <div className="flex-1 overflow-y-auto p-4 md:p-6"><div className="space-y-2">{loadingMessages ? <p>Đang tải...</p> : groupedMessages.map((item, index) => { if (item.type === 'date') return <div key={index} className="text-center my-4"><span className="text-xs text-muted-foreground bg-white px-3 py-1 rounded-full shadow-sm">{item.date}</span></div>; const msg = item.data; const isOutgoing = msg.message_type === 1; if (msg.message_type === 2) return <div key={msg.id} className="text-center text-xs text-muted-foreground py-2 italic">{msg.content}</div>; return (<div key={msg.id} className={cn("flex items-start gap-3", isOutgoing && "justify-end")}>{!isOutgoing && <Avatar className="h-8 w-8"><AvatarImage src={msg.sender?.thumbnail} /><AvatarFallback>{getInitials(msg.sender?.name)}</AvatarFallback></Avatar>}<div className={cn("flex flex-col gap-1", isOutgoing ? 'items-end' : 'items-start')}><div className={cn("rounded-2xl px-3 py-2 max-w-sm md:max-w-md break-words shadow-sm", isOutgoing ? 'bg-green-100 text-gray-800' : 'bg-white text-gray-800')}>{msg.attachments?.map(att => <div key={att.id}>{att.file_type === 'image' ? <a href={att.data_url} target="_blank" rel="noopener noreferrer"><img src={att.data_url} alt="Attachment" className="rounded-lg max-w-full h-auto" /></a> : <video controls className="rounded-lg max-w-full h-auto"><source src={att.data_url} /></video>}</div>)}{msg.content && <p className={cn("whitespace-pre-wrap", msg.attachments && msg.attachments.length > 0 && msg.content ? "mt-2" : "")}>{msg.content}</p>}</div></div></div>);})}</div><div ref={messagesEndRef} /></div>
             <footer className="p-2 border-t bg-white space-y-2">
-              <div className="flex flex-wrap gap-2 px-2">{['Spa & TMV', 'Mỹ phẩm & TPCN', 'Mẹ & Bé', 'Nha khoa'].map(tag => <Button key={tag} variant="outline" size="sm" className="text-xs h-7" onClick={() => handleAddLabel(tag)}>{tag}</Button>)}</div>
+              <div className="flex flex-wrap gap-2 px-2">
+                {suggestedLabels.map(label => (
+                  <Button
+                    key={label.id}
+                    variant="outline"
+                    size="sm"
+                    className="text-xs h-7"
+                    onClick={() => handleAddLabel(label.name)}
+                  >
+                    {label.name}
+                  </Button>
+                ))}
+              </div>
               <div className="relative"><Input placeholder="Trả lời..." className="pr-10" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(e); } }} /><SendHorizonal className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground cursor-pointer" onClick={handleSendMessage} /></div>
               <div className="flex justify-between items-center px-2"><div className="flex items-center space-x-4 text-muted-foreground"><Paperclip className="h-5 w-5 cursor-pointer hover:text-primary" /><ImageIcon className="h-5 w-5 cursor-pointer hover:text-primary" /></div><div className="flex items-center space-x-4 text-muted-foreground"><ThumbsUp className="h-5 w-5 cursor-pointer hover:text-primary" /><Settings2 className="h-5 w-5 cursor-pointer hover:text-primary" /></div></div>
             </footer>
