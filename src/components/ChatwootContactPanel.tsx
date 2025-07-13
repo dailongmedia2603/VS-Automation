@@ -37,7 +37,11 @@ const getInitials = (name?: string) => {
 };
 
 const statusMap: Record<CareScriptStatus, string> = { scheduled: 'Xếp lịch', sent: 'Đã gửi', failed: 'Thất bại' };
-const statusBadgeColors: Record<CareScriptStatus, string> = { scheduled: 'bg-red-100 text-red-600', sent: 'bg-green-100 text-green-600', failed: 'bg-red-100 text-red-600' };
+const statusBadgeColors: Record<CareScriptStatus, string> = { 
+  scheduled: 'bg-red-100 text-red-600 hover:bg-red-100', 
+  sent: 'bg-green-100 text-green-600 hover:bg-green-100', 
+  failed: 'bg-red-100 text-red-600 hover:bg-red-100' 
+};
 
 export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote, scripts, fetchCareScripts }: ChatwootContactPanelProps) => {
   const { settings } = useChatwoot();
@@ -239,7 +243,7 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
                             <Clock className="h-3.5 w-3.5" />
                             <span>{format(new Date(script.scheduled_at), 'dd/MM/yy HH:mm')}</span>
                           </div>
-                          <Badge className={cn("px-2 py-0.5 text-xs font-medium rounded-full border-none", statusBadgeColors[script.status])}>
+                          <Badge className={cn("px-2 py-0.5 text-xs font-medium rounded-full border-none whitespace-nowrap", statusBadgeColors[script.status])}>
                             {statusMap[script.status]}
                           </Badge>
                         </div>
