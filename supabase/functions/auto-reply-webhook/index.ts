@@ -45,31 +45,45 @@ serve(async (req) => {
       throw new Error("Auto-reply is disabled globally.");
     }
 
-    // 3. Fetch history and labels
+    // 3. Get labels from payload and handle new customer tagging
+    let labelNames = payload.conversation?.labels || [];
+    const isNewCustomerMessage = payload.conversation?.messages_count === 1;
+
+    if (isNewCustomerMessage && !labelNames.includes(AI_STAR_LABEL)) {
+      const { data: chatwootSettings } = await supabaseAdmin.from('chatwoot_settings').select('*').eq('id', 1).single();
+      if (chatwootSettings) {
+        const newLabels = [...labelNames, AI_STAR_LABEL];
+        const endpoint = `/api/v1/accounts/${chatwootSettings.account_id}/conversations/${conversationId}/labels`;
+        const upstreamUrl = `${chatwootSettings.chatwoot_url.replace(/\/$/, '')}${endpoint}`;
+        const response = await fetch(upstreamUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'api_access_token': chatwootSettings.api_token },
+            body: JSON.stringify({ labels: newLabels }),
+        });
+
+        if (response.ok) {
+            labelNames.push(AI_STAR_LABEL); // Update labels for current execution
+            // Sync to our DB in background
+            const { data: aiStarLabelData } = await supabaseAdmin.from('chatwoot_labels').select('id').eq('name', AI_STAR_LABEL).single();
+            if (aiStarLabelData) {
+                await supabaseAdmin.from('chatwoot_conversation_labels').insert({ conversation_id: conversationId, label_id: aiStarLabelData.id });
+            }
+        } else {
+            console.error(`Failed to add AI Star label for convo ${conversationId}: ${await response.text()}`);
+        }
+      }
+    }
+
+    // 4. Check if conversation has 'AI Star' tag
+    if (!labelNames.includes(AI_STAR_LABEL)) {
+      throw new Error("Conversation does not have AI Star label.");
+    }
+
+    // 5. Fetch conversation history from DB
     const { data: conversationHistory, error: historyError } = await supabaseAdmin
       .from('chatwoot_messages').select('content, message_type, created_at_chatwoot')
       .eq('conversation_id', conversationId).order('created_at_chatwoot', { ascending: true });
     if (historyError) throw historyError;
-
-    const { data: labels, error: labelsError } = await supabaseAdmin
-      .from('chatwoot_conversation_labels').select('chatwoot_labels(name)').eq('conversation_id', conversationId);
-    if (labelsError) throw labelsError;
-    const labelNames = labels.map(l => l.chatwoot_labels.name);
-
-    // 4. Handle new customer tagging
-    const isNewCustomerMessage = (conversationHistory || []).filter(m => m.message_type === 0).length === 0;
-    if (isNewCustomerMessage && !labelNames.includes(AI_STAR_LABEL)) {
-      const { data: aiStarLabelData } = await supabaseAdmin.from('chatwoot_labels').select('id').eq('name', AI_STAR_LABEL).single();
-      if (aiStarLabelData) {
-        await supabaseAdmin.from('chatwoot_conversation_labels').insert({ conversation_id: conversationId, label_id: aiStarLabelData.id });
-        labelNames.push(AI_STAR_LABEL);
-      }
-    }
-
-    // 5. Check if conversation has 'AI Star' tag
-    if (!labelNames.includes(AI_STAR_LABEL)) {
-      throw new Error("Conversation does not have AI Star label.");
-    }
 
     const fullHistory = [...(conversationHistory || []), {
         content: payload.content,
