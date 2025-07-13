@@ -7,6 +7,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const AI_CARE_LABEL = 'AI chăm';
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -83,9 +85,39 @@ serve(async (req) => {
 
         console.log(`Successfully sent script ${script.id} to conversation ${script.conversation_id}`);
 
+        // Re-trigger AI for next script
+        const { data: convoDetails, error: convoError } = await supabaseAdmin.functions.invoke('chatwoot-proxy', {
+            body: {
+                action: 'get_conversation_details',
+                settings: { chatwootUrl: settings.chatwoot_url, accountId: settings.account_id, apiToken: settings.api_token },
+                conversationId: script.conversation_id,
+            },
+        });
+
+        if (convoError) {
+            console.error(`Could not fetch details for convo ${script.conversation_id} to check for AI label.`, await convoError.context.json());
+            continue;
+        }
+        
+        const hasAiCareLabel = convoDetails?.labels?.includes(AI_CARE_LABEL);
+
+        if (hasAiCareLabel) {
+            console.log(`Convo ${script.conversation_id} has '${AI_CARE_LABEL}' label. Triggering next AI script.`);
+            const { error: triggerError } = await supabaseAdmin.functions.invoke('trigger-ai-care-script', {
+                body: { conversationId: script.conversation_id, contactId: script.contact_id },
+            });
+
+            if (triggerError) {
+                console.error(`Failed to trigger next AI script for convo ${script.conversation_id}.`, await triggerError.context.json());
+            } else {
+                console.log(`Successfully triggered next AI script for convo ${script.conversation_id}.`);
+            }
+        } else {
+            console.log(`Convo ${script.conversation_id} does not have '${AI_CARE_LABEL}' label. Stopping sequence.`);
+        }
+
       } catch (e) {
         console.error(`Failed to process script ${script.id}:`, e.message);
-        // If failed, update script status to 'failed'
         await supabaseAdmin
           .from('care_scripts')
           .update({ status: 'failed' })

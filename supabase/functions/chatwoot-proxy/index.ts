@@ -29,6 +29,12 @@ serve(async (req) => {
         method = 'GET';
         break;
       
+      case 'get_conversation_details':
+        if (!conversationId) throw new Error("Conversation ID is required.");
+        endpoint = `/api/v1/accounts/${settings.accountId}/conversations/${conversationId}`;
+        method = 'GET';
+        break;
+
       case 'list_messages':
         if (!conversationId) throw new Error("Conversation ID is required.");
         endpoint = `/api/v1/accounts/${settings.accountId}/conversations/${conversationId}/messages`;
