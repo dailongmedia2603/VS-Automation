@@ -6,20 +6,27 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
-import { format, formatDistanceToNow, isSameDay } from 'date-fns';
+import { format, isSameDay } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { ChatwootContactPanel } from '@/components/ChatwootContactPanel';
-import { Search, Phone, Link as LinkIcon, Smile, Paperclip, Image as ImageIcon, SendHorizonal, ThumbsUp, Settings2, CornerDownLeft, Eye, RefreshCw, UserPlus, FileText, X } from 'lucide-react';
+import { Search, Phone, Link as LinkIcon, Smile, Paperclip, Image as ImageIcon, SendHorizonal, ThumbsUp, Settings2, CornerDownLeft, Eye, RefreshCw, UserPlus, FileText, X, Filter } from 'lucide-react';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 
 // Interfaces
 interface Attachment { id: number; file_type: 'image' | 'video' | 'audio' | 'file'; data_url: string; }
 interface MessageSender { name: string; thumbnail?: string; }
-interface Conversation { id: number; meta: { sender: { id: number; name: string; email?: string; phone_number?: string; thumbnail?: string; additional_attributes?: { company_name?: string; }; }; }; messages: { content: string }[]; last_activity_at: number; unread_count: number; labels: string[]; status: string; additional_attributes?: { type?: string }; }
+interface Conversation { id: number; meta: { sender: { id: number; name: string; email?: string; phone_number?: string; thumbnail?: string; additional_attributes?: { company_name?: string; }; }; }; messages: { content: string, message_type: number }[]; last_activity_at: number; unread_count: number; labels: string[]; status: string; additional_attributes?: { type?: string }; }
 interface Message { id: number; content: string; created_at: number; message_type: number; private: boolean; sender?: MessageSender; attachments?: Attachment[]; }
 interface ChatwootLabel { id: number; name: string; color: string; }
 interface CareScript { id: number; content: string; scheduled_at: string; status: 'scheduled' | 'sent' | 'failed'; image_url?: string; }
+interface Filters {
+  hasPhoneNumber: boolean | null;
+  selectedLabels: string[];
+  seenNotReplied: boolean;
+}
 
 const getInitials = (name?: string) => {
   if (!name) return 'U';
@@ -41,6 +48,12 @@ const ChatwootInbox = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestedLabels, setSuggestedLabels] = useState<ChatwootLabel[]>([]);
   const [scripts, setScripts] = useState<CareScript[]>([]);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [filters, setFilters] = useState<Filters>({
+    hasPhoneNumber: null,
+    selectedLabels: [],
+    seenNotReplied: false,
+  });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const POLLING_INTERVAL = 15000;
@@ -92,9 +105,6 @@ const ChatwootInbox = () => {
       if (functionError) throw new Error((await functionError.context.json()).error || functionError.message);
       if (chatwootData.error) throw new Error(chatwootData.error);
       const conversationsFromServer = chatwootData.data.payload || [];
-      
-      console.log("Raw conversations from Chatwoot:", conversationsFromServer);
-
       if (conversationsFromServer.length === 0) {
           setConversations([]);
           return;
@@ -300,11 +310,39 @@ const ChatwootInbox = () => {
   };
   const groupedMessages = groupMessagesByDate(messages);
   
-  const filteredConversations = conversations
-    .filter(convo => convo.meta.sender.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredConversations = useMemo(() => {
+    return conversations
+      .filter(convo => {
+        const searchMatch = convo.meta.sender.name.toLowerCase().includes(searchQuery.toLowerCase());
+        if (!searchMatch) return false;
+
+        if (filters.hasPhoneNumber === true) {
+          if (!convo.meta.sender.phone_number) return false;
+        } else if (filters.hasPhoneNumber === false) {
+          if (convo.meta.sender.phone_number) return false;
+        }
+
+        if (filters.selectedLabels.length > 0) {
+          const convoLabels = convo.labels || [];
+          const hasLabel = filters.selectedLabels.some(label => convoLabels.includes(label));
+          if (!hasLabel) return false;
+        }
+
+        if (filters.seenNotReplied) {
+          const isSeen = !convo.unread_count || convo.unread_count === 0;
+          const lastMessageIsIncoming = convo.messages[0]?.message_type !== 1;
+          if (!(isSeen && lastMessageIsIncoming)) return false;
+        }
+
+        return true;
+      });
+  }, [conversations, searchQuery, filters]);
 
   const unreadConversations = filteredConversations.filter(c => c.unread_count > 0);
   const readConversations = filteredConversations.filter(c => !c.unread_count || c.unread_count === 0);
+  
+  const countWithPhone = useMemo(() => conversations.filter(c => !!c.meta.sender.phone_number).length, [conversations]);
+  const countWithoutPhone = useMemo(() => conversations.filter(c => !c.meta.sender.phone_number).length, [conversations]);
 
   const renderConversationItem = (convo: Conversation) => (
     <div key={convo.id} onClick={() => handleSelectConversation(convo)} className={cn("p-2.5 flex space-x-3 cursor-pointer rounded-lg", selectedConversation?.id === convo.id && "bg-blue-100")}>
@@ -352,6 +390,41 @@ const ChatwootInbox = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Tìm kiếm" className="pl-9" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
           </div>
+          <Collapsible open={isFilterOpen} onOpenChange={setIsFilterOpen} className="mt-2">
+            <CollapsibleTrigger asChild>
+              <Button variant="outline" className="w-full justify-start px-3 font-normal text-muted-foreground">
+                <Filter className="h-4 w-4 mr-2" />
+                Thêm bộ lọc...
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-4 pt-4 text-sm">
+              <div className="space-y-2">
+                <h4 className="font-semibold px-1">Số điện thoại</h4>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button size="sm" variant={filters.hasPhoneNumber === true ? 'secondary' : 'outline'} onClick={() => setFilters(f => ({...f, hasPhoneNumber: f.hasPhoneNumber === true ? null : true}))}>Có SĐT ({countWithPhone})</Button>
+                  <Button size="sm" variant={filters.hasPhoneNumber === false ? 'secondary' : 'outline'} onClick={() => setFilters(f => ({...f, hasPhoneNumber: f.hasPhoneNumber === false ? null : false}))}>Không có SĐT ({countWithoutPhone})</Button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <h4 className="font-semibold px-1">Trạng thái</h4>
+                <div className="flex items-center space-x-2 p-2 rounded-md hover:bg-accent">
+                  <Checkbox id="seenNotReplied" checked={filters.seenNotReplied} onCheckedChange={(checked) => setFilters(f => ({...f, seenNotReplied: !!checked}))} />
+                  <label htmlFor="seenNotReplied" className="flex-1 cursor-pointer">Đã xem, chưa trả lời</label>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <h4 className="font-semibold px-1">Tags</h4>
+                <div className="space-y-1 max-h-32 overflow-y-auto pr-2">
+                  {suggestedLabels.map(label => (
+                    <div key={label.id} className="flex items-center space-x-2 p-2 rounded-md hover:bg-accent">
+                      <Checkbox id={`label-${label.id}`} checked={filters.selectedLabels.includes(label.name)} onCheckedChange={(checked) => { setFilters(f => ({ ...f, selectedLabels: checked ? [...f.selectedLabels, label.name] : f.selectedLabels.filter(l => l !== label.name) })) }} />
+                      <label htmlFor={`label-${label.id}`} className="flex-1 cursor-pointer">{label.name}</label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-1">{loadingConversations ? ([...Array(10)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)) : (<>{unreadConversations.length > 0 && (<div className="mb-4 p-2 bg-blue-50/50 rounded-lg"><h3 className="px-1 pb-1 text-xs font-bold uppercase text-blue-600 tracking-wider">Chưa xem</h3><div className="space-y-1">{unreadConversations.map(renderConversationItem)}</div></div>)}{readConversations.length > 0 && (<div className="space-y-1">{readConversations.map(renderConversationItem)}</div>)}{filteredConversations.length === 0 && !loadingConversations && (<p className="p-4 text-sm text-center text-muted-foreground">Không tìm thấy cuộc trò chuyện nào.</p>)}</>)}</div>
       </aside>
