@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError } from '@/utils/toast';
@@ -73,12 +72,15 @@ const TrainingChatbot = () => {
 
   if (isLoading) {
     return (
-      <main className="flex-1 space-y-8 p-6 sm:p-8 bg-slate-50">
-        <Skeleton className="h-10 w-1/3" />
-        <Skeleton className="h-8 w-1/4" />
+      <main className="flex-1 space-y-6 p-6 sm:p-8 bg-slate-50">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-1/3" />
+          <Skeleton className="h-5 w-1/2" />
+        </div>
         <div className="space-y-6">
-          <Skeleton className="h-12 w-full max-w-md" />
-          <Skeleton className="h-96 w-full" />
+          <Skeleton className="h-10 w-full max-w-sm" />
+          <Skeleton className="h-96 w-full rounded-xl" />
+          <Skeleton className="h-64 w-full rounded-xl" />
         </div>
       </main>
     );
@@ -87,15 +89,15 @@ const TrainingChatbot = () => {
   return (
     <main className="flex-1 space-y-6 p-6 sm:p-8 bg-slate-50">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Training Chatbot</h1>
-        <p className="text-muted-foreground mt-1">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Training Chatbot</h1>
+        <p className="text-slate-500 mt-1">
           Dạy cho AI cách trả lời và tương tác trong các tình huống cụ thể.
         </p>
       </div>
       <Tabs defaultValue="auto_reply" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 max-w-md bg-slate-200 p-1 rounded-xl">
-          <TabsTrigger value="auto_reply" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">Tự động trả lời</TabsTrigger>
-          <TabsTrigger value="care_script_suggestion" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">Kịch bản chăm sóc</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 max-w-sm bg-slate-100 p-1 rounded-xl h-11">
+          <TabsTrigger value="auto_reply" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-slate-900 text-slate-600 font-medium">Tự động trả lời</TabsTrigger>
+          <TabsTrigger value="care_script_suggestion" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-slate-900 text-slate-600 font-medium">Kịch bản chăm sóc</TabsTrigger>
         </TabsList>
         <TabsContent value="auto_reply">
           <TrainingForm
