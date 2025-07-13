@@ -13,8 +13,14 @@ serve(async (req) => {
   }
 
   try {
+    // Log để xác nhận function đã được gọi
+    console.log("Webhook received! Processing payload...");
+
     const payload = await req.json();
     const event = payload.event;
+
+    // Log để xem sự kiện nhận được là gì
+    console.log(`Received event: ${event}`);
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -90,6 +96,8 @@ serve(async (req) => {
             }
         }
     }
+    
+    console.log("Payload processed successfully.");
 
     return new Response(JSON.stringify({ status: 'ok' }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -97,7 +105,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Error in chatwoot-webhook-handler:', error.message);
+    console.error('Error in chatwoot-webhook-handler:', error.message, error.stack);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
