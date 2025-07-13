@@ -260,26 +260,26 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig, i
               <Table>
                 <TableHeader className="bg-slate-100/80">
                   <TableRow>
+                    <TableHead className="px-4 py-3 text-xs font-semibold uppercase text-slate-500 w-[200px]">Loại tài liệu</TableHead>
+                    <TableHead className="px-4 py-3 text-xs font-semibold uppercase text-slate-500 w-[250px]">Mục đích</TableHead>
                     <TableHead className="px-4 py-3 text-xs font-semibold uppercase text-slate-500">Tài liệu</TableHead>
-                    <TableHead className="px-4 py-3 text-xs font-semibold uppercase text-slate-500">Loại tài liệu</TableHead>
-                    <TableHead className="px-4 py-3 text-xs font-semibold uppercase text-slate-500">Mục đích</TableHead>
-                    <TableHead className="px-4 py-3 text-xs font-semibold uppercase text-slate-500">Người tạo</TableHead>
-                    <TableHead className="px-4 py-3 text-xs font-semibold uppercase text-slate-500 text-right">Thao tác</TableHead>
+                    <TableHead className="px-4 py-3 text-xs font-semibold uppercase text-slate-500 w-[150px]">Người tạo</TableHead>
+                    <TableHead className="px-4 py-3 text-xs font-semibold uppercase text-slate-500 text-right w-[120px]">Thao tác</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {config.documents.length > 0 ? config.documents.map(doc => (
                     <TableRow key={doc.id} className="hover:bg-slate-50/50 transition-colors">
+                      <TableCell className="px-4 py-3 text-slate-600">{doc.type}</TableCell>
+                      <TableCell className="px-4 py-3 text-slate-600">{doc.purpose || 'Chưa có'}</TableCell>
                       <TableCell className="px-4 py-3 font-medium text-slate-800">
                         <div className="flex items-center gap-3">
-                          <FileIcon className="h-5 w-5 text-slate-400" />
+                          <FileIcon className="h-5 w-5 text-slate-400 flex-shrink-0" />
                           <span className="truncate">{doc.name}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="px-4 py-3 text-slate-600">{doc.type}</TableCell>
-                      <TableCell className="px-4 py-3 text-slate-600">{doc.purpose || 'Chưa có'}</TableCell>
                       <TableCell className="px-4 py-3 text-slate-600">{doc.creator}</TableCell>
-                      <TableCell className="px-4 py-3 text-right">
+                      <TableCell className="px-4 py-3 text-right whitespace-nowrap">
                         <Button variant="ghost" size="icon" className="text-slate-500 hover:text-slate-800"><Download className="h-4 w-4" /></Button>
                         <Button variant="ghost" size="icon" className="text-slate-500 hover:text-slate-800"><Edit className="h-4 w-4" /></Button>
                         <Button variant="ghost" size="icon" className="text-slate-500 hover:text-destructive hover:bg-destructive/10" onClick={() => handleRemoveDocument(doc.id)}><Trash2 className="h-4 w-4" /></Button>
