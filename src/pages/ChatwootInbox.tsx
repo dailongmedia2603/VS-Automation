@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 import { format, formatDistanceToNow, isSameDay } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { ChatwootContactPanel } from '@/components/ChatwootContactPanel';
-import { Search, Phone, Link as LinkIcon, Smile, Paperclip, Image as ImageIcon, SendHorizonal, ThumbsUp, Settings2, CornerDownLeft, Eye, RefreshCw, UserPlus } from 'lucide-react';
+import { Search, Phone, Link as LinkIcon, Smile, Paperclip, Image as ImageIcon, SendHorizonal, ThumbsUp, Settings2, CornerDownLeft, Eye, RefreshCw, UserPlus, FileText, X } from 'lucide-react';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 
 // Interfaces
@@ -36,11 +36,13 @@ const ChatwootInbox = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [newMessage, setNewMessage] = useState('');
+  const [attachment, setAttachment] = useState<File | null>(null);
   const [sendingMessage, setSendingMessage] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestedLabels, setSuggestedLabels] = useState<ChatwootLabel[]>([]);
   const [scripts, setScripts] = useState<CareScript[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const POLLING_INTERVAL = 15000;
   const phoneRegex = /(0[3|5|7|8|9][0-9]{8})\b/;
   const AI_CARE_LABEL = 'AI chăm';
@@ -187,16 +189,59 @@ const ChatwootInbox = () => {
     }
   };
 
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+        const file = event.target.files[0];
+        if (file.size > 10 * 1024 * 1024) { // 10MB limit
+            showError("Tệp quá lớn. Vui lòng chọn tệp nhỏ hơn 10MB.");
+            return;
+        }
+        setAttachment(file);
+    }
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !selectedConversation) return;
+    if ((!newMessage.trim() && !attachment) || !selectedConversation) return;
+
     setSendingMessage(true);
+    const toastId = showLoading("Đang gửi tin nhắn...");
+
     try {
-      const { data } = await supabase.functions.invoke('chatwoot-proxy', { body: { action: 'send_message', settings, conversationId: selectedConversation.id, content: newMessage }, });
-      setMessages(prev => [...prev, data]);
-      await syncMessagesToDB([data], selectedConversation.id);
-    } catch (err) { console.error('Gửi tin nhắn thất bại.');
-    } finally { setSendingMessage(false); }
+        let responseData;
+        if (attachment) {
+            const formData = new FormData();
+            formData.append('content', newMessage.trim());
+            formData.append('message_type', 'outgoing');
+            formData.append('private', 'false');
+            formData.append('attachments[]', attachment, attachment.name);
+            formData.append('settings', JSON.stringify(settings));
+            formData.append('conversationId', selectedConversation.id.toString());
+
+            const { data, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', { body: formData });
+            if (functionError) throw new Error((await functionError.context.json()).error || functionError.message);
+            if (data.error) throw new Error(data.error);
+            responseData = data;
+        } else {
+            const { data, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', { body: { action: 'send_message', settings, conversationId: selectedConversation.id, content: newMessage.trim() } });
+            if (functionError) throw new Error((await functionError.context.json()).error || functionError.message);
+            if (data.error) throw new Error(data.error);
+            responseData = data;
+        }
+
+        setMessages(prev => [...prev, responseData]);
+        await syncMessagesToDB([responseData], selectedConversation.id);
+        setNewMessage('');
+        setAttachment(null);
+        dismissToast(toastId);
+        showSuccess("Đã gửi tin nhắn thành công!");
+
+    } catch (err: any) {
+        dismissToast(toastId);
+        showError(`Gửi tin nhắn thất bại: ${err.message}`);
+    } finally {
+        setSendingMessage(false);
+    }
   };
 
   const handleAddLabel = async (label: string) => {
@@ -294,6 +339,7 @@ const ChatwootInbox = () => {
 
   return (
     <div className="flex h-full bg-white border-t">
+      <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" />
       <aside className="w-80 border-r flex flex-col">
         <div className="p-3 border-b"><div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Tìm kiếm" className="pl-9" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} /></div><div className="flex space-x-1.5 mt-3">{['#fde2e4', '#fad2e1', '#e2ece9', '#bee1e6', '#cddafd', '#fcf6bd', '#d0f4de'].map(color => (<div key={color} style={{ backgroundColor: color }} className="w-5 h-5 rounded-md cursor-pointer flex-1"></div>))}</div></div>
         <div className="flex-1 overflow-y-auto p-2 space-y-1">{loadingConversations ? ([...Array(10)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)) : (<>{unreadConversations.length > 0 && (<div className="mb-4 p-2 bg-blue-50/50 rounded-lg"><h3 className="px-1 pb-1 text-xs font-bold uppercase text-blue-600 tracking-wider">Chưa xem</h3><div className="space-y-1">{unreadConversations.map(renderConversationItem)}</div></div>)}{readConversations.length > 0 && (<div className="space-y-1">{readConversations.map(renderConversationItem)}</div>)}{filteredConversations.length === 0 && !loadingConversations && (<p className="p-4 text-sm text-center text-muted-foreground">Không tìm thấy cuộc trò chuyện nào.</p>)}</>)}</div>
@@ -307,6 +353,18 @@ const ChatwootInbox = () => {
             </header>
             <div className="flex-1 overflow-y-auto p-4 md:p-6"><div className="space-y-2">{loadingMessages ? <p>Đang tải...</p> : groupedMessages.map((item, index) => { if (item.type === 'date') return <div key={index} className="text-center my-4"><span className="text-xs text-muted-foreground bg-white px-3 py-1 rounded-full shadow-sm">{item.date}</span></div>; const msg = item.data; const isOutgoing = msg.message_type === 1; if (msg.message_type === 2) return <div key={msg.id} className="text-center text-xs text-muted-foreground py-2 italic">{msg.content}</div>; return (<div key={msg.id} className={cn("flex items-start gap-3", isOutgoing && "justify-end")}>{!isOutgoing && <Avatar className="h-8 w-8"><AvatarImage src={msg.sender?.thumbnail} /><AvatarFallback>{getInitials(msg.sender?.name)}</AvatarFallback></Avatar>}<div className={cn("flex flex-col gap-1", isOutgoing ? 'items-end' : 'items-start')}><div className={cn("rounded-2xl px-3 py-2 max-w-sm md:max-w-md break-words shadow-sm", isOutgoing ? 'bg-green-100 text-gray-800' : 'bg-white text-gray-800')}>{msg.attachments?.map(att => <div key={att.id}>{att.file_type === 'image' ? <a href={att.data_url} target="_blank" rel="noopener noreferrer"><img src={att.data_url} alt="Attachment" className="rounded-lg max-w-full h-auto" /></a> : <video controls className="rounded-lg max-w-full h-auto"><source src={att.data_url} /></video>}</div>)}{msg.content && <p className={cn("whitespace-pre-wrap", msg.attachments && msg.attachments.length > 0 && msg.content ? "mt-2" : "")}>{msg.content}</p>}</div></div></div>);})}</div><div ref={messagesEndRef} /></div>
             <footer className="p-2 border-t bg-white space-y-2">
+              {attachment && (
+                <div className="px-2 py-1.5 bg-slate-100 rounded-lg flex items-center justify-between animate-in fade-in">
+                  <div className="flex items-center gap-2 text-sm overflow-hidden">
+                    <FileText className="h-4 w-4 text-slate-500 flex-shrink-0" />
+                    <span className="text-slate-700 truncate">{attachment.name}</span>
+                    <span className="text-slate-500 flex-shrink-0">({(attachment.size / 1024).toFixed(1)} KB)</span>
+                  </div>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={() => setAttachment(null)}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
               <div className="flex flex-wrap gap-2 px-2">
                 {suggestedLabels.map(label => (
                   <Button
@@ -326,7 +384,7 @@ const ChatwootInbox = () => {
                 ))}
               </div>
               <div className="relative"><Input placeholder="Trả lời..." className="pr-10" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(e); } }} /><SendHorizonal className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground cursor-pointer" onClick={handleSendMessage} /></div>
-              <div className="flex justify-between items-center px-2"><div className="flex items-center space-x-4 text-muted-foreground"><Paperclip className="h-5 w-5 cursor-pointer hover:text-primary" /><ImageIcon className="h-5 w-5 cursor-pointer hover:text-primary" /></div><div className="flex items-center space-x-4 text-muted-foreground"><ThumbsUp className="h-5 w-5 cursor-pointer hover:text-primary" /><Settings2 className="h-5 w-5 cursor-pointer hover:text-primary" /></div></div>
+              <div className="flex justify-between items-center px-2"><div className="flex items-center space-x-4 text-muted-foreground"><Paperclip className="h-5 w-5 cursor-pointer hover:text-primary" onClick={() => fileInputRef.current?.click()} /><ImageIcon className="h-5 w-5 cursor-pointer hover:text-primary" onClick={() => fileInputRef.current?.click()} /></div><div className="flex items-center space-x-4 text-muted-foreground"><ThumbsUp className="h-5 w-5 cursor-pointer hover:text-primary" /><Settings2 className="h-5 w-5 cursor-pointer hover:text-primary" /></div></div>
             </footer>
           </>
         ) : (<div className="flex-1 flex items-center justify-center text-center text-muted-foreground"><p>Vui lòng chọn một cuộc trò chuyện để xem tin nhắn.</p></div>)}

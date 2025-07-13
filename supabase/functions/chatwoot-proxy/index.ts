@@ -12,84 +12,116 @@ serve(async (req) => {
   }
 
   try {
-    const requestBody = await req.json();
-    const { action, settings, conversationId, content, isPrivate, labels, contactId, payload } = requestBody;
+    const contentType = req.headers.get('content-type') || '';
+    let upstreamUrl = '';
+    let upstreamOptions = {};
 
-    if (!settings || !settings.chatwootUrl || !settings.accountId || !settings.apiToken) {
-      throw new Error("Thông tin cấu hình Chatwoot không đầy đủ.");
+    // Handle multipart/form-data for file uploads
+    if (contentType.includes('multipart/form-data')) {
+        const formData = await req.formData();
+        const settings = JSON.parse(formData.get('settings') as string);
+        const conversationId = formData.get('conversationId') as string;
+
+        if (!settings || !settings.chatwootUrl || !settings.accountId || !settings.apiToken) {
+            throw new Error("Thông tin cấu hình Chatwoot không đầy đủ.");
+        }
+        if (!conversationId) throw new Error("Conversation ID is required for sending a message.");
+
+        // Remove proxy-specific fields from FormData before forwarding
+        formData.delete('settings');
+        formData.delete('conversationId');
+
+        upstreamUrl = `${settings.chatwootUrl.replace(/\/$/, '')}/api/v1/accounts/${settings.accountId}/conversations/${conversationId}/messages`;
+        upstreamOptions = {
+            method: 'POST',
+            headers: {
+                'api_access_token': settings.apiToken,
+            },
+            body: formData,
+        };
+    } 
+    // Handle JSON requests for other actions
+    else {
+        const requestBody = await req.json();
+        const { action, settings, conversationId, content, isPrivate, labels, contactId, payload } = requestBody;
+
+        if (!settings || !settings.chatwootUrl || !settings.accountId || !settings.apiToken) {
+            throw new Error("Thông tin cấu hình Chatwoot không đầy đủ.");
+        }
+
+        let endpoint = '';
+        let method = 'GET';
+        let body = null;
+        
+        switch (action) {
+          case 'list_conversations':
+            endpoint = `/api/v1/accounts/${settings.accountId}/conversations?assignee_type=all&status=all&page=1`;
+            method = 'GET';
+            break;
+          
+          case 'get_conversation_details':
+            if (!conversationId) throw new Error("Conversation ID is required.");
+            endpoint = `/api/v1/accounts/${settings.accountId}/conversations/${conversationId}`;
+            method = 'GET';
+            break;
+
+          case 'list_messages':
+            if (!conversationId) throw new Error("Conversation ID is required.");
+            endpoint = `/api/v1/accounts/${settings.accountId}/conversations/${conversationId}/messages`;
+            method = 'GET';
+            break;
+
+          case 'send_message':
+            if (!conversationId) throw new Error("Conversation ID is required.");
+            if (!content) throw new Error("Message content is required.");
+            endpoint = `/api/v1/accounts/${settings.accountId}/conversations/${conversationId}/messages`;
+            method = 'POST';
+            body = JSON.stringify({
+              content: content,
+              message_type: 'outgoing',
+              private: !!isPrivate,
+            });
+            break;
+
+          case 'mark_as_read':
+            if (!conversationId) throw new Error("Conversation ID is required.");
+            endpoint = `/api/v1/accounts/${settings.accountId}/conversations/${conversationId}/update_last_seen`;
+            method = 'POST';
+            body = JSON.stringify({});
+            break;
+
+          case 'update_labels':
+            if (!conversationId) throw new Error("Conversation ID is required.");
+            if (labels === undefined) throw new Error("Labels array is required.");
+            endpoint = `/api/v1/accounts/${settings.accountId}/conversations/${conversationId}/labels`;
+            method = 'POST';
+            body = JSON.stringify({ labels });
+            break;
+
+          case 'update_contact':
+            if (!contactId) throw new Error("Contact ID is required.");
+            if (!payload) throw new Error("Payload for contact update is required.");
+            endpoint = `/api/v1/accounts/${settings.accountId}/contacts/${contactId}`;
+            method = 'PUT';
+            body = JSON.stringify(payload);
+            break;
+
+          default:
+            throw new Error(`Hành động không hợp lệ: ${action}`);
+        }
+
+        upstreamUrl = `${settings.chatwootUrl.replace(/\/$/, '')}${endpoint}`;
+        upstreamOptions = {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'api_access_token': settings.apiToken,
+            },
+            body: body,
+        };
     }
 
-    let endpoint = '';
-    let method = 'GET';
-    let body = null;
-    
-    switch (action) {
-      case 'list_conversations':
-        endpoint = `/api/v1/accounts/${settings.accountId}/conversations?assignee_type=all&status=all&page=1`;
-        method = 'GET';
-        break;
-      
-      case 'get_conversation_details':
-        if (!conversationId) throw new Error("Conversation ID is required.");
-        endpoint = `/api/v1/accounts/${settings.accountId}/conversations/${conversationId}`;
-        method = 'GET';
-        break;
-
-      case 'list_messages':
-        if (!conversationId) throw new Error("Conversation ID is required.");
-        endpoint = `/api/v1/accounts/${settings.accountId}/conversations/${conversationId}/messages`;
-        method = 'GET';
-        break;
-
-      case 'send_message':
-        if (!conversationId) throw new Error("Conversation ID is required.");
-        if (!content) throw new Error("Message content is required.");
-        endpoint = `/api/v1/accounts/${settings.accountId}/conversations/${conversationId}/messages`;
-        method = 'POST';
-        body = JSON.stringify({
-          content: content,
-          message_type: 'outgoing',
-          private: !!isPrivate,
-        });
-        break;
-
-      case 'mark_as_read':
-        if (!conversationId) throw new Error("Conversation ID is required.");
-        endpoint = `/api/v1/accounts/${settings.accountId}/conversations/${conversationId}/update_last_seen`;
-        method = 'POST';
-        body = JSON.stringify({});
-        break;
-
-      case 'update_labels':
-        if (!conversationId) throw new Error("Conversation ID is required.");
-        if (labels === undefined) throw new Error("Labels array is required.");
-        endpoint = `/api/v1/accounts/${settings.accountId}/conversations/${conversationId}/labels`;
-        method = 'POST';
-        body = JSON.stringify({ labels });
-        break;
-
-      case 'update_contact':
-        if (!contactId) throw new Error("Contact ID is required.");
-        if (!payload) throw new Error("Payload for contact update is required.");
-        endpoint = `/api/v1/accounts/${settings.accountId}/contacts/${contactId}`;
-        method = 'PUT';
-        body = JSON.stringify(payload);
-        break;
-
-      default:
-        throw new Error(`Hành động không hợp lệ: ${action}`);
-    }
-
-    const upstreamUrl = `${settings.chatwootUrl.replace(/\/$/, '')}${endpoint}`;
-
-    const response = await fetch(upstreamUrl, {
-      method: method,
-      headers: {
-        'Content-Type': 'application/json',
-        'api_access_token': settings.apiToken,
-      },
-      body: body,
-    });
+    const response = await fetch(upstreamUrl, upstreamOptions);
 
     const responseText = await response.text();
     let data;
