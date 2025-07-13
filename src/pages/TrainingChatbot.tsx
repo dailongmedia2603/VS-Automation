@@ -49,7 +49,13 @@ const TrainingChatbot = () => {
         const documentsWithUrls = await Promise.all(
             configToSave.documents.map(async (doc) => {
                 if (doc.file && !doc.url) { // New file to upload
-                    const filePath = `public/${doc.id}-${doc.file.name}`;
+                    const sanitizedName = doc.file.name
+                        .normalize("NFD") // Decompose accented characters
+                        .replace(/[\u0300-\u036f]/g, "") // Remove diacritical marks
+                        .replace(/\s+/g, '_') // Replace spaces with underscores
+                        .replace(/[^\w.-_]/g, ''); // Remove any remaining non-word characters except dot, hyphen, underscore
+
+                    const filePath = `public/${doc.id}-${sanitizedName}`;
                     const { error: uploadError } = await supabase.storage
                         .from('training_documents')
                         .upload(filePath, doc.file, { upsert: true });
