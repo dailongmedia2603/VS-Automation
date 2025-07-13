@@ -94,10 +94,10 @@ const ChatwootSettings = () => {
     <main className="flex-1 space-y-6 p-6 sm:p-8">
       <h2 className="text-3xl font-bold tracking-tight">Cài đặt Chatbot</h2>
       <Tabs defaultValue="connection">
-        <TabsList className="grid w-full grid-cols-3 bg-slate-100 rounded-lg p-1">
-          <TabsTrigger value="connection" className="rounded-md data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm">Kết nối</TabsTrigger>
-          <TabsTrigger value="fanpage" className="rounded-md data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm">Fanpage</TabsTrigger>
-          <TabsTrigger value="inbox-config" className="rounded-md data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm">Cấu hình hộp thư</TabsTrigger>
+        <TabsList className="flex items-center gap-1 p-0 bg-transparent">
+          <TabsTrigger value="connection" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Kết nối</TabsTrigger>
+          <TabsTrigger value="fanpage" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Fanpage</TabsTrigger>
+          <TabsTrigger value="inbox-config" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Cấu hình hộp thư</TabsTrigger>
         </TabsList>
         <TabsContent value="connection">
           <Card className="mt-4 shadow-sm rounded-2xl bg-white">
