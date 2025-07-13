@@ -86,6 +86,10 @@ const ChatwootInbox = () => {
     return map;
   }, [suggestedLabels]);
 
+  const suggestedLabelNames = useMemo(() => {
+    return new Set(suggestedLabels.map(label => label.name));
+  }, [suggestedLabels]);
+
   const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); };
   useEffect(() => { scrollToBottom(); }, [messages]);
 
@@ -373,42 +377,46 @@ const ChatwootInbox = () => {
   const countWithPhone = useMemo(() => conversations.filter(c => !!c.meta.sender.phone_number).length, [conversations]);
   const countWithoutPhone = useMemo(() => conversations.filter(c => !c.meta.sender.phone_number).length, [conversations]);
 
-  const renderConversationItem = (convo: Conversation) => (
-    <div key={convo.id} onClick={() => handleSelectConversation(convo)} className={cn("p-2.5 flex space-x-3 cursor-pointer rounded-lg", selectedConversation?.id === convo.id && "bg-blue-100")}>
-      <Avatar className="h-12 w-12"><AvatarImage src={convo.meta.sender.thumbnail} /><AvatarFallback>{getInitials(convo.meta.sender.name)}</AvatarFallback></Avatar>
-      <div className="flex-1 overflow-hidden">
-        <div className="flex justify-between items-center"><p className="font-semibold truncate text-sm">{convo.meta.sender.name}</p><p className="text-xs text-muted-foreground whitespace-nowrap">{format(new Date(convo.last_activity_at * 1000), 'HH:mm')}</p></div>
-        <div className="flex justify-between items-start mt-1">
-          <p className={cn("text-sm truncate flex items-center", convo.unread_count > 0 ? "text-black font-bold" : "text-muted-foreground")}><CornerDownLeft className="h-4 w-4 mr-1 flex-shrink-0" />{convo.messages[0]?.content || '[Media]'}</p>
-          <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-            {convo.meta.sender.phone_number && <Phone className="h-4 w-4 text-green-600" strokeWidth={2} />}
-            {convo.unread_count > 0 && <Badge variant="destructive">{convo.unread_count}</Badge>}
+  const renderConversationItem = (convo: Conversation) => {
+    const existingLabels = convo.labels?.filter(labelName => suggestedLabelNames.has(labelName)) || [];
+
+    return (
+      <div key={convo.id} onClick={() => handleSelectConversation(convo)} className={cn("p-2.5 flex space-x-3 cursor-pointer rounded-lg", selectedConversation?.id === convo.id && "bg-blue-100")}>
+        <Avatar className="h-12 w-12"><AvatarImage src={convo.meta.sender.thumbnail} /><AvatarFallback>{getInitials(convo.meta.sender.name)}</AvatarFallback></Avatar>
+        <div className="flex-1 overflow-hidden">
+          <div className="flex justify-between items-center"><p className="font-semibold truncate text-sm">{convo.meta.sender.name}</p><p className="text-xs text-muted-foreground whitespace-nowrap">{format(new Date(convo.last_activity_at * 1000), 'HH:mm')}</p></div>
+          <div className="flex justify-between items-start mt-1">
+            <p className={cn("text-sm truncate flex items-center", convo.unread_count > 0 ? "text-black font-bold" : "text-muted-foreground")}><CornerDownLeft className="h-4 w-4 mr-1 flex-shrink-0" />{convo.messages[0]?.content || '[Media]'}</p>
+            <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+              {convo.meta.sender.phone_number && <Phone className="h-4 w-4 text-green-600" strokeWidth={2} />}
+              {convo.unread_count > 0 && <Badge variant="destructive">{convo.unread_count}</Badge>}
+            </div>
           </div>
+          {existingLabels.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              {existingLabels.map(labelName => {
+                const color = labelColorMap.get(labelName) || '#6B7280';
+                return (
+                  <Badge
+                    key={labelName}
+                    variant="outline"
+                    className="text-xs font-normal px-2 py-0.5"
+                    style={{
+                      backgroundColor: `${color}20`,
+                      color: color,
+                      borderColor: color,
+                    }}
+                  >
+                    {labelName}
+                  </Badge>
+                )
+              })}
+            </div>
+          )}
         </div>
-        {convo.labels && convo.labels.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-1.5">
-            {convo.labels.map(labelName => {
-              const color = labelColorMap.get(labelName) || '#6B7280';
-              return (
-                <Badge
-                  key={labelName}
-                  variant="outline"
-                  className="text-xs font-normal px-2 py-0.5"
-                  style={{
-                    backgroundColor: `${color}20`,
-                    color: color,
-                    borderColor: color,
-                  }}
-                >
-                  {labelName}
-                </Badge>
-              )
-            })}
-          </div>
-        )}
       </div>
-    </div>
-  );
+    );
+  }
 
   return (
     <div className="flex h-full bg-white border-t">
