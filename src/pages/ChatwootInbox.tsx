@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useChatwoot } from '@/contexts/ChatwootContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -40,6 +40,14 @@ const ChatwootInbox = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const POLLING_INTERVAL = 15000;
   const phoneRegex = /(0[3|5|7|8|9][0-9]{8})\b/;
+
+  const labelColorMap = useMemo(() => {
+    const map = new Map<string, string>();
+    suggestedLabels.forEach(label => {
+        map.set(label.name, label.color);
+    });
+    return map;
+  }, [suggestedLabels]);
 
   const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); };
   useEffect(() => { scrollToBottom(); }, [messages]);
@@ -228,11 +236,23 @@ const ChatwootInbox = () => {
         </div>
         {convo.labels && convo.labels.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-1.5">
-            {convo.labels.map(label => (
-              <Badge key={label} variant="secondary" className="text-xs font-normal px-2 py-0.5">
-                {label}
-              </Badge>
-            ))}
+            {convo.labels.map(labelName => {
+              const color = labelColorMap.get(labelName) || '#6B7280';
+              return (
+                <Badge
+                  key={labelName}
+                  variant="outline"
+                  className="text-xs font-normal px-2 py-0.5"
+                  style={{
+                    backgroundColor: `${color}20`,
+                    color: color,
+                    borderColor: color,
+                  }}
+                >
+                  {labelName}
+                </Badge>
+              )
+            })}
           </div>
         )}
       </div>
@@ -261,6 +281,11 @@ const ChatwootInbox = () => {
                     variant="outline"
                     size="sm"
                     className="text-xs h-7"
+                    style={{
+                      backgroundColor: `${label.color}20`,
+                      borderColor: label.color,
+                      color: label.color,
+                    }}
                     onClick={() => handleAddLabel(label.name)}
                   >
                     {label.name}
