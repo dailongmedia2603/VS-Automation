@@ -10,8 +10,9 @@ const corsHeaders = {
 const AI_STAR_LABEL = 'AI Star';
 
 const formatMessage = (msg) => {
+    // message_type: 0 for incoming, 1 for outgoing.
     const sender = msg.message_type === 1 ? 'Agent' : 'User';
-    const timestamp = new Date(msg.created_at_chatwoot || Date.now()).toLocaleString('vi-VN');
+    const timestamp = new Date(msg.created_at * 1000).toLocaleString('vi-VN');
     const content = msg.content || '[Tệp đính kèm hoặc tin nhắn trống]';
     return `[${timestamp}] ${sender}: ${content}`;
 }
@@ -29,78 +30,84 @@ serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
 
+  // Function to send private error notes to Chatwoot
+  const sendErrorNote = async (message) => {
+    const { data: chatwootSettings } = await supabaseAdmin.from('chatwoot_settings').select('*').eq('id', 1).single();
+    if (chatwootSettings && conversationId) {
+        try {
+            await supabaseAdmin.functions.invoke('chatwoot-proxy', {
+                body: {
+                    action: 'send_message',
+                    settings: chatwootSettings,
+                    conversationId: conversationId,
+                    content: `AI Auto-Reply Error: ${message}`,
+                    isPrivate: true,
+                }
+            });
+        } catch (e) {
+            console.error("Failed to send error note to Chatwoot:", e.message);
+        }
+    }
+  };
+
   try {
-    // 1. Validate webhook payload from Chatwoot
+    // 1. Validate webhook payload
     if (payload.event !== 'message_created' || payload.private === true || payload.message_type !== 'incoming') {
-      return new Response(JSON.stringify({ message: "Ignoring event: Not an incoming public message." }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ message: "Ignoring event: Not a relevant message." }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Set AI status to typing
-    await supabaseAdmin.from('ai_typing_status').upsert({ conversation_id: conversationId, is_typing: true, updated_at: new Date().toISOString() });
+    await supabaseAdmin.from('ai_typing_status').upsert({ conversation_id: conversationId, is_typing: true });
 
-    // 2. Check if auto-reply is globally enabled
+    // 2. Check if feature is enabled
     const { data: autoReplySettings, error: settingsError } = await supabaseAdmin
       .from('auto_reply_settings').select('config').eq('id', 1).single();
     if (settingsError || !autoReplySettings?.config?.enabled) {
-      throw new Error("Auto-reply is disabled globally.");
+      throw new Error("Auto-reply feature is disabled in settings.");
     }
 
-    // 3. Get labels from payload and handle new customer tagging
+    // 3. Get Chatwoot & AI settings
+    const { data: chatwootSettings } = await supabaseAdmin.from('chatwoot_settings').select('*').eq('id', 1).single();
+    if (!chatwootSettings) throw new Error("Chatwoot settings are not configured.");
+    
+    const { data: aiSettings } = await supabaseAdmin.from('ai_settings').select('api_url, api_key').eq('id', 1).single();
+    if (!aiSettings) throw new Error("AI API settings are not configured.");
+
+    // 4. Handle new customer tagging
     let labelNames = payload.conversation?.labels || [];
-    const isNewCustomerMessage = payload.conversation?.messages_count === 1;
-
-    if (isNewCustomerMessage && !labelNames.includes(AI_STAR_LABEL)) {
-      const { data: chatwootSettings } = await supabaseAdmin.from('chatwoot_settings').select('*').eq('id', 1).single();
-      if (chatwootSettings) {
+    if (payload.conversation?.messages_count === 1 && !labelNames.includes(AI_STAR_LABEL)) {
         const newLabels = [...labelNames, AI_STAR_LABEL];
-        const endpoint = `/api/v1/accounts/${chatwootSettings.account_id}/conversations/${conversationId}/labels`;
-        const upstreamUrl = `${chatwootSettings.chatwoot_url.replace(/\/$/, '')}${endpoint}`;
-        const response = await fetch(upstreamUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'api_access_token': chatwootSettings.api_token },
-            body: JSON.stringify({ labels: newLabels }),
+        await supabaseAdmin.functions.invoke('chatwoot-proxy', {
+            body: { action: 'update_labels', settings: chatwootSettings, conversationId, labels: newLabels }
         });
+        labelNames.push(AI_STAR_LABEL);
+    }
 
-        if (response.ok) {
-            labelNames.push(AI_STAR_LABEL); // Update labels for current execution
-            // Sync to our DB in background
-            const { data: aiStarLabelData } = await supabaseAdmin.from('chatwoot_labels').select('id').eq('name', AI_STAR_LABEL).single();
-            if (aiStarLabelData) {
-                await supabaseAdmin.from('chatwoot_conversation_labels').insert({ conversation_id: conversationId, label_id: aiStarLabelData.id });
-            }
-        } else {
-            console.error(`Failed to add AI Star label for convo ${conversationId}: ${await response.text()}`);
-        }
+    // 5. Verify 'AI Star' label exists
+    if (!labelNames.includes(AI_STAR_LABEL)) {
+      // As a fallback, check directly with Chatwoot API
+      const { data: convDetails } = await supabaseAdmin.functions.invoke('chatwoot-proxy', {
+          body: { action: 'get_conversation_details', settings: chatwootSettings, conversationId }
+      });
+      if (!convDetails?.payload?.labels?.includes(AI_STAR_LABEL)) {
+          throw new Error(`Conversation is not tagged with '${AI_STAR_LABEL}'.`);
       }
     }
 
-    // 4. Check if conversation has 'AI Star' tag
-    if (!labelNames.includes(AI_STAR_LABEL)) {
-      throw new Error("Conversation does not have AI Star label.");
-    }
+    // 6. Fetch full, real-time conversation history from Chatwoot
+    const { data: messagesData, error: messagesError } = await supabaseAdmin.functions.invoke('chatwoot-proxy', {
+        body: { action: 'list_messages', settings: chatwootSettings, conversationId }
+    });
+    if (messagesError) throw new Error(`Failed to fetch message history: ${(await messagesError.context.json()).error || messagesError.message}`);
+    const conversationHistory = messagesData.payload || [];
+    if (conversationHistory.length === 0) throw new Error("Could not retrieve conversation history.");
 
-    // 5. Fetch conversation history from DB
-    const { data: conversationHistory, error: historyError } = await supabaseAdmin
-      .from('chatwoot_messages').select('content, message_type, created_at_chatwoot')
-      .eq('conversation_id', conversationId).order('created_at_chatwoot', { ascending: true });
-    if (historyError) throw historyError;
-
-    const fullHistory = [...(conversationHistory || []), {
-        content: payload.content,
-        message_type: 0,
-        created_at_chatwoot: new Date(payload.created_at * 1000).toISOString()
-    }];
-
-    if (fullHistory.length === 0) throw new Error("Could not retrieve conversation history.");
-
-    // 6. Get AI training prompt
+    // 7. Construct prompt
     const trainingConfig = autoReplySettings.config;
     if (!trainingConfig) throw new Error("Auto-reply training config not found.");
-
     const products = trainingConfig.products?.map(p => `- ${p.value}`).join('\n') || 'Không có';
     const processSteps = trainingConfig.processSteps?.map((p, i) => `${i+1}. ${p.value}`).join('\n') || 'Không có';
     const conditions = trainingConfig.conditions?.map(c => `- ${c.value}`).join('\n') || 'Không có';
-    const historyText = fullHistory.map(formatMessage).join('\n');
+    const historyText = conversationHistory.sort((a, b) => a.created_at - b.created_at).map(formatMessage).join('\n');
 
     const systemPrompt = `Bạn là một ${trainingConfig.role || 'trợ lý AI chuyên nghiệp'} của một doanh nghiệp hoạt động trong lĩnh vực ${trainingConfig.industry || 'tổng hợp'}.
 Phong cách của bạn là ${trainingConfig.style || 'thân thiện'}, tông giọng ${trainingConfig.tone || 'nhiệt tình'}.
@@ -122,61 +129,33 @@ ${historyText}
 ---
 Hãy tạo ra câu trả lời cho tin nhắn cuối cùng. Chỉ trả lời nội dung tin nhắn, không thêm bất kỳ lời giải thích nào.`;
 
-    // 7. Call AI to get response
-    const { data: aiSettings } = await supabaseAdmin.from('ai_settings').select('api_url, api_key').eq('id', 1).single();
-    if (!aiSettings) throw new Error("AI settings not found.");
-
+    // 8. Call AI
     const { data: proxyResponse, error: proxyError } = await supabaseAdmin.functions.invoke('multi-ai-proxy', {
       body: { messages: [{ role: 'system', content: systemPrompt }], apiUrl: aiSettings.api_url, apiKey: aiSettings.api_key, model: 'gpt-4o' }
     });
-    if (proxyError) throw new Error((await proxyError.context.json()).error || proxyError.message);
-    if (proxyResponse.error) throw new Error(proxyResponse.error);
+    if (proxyError) throw new Error(`AI proxy failed: ${(await proxyError.context.json()).error || proxyError.message}`);
+    if (proxyResponse.error) throw new Error(`AI service error: ${proxyResponse.error}`);
 
     const aiReply = proxyResponse.choices[0].message.content;
 
-    // 8. Send reply to Chatwoot
-    const { data: chatwootSettings } = await supabaseAdmin.from('chatwoot_settings').select('*').eq('id', 1).single();
-    if (!chatwootSettings) throw new Error("Chatwoot settings not found.");
-
-    const endpoint = `/api/v1/accounts/${chatwootSettings.account_id}/conversations/${conversationId}/messages`;
-    const upstreamUrl = `${chatwootSettings.chatwoot_url.replace(/\/$/, '')}${endpoint}`;
-
-    const chatwootResponse = await fetch(upstreamUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'api_access_token': chatwootSettings.api_token },
-        body: JSON.stringify({ content: aiReply, message_type: 'outgoing', private: false }),
+    // 9. Send reply to Chatwoot
+    await supabaseAdmin.functions.invoke('chatwoot-proxy', {
+        body: { action: 'send_message', settings: chatwootSettings, conversationId, content: aiReply, isPrivate: false }
     });
-
-    if (!chatwootResponse.ok) {
-        const errorText = await chatwootResponse.text();
-        throw new Error(`Chatwoot API Error: ${chatwootResponse.status} ${errorText}`);
-    }
 
     return new Response(JSON.stringify({ success: true, reply: aiReply }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200,
     });
 
   } catch (error) {
-    console.error(`Auto-reply webhook error for convo ${conversationId}:`, error.message);
-    // Send a private note to the conversation about the error
-    const errorMessage = `AI Auto-Reply Error: ${error.message}. AI will not reply.`;
-    const { data: chatwootSettings } = await supabaseAdmin.from('chatwoot_settings').select('*').eq('id', 1).single();
-    if (chatwootSettings && conversationId) {
-        const endpoint = `/api/v1/accounts/${chatwootSettings.account_id}/conversations/${conversationId}/messages`;
-        const upstreamUrl = `${chatwootSettings.chatwoot_url.replace(/\/$/, '')}${endpoint}`;
-        await fetch(upstreamUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'api_access_token': chatwootSettings.api_token },
-            body: JSON.stringify({ content: errorMessage, message_type: 'outgoing', private: true }),
-        });
-    }
+    console.error(`[CONVO_ID: ${conversationId}] Auto-reply webhook error:`, error.message);
+    await sendErrorNote(error.message);
     return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200, // Return 200 to prevent Chatwoot from retrying
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200,
     })
   } finally {
-    // Set AI status to not typing
     if (conversationId) {
-      await supabaseAdmin.from('ai_typing_status').upsert({ conversation_id: conversationId, is_typing: false, updated_at: new Date().toISOString() });
+      await supabaseAdmin.from('ai_typing_status').upsert({ conversation_id: conversationId, is_typing: false });
     }
   }
 })
