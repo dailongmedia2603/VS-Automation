@@ -36,8 +36,8 @@ const getInitials = (name?: string) => {
   return name.substring(0, 2).toUpperCase();
 };
 
-const statusMap: Record<CareScriptStatus, string> = { scheduled: 'Đã lên lịch', sent: 'Đã gửi', failed: 'Thất bại' };
-const statusBadgeColors: Record<CareScriptStatus, string> = { scheduled: 'bg-blue-100 text-blue-600', sent: 'bg-green-100 text-green-600', failed: 'bg-red-100 text-red-600' };
+const statusMap: Record<CareScriptStatus, string> = { scheduled: 'Xếp lịch', sent: 'Đã gửi', failed: 'Thất bại' };
+const statusBadgeColors: Record<CareScriptStatus, string> = { scheduled: 'bg-red-100 text-red-600', sent: 'bg-green-100 text-green-600', failed: 'bg-red-100 text-red-600' };
 
 export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote, scripts, fetchCareScripts }: ChatwootContactPanelProps) => {
   const { settings } = useChatwoot();
@@ -120,6 +120,7 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
   };
 
   const notes = messages.filter(msg => msg.private).sort((a, b) => b.created_at - a.created_at);
+  const sortedScripts = [...scripts].sort((a, b) => b.id - a.id);
 
   if (!selectedConversation) {
     return (
@@ -226,10 +227,10 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
       {activeTab === 'care' && (
         <div className="flex-1 flex flex-col bg-slate-50 overflow-hidden">
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {scripts.length > 0 ? (
+            {sortedScripts.length > 0 ? (
               <TooltipProvider>
                 <div className="space-y-3">
-                  {scripts.map(script => (
+                  {sortedScripts.map(script => (
                     <div key={script.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
                       <p className="text-sm text-slate-700 mb-4 leading-relaxed">{script.content}</p>
                       <div className="flex justify-between items-center">
