@@ -174,18 +174,32 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
               <div className="flex items-center"><Building className="h-4 w-4 mr-3" /><span>{contact.additional_attributes?.company_name || 'Không có sẵn'}</span></div>
             </div>
           </div>
-          <div className="flex-1 flex flex-col bg-gray-50 overflow-hidden">
-            <div ref={notesContainerRef} className="flex-1 p-4 space-y-4 overflow-y-auto">
+          <div className="flex-1 flex flex-col bg-slate-50 overflow-hidden">
+            <div ref={notesContainerRef} className="flex-1 p-4 space-y-3 overflow-y-auto">
               {notes.length === 0 ? (
-                <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-full">
-                  <FileText className="h-8 w-8 mb-2 text-gray-300" />
-                  <p className="text-sm font-semibold text-gray-600">Chưa có ghi chú nào</p>
+                <div className="h-full flex flex-col items-center justify-center text-center p-6">
+                  <div className="flex items-center justify-center h-16 w-16 bg-slate-200/70 rounded-full mb-4">
+                    <FileText className="h-8 w-8 text-slate-400" />
+                  </div>
+                  <p className="text-md font-semibold text-slate-800">Chưa có ghi chú</p>
+                  <p className="text-sm text-slate-500 mt-1">Thêm ghi chú mới để thảo luận nội bộ về cuộc trò chuyện này.</p>
                 </div>
               ) : (
                 notes.map(n => (
-                  <div key={n.id} className="bg-yellow-100/50 border-l-4 border-yellow-400 p-3 rounded-r-lg">
-                    <p className="text-sm text-gray-800">{n.content}</p>
-                    <p className="text-xs text-gray-500 mt-2 text-right">{n.sender?.name} - {format(new Date(n.created_at * 1000), 'dd/MM/yy HH:mm', { locale: vi })}</p>
+                  <div key={n.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                    <div className="flex items-start space-x-3">
+                      <Avatar className="h-8 w-8 border">
+                        <AvatarImage src={n.sender?.thumbnail} />
+                        <AvatarFallback>{getInitials(n.sender?.name)}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-semibold text-slate-800">{n.sender?.name || 'Hệ thống'}</p>
+                          <p className="text-xs text-slate-400">{format(new Date(n.created_at * 1000), 'dd/MM/yy HH:mm', { locale: vi })}</p>
+                        </div>
+                        <p className="text-sm text-slate-600 mt-1 leading-relaxed">{n.content}</p>
+                      </div>
+                    </div>
                   </div>
                 ))
               )}
