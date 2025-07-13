@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Mail, Phone, Building, Send, Loader2, PlusCircle, Calendar, Clock, Trash2, Pencil, ImagePlus } from "lucide-react";
+import { FileText, Mail, Phone, Building, Send, Loader2, PlusCircle, Calendar, Clock, Trash2, Pencil, ImagePlus, Bot } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useChatwoot } from '@/contexts/ChatwootContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -122,6 +122,7 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
   }
 
   const contact = selectedConversation.meta.sender;
+  const hasAiCareTag = selectedConversation.labels.includes('AI chăm');
 
   return (
     <aside className="hidden lg:flex lg:w-80 border-l bg-white flex-col">
@@ -147,7 +148,43 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
           <p className="text-xs text-muted-foreground text-center mt-2 px-2">
             Để AI tự động chăm sóc, thêm nhãn "AI chăm" vào cuộc trò chuyện.
           </p>
-          <div className="flex-1 overflow-y-auto space-y-3 pr-2">{scripts.length === 0 ? (<div className="flex flex-col items-center justify-center text-center text-muted-foreground h-full"><Calendar className="h-10 w-10 mb-3 text-gray-400" /><p className="text-sm font-semibold text-gray-600">Chưa có kịch bản nào</p><p className="text-xs">Hãy tạo kịch bản để chăm sóc khách hàng tự động.</p></div>) : (scripts.map(script => (<div key={script.id} className="bg-white p-3 rounded-lg border shadow-sm"><p className="text-sm text-gray-800 mb-2">{script.content}</p><div className="flex justify-between items-center"><div className="flex items-center gap-2 text-xs text-muted-foreground"><Clock className="h-3 w-3" /><span>{format(new Date(script.scheduled_at), 'dd/MM/yy HH:mm')}</span><Badge variant={statusColorMap[script.status]}>{statusMap[script.status]}</Badge></div><div className="flex items-center gap-2"><Button variant="ghost" size="icon" className="h-6 w-6"><ImagePlus className="h-4 w-4 text-muted-foreground" /></Button><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditDialog(script)}><Pencil className="h-4 w-4 text-muted-foreground" /></Button><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setScriptToDelete(script)}><Trash2 className="h-4 w-4 text-destructive" /></Button></div></div></div>)))}</div>
+          <div className="flex-1 overflow-y-auto space-y-3 pr-2">
+            {scripts.length === 0 ? (
+              hasAiCareTag ? (
+                <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-full p-4">
+                  <Bot className="h-10 w-10 mb-3 text-blue-500 animate-pulse" />
+                  <p className="text-sm font-semibold text-gray-700">AI đang phân tích...</p>
+                  <p className="text-xs mt-1">
+                    Hệ thống đã ghi nhận và sẽ sớm tự động tạo kịch bản chăm sóc cho cuộc trò chuyện này.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-full">
+                  <Calendar className="h-10 w-10 mb-3 text-gray-400" />
+                  <p className="text-sm font-semibold text-gray-600">Chưa có kịch bản nào</p>
+                  <p className="text-xs">Hãy tạo kịch bản để chăm sóc khách hàng tự động.</p>
+                </div>
+              )
+            ) : (
+              scripts.map(script => (
+                <div key={script.id} className="bg-white p-3 rounded-lg border shadow-sm">
+                  <p className="text-sm text-gray-800 mb-2">{script.content}</p>
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Clock className="h-3 w-3" />
+                      <span>{format(new Date(script.scheduled_at), 'dd/MM/yy HH:mm')}</span>
+                      <Badge variant={statusColorMap[script.status]}>{statusMap[script.status]}</Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="ghost" size="icon" className="h-6 w-6"><ImagePlus className="h-4 w-4 text-muted-foreground" /></Button>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditDialog(script)}><Pencil className="h-4 w-4 text-muted-foreground" /></Button>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setScriptToDelete(script)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </TabsContent>
       </Tabs>
       <Dialog open={isScriptDialogOpen} onOpenChange={setIsScriptDialogOpen}><DialogContent><DialogHeader><DialogTitle>{editingScript ? 'Sửa kịch bản' : 'Tạo kịch bản mới'}</DialogTitle></DialogHeader><div className="space-y-4 py-4"><Textarea placeholder="Nhập nội dung tin nhắn..." value={scriptContent} onChange={(e) => setScriptContent(e.target.value)} /><div className="flex items-center gap-2"><Input type="date" value={scriptDate} onChange={(e) => setScriptDate(e.target.value)} className="flex-1" /><Select value={String(scriptHour)} onValueChange={(value) => setScriptHour(Number(value))}><SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger><SelectContent>{Array.from({ length: 15 }, (_, i) => i + 7).map(hour => (<SelectItem key={hour} value={String(hour)}>{String(hour).padStart(2, '0')}:00</SelectItem>))}</SelectContent></Select></div></div><DialogFooter><Button variant="outline" onClick={() => setIsScriptDialogOpen(false)}>Hủy</Button><Button onClick={handleSaveScript}>Lưu</Button></DialogFooter></DialogContent></Dialog>
