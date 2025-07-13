@@ -156,25 +156,9 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
           
           {/* Scrollable List */}
           <div className="flex-1 overflow-y-auto px-4 pb-4">
-            <div className="space-y-3">
-              {scripts.length === 0 ? (
-                hasAiCareTag ? (
-                  <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-full p-4">
-                    <Bot className="h-10 w-10 mb-3 text-blue-500 animate-pulse" />
-                    <p className="text-sm font-semibold text-gray-700">AI đang phân tích...</p>
-                    <p className="text-xs mt-1">
-                      Hệ thống đã ghi nhận và sẽ sớm tự động tạo kịch bản chăm sóc cho cuộc trò chuyện này.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-full">
-                    <Calendar className="h-10 w-10 mb-3 text-gray-400" />
-                    <p className="text-sm font-semibold text-gray-600">Chưa có kịch bản nào</p>
-                    <p className="text-xs">Hãy tạo kịch bản để chăm sóc khách hàng tự động.</p>
-                  </div>
-                )
-              ) : (
-                scripts.map(script => (
+            {scripts.length > 0 ? (
+              <div className="space-y-3">
+                {scripts.map(script => (
                   <div key={script.id} className="bg-white p-3 rounded-lg border shadow-sm">
                     <p className="text-sm text-gray-800 mb-2">{script.content}</p>
                     <div className="flex justify-between items-center">
@@ -190,9 +174,23 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
                       </div>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            ) : hasAiCareTag ? (
+              <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-full p-4">
+                <Bot className="h-10 w-10 mb-3 text-blue-500 animate-pulse" />
+                <p className="text-sm font-semibold text-gray-700">AI đang phân tích...</p>
+                <p className="text-xs mt-1">
+                  Hệ thống đã ghi nhận và sẽ sớm tự động tạo kịch bản chăm sóc cho cuộc trò chuyện này.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-full">
+                <Calendar className="h-10 w-10 mb-3 text-gray-400" />
+                <p className="text-sm font-semibold text-gray-600">Chưa có kịch bản nào</p>
+                <p className="text-xs">Hãy tạo kịch bản để chăm sóc khách hàng tự động.</p>
+              </div>
+            )}
           </div>
         </TabsContent>
       </Tabs>
