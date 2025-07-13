@@ -79,14 +79,18 @@ const Staff = () => {
       return;
     }
     setIsSaving(true);
-    const { error } = await supabase.from('staff').upsert({
-      id: selectedStaff.id,
+
+    const staffData = {
       name: selectedStaff.name,
       role: selectedStaff.role,
       email: selectedStaff.email,
       status: selectedStaff.status,
       avatar_url: selectedStaff.avatar_url || `https://i.pravatar.cc/150?u=${selectedStaff.email}`
-    });
+    };
+
+    const { error } = selectedStaff.id
+      ? await supabase.from('staff').update(staffData).eq('id', selectedStaff.id)
+      : await supabase.from('staff').insert(staffData);
 
     if (error) {
       showError("Lưu thông tin thất bại: " + error.message);
