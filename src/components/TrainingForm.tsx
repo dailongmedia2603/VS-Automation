@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PlusCircle, Trash2, File as FileIcon, Download, Edit, Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 // Type definitions
 export type TrainingItem = { id: string; value: string };
@@ -59,12 +58,12 @@ const DynamicList = ({ title, items, setItems, placeholder, buttonText }: { titl
   const handleRemoveItem = (id: string) => setItems(items.filter(item => item.id !== id));
 
   return (
-    <div className="space-y-2">
-      <Label className="font-medium text-slate-700">{title}</Label>
+    <div className="space-y-3">
+      <Label className="text-sm font-medium text-slate-800">{title}</Label>
       <div className="space-y-2">
         {items.map((item) => (
           <div key={item.id} className="flex items-center gap-2">
-            <Input placeholder={placeholder} value={item.value} onChange={(e) => handleItemChange(item.id, e.target.value)} className="bg-slate-50" />
+            <Input placeholder={placeholder} value={item.value} onChange={(e) => handleItemChange(item.id, e.target.value)} className="bg-slate-100/70 border-slate-200" />
             <Button variant="ghost" size="icon" className="flex-shrink-0 text-slate-500 hover:text-destructive hover:bg-destructive/10" onClick={() => handleRemoveItem(item.id)}>
               <Trash2 className="h-4 w-4" />
             </Button>
@@ -85,15 +84,15 @@ const DynamicPrefixedList = ({ title, description, items, setItems, prefix, butt
     const handleRemoveItem = (id: string) => setItems(items.filter(item => item.id !== id));
   
     return (
-      <div className="space-y-2">
-        <Label className="font-medium text-slate-700">{title}</Label>
-        {description && <p className="text-sm text-slate-500">{description}</p>}
+      <div className="space-y-3">
+        <Label className="text-sm font-medium text-slate-800">{title}</Label>
+        {description && <p className="text-xs text-slate-500">{description}</p>}
         <div className="space-y-2 mt-2">
           {items.map((item, index) => (
             <div key={item.id} className="flex items-center gap-2">
-              <div className="flex items-center gap-2 flex-grow">
-                <span className="font-medium text-slate-500 whitespace-nowrap">{prefix} {index + 1}:</span>
-                <Input value={item.value} onChange={(e) => handleItemChange(item.id, e.target.value)} className="bg-slate-50" />
+              <div className="flex items-center gap-3 flex-grow">
+                <span className="font-semibold text-slate-500 whitespace-nowrap">{prefix} {index + 1}</span>
+                <Input value={item.value} onChange={(e) => handleItemChange(item.id, e.target.value)} className="bg-slate-100/70 border-slate-200" />
               </div>
               <Button variant="ghost" size="icon" className="flex-shrink-0 text-slate-500 hover:text-destructive hover:bg-destructive/10" onClick={() => handleRemoveItem(item.id)}>
                 <Trash2 className="h-4 w-4" />
@@ -141,23 +140,23 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig, i
   };
 
   return (
-    <div className="space-y-6 mt-6">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <Card className="bg-white rounded-xl shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold text-slate-900">Thông tin cơ bản</CardTitle>
-              <CardDescription className="text-sm text-slate-500">Cung cấp thông tin nền tảng về doanh nghiệp và sản phẩm của bạn.</CardDescription>
+    <div className="space-y-8 mt-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-8">
+          <Card className="bg-white rounded-2xl shadow-lg shadow-slate-200/30 border border-slate-200/80">
+            <CardHeader className="p-6">
+              <CardTitle className="text-xl font-bold text-slate-900">Thông tin cơ bản</CardTitle>
+              <CardDescription className="text-sm text-slate-500 pt-1">Cung cấp thông tin nền tảng về doanh nghiệp và sản phẩm của bạn.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="p-6 pt-0 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="industry" className="font-medium text-slate-700">Lĩnh vực / Ngành nghề</Label>
-                  <Input id="industry" value={config.industry} onChange={(e) => handleFieldChange('industry', e.target.value)} className="bg-slate-50" />
+                <div className="space-y-2">
+                  <Label htmlFor="industry" className="text-sm font-medium text-slate-800">Lĩnh vực / Ngành nghề</Label>
+                  <Input id="industry" value={config.industry} onChange={(e) => handleFieldChange('industry', e.target.value)} className="bg-slate-100/70 border-slate-200" />
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="role" className="font-medium text-slate-700">Vai trò của AI</Label>
-                  <Input id="role" placeholder="VD: Chuyên viên tư vấn" value={config.role} onChange={(e) => handleFieldChange('role', e.target.value)} className="bg-slate-50" />
+                <div className="space-y-2">
+                  <Label htmlFor="role" className="text-sm font-medium text-slate-800">Vai trò của AI</Label>
+                  <Input id="role" placeholder="VD: Chuyên viên tư vấn" value={config.role} onChange={(e) => handleFieldChange('role', e.target.value)} className="bg-slate-100/70 border-slate-200" />
                 </div>
               </div>
               <DynamicList
@@ -170,12 +169,12 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig, i
             </CardContent>
           </Card>
 
-          <Card className="bg-white rounded-xl shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold text-slate-900">Quy trình và Điều kiện</CardTitle>
-              <CardDescription className="text-sm text-slate-500">Hướng dẫn AI cách tư vấn và các quy tắc cần tuân thủ.</CardDescription>
+          <Card className="bg-white rounded-2xl shadow-lg shadow-slate-200/30 border border-slate-200/80">
+            <CardHeader className="p-6">
+              <CardTitle className="text-xl font-bold text-slate-900">Quy trình và Điều kiện</CardTitle>
+              <CardDescription className="text-sm text-slate-500 pt-1">Hướng dẫn AI cách tư vấn và các quy tắc cần tuân thủ.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="p-6 pt-0 space-y-6">
               <DynamicPrefixedList
                 title="Quy trình tư vấn"
                 description="Đưa ra quy trình tư vấn từng bước để AI hiểu được nên tư vấn từng bước như nào."
@@ -184,6 +183,7 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig, i
                 prefix="Bước"
                 buttonText="Thêm bước"
               />
+              <div className="border-t border-slate-200/80 -mx-6 my-6"></div>
               <DynamicPrefixedList
                 title="Điều kiện bắt buộc AI tuân thủ"
                 items={config.conditions}
@@ -195,75 +195,75 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig, i
           </Card>
         </div>
 
-        <div className="lg:col-span-1 space-y-6">
-          <Card className="bg-white rounded-xl shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold text-slate-900">Phong cách và Tông giọng</CardTitle>
+        <div className="lg:col-span-1 space-y-8">
+          <Card className="bg-white rounded-2xl shadow-lg shadow-slate-200/30 border border-slate-200/80">
+            <CardHeader className="p-6">
+              <CardTitle className="text-xl font-bold text-slate-900">Phong cách & Tông giọng</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="style" className="font-medium text-slate-700">Phong cách trả lời</Label>
-                <Input id="style" placeholder="VD: Thân thiện, chuyên nghiệp" value={config.style} onChange={(e) => handleFieldChange('style', e.target.value)} className="bg-slate-50" />
+            <CardContent className="p-6 pt-0 space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="style" className="text-sm font-medium text-slate-800">Phong cách trả lời</Label>
+                <Input id="style" placeholder="VD: Thân thiện, chuyên nghiệp" value={config.style} onChange={(e) => handleFieldChange('style', e.target.value)} className="bg-slate-100/70 border-slate-200" />
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="tone" className="font-medium text-slate-700">Tông giọng trả lời</Label>
-                <Input id="tone" placeholder="VD: Vui vẻ, nghiêm túc" value={config.tone} onChange={(e) => handleFieldChange('tone', e.target.value)} className="bg-slate-50" />
+              <div className="space-y-2">
+                <Label htmlFor="tone" className="text-sm font-medium text-slate-800">Tông giọng trả lời</Label>
+                <Input id="tone" placeholder="VD: Vui vẻ, nghiêm túc" value={config.tone} onChange={(e) => handleFieldChange('tone', e.target.value)} className="bg-slate-100/70 border-slate-200" />
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="language" className="font-medium text-slate-700">Ngôn ngữ trả lời</Label>
-                <Input id="language" value={config.language} onChange={(e) => handleFieldChange('language', e.target.value)} className="bg-slate-50" />
+              <div className="space-y-2">
+                <Label htmlFor="language" className="text-sm font-medium text-slate-800">Ngôn ngữ trả lời</Label>
+                <Input id="language" value={config.language} onChange={(e) => handleFieldChange('language', e.target.value)} className="bg-slate-100/70 border-slate-200" />
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="pronouns" className="font-medium text-slate-700">Xưng hô (Page vs Khách hàng)</Label>
-                <Input id="pronouns" placeholder="VD: Shop - bạn, Em - anh/chị" value={config.pronouns} onChange={(e) => handleFieldChange('pronouns', e.target.value)} className="bg-slate-50" />
+              <div className="space-y-2">
+                <Label htmlFor="pronouns" className="text-sm font-medium text-slate-800">Xưng hô (Page vs KH)</Label>
+                <Input id="pronouns" placeholder="VD: Shop - bạn" value={config.pronouns} onChange={(e) => handleFieldChange('pronouns', e.target.value)} className="bg-slate-100/70 border-slate-200" />
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="goal" className="font-medium text-slate-700">Mục tiêu trò chuyện</Label>
-                <Input id="goal" placeholder="VD: Bán hàng, giải đáp thắc mắc" value={config.goal} onChange={(e) => handleFieldChange('goal', e.target.value)} className="bg-slate-50" />
+              <div className="space-y-2">
+                <Label htmlFor="goal" className="text-sm font-medium text-slate-800">Mục tiêu trò chuyện</Label>
+                <Input id="goal" placeholder="VD: Bán hàng, giải đáp" value={config.goal} onChange={(e) => handleFieldChange('goal', e.target.value)} className="bg-slate-100/70 border-slate-200" />
               </div>
             </CardContent>
           </Card>
         </div>
       </div>
 
-      <Card className="bg-white rounded-xl shadow-sm">
-        <CardHeader className="flex flex-row items-center justify-between">
+      <Card className="bg-white rounded-2xl shadow-lg shadow-slate-200/30 border border-slate-200/80">
+        <CardHeader className="p-6 flex flex-row items-center justify-between">
           <div>
-            <CardTitle className="text-lg font-semibold text-slate-900">Bảng tài liệu</CardTitle>
-            <CardDescription className="text-sm text-slate-500">Tải lên các tài liệu để AI học hỏi và tham khảo.</CardDescription>
+            <CardTitle className="text-xl font-bold text-slate-900">Bảng tài liệu</CardTitle>
+            <CardDescription className="text-sm text-slate-500 pt-1">Tải lên các tài liệu để AI học hỏi và tham khảo.</CardDescription>
           </div>
-          <Button onClick={() => fileInputRef.current?.click()} className="bg-blue-600 hover:bg-blue-700 text-white">
+          <Button onClick={() => fileInputRef.current?.click()} className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold">
             <PlusCircle className="h-4 w-4 mr-2" />
             Thêm tài liệu
           </Button>
           <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-6 pt-0">
           <div className="border rounded-lg overflow-hidden">
             <Table>
-              <TableHeader className="bg-slate-50">
+              <TableHeader className="bg-slate-100/80">
                 <TableRow>
-                  <TableHead className="text-slate-600 font-medium">Loại tài liệu</TableHead>
-                  <TableHead className="text-slate-600 font-medium">Mục đích</TableHead>
-                  <TableHead className="text-slate-600 font-medium">Người tạo</TableHead>
-                  <TableHead className="text-right text-slate-600 font-medium">Thao tác</TableHead>
+                  <TableHead className="px-4 py-3 text-xs font-semibold uppercase text-slate-500">Loại tài liệu</TableHead>
+                  <TableHead className="px-4 py-3 text-xs font-semibold uppercase text-slate-500">Mục đích</TableHead>
+                  <TableHead className="px-4 py-3 text-xs font-semibold uppercase text-slate-500">Người tạo</TableHead>
+                  <TableHead className="px-4 py-3 text-xs font-semibold uppercase text-slate-500 text-right">Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {config.documents.length > 0 ? config.documents.map(doc => (
-                  <TableRow key={doc.id}>
-                    <TableCell className="font-medium text-slate-800">
+                  <TableRow key={doc.id} className="hover:bg-slate-50/50 transition-colors">
+                    <TableCell className="px-4 py-3 font-medium text-slate-800">
                       <div className="flex items-center gap-3">
                         <FileIcon className="h-5 w-5 text-slate-400" />
-                        <span>{doc.name}</span>
+                        <span className="truncate">{doc.name}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-slate-600">{doc.purpose || 'Chưa có'}</TableCell>
-                    <TableCell className="text-slate-600">{doc.creator}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="px-4 py-3 text-slate-600">{doc.purpose || 'Chưa có'}</TableCell>
+                    <TableCell className="px-4 py-3 text-slate-600">{doc.creator}</TableCell>
+                    <TableCell className="px-4 py-3 text-right">
                       <Button variant="ghost" size="icon" className="text-slate-500 hover:text-slate-800"><Download className="h-4 w-4" /></Button>
                       <Button variant="ghost" size="icon" className="text-slate-500 hover:text-slate-800"><Edit className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" className="text-slate-500 hover:text-destructive" onClick={() => handleRemoveDocument(doc.id)}><Trash2 className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" className="text-slate-500 hover:text-destructive hover:bg-destructive/10" onClick={() => handleRemoveDocument(doc.id)}><Trash2 className="h-4 w-4" /></Button>
                     </TableCell>
                   </TableRow>
                 )) : (
@@ -278,7 +278,7 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig, i
       </Card>
 
       <div className="flex justify-end pt-4">
-        <Button onClick={onSave} disabled={isSaving} size="lg" className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
+        <Button onClick={onSave} disabled={isSaving} size="lg" className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold">
           {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Lưu thay đổi
         </Button>

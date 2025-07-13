@@ -28,7 +28,15 @@ const TrainingChatbot = () => {
             try {
               const parsedConfig = JSON.parse(prompt.prompt_text);
               if (typeof parsedConfig === 'object' && parsedConfig !== null && 'industry' in parsedConfig) {
-                config = { ...initialConfig, ...parsedConfig };
+                // Ensure all fields from initialConfig are present
+                config = { 
+                  ...initialConfig, 
+                  ...parsedConfig,
+                  products: parsedConfig.products || [],
+                  processSteps: parsedConfig.processSteps || [],
+                  conditions: parsedConfig.conditions || [],
+                  documents: parsedConfig.documents || [],
+                };
               }
             } catch (e) {
               console.error(`Failed to parse config for ${prompt.name}:`, e);
@@ -72,32 +80,32 @@ const TrainingChatbot = () => {
 
   if (isLoading) {
     return (
-      <main className="flex-1 space-y-6 p-6 sm:p-8 bg-slate-50">
+      <main className="flex-1 space-y-8 p-6 sm:p-8 bg-slate-50">
         <div className="space-y-2">
-          <Skeleton className="h-8 w-1/3" />
-          <Skeleton className="h-5 w-1/2" />
+          <Skeleton className="h-10 w-1/3 rounded-lg" />
+          <Skeleton className="h-5 w-1/2 rounded-lg" />
         </div>
         <div className="space-y-6">
-          <Skeleton className="h-10 w-full max-w-sm" />
-          <Skeleton className="h-96 w-full rounded-xl" />
-          <Skeleton className="h-64 w-full rounded-xl" />
+          <Skeleton className="h-12 w-full max-w-md rounded-xl" />
+          <Skeleton className="h-[400px] w-full rounded-2xl" />
+          <Skeleton className="h-[300px] w-full rounded-2xl" />
         </div>
       </main>
     );
   }
 
   return (
-    <main className="flex-1 space-y-6 p-6 sm:p-8 bg-slate-50">
+    <main className="flex-1 space-y-8 p-6 sm:p-8 bg-slate-50">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Training Chatbot</h1>
-        <p className="text-slate-500 mt-1">
-          Dạy cho AI cách trả lời và tương tác trong các tình huống cụ thể.
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900">Training Chatbot</h1>
+        <p className="text-muted-foreground mt-2 max-w-2xl">
+          Dạy cho AI cách trả lời và tương tác trong các tình huống cụ thể. Cung cấp càng nhiều thông tin chi tiết, AI sẽ càng hoạt động hiệu quả và phù hợp với doanh nghiệp của bạn.
         </p>
       </div>
       <Tabs defaultValue="auto_reply" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 max-w-sm bg-slate-100 p-1 rounded-xl h-11">
-          <TabsTrigger value="auto_reply" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-slate-900 text-slate-600 font-medium">Tự động trả lời</TabsTrigger>
-          <TabsTrigger value="care_script_suggestion" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-slate-900 text-slate-600 font-medium">Kịch bản chăm sóc</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 max-w-md bg-slate-200/75 p-1.5 rounded-xl h-12">
+          <TabsTrigger value="auto_reply" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-blue-600 text-slate-600 font-semibold text-base transition-all duration-300">Tự động trả lời</TabsTrigger>
+          <TabsTrigger value="care_script_suggestion" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-blue-600 text-slate-600 font-semibold text-base transition-all duration-300">Kịch bản chăm sóc</TabsTrigger>
         </TabsList>
         <TabsContent value="auto_reply">
           <TrainingForm
