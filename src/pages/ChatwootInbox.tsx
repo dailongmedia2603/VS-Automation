@@ -20,7 +20,7 @@ import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast
 // Interfaces
 interface Attachment { id: number; file_type: 'image' | 'video' | 'audio' | 'file'; data_url: string; }
 interface MessageSender { name: string; thumbnail?: string; }
-interface Conversation { id: number; meta: { sender: { id: number; name: string; email?: string; phone_number?: string; thumbnail?: string; additional_attributes?: { company_name?: string; }; }; }; messages: { content: string, message_type: number }[]; last_activity_at: number; unread_count: number; labels: string[]; status: string; additional_attributes?: { type?: string }; }
+interface Conversation { id: number; meta: { sender: { id: number; name: string; email?: string; phone_number?: string; thumbnail?: string; additional_attributes?: { company_name?: string; product_service?: string; }; }; }; messages: { content: string, message_type: number }[]; last_activity_at: number; unread_count: number; labels: string[]; status: string; additional_attributes?: { type?: string }; }
 interface Message { id: number; content: string; created_at: number; message_type: number; private: boolean; sender?: MessageSender; attachments?: Attachment[]; }
 interface ChatwootLabel { id: number; name: string; color: string; }
 interface CareScript { id: number; content: string; scheduled_at: string; status: 'scheduled' | 'sent' | 'failed'; image_url?: string; }
@@ -331,6 +331,13 @@ const ChatwootInbox = () => {
     }
   };
 
+  const handleConversationUpdate = (updatedConversation: Conversation) => {
+    setSelectedConversation(updatedConversation);
+    setConversations(convos => 
+        convos.map(c => c.id === updatedConversation.id ? updatedConversation : c)
+    );
+  };
+
   const groupMessagesByDate = (messages: Message[]) => {
     return messages.reduce((acc, message, index) => {
       const messageDate = new Date(message.created_at * 1000);
@@ -596,7 +603,14 @@ const ChatwootInbox = () => {
           </>
         ) : (<div className="flex-1 flex items-center justify-center text-center text-muted-foreground"><p>Vui lòng chọn một cuộc trò chuyện để xem tin nhắn.</p></div>)}
       </section>
-      <ChatwootContactPanel selectedConversation={selectedConversation} messages={messages} onNewNote={handleNewNote} scripts={scripts} fetchCareScripts={fetchCareScripts} />
+      <ChatwootContactPanel 
+        selectedConversation={selectedConversation} 
+        messages={messages} 
+        onNewNote={handleNewNote} 
+        scripts={scripts} 
+        fetchCareScripts={fetchCareScripts}
+        onConversationUpdate={handleConversationUpdate}
+      />
     </div>
   );
 };

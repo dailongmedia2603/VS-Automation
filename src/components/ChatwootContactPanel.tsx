@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Mail, Phone, Building, Send, Loader2, PlusCircle, Calendar, Clock, Trash2, Pencil, ImagePlus, Bot } from "lucide-react";
+import { FileText, Mail, Phone, Building, Send, Loader2, PlusCircle, Calendar, Clock, Trash2, Pencil, ImagePlus, Bot, ShoppingBag, Check } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useChatwoot } from '@/contexts/ChatwootContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,8 +17,24 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // Interfaces
+interface Conversation {
+  id: number;
+  meta: {
+    sender: {
+      id: number;
+      name: string;
+      email?: string;
+      phone_number?: string;
+      thumbnail?: string;
+      additional_attributes?: {
+        company_name?: string;
+        product_service?: string;
+      };
+    };
+  };
+  labels: string[];
+}
 interface Message { id: number; content: string; created_at: number; private: boolean; sender?: { name: string; thumbnail?: string; }; }
-interface Conversation { id: number; meta: { sender: { id: number; name: string; email?: string; phone_number?: string; thumbnail?: string; additional_attributes?: { company_name?: string; }; }; }; labels: string[]; }
 type CareScriptStatus = 'scheduled' | 'sent' | 'failed';
 interface CareScript { id: number; content: string; scheduled_at: string; status: CareScriptStatus; image_url?: string; }
 interface ChatwootContactPanelProps { 
@@ -27,6 +43,7 @@ interface ChatwootContactPanelProps {
   onNewNote: (newNote: Message) => void;
   scripts: CareScript[];
   fetchCareScripts: (conversationId: number) => Promise<void>;
+  onConversationUpdate: (updatedConversation: Conversation) => void;
 }
 
 const getInitials = (name?: string) => {
@@ -43,7 +60,7 @@ const statusBadgeColors: Record<CareScriptStatus, string> = {
   failed: 'bg-red-100 text-red-600 hover:bg-red-100' 
 };
 
-export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote, scripts, fetchCareScripts }: ChatwootContactPanelProps) => {
+export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote, scripts, fetchCareScripts, onConversationUpdate }: ChatwootContactPanelProps) => {
   const { settings } = useChatwoot();
   const [note, setNote] = useState('');
   const [isSendingNote, setIsSendingNote] = useState(false);
@@ -58,12 +75,66 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [scriptForImageUpload, setScriptForImageUpload] = useState<CareScript | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [isEditingProduct, setIsEditingProduct] = useState(false);
+  const [productValue, setProductValue] = useState('');
 
   useEffect(() => {
     if (notesContainerRef.current) {
       notesContainerRef.current.scrollTop = 0;
     }
   }, [messages, activeTab, selectedConversation]);
+
+  useEffect(() => {
+    if (selectedConversation) {
+      setProductValue(selectedConversation.meta.sender.additional_attributes?.product_service || '');
+      setIsEditingProduct(false);
+    }
+  }, [selectedConversation]);
+
+  const handleSaveProductService = async () => {
+    if (!selectedConversation || productValue === (selectedConversation.meta.sender.additional_attributes?.product_service || '')) {
+      setIsEditingProduct(false);
+      return;
+    }
+
+    const toastId = showLoading("Đang cập nhật SP/DV...");
+    try {
+      const contactId = selectedConversation.meta.sender.id;
+      const newAttributes = {
+        ...selectedConversation.meta.sender.additional_attributes,
+        product_service: productValue,
+      };
+
+      const { error } = await supabase.functions.invoke('chatwoot-proxy', {
+        body: {
+          action: 'update_contact',
+          settings,
+          contactId,
+          payload: { additional_attributes: newAttributes },
+        },
+      });
+
+      if (error) throw error;
+
+      const updatedConversation = {
+        ...selectedConversation,
+        meta: {
+          ...selectedConversation.meta,
+          sender: {
+            ...selectedConversation.meta.sender,
+            additional_attributes: newAttributes,
+          },
+        },
+      };
+      onConversationUpdate(updatedConversation as any);
+      dismissToast(toastId);
+      showSuccess("Đã cập nhật SP/DV.");
+      setIsEditingProduct(false);
+    } catch (err: any) {
+      dismissToast(toastId);
+      showError(`Cập nhật thất bại: ${err.message || 'Lỗi không xác định'}`);
+    }
+  };
 
   const handleSendNote = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -198,6 +269,41 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
               <h3 className="font-bold text-lg">{contact.name}</h3>
             </div>
             <div className="space-y-2 text-sm text-muted-foreground">
+              <div className="flex items-start">
+                <ShoppingBag className="h-4 w-4 mr-3 mt-1.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <span className="font-medium text-slate-500">SP/DV</span>
+                  {isEditingProduct ? (
+                    <div className="flex items-center gap-2 mt-1">
+                      <Input
+                        value={productValue}
+                        onChange={(e) => setProductValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveProductService();
+                          if (e.key === 'Escape') {
+                            setIsEditingProduct(false);
+                            setProductValue(selectedConversation?.meta.sender.additional_attributes?.product_service || '');
+                          }
+                        }}
+                        className="h-8"
+                        autoFocus
+                      />
+                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={handleSaveProductService}>
+                        <Check className="h-4 w-4 text-green-600" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between group min-h-[32px]">
+                      <p className="text-slate-800 cursor-pointer" onClick={() => setIsEditingProduct(true)}>
+                        {selectedConversation?.meta.sender.additional_attributes?.product_service || <span className="text-slate-400 italic">Chưa có</span>}
+                      </p>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100" onClick={() => setIsEditingProduct(true)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
               <div className="flex items-center"><Mail className="h-4 w-4 mr-3" /><span>{contact.email || 'Không có sẵn'}</span></div>
               <div className="flex items-center"><Phone className={cn("h-4 w-4 mr-3", contact.phone_number && "text-green-500")} /><span className={cn(contact.phone_number && "text-green-600 font-medium")}>{contact.phone_number || 'Không có sẵn'}</span></div>
               <div className="flex items-center"><Building className="h-4 w-4 mr-3" /><span>{contact.additional_attributes?.company_name || 'Không có sẵn'}</span></div>
