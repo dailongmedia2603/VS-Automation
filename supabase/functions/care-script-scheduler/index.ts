@@ -18,27 +18,20 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // 1. Get Chatwoot settings FIRST
+    // 1. Get Chatwoot settings
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from('chatwoot_settings')
       .select('chatwoot_url, account_id, api_token')
       .eq('id', 1)
       .single()
 
-    // If settings are missing or incomplete, exit gracefully.
     if (settingsError || !settings || !settings.chatwoot_url || !settings.account_id || !settings.api_token) {
-      console.warn("Chatwoot settings are incomplete. Skipping care script scheduler run.");
+      console.warn("Chatwoot settings are incomplete. Skipping run.");
       return new Response(JSON.stringify({ message: "Chatwoot settings incomplete, skipping run." }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
       });
     }
-    
-    const chatwootSettings = {
-        chatwootUrl: settings.chatwoot_url,
-        accountId: settings.account_id,
-        apiToken: settings.api_token,
-    };
 
     // 2. Find all scheduled scripts that are due
     const { data: scripts, error: scriptsError } = await supabaseAdmin
@@ -50,7 +43,6 @@ serve(async (req) => {
     if (scriptsError) throw scriptsError;
 
     if (!scripts || scripts.length === 0) {
-      console.log("No scheduled scripts to send.");
       return new Response(JSON.stringify({ message: "No scheduled scripts to send." }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
@@ -62,18 +54,28 @@ serve(async (req) => {
     // 3. Process each script
     for (const script of scripts) {
       try {
-        const { error: invokeError } = await supabaseAdmin.functions.invoke('chatwoot-proxy', {
-          body: {
-            action: 'send_message',
-            settings: chatwootSettings,
-            conversationId: script.conversation_id,
-            content: script.content,
-            isPrivate: false,
+        const endpoint = `/api/v1/accounts/${settings.account_id}/conversations/${script.conversation_id}/messages`;
+        const upstreamUrl = `${settings.chatwoot_url.replace(/\/$/, '')}${endpoint}`;
+
+        const response = await fetch(upstreamUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'api_access_token': settings.api_token,
           },
-        })
+          body: JSON.stringify({
+            content: script.content,
+            message_type: 'outgoing',
+            private: false,
+          }),
+        });
 
-        if (invokeError) throw invokeError;
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Chatwoot API Error: ${response.status} ${errorText}`);
+        }
 
+        // If successful, update script status to 'sent'
         await supabaseAdmin
           .from('care_scripts')
           .update({ status: 'sent' })
@@ -83,6 +85,7 @@ serve(async (req) => {
 
       } catch (e) {
         console.error(`Failed to process script ${script.id}:`, e.message);
+        // If failed, update script status to 'failed'
         await supabaseAdmin
           .from('care_scripts')
           .update({ status: 'failed' })
