@@ -294,16 +294,18 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig, i
       </div>
 
       <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-bold">Xem trước cấu hình huấn luyện</DialogTitle>
-            <DialogDescription className="pt-1">
+        <DialogContent className="sm:max-w-2xl p-6 rounded-xl">
+          <DialogHeader className="text-left">
+            <DialogTitle className="text-xl font-bold text-slate-900">Xem trước cấu hình huấn luyện</DialogTitle>
+            <DialogDescription className="text-slate-500 pt-1">
               Đây là tổng quan dữ liệu bạn đã cấu hình. Dữ liệu này sẽ được sử dụng để huấn luyện AI.
             </DialogDescription>
           </DialogHeader>
-          <TrainingPreview config={config} />
+          <div className="py-4">
+            <TrainingPreview config={config} />
+          </div>
           <DialogFooter>
-            <Button onClick={() => setIsPreviewOpen(false)} className="rounded-lg">Đóng</Button>
+            <Button onClick={() => setIsPreviewOpen(false)} className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-5">Đóng</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
