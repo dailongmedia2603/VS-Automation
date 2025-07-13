@@ -100,26 +100,45 @@ const ChatwootInbox = () => {
     };
     fetchLabels();
 
-    const channel = supabase
-      .channel('chatwoot-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
-        fetchInitialData();
-        const currentConvo = selectedConversationRef.current;
-        if (currentConvo && payload.table === 'chatwoot_messages' && (payload.new as any).conversation_id === currentConvo.id) {
-          handleSelectConversation(currentConvo, true);
-        }
-      })
+    const conversationsChannel = supabase
+      .channel('public-conversations')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chatwoot_conversations' }, fetchInitialData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chatwoot_contacts' }, fetchInitialData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chatwoot_conversation_labels' }, fetchInitialData)
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(conversationsChannel);
+    };
   }, []);
 
   useEffect(() => {
-    if (selectedConversation) {
-      fetchCareScripts(selectedConversation.id);
-    } else {
+    if (!selectedConversation) {
       setScripts([]);
+      return;
     }
+
+    fetchCareScripts(selectedConversation.id);
+
+    const messagesChannel = supabase
+      .channel(`public-messages-convo-${selectedConversation.id}`)
+      .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'chatwoot_messages',
+          filter: `conversation_id=eq.${selectedConversation.id}`,
+        },
+        () => {
+          if (selectedConversationRef.current) {
+            handleSelectConversation(selectedConversationRef.current, true);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(messagesChannel);
+    };
   }, [selectedConversation]);
 
   const handleSelectConversation = async (conversation: Conversation, forceRefetch = false) => {
