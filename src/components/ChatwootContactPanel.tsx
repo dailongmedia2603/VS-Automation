@@ -176,16 +176,8 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
             </div>
           </form>
         </TabsContent>
-        <TabsContent value="care" className="flex-1 flex flex-col bg-gray-50 overflow-y-auto p-4 space-y-4">
-          <Button className="w-full flex-shrink-0 rounded-lg bg-blue-600 hover:bg-blue-700" onClick={openCreateDialog}>
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Tạo kịch bản thủ công
-          </Button>
-          <p className="text-xs text-muted-foreground text-center px-2 flex-shrink-0">
-            Để AI tự động chăm sóc, thêm nhãn "AI chăm" vào cuộc trò chuyện.
-          </p>
-          
-          <div className="flex-1">
+        <TabsContent value="care" className="flex-1 flex flex-col bg-gray-50 overflow-hidden">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {scripts.length > 0 ? (
               <div className="space-y-3">
                 {scripts.map(script => (
