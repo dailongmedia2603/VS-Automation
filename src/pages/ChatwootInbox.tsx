@@ -37,6 +37,9 @@ const getInitials = (name?: string) => {
   return name.substring(0, 2).toUpperCase();
 };
 
+const AI_STAR_LABEL_NAME = 'AI Star';
+const AI_CARE_LABEL = 'AI chăm';
+
 const ChatwootInbox = () => {
   const { settings } = useChatwoot();
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -56,11 +59,12 @@ const ChatwootInbox = () => {
     selectedLabels: [],
     seenNotReplied: false,
   });
+  const [isAutoReplyEnabled, setIsAutoReplyEnabled] = useState(false);
+  const [aiStarLabelId, setAiStarLabelId] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const POLLING_INTERVAL = 15000;
   const phoneRegex = /(0[3|5|7|8|9][0-9]{8})\b/;
-  const AI_CARE_LABEL = 'AI chăm';
 
   const handleClearFilters = () => {
     setFilters({
@@ -126,15 +130,41 @@ const ChatwootInbox = () => {
       const { data: chatwootData, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', { body: { action: 'list_conversations', settings }, });
       if (functionError) throw new Error((await functionError.context.json()).error || functionError.message);
       if (chatwootData.error) throw new Error(chatwootData.error);
-      const conversationsFromServer = chatwootData.data.payload || [];
+      let conversationsFromServer = chatwootData.data.payload || [];
       if (conversationsFromServer.length === 0) {
           setConversations([]);
           return;
       }
-      const contactIds = conversationsFromServer.map(c => c.meta.sender.id);
+
+      // Tự động gắn thẻ 'AI Star'
+      if (isAutoReplyEnabled && aiStarLabelId) {
+        const conversationsToTag = conversationsFromServer.filter(
+          (convo: Conversation) => !convo.labels.includes(AI_STAR_LABEL_NAME)
+        );
+
+        if (conversationsToTag.length > 0) {
+          await Promise.all(
+            conversationsToTag.map(async (convo: Conversation) => {
+              const newLabels = [...convo.labels, AI_STAR_LABEL_NAME];
+              await supabase.functions.invoke('chatwoot-proxy', {
+                body: { action: 'update_labels', settings, conversationId: convo.id, labels: newLabels },
+              });
+              await supabase.from('chatwoot_conversation_labels').upsert({ conversation_id: convo.id, label_id: aiStarLabelId });
+            })
+          );
+          // Cập nhật lại danh sách hội thoại để hiển thị thẻ mới ngay lập tức
+          conversationsFromServer = conversationsFromServer.map((convo: Conversation) =>
+            conversationsToTag.some((taggedConvo: Conversation) => taggedConvo.id === convo.id)
+              ? { ...convo, labels: [...convo.labels, AI_STAR_LABEL_NAME] }
+              : convo
+          );
+        }
+      }
+
+      const contactIds = conversationsFromServer.map((c: Conversation) => c.meta.sender.id);
       const { data: contactsFromDB } = await supabase.from('chatwoot_contacts').select('id, phone_number').in('id', contactIds);
       const phoneMap = new Map(contactsFromDB?.map(c => [c.id, c.phone_number]));
-      const enrichedConversations = conversationsFromServer.map(convo => {
+      const enrichedConversations = conversationsFromServer.map((convo: Conversation) => {
           const storedPhoneNumber = phoneMap.get(convo.meta.sender.id);
           if (storedPhoneNumber && !convo.meta.sender.phone_number) {
               return { ...convo, meta: { ...convo.meta, sender: { ...convo.meta.sender, phone_number: storedPhoneNumber } } };
@@ -159,17 +189,29 @@ const ChatwootInbox = () => {
   };
 
   useEffect(() => {
-    const fetchLabels = async () => {
-      const { data, error } = await supabase.from('chatwoot_labels').select('*').order('name', { ascending: true });
-      if (!error && data) {
-        setSuggestedLabels(data);
+    const fetchInitialSettings = async () => {
+      // Fetch labels
+      const { data: labelsData, error: labelsError } = await supabase.from('chatwoot_labels').select('*').order('name', { ascending: true });
+      if (!labelsError && labelsData) {
+        setSuggestedLabels(labelsData);
+        const starLabel = labelsData.find(l => l.name === AI_STAR_LABEL_NAME);
+        if (starLabel) {
+          setAiStarLabelId(starLabel.id);
+        }
+      }
+
+      // Fetch auto-reply setting
+      const { data: autoReplyData, error: autoReplyError } = await supabase.from('auto_reply_settings').select('config').eq('id', 1).single();
+      if (!autoReplyError && autoReplyData?.config && typeof autoReplyData.config === 'object') {
+        setIsAutoReplyEnabled((autoReplyData.config as { enabled?: boolean }).enabled || false);
       }
     };
-    fetchLabels();
+
+    fetchInitialSettings();
     fetchConversations(true);
     const intervalId = setInterval(() => fetchConversations(false), POLLING_INTERVAL);
     return () => clearInterval(intervalId);
-  }, [settings.apiToken, settings.accountId]);
+  }, [settings.apiToken, settings.accountId, isAutoReplyEnabled, aiStarLabelId]);
 
   useEffect(() => {
     if (selectedConversation) {
