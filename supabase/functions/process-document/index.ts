@@ -1,13 +1,8 @@
 // @ts-nocheck
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-// Import from pdfjs-dist using jsdelivr CDN
-import * as pdfjs from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.170/build/pdf.min.mjs';
-
-// Set worker source
-pdfjs.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.170/build/pdf.worker.min.mjs`;
-
-const { getDocument } = pdfjs;
+// Import a Deno-native PDF parsing library
+import pdf from "https://deno.land/x/pdf_parser@v1.1.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -58,15 +53,9 @@ serve(async (req) => {
     // Chuyển đổi Blob thành ArrayBuffer
     const arrayBuffer = await fileData.arrayBuffer();
 
-    // Bước 2: Phân tích PDF bằng PDF.js
-    const pdf = await getDocument(arrayBuffer).promise;
-    let fullText = '';
-    for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        const pageText = textContent.items.map(item => item.str).join(' ');
-        fullText += pageText + '\n';
-    }
+    // Bước 2: Phân tích PDF bằng pdf_parser
+    const pdfData = await pdf(arrayBuffer);
+    const fullText = pdfData.text;
     
     const fileName = path.split('/').pop();
 
