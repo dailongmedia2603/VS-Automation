@@ -16,7 +16,18 @@ const formatMessage = (msg) => {
     return `[${timestamp}] ${sender}: ${content}`;
 }
 
-const buildSystemPrompt = (config, history) => {
+const buildSystemPrompt = (config, history, context) => {
+    let contextSection = '';
+    if (context && context.length > 0) {
+        contextSection = `
+Dưới đây là một số thông tin liên quan từ tài liệu nội bộ có thể giúp bạn trả lời:
+---
+${context.map(c => c.content).join('\n---\n')}
+---
+Hãy ưu tiên sử dụng thông tin này để trả lời câu hỏi của khách hàng.
+`;
+    }
+
     let prompt = `Bạn là một trợ lý AI tên là ${config.role || 'Trợ lý ảo'}. 
 Lĩnh vực kinh doanh của bạn là ${config.industry || 'đa dạng'}.
 Phong cách của bạn là ${config.style || 'thân thiện và chuyên nghiệp'}.
@@ -24,7 +35,7 @@ Tông giọng của bạn là ${config.tone || 'nhiệt tình'}.
 Bạn sẽ trả lời bằng ${config.language || 'Tiếng Việt'}.
 Bạn bắt buộc phải xưng hô là "${config.pronouns || 'Shop'}" và gọi khách hàng là "${config.customerPronouns || 'bạn'}". Đây là điều kiện không được vi phạm.
 Mục tiêu của cuộc trò chuyện là ${config.goal || 'giải đáp thắc mắc và hỗ trợ khách hàng'}.
-
+${contextSection}
 Sản phẩm/dịch vụ của bạn bao gồm:
 ${config.products && config.products.length > 0 ? config.products.map(p => `- ${p.value}`).join('\n') : 'Không có thông tin.'}
 
@@ -108,8 +119,19 @@ serve(async (req) => {
       throw new Error(`Không tìm thấy tin nhắn cho cuộc trò chuyện #${conversationId}`);
     }
     const conversationHistory = messages.map(formatMessage).join('\n');
+    const lastUserMessage = messages.filter(m => m.message_type === 0).pop()?.content || '';
 
-    const systemPrompt = buildSystemPrompt(trainingConfig, conversationHistory);
+    // Tìm kiếm tài liệu liên quan
+    let context = null;
+    if (lastUserMessage) {
+        const { data: searchResults, error: searchError } = await supabaseAdmin.functions.invoke('search-documents', {
+            body: { query: lastUserMessage }
+        });
+        if (searchError) console.error("Lỗi tìm kiếm tài liệu:", searchError.message);
+        else context = searchResults;
+    }
+
+    const systemPrompt = buildSystemPrompt(trainingConfig, conversationHistory, context);
     const { data: proxyResponse, error: proxyError } = await supabaseAdmin.functions.invoke('multi-ai-proxy', {
       body: { messages: [{ role: 'system', content: systemPrompt }], apiUrl: aiSettings.api_url, apiKey: aiSettings.api_key, model: 'gpt-4o' }
     });
@@ -123,7 +145,6 @@ serve(async (req) => {
     });
     if (sendMessageError) throw new Error(`Lỗi gửi tin nhắn qua Chatwoot: ${(await sendMessageError.context.json()).error || sendMessageError.message}`);
 
-    // Mark as read and remove AI Star tag
     const { data: convoDetails } = await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'get_conversation_details', settings: chatwootSettings, conversationId: conversationId } });
     const currentLabels = convoDetails?.labels || [];
     const newLabels = currentLabels.filter((label: string) => label !== AI_STAR_LABEL_NAME);
