@@ -223,10 +223,14 @@ const ChatwootInbox = () => {
   }, []);
 
   useEffect(() => {
+    if (!settings.apiToken || !settings.accountId) {
+      setLoadingConversations(false);
+      return;
+    }
     fetchConversations(true);
     const intervalId = setInterval(() => fetchConversations(false), POLLING_INTERVAL);
     return () => clearInterval(intervalId);
-  }, [fetchConversations]);
+  }, [settings.apiToken, settings.accountId, fetchConversations]);
 
   useEffect(() => {
     if (!selectedConversation) {
