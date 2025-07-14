@@ -139,7 +139,7 @@ const ChatwootInbox = () => {
       // Tự động gắn thẻ 'AI Star'
       if (isAutoReplyEnabled && aiStarLabelId) {
         const conversationsToTag = conversationsFromServer.filter(
-          (convo: Conversation) => !convo.labels.includes(AI_STAR_LABEL_NAME)
+          (convo: Conversation) => !convo.labels.includes(AI_STAR_LABEL_NAME) && convo.unread_count > 0
         );
 
         if (conversationsToTag.length > 0) {
