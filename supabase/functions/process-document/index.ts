@@ -1,18 +1,28 @@
 // @ts-nocheck
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { RecursiveCharacterTextSplitter } from 'https://esm.sh/langchain/text_splitter'
-import * as pdfjs from 'https://esm.sh/pdfjs-dist@4.4.170/build/pdf.mjs'
+import pdf from 'https://esm.sh/pdf-parse@1.1.1'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Set up the worker source for pdf.js
-// This is crucial for it to work in a non-browser environment like Deno
-// @ts-ignore
-pdfjs.GlobalWorkerOptions.workerSrc = `https://esm.sh/pdfjs-dist@4.4.170/build/pdf.worker.mjs`
+// Hàm chia nhỏ văn bản đơn giản để thay thế cho langchain
+function splitText(text: string, { chunkSize, chunkOverlap }: { chunkSize: number; chunkOverlap: number }): string[] {
+    if (chunkOverlap >= chunkSize) {
+        throw new Error("chunkOverlap phải nhỏ hơn chunkSize.");
+    }
+
+    const chunks: string[] = [];
+    let i = 0;
+    while (i < text.length) {
+        const end = i + chunkSize;
+        chunks.push(text.slice(i, end));
+        i += chunkSize - chunkOverlap;
+    }
+    return chunks;
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -30,7 +40,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Download the file from storage
+    // Tải tệp từ storage
     const { data: fileData, error: downloadError } = await supabaseAdmin.storage
       .from(bucket)
       .download(path);
@@ -39,21 +49,17 @@ serve(async (req) => {
       throw new Error(`Lỗi tải file từ storage: ${downloadError.message}`);
     }
 
-    // Convert Blob to ArrayBuffer and use pdfjs-dist
+    // Chuyển đổi Blob thành Buffer để pdf-parse xử lý
     const arrayBuffer = await fileData.arrayBuffer();
-    const uint8array = new Uint8Array(arrayBuffer);
-    const pdf = await pdfjs.getDocument(uint8array).promise;
-    let fullText = '';
-    for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        const pageText = textContent.items.map(item => item.str).join(' ');
-        fullText += pageText + '\n';
-    }
+    const buffer = Buffer.from(arrayBuffer); // esm.sh sẽ tự động polyfill Buffer
+
+    // Phân tích PDF bằng pdf-parse
+    const pdfParsed = await pdf(buffer);
+    const fullText = pdfParsed.text;
     
     const fileName = path.split('/').pop();
 
-    // Get AI API settings
+    // Lấy cài đặt API AI
     const { data: aiSettings, error: settingsError } = await supabaseAdmin
       .from('ai_settings')
       .select('api_key, api_url')
@@ -67,14 +73,13 @@ serve(async (req) => {
     const openAIApiKey = aiSettings.api_key;
     const embeddingUrl = `${aiSettings.api_url.replace(/\/v1\/?$/, '')}/v1/embeddings`;
 
-    // Split the text into chunks
-    const splitter = new RecursiveCharacterTextSplitter({
+    // Chia văn bản thành các đoạn nhỏ
+    const chunks = splitText(fullText, {
       chunkSize: 500,
       chunkOverlap: 50,
     });
-    const chunks = await splitter.splitText(fullText);
 
-    // Create embeddings for the chunks
+    // Tạo embedding cho các đoạn văn bản
     const embeddingResponse = await fetch(embeddingUrl, {
         method: 'POST',
         headers: {
@@ -100,7 +105,7 @@ serve(async (req) => {
       metadata: { file_name: fileName },
     }));
 
-    // Insert into the database
+    // Chèn vào cơ sở dữ liệu
     const { error: insertError } = await supabaseAdmin.from('documents').insert(documentsToInsert);
     if (insertError) {
       throw new Error(`Lỗi lưu vào cơ sở dữ liệu: ${insertError.message}`);
