@@ -2,7 +2,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { RecursiveCharacterTextSplitter } from 'https://esm.sh/langchain/text_splitter'
-import * as pdfjs from 'https://esm.sh/pdfjs-dist@4.4.170'
+import { PDFLoader } from "https://esm.sh/langchain/document_loaders/web/pdf"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,18 +34,10 @@ serve(async (req) => {
       throw new Error(`Lỗi tải file từ storage: ${downloadError.message}`);
     }
 
-    // Convert Blob to ArrayBuffer and use pdfjs-dist
-    const arrayBuffer = await fileData.arrayBuffer();
-    const uint8array = new Uint8Array(arrayBuffer);
-    const pdf = await pdfjs.getDocument(uint8array).promise;
-    let fullText = '';
-    for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        const pageText = textContent.items.map(item => item.str).join(' ');
-        fullText += pageText + '\n';
-    }
-    
+    // Use PDFLoader to load the document from the downloaded blob
+    const loader = new PDFLoader(fileData);
+    const docs = await loader.load();
+    const text = docs.map(doc => doc.pageContent).join('\n');
     const fileName = path.split('/').pop();
 
     // Get AI API settings
@@ -67,7 +59,7 @@ serve(async (req) => {
       chunkSize: 500,
       chunkOverlap: 50,
     });
-    const chunks = await splitter.splitText(fullText);
+    const chunks = await splitter.splitText(text);
 
     // Create embeddings for the chunks
     const embeddingResponse = await fetch(embeddingUrl, {
