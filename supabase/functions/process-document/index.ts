@@ -2,6 +2,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import pdf from 'https://esm.sh/pdf-parse@1.1.1'
+import { Buffer } from "https://deno.land/std@0.168.0/node/buffer.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -40,7 +41,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Tải tệp từ storage
+    // Bước 1: Tải tệp từ storage
     const { data: fileData, error: downloadError } = await supabaseAdmin.storage
       .from(bucket)
       .download(path);
@@ -49,11 +50,12 @@ serve(async (req) => {
       throw new Error(`Lỗi tải file từ storage: ${downloadError.message}`);
     }
 
-    // Chuyển đổi Blob thành Buffer để pdf-parse xử lý
+    // Chuyển đổi Blob thành ArrayBuffer
     const arrayBuffer = await fileData.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer); // esm.sh sẽ tự động polyfill Buffer
+    // Bước 2: Tạo một đối tượng Buffer từ ArrayBuffer
+    const buffer = Buffer.from(arrayBuffer);
 
-    // Phân tích PDF bằng pdf-parse
+    // Bước 3: Phân tích PDF bằng pdf-parse, truyền trực tiếp buffer vào
     const pdfParsed = await pdf(buffer);
     const fullText = pdfParsed.text;
     
