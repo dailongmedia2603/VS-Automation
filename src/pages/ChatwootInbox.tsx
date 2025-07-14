@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useChatwoot } from '@/contexts/ChatwootContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -123,7 +123,7 @@ const ChatwootInbox = () => {
     }
   };
 
-  const fetchConversations = async (isInitialLoad = false) => {
+  const fetchConversations = useCallback(async (isInitialLoad = false) => {
     if (!settings.accountId || !settings.apiToken) {
       if (isInitialLoad) setLoadingConversations(false);
       return;
@@ -136,6 +136,7 @@ const ChatwootInbox = () => {
       let conversationsFromServer = chatwootData.data.payload || [];
       if (conversationsFromServer.length === 0) {
           setConversations([]);
+          if (isInitialLoad) setLoadingConversations(false);
           return;
       }
 
@@ -151,7 +152,6 @@ const ChatwootInbox = () => {
               await supabase.functions.invoke('chatwoot-proxy', {
                 body: { action: 'update_labels', settings, conversationId: convo.id, labels: newLabels },
               });
-              // FIX: Ensure data is synced to local DB for the Edge Function to see
               await supabase.from('chatwoot_conversation_labels').upsert({ conversation_id: convo.id, label_id: aiStarLabelId });
             })
           );
@@ -177,7 +177,7 @@ const ChatwootInbox = () => {
       await syncConversationsToDB(enrichedConversations);
     } catch (err) { console.error("Lỗi polling cuộc trò chuyện:", err);
     } finally { if (isInitialLoad) setLoadingConversations(false); }
-  };
+  }, [settings, isAutoReplyEnabled, aiStarLabelId]);
 
   const fetchMessages = async (convoId: number) => {
     try {
@@ -206,9 +206,7 @@ const ChatwootInbox = () => {
     };
 
     fetchInitialSettings();
-    fetchConversations(true);
-    const intervalId = setInterval(() => fetchConversations(false), POLLING_INTERVAL);
-    
+
     const typingChannel = supabase.channel('ai-typing-status-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_typing_status' },
         (payload) => {
@@ -218,17 +216,22 @@ const ChatwootInbox = () => {
       ).subscribe();
 
     return () => {
-      clearInterval(intervalId);
       supabase.removeChannel(typingChannel);
     };
-  }, [settings.apiToken, settings.accountId, isAutoReplyEnabled, aiStarLabelId]);
+  }, []);
+
+  useEffect(() => {
+    fetchConversations(true);
+    const intervalId = setInterval(() => fetchConversations(false), POLLING_INTERVAL);
+    return () => clearInterval(intervalId);
+  }, [fetchConversations]);
 
   useEffect(() => {
     if (!selectedConversation) {
       return;
     }
 
-    setHasNewLog(false); // Reset on conversation change
+    setHasNewLog(false);
 
     const logChannel = supabase
       .channel(`ai-logs-for-${selectedConversation.id}`)
