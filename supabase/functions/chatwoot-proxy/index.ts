@@ -19,15 +19,20 @@ serve(async (req) => {
     // Handle multipart/form-data for file uploads
     if (contentType.includes('multipart/form-data')) {
         const formData = await req.formData();
-        const settings = JSON.parse(formData.get('settings') as string);
+        const settingsData = JSON.parse(formData.get('settings') as string);
         const conversationId = formData.get('conversationId') as string;
 
-        if (!settings || !settings.chatwootUrl || !settings.accountId || !settings.apiToken) {
+        const settings = {
+            chatwootUrl: settingsData.chatwootUrl || settingsData.chatwoot_url,
+            accountId: settingsData.accountId || settingsData.account_id,
+            apiToken: settingsData.apiToken || settingsData.api_token,
+        };
+
+        if (!settings.chatwootUrl || !settings.accountId || !settings.apiToken) {
             throw new Error("Thông tin cấu hình Chatwoot không đầy đủ.");
         }
         if (!conversationId) throw new Error("Conversation ID is required for sending a message.");
 
-        // Remove proxy-specific fields from FormData before forwarding
         formData.delete('settings');
         formData.delete('conversationId');
 
@@ -43,9 +48,15 @@ serve(async (req) => {
     // Handle JSON requests for other actions
     else {
         const requestBody = await req.json();
-        const { action, settings, conversationId, content, isPrivate, labels, contactId, payload } = requestBody;
+        const { action, settings: settingsData, conversationId, content, isPrivate, labels, contactId, payload } = requestBody;
 
-        if (!settings || !settings.chatwootUrl || !settings.accountId || !settings.apiToken) {
+        const settings = {
+            chatwootUrl: settingsData.chatwootUrl || settingsData.chatwoot_url,
+            accountId: settingsData.accountId || settingsData.account_id,
+            apiToken: settingsData.apiToken || settingsData.api_token,
+        };
+
+        if (!settings.chatwootUrl || !settings.accountId || !settings.apiToken) {
             throw new Error("Thông tin cấu hình Chatwoot không đầy đủ.");
         }
 
