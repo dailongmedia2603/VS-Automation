@@ -1,8 +1,8 @@
 // @ts-nocheck
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-// Using a Deno-native PDF parsing library for better compatibility
-import { readPdf } from "https://deno.land/x/deno_pdf_parser@0.0.2/mod.ts";
+// Import a Deno-native PDF parsing library
+import pdf from "https://deno.land/x/pdf_parser@v1.1.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -50,12 +50,12 @@ serve(async (req) => {
       throw new Error(`Lỗi tải file từ storage: ${downloadError.message}`);
     }
 
+    // Chuyển đổi Blob thành ArrayBuffer
     const arrayBuffer = await fileData.arrayBuffer();
-    const uint8array = new Uint8Array(arrayBuffer);
 
-    // Bước 2: Phân tích PDF bằng deno-pdf-parser
-    const pdf = await readPdf(uint8array);
-    const fullText = await pdf.getText();
+    // Bước 2: Phân tích PDF bằng pdf_parser
+    const pdfData = await pdf(arrayBuffer);
+    const fullText = pdfData.text;
     
     const fileName = path.split('/').pop();
 

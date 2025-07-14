@@ -5,25 +5,17 @@ import {
   Settings,
   MessageSquare,
   GraduationCap,
+  ArrowRight,
   LayoutDashboard,
   ChevronLeft,
-  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import React, { useState, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "./ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 interface NavItem {
   name: string;
@@ -62,7 +54,6 @@ interface StaffProfile {
 
 export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps) {
   const location = useLocation();
-  const navigate = useNavigate();
   const [profile, setProfile] = useState<StaffProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
 
@@ -101,21 +92,14 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
   
     fetchProfile();
   
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-        if (_event === 'SIGNED_OUT') {
-            navigate('/login');
-        }
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, _session) => {
         fetchProfile();
     });
   
     return () => {
       authListener?.subscription.unsubscribe();
     };
-  }, [navigate]);
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-  };
+  }, []);
 
   const getInitials = (name?: string | null) => {
     if (!name) return '...';
@@ -194,28 +178,19 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
                 </div>
             </div>
         ) : profile ? (
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <div className="flex items-center space-x-3 overflow-hidden cursor-pointer w-full p-2 rounded-lg hover:bg-slate-100">
-                        <Avatar className="h-10 w-10 flex-shrink-0">
-                            <AvatarImage src={profile.avatar_url || undefined} />
-                            <AvatarFallback>{getInitials(profile.name)}</AvatarFallback>
-                        </Avatar>
-                        <div className="overflow-hidden">
-                            <p className="font-semibold text-sm truncate" title={profile.name}>{profile.name}</p>
-                            <p className="text-xs text-gray-500 truncate" title={profile.role || 'Thành viên'}>{profile.role || 'Thành viên'}</p>
-                        </div>
+            <>
+                <div className="flex items-center space-x-3 overflow-hidden">
+                    <Avatar className="h-10 w-10 flex-shrink-0">
+                        <AvatarImage src={profile.avatar_url || undefined} />
+                        <AvatarFallback>{getInitials(profile.name)}</AvatarFallback>
+                    </Avatar>
+                    <div className="overflow-hidden">
+                        <p className="font-semibold text-sm truncate" title={profile.name}>{profile.name}</p>
+                        <p className="text-xs text-gray-500 truncate" title={profile.role || 'Thành viên'}>{profile.role || 'Thành viên'}</p>
                     </div>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuLabel>Tài khoản của tôi</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
-                        <LogOut className="mr-2 h-4 w-4" />
-                        <span>Đăng xuất</span>
-                    </DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
+                </div>
+                <ArrowRight className="h-5 w-5 text-gray-400 cursor-pointer hover:text-gray-600 flex-shrink-0" />
+            </>
         ) : (
             <div className="flex items-center space-x-3">
                 <Avatar className="h-10 w-10">
