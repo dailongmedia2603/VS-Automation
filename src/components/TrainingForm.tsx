@@ -28,6 +28,7 @@ export type TrainingConfig = {
   language: string;
   tone: string;
   pronouns: string;
+  customerPronouns: string;
   goal: string;
   processSteps: TrainingItem[];
   conditions: TrainingItem[];
@@ -42,6 +43,7 @@ export const initialConfig: TrainingConfig = {
   language: 'Tiếng Việt',
   tone: '',
   pronouns: '',
+  customerPronouns: '',
   goal: '',
   processSteps: [],
   conditions: [],
@@ -259,8 +261,12 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig, i
                   <Input id="language" value={config.language} onChange={(e) => handleFieldChange('language', e.target.value)} className="bg-slate-100/70 border-slate-200" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="pronouns" className="text-sm font-medium text-slate-800">Xưng hô (Page vs KH)</Label>
-                  <Input id="pronouns" placeholder="VD: Shop - bạn" value={config.pronouns} onChange={(e) => handleFieldChange('pronouns', e.target.value)} className="bg-slate-100/70 border-slate-200" />
+                  <Label htmlFor="pronouns" className="text-sm font-medium text-slate-800">Page xưng hô là:</Label>
+                  <Input id="pronouns" placeholder="VD: Shop, mình" value={config.pronouns} onChange={(e) => handleFieldChange('pronouns', e.target.value)} className="bg-slate-100/70 border-slate-200" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="customerPronouns" className="text-sm font-medium text-slate-800">KH xưng hô là:</Label>
+                  <Input id="customerPronouns" placeholder="VD: bạn, anh, chị" value={config.customerPronouns} onChange={(e) => handleFieldChange('customerPronouns', e.target.value)} className="bg-slate-100/70 border-slate-200" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="goal" className="text-sm font-medium text-slate-800">Mục tiêu trò chuyện</Label>

@@ -22,7 +22,7 @@ Lĩnh vực kinh doanh của bạn là ${config.industry || 'đa dạng'}.
 Phong cách của bạn là ${config.style || 'thân thiện và chuyên nghiệp'}.
 Tông giọng của bạn là ${config.tone || 'nhiệt tình'}.
 Bạn sẽ trả lời bằng ${config.language || 'Tiếng Việt'}.
-Cách xưng hô của bạn là "${config.pronouns || 'Shop và bạn'}".
+Bạn bắt buộc phải xưng hô là "${config.pronouns || 'Shop'}" và gọi khách hàng là "${config.customerPronouns || 'bạn'}". Đây là điều kiện không được vi phạm.
 Mục tiêu của cuộc trò chuyện là ${config.goal || 'giải đáp thắc mắc và hỗ trợ khách hàng'}.
 
 Sản phẩm/dịch vụ của bạn bao gồm:
@@ -114,7 +114,7 @@ serve(async (req) => {
       body: { messages: [{ role: 'system', content: systemPrompt }], apiUrl: aiSettings.api_url, apiKey: aiSettings.api_key, model: 'gpt-4o' }
     });
     if (proxyError) throw new Error(`Lỗi gọi AI Proxy: ${(await proxyError.context.json()).error || proxyError.message}`);
-    if (proxyResponse.error) throw new Error(proxyResponse.error);
+    if (proxyResponse.error) throw new Error(`Lỗi từ AI Proxy: ${proxyResponse.error}`);
 
     const aiReply = proxyResponse.choices[0].message.content;
 
