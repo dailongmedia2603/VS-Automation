@@ -57,52 +57,64 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: "Missing conversationId" }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 
+  // Fetch Chatwoot settings early for error reporting
+  const { data: chatwootSettings } = await supabaseAdmin.from('chatwoot_settings').select('*').eq('id', 1).single();
+
+  const sendErrorNote = async (errorMessage) => {
+    if (!chatwootSettings) return;
+    try {
+      await supabaseAdmin.functions.invoke('chatwoot-proxy', {
+        body: {
+          action: 'send_message',
+          settings: chatwootSettings,
+          conversationId: conversationId,
+          content: `**Lỗi AI trả lời tự động:**\n\n${errorMessage}`,
+          isPrivate: true,
+        }
+      });
+    } catch (e) {
+      console.error(`Failed to send error note for convo ${conversationId}:`, e.message);
+    }
+  };
+
   try {
-    // Set typing indicator
     await supabaseAdmin.from('ai_typing_status').upsert({ conversation_id: conversationId, is_typing: true });
 
-    // Get settings in parallel
-    const [autoReplySettingsRes, aiSettingsRes, chatwootSettingsRes] = await Promise.all([
+    const [autoReplySettingsRes, aiSettingsRes] = await Promise.all([
         supabaseAdmin.from('auto_reply_settings').select('config').eq('id', 1).single(),
         supabaseAdmin.from('ai_settings').select('api_url, api_key').eq('id', 1).single(),
-        supabaseAdmin.from('chatwoot_settings').select('*').eq('id', 1).single()
     ]);
 
-    if (aiSettingsRes.error || !aiSettingsRes.data) throw new Error("AI settings not found.");
-    if (chatwootSettingsRes.error || !chatwootSettingsRes.data) throw new Error("Chatwoot settings not found.");
+    if (aiSettingsRes.error || !aiSettingsRes.data) throw new Error("Không tìm thấy cấu hình AI. Vui lòng kiểm tra trang Cài đặt API AI.");
     if (autoReplySettingsRes.error || !autoReplySettingsRes.data || !autoReplySettingsRes.data.config?.enabled) {
-        // If auto-reply was disabled between scheduler and worker, just stop.
         return new Response(JSON.stringify({ message: "Auto-reply disabled." }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
+    if (!chatwootSettings) throw new Error("Không tìm thấy cấu hình Chatwoot. Vui lòng kiểm tra trang Cài đặt Chatbot.");
 
     const trainingConfig = autoReplySettingsRes.data.config;
     const aiSettings = aiSettingsRes.data;
-    const chatwootSettings = chatwootSettingsRes.data;
 
-    // Get conversation history
     const { data: messages, error: messagesError } = await supabaseAdmin
       .from('chatwoot_messages').select('content, message_type, created_at_chatwoot')
       .eq('conversation_id', conversationId).order('created_at_chatwoot', { ascending: true });
     if (messagesError || !messages || messages.length === 0) {
-      throw new Error(`No messages found for conversation ${conversationId}`);
+      throw new Error(`Không tìm thấy tin nhắn cho cuộc trò chuyện #${conversationId}`);
     }
     const conversationHistory = messages.map(formatMessage).join('\n');
 
-    // Build prompt and call AI
     const systemPrompt = buildSystemPrompt(trainingConfig, conversationHistory);
     const { data: proxyResponse, error: proxyError } = await supabaseAdmin.functions.invoke('multi-ai-proxy', {
       body: { messages: [{ role: 'system', content: systemPrompt }], apiUrl: aiSettings.api_url, apiKey: aiSettings.api_key, model: 'gpt-4o' }
     });
-    if (proxyError) throw new Error((await proxyError.context.json()).error || proxyError.message);
-    if (proxyResponse.error) throw new Error(proxyResponse.error);
+    if (proxyError) throw new Error(`Lỗi gọi AI Proxy: ${(await proxyError.context.json()).error || proxyError.message}`);
+    if (proxyResponse.error) throw new Error(`Lỗi từ AI Proxy: ${proxyResponse.error}`);
 
     const aiReply = proxyResponse.choices[0].message.content;
 
-    // Send reply to Chatwoot
     const { error: sendMessageError } = await supabaseAdmin.functions.invoke('chatwoot-proxy', {
       body: { action: 'send_message', settings: chatwootSettings, conversationId: conversationId, content: aiReply }
     });
-    if (sendMessageError) throw new Error((await sendMessageError.context.json()).error || sendMessageError.message);
+    if (sendMessageError) throw new Error(`Lỗi gửi tin nhắn qua Chatwoot: ${(await sendMessageError.context.json()).error || sendMessageError.message}`);
 
     return new Response(JSON.stringify({ message: `Successfully processed conversation ${conversationId}` }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200,
@@ -110,9 +122,9 @@ serve(async (req) => {
 
   } catch (e) {
     console.error(`Failed to process conversation ${conversationId}:`, e.message);
+    await sendErrorNote(e.message);
     return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } finally {
-    // Remove typing indicator
     await supabaseAdmin.from('ai_typing_status').upsert({ conversation_id: conversationId, is_typing: false });
   }
 });
