@@ -1,16 +1,19 @@
 // @ts-nocheck
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import pdf from 'https://esm.sh/pdf-parse@1.1.1'
-// SỬA LỖI: Sử dụng 'node:' specifier để import Buffer một cách chính thống và tương thích.
-import { Buffer } from "node:buffer";
+// Import from pdfjs-dist
+import { getDocument } from 'https://esm.sh/pdfjs-dist@4.4.170/build/pdf.mjs';
+import * as pdfjsWorker from 'https://esm.sh/pdfjs-dist@4.4.170/build/pdf.worker.mjs';
+
+// Set worker source
+getDocument.workerSrc = pdfjsWorker;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Hàm chia nhỏ văn bản đơn giản để thay thế cho langchain
+// Hàm chia nhỏ văn bản đơn giản
 function splitText(text: string, { chunkSize, chunkOverlap }: { chunkSize: number; chunkOverlap: number }): string[] {
     if (chunkOverlap >= chunkSize) {
         throw new Error("chunkOverlap phải nhỏ hơn chunkSize.");
@@ -53,12 +56,16 @@ serve(async (req) => {
 
     // Chuyển đổi Blob thành ArrayBuffer
     const arrayBuffer = await fileData.arrayBuffer();
-    // Bước 2: Tạo một đối tượng Buffer từ ArrayBuffer
-    const buffer = Buffer.from(arrayBuffer);
 
-    // Bước 3: Phân tích PDF bằng pdf-parse, truyền trực tiếp buffer vào
-    const pdfParsed = await pdf(buffer);
-    const fullText = pdfParsed.text;
+    // Bước 2: Phân tích PDF bằng PDF.js
+    const pdf = await getDocument(arrayBuffer).promise;
+    let fullText = '';
+    for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map(item => item.str).join(' ');
+        fullText += pageText + '\n';
+    }
     
     const fileName = path.split('/').pop();
 
