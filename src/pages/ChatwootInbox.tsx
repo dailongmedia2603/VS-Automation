@@ -346,7 +346,6 @@ const ChatwootInbox = () => {
     }
 
     if (label === AI_CARE_LABEL && !isLabelApplied) {
-      const toastId = showLoading("AI đang bắt đầu phân tích...");
       try {
         const { error } = await supabase.functions.invoke('trigger-ai-care-script', {
           body: {
@@ -355,11 +354,9 @@ const ChatwootInbox = () => {
           }
         });
         if (error) throw error;
-        dismissToast(toastId);
-        showSuccess("AI đã tạo xong kịch bản. Đang làm mới...");
         await fetchCareScripts(selectedConversation.id);
       } catch (err: any) {
-        dismissToast(toastId);
+        console.error(`Kích hoạt AI thất bại:`, err);
         const errorMessage = err.context ? (await err.context.json()).error : err.message;
         showError(`Kích hoạt AI thất bại: ${errorMessage}`);
       }
