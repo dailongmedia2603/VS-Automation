@@ -304,6 +304,7 @@ export const ChatwootContactPanel = ({ selectedConversation, messages, onNewNote
                   )}
                 </div>
               </div>
+              <div className="flex items-center"><Mail className="h-4 w-4 mr-3" /><span>{contact.email || 'Không có sẵn'}</span></div>
               <div className="flex items-center"><Phone className={cn("h-4 w-4 mr-3", contact.phone_number && "text-green-500")} /><span className={cn(contact.phone_number && "text-green-600 font-medium")}>{contact.phone_number || 'Không có sẵn'}</span></div>
             </div>
           </div>
