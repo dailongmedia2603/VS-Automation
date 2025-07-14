@@ -99,3 +99,18 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  .animate-glow-green {
+    animation: glow-green 1.5s ease-in-out infinite;
+  }
+}
+
+@keyframes glow-green {
+  0%, 100% {
+    box-shadow: 0 0 3px rgba(74, 222, 128, 0.6), 0 0 6px rgba(74, 222, 128, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 10px rgba(74, 222, 128, 0.8), 0 0 15px rgba(74, 222, 128, 0.6);
+  }
+}

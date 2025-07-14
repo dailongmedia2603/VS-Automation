@@ -63,6 +63,7 @@ const ChatwootInbox = () => {
   const [isAutoReplyEnabled, setIsAutoReplyEnabled] = useState(false);
   const [aiStarLabelId, setAiStarLabelId] = useState<number | null>(null);
   const [aiTypingStatus, setAiTypingStatus] = useState<Record<number, boolean>>({});
+  const [hasNewLog, setHasNewLog] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const POLLING_INTERVAL = 15000;
@@ -222,14 +223,36 @@ const ChatwootInbox = () => {
   }, [settings.apiToken, settings.accountId, isAutoReplyEnabled, aiStarLabelId]);
 
   useEffect(() => {
-    if (selectedConversation) {
-      fetchMessages(selectedConversation.id);
-      fetchCareScripts(selectedConversation.id);
-      const intervalId = setInterval(() => fetchMessages(selectedConversation.id), POLLING_INTERVAL);
-      return () => clearInterval(intervalId);
-    } else {
-      setScripts([]);
+    if (!selectedConversation) {
+      return;
     }
+
+    setHasNewLog(false); // Reset on conversation change
+
+    const logChannel = supabase
+      .channel(`ai-logs-for-${selectedConversation.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'ai_reply_logs',
+          filter: `conversation_id=eq.${selectedConversation.id}`,
+        },
+        () => {
+          setHasNewLog(true);
+        }
+      )
+      .subscribe();
+      
+    fetchMessages(selectedConversation.id);
+    fetchCareScripts(selectedConversation.id);
+    const intervalId = setInterval(() => fetchMessages(selectedConversation.id), POLLING_INTERVAL);
+
+    return () => {
+      clearInterval(intervalId);
+      supabase.removeChannel(logChannel);
+    };
   }, [selectedConversation]);
 
   useEffect(() => {
@@ -606,9 +629,9 @@ const ChatwootInbox = () => {
             <header className="p-3 border-b bg-white flex items-center justify-between shadow-sm">
               <div className="flex items-center space-x-3"><Avatar><AvatarImage src={selectedConversation.meta.sender.thumbnail} /><AvatarFallback>{getInitials(selectedConversation.meta.sender.name)}</AvatarFallback></Avatar><div><h3 className="font-bold">{selectedConversation.meta.sender.name}</h3><p className="text-xs text-muted-foreground flex items-center"><Eye className="h-3 w-3 mr-1" />Chưa có người xem</p></div></div>
               <div className="flex items-center space-x-2 text-muted-foreground">
-                <Popover>
+                <Popover onOpenChange={(open) => { if (open) setHasNewLog(false); }}>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-8">
+                    <Button variant="outline" size="sm" className={cn("h-8", hasNewLog && "bg-green-100 text-green-800 animate-glow-green border-green-300")}>
                       <Bot className="h-4 w-4 mr-2" />
                       Log AI
                     </Button>
@@ -680,6 +703,12 @@ const ChatwootInbox = () => {
             )}
             </div><div ref={messagesEndRef} /></div>
             <footer className="p-2 border-t bg-white space-y-2">
+              {selectedConversation && aiTypingStatus[selectedConversation.id] && (
+                <div className="px-3 py-2 bg-blue-50 rounded-lg flex items-center justify-center gap-2 text-sm text-blue-700 font-medium animate-in fade-in">
+                  <Bot className="h-4 w-4 animate-pulse" />
+                  <span>AI đang phân tích và trả lời...</span>
+                </div>
+              )}
               {attachment && (
                 <div className="px-2 py-1.5 bg-slate-100 rounded-lg flex items-center justify-between animate-in fade-in">
                   <div className="flex items-center gap-2 text-sm overflow-hidden">
