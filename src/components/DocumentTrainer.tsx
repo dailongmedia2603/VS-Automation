@@ -6,13 +6,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { UploadCloud, FileText, Trash2, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
-import * as pdfjs from 'pdfjs-dist';
-
-// A robust way to set up the worker that is compatible with modern bundlers like Vite
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.mjs',
-  import.meta.url,
-).toString();
 
 interface Document {
   id: number;
@@ -32,7 +25,6 @@ export const DocumentTrainer = () => {
     if (error) {
       showError("Không thể tải danh sách tài liệu: " + error.message);
     } else {
-      // Group by file name
       const grouped = (data || []).reduce((acc, doc) => {
         const fileName = doc.metadata?.file_name || 'Không rõ';
         if (!acc[fileName]) {
@@ -44,7 +36,7 @@ export const DocumentTrainer = () => {
       }, {} as Record<string, { count: number, ids: number[] }>);
       
       const formatted = Object.entries(grouped).map(([name, data], index) => ({
-        id: index, // Fake ID for rendering
+        id: index,
         content: `${data.count} đoạn`,
         metadata: { file_name: name },
         ids: data.ids,
@@ -56,6 +48,16 @@ export const DocumentTrainer = () => {
 
   useEffect(() => {
     fetchDocuments();
+    const documentsSubscription = supabase
+      .channel('documents-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'documents' }, () => {
+        fetchDocuments();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(documentsSubscription);
+    };
   }, [fetchDocuments]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -75,45 +77,26 @@ export const DocumentTrainer = () => {
       return;
     }
     setIsUploading(true);
-    const toastId = showLoading("Đang xử lý tệp PDF...");
+    const toastId = showLoading("Đang tải tệp lên...");
 
     try {
-      const reader = new FileReader();
-      reader.readAsArrayBuffer(file);
-      reader.onload = async (e) => {
-        try {
-          const pdfData = new Uint8Array(e.target?.result as ArrayBuffer);
-          const pdf = await pdfjs.getDocument({ data: pdfData }).promise;
-          let fullText = '';
-          for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i);
-            const textContent = await page.getTextContent();
-            fullText += textContent.items.map(item => (item as any).str).join(' ') + '\n';
-          }
+      const filePath = `public/${Date.now()}-${file.name}`;
+      const { error } = await supabase.storage
+        .from('document-uploads')
+        .upload(filePath, file);
 
-          dismissToast(toastId);
-          const embedToastId = showLoading("Đang tạo 'bộ não tri thức' cho AI...");
+      if (error) {
+        throw new Error(`Lỗi tải lên: ${error.message}`);
+      }
+      
+      dismissToast(toastId);
+      showSuccess("Tệp đã được tải lên và đang được xử lý trong nền. Danh sách sẽ tự động cập nhật.");
+      setFile(null);
 
-          const { error } = await supabase.functions.invoke('embed-document', {
-            body: { text: fullText, fileName: file.name },
-          });
-
-          if (error) throw new Error(error.message);
-
-          dismissToast(embedToastId);
-          showSuccess("Tài liệu đã được huấn luyện thành công!");
-          setFile(null);
-          fetchDocuments();
-        } catch (err: any) {
-          dismissToast(toastId);
-          showError("Xử lý thất bại: " + err.message);
-        } finally {
-          setIsUploading(false);
-        }
-      };
     } catch (err: any) {
       dismissToast(toastId);
-      showError("Lỗi đọc tệp: " + err.message);
+      showError(err.message);
+    } finally {
       setIsUploading(false);
     }
   };
@@ -149,7 +132,7 @@ export const DocumentTrainer = () => {
             <Input type="file" onChange={handleFileChange} accept=".pdf" className="flex-1" />
             <Button onClick={handleUpload} disabled={!file || isUploading}>
               {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
-              {isUploading ? 'Đang xử lý...' : 'Tải lên & Huấn luyện'}
+              {isUploading ? 'Đang tải lên...' : 'Tải lên & Huấn luyện'}
             </Button>
           </div>
         </CardContent>
