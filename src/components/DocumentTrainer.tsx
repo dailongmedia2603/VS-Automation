@@ -7,11 +7,12 @@ import { UploadCloud, FileText, Trash2, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import * as pdfjs from 'pdfjs-dist';
-// @ts-ignore
-import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.js?url';
 
-// Setup worker
-pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+// @ts-ignore
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.js',
+  import.meta.url,
+).toString();
 
 interface Document {
   id: number;
