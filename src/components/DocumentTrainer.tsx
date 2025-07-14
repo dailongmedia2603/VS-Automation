@@ -1,120 +1,89 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { UploadCloud, FileText, Trash2, Loader2 } from 'lucide-react';
+import { Textarea } from "@/components/ui/textarea";
+import { PlusCircle, Trash2, Loader2, Save } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
+import { Skeleton } from '@/components/ui/skeleton';
 
-interface Document {
-  id: number;
+interface KnowledgeChunk {
+  id: string; // Use a client-side UUID for key prop
   content: string;
-  metadata: { file_name: string };
+  db_id?: number; // The actual ID from the database, if it exists
 }
 
 export const DocumentTrainer = () => {
-  const [documents, setDocuments] = useState<Document[]>([]);
+  const [chunks, setChunks] = useState<KnowledgeChunk[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isUploading, setIsUploading] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const fetchDocuments = useCallback(async () => {
     setIsLoading(true);
-    const { data, error } = await supabase.from('documents').select('id, metadata').order('id', { ascending: false });
+    const { data, error } = await supabase
+      .from('documents')
+      .select('id, content')
+      .order('id', { ascending: true });
+
     if (error) {
-      showError("Không thể tải danh sách tài liệu: " + error.message);
+      showError("Không thể tải kiến thức đã lưu: " + error.message);
+      setChunks([]);
     } else {
-      const grouped = (data || []).reduce((acc, doc) => {
-        const fileName = doc.metadata?.file_name || 'Không rõ';
-        if (!acc[fileName]) {
-          acc[fileName] = { count: 0, ids: [] };
-        }
-        acc[fileName].count++;
-        acc[fileName].ids.push(doc.id);
-        return acc;
-      }, {} as Record<string, { count: number, ids: number[] }>);
-      
-      const formatted = Object.entries(grouped).map(([name, data], index) => ({
-        id: index,
-        content: `${data.count} đoạn`,
-        metadata: { file_name: name },
-        ids: data.ids,
-      }));
-      setDocuments(formatted as any);
+      setChunks(data.map(doc => ({ id: crypto.randomUUID(), content: doc.content, db_id: doc.id })));
     }
     setIsLoading(false);
   }, []);
 
   useEffect(() => {
     fetchDocuments();
-    const documentsSubscription = supabase
-      .channel('documents-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'documents' }, () => {
-        fetchDocuments();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(documentsSubscription);
-    };
   }, [fetchDocuments]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const selectedFile = e.target.files[0];
-      if (selectedFile.type !== 'application/pdf') {
-        showError("Chỉ hỗ trợ tệp PDF.");
-        return;
-      }
-      setFile(selectedFile);
-    }
+  const handleAddChunk = () => {
+    setChunks(prev => [...prev, { id: crypto.randomUUID(), content: '' }]);
   };
 
-  const handleUpload = async () => {
-    if (!file) {
-      showError("Vui lòng chọn một tệp để tải lên.");
+  const handleRemoveChunk = (id: string) => {
+    setChunks(prev => prev.filter(chunk => chunk.id !== id));
+  };
+
+  const handleContentChange = (id: string, content: string) => {
+    setChunks(prev => prev.map(chunk => chunk.id === id ? { ...chunk, content } : chunk));
+  };
+
+  const handleSaveAndTrain = async () => {
+    const nonEmptyChunks = chunks.map(c => c.content).filter(c => c.trim() !== '');
+    if (nonEmptyChunks.length === 0) {
+      showError("Vui lòng nhập ít nhất một đoạn kiến thức.");
       return;
     }
-    setIsUploading(true);
-    const toastId = showLoading("Đang tải tệp lên...");
+
+    setIsSaving(true);
+    const toastId = showLoading("Đang lưu và huấn luyện AI...");
 
     try {
-      const filePath = `public/${Date.now()}-${file.name}`;
-      const { error } = await supabase.storage
-        .from('document-uploads')
-        .upload(filePath, file);
-
-      if (error) {
-        throw new Error(`Lỗi tải lên: ${error.message}`);
+      // Step 1: Delete all existing documents to ensure a clean slate
+      const { error: deleteError } = await supabase.from('documents').delete().neq('id', -1); // A trick to delete all rows
+      if (deleteError) {
+        throw new Error(`Lỗi dọn dẹp dữ liệu cũ: ${deleteError.message}`);
       }
-      
-      dismissToast(toastId);
-      showSuccess("Tệp đã được tải lên và đang được xử lý trong nền. Danh sách sẽ tự động cập nhật.");
-      setFile(null);
 
+      // Step 2: Invoke the edge function to embed and save the new chunks
+      const { error: embedError } = await supabase.functions.invoke('embed-document', {
+        body: { chunks: nonEmptyChunks },
+      });
+
+      if (embedError) {
+        throw new Error(`Lỗi huấn luyện AI: ${embedError.message}`);
+      }
+
+      dismissToast(toastId);
+      showSuccess("Đã huấn luyện AI với kiến thức mới thành công!");
+      await fetchDocuments(); // Refresh the list from the DB
     } catch (err: any) {
       dismissToast(toastId);
       showError(err.message);
     } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handleDelete = async (fileName: string) => {
-    const confirmation = confirm(`Bạn có chắc chắn muốn xóa tất cả các đoạn từ tài liệu "${fileName}" không?`);
-    if (!confirmation) return;
-
-    const toastId = showLoading("Đang xóa tài liệu...");
-    try {
-      const { error } = await supabase.from('documents').delete().eq('metadata->>file_name', fileName);
-      if (error) throw error;
-      dismissToast(toastId);
-      showSuccess("Đã xóa tài liệu thành công.");
-      fetchDocuments();
-    } catch (err: any) {
-      dismissToast(toastId);
-      showError("Xóa thất bại: " + err.message);
+      setIsSaving(false);
     }
   };
 
@@ -122,62 +91,41 @@ export const DocumentTrainer = () => {
     <div className="space-y-8 mt-6">
       <Card className="bg-white rounded-2xl shadow-lg shadow-slate-200/30 border border-slate-200/80">
         <CardHeader>
-          <CardTitle className="text-xl font-bold text-slate-900">Tải lên tài liệu</CardTitle>
+          <CardTitle className="text-xl font-bold text-slate-900">Huấn luyện từ Văn bản</CardTitle>
           <CardDescription className="text-sm text-slate-500 pt-1">
-            Tải lên các tệp PDF chứa kiến thức nội bộ (bảng giá, chính sách, thông tin sản phẩm...). Hệ thống sẽ tự động đọc, phân tích và lưu trữ để AI sử dụng khi trả lời tin nhắn.
+            Nhập hoặc dán các đoạn kiến thức (thông tin sản phẩm, chính sách, câu hỏi thường gặp...) vào các ô bên dưới. Mỗi ô là một "mẩu tri thức" riêng biệt để AI học.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center gap-4">
-            <Input type="file" onChange={handleFileChange} accept=".pdf" className="flex-1" />
-            <Button onClick={handleUpload} disabled={!file || isUploading}>
-              {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
-              {isUploading ? 'Đang tải lên...' : 'Tải lên & Huấn luyện'}
+          {isLoading ? (
+            <div className="space-y-4">
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-24 w-full" />
+            </div>
+          ) : (
+            chunks.map((chunk) => (
+              <div key={chunk.id} className="flex items-start gap-2">
+                <Textarea
+                  placeholder="Nhập một đoạn kiến thức..."
+                  value={chunk.content}
+                  onChange={(e) => handleContentChange(chunk.id, e.target.value)}
+                  className="min-h-[100px] bg-slate-50"
+                />
+                <Button variant="ghost" size="icon" onClick={() => handleRemoveChunk(chunk.id)} className="text-slate-500 hover:text-destructive hover:bg-destructive/10">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))
+          )}
+          <div className="flex items-center justify-between pt-4">
+            <Button variant="outline" onClick={handleAddChunk}>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Thêm đoạn kiến thức
             </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-white rounded-2xl shadow-lg shadow-slate-200/30 border border-slate-200/80">
-        <CardHeader>
-          <CardTitle className="text-xl font-bold text-slate-900">Cơ sở tri thức</CardTitle>
-          <CardDescription className="text-sm text-slate-500 pt-1">Danh sách các tài liệu đã được huấn luyện cho AI.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="border rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader className="bg-slate-100/80">
-                <TableRow>
-                  <TableHead>Tên tài liệu</TableHead>
-                  <TableHead>Số đoạn đã học</TableHead>
-                  <TableHead className="text-right">Hành động</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow><TableCell colSpan={3} className="text-center h-24"><Loader2 className="mx-auto h-6 w-6 animate-spin text-slate-400" /></TableCell></TableRow>
-                ) : documents.length > 0 ? (
-                  documents.map((doc) => (
-                    <TableRow key={doc.id}>
-                      <TableCell className="font-medium flex items-center gap-3">
-                        <FileText className="h-5 w-5 text-slate-500" />
-                        {doc.metadata.file_name}
-                      </TableCell>
-                      <TableCell>{doc.content}</TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(doc.metadata.file_name)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={3} className="text-center h-24 text-slate-500">Chưa có tài liệu nào được huấn luyện.</TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+            <Button onClick={handleSaveAndTrain} disabled={isSaving}>
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              {isSaving ? 'Đang huấn luyện...' : 'Lưu và Huấn luyện'}
+            </Button>
           </div>
         </CardContent>
       </Card>
