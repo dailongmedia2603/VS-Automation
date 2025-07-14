@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
+import React, { createContext, useState, useContext, ReactNode, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
 
@@ -53,8 +53,10 @@ export const ApiSettingsProvider = ({ children }: { children: ReactNode }) => {
     fetchSettings();
   }, []);
 
+  const value = useMemo(() => ({ settings, setSettings, isLoading }), [settings, isLoading]);
+
   return (
-    <ApiSettingsContext.Provider value={{ settings, setSettings, isLoading }}>
+    <ApiSettingsContext.Provider value={value}>
       {children}
     </ApiSettingsContext.Provider>
   );

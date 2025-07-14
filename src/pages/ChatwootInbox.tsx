@@ -606,7 +606,53 @@ const ChatwootInbox = () => {
               <div className="flex items-center space-x-3"><Avatar><AvatarImage src={selectedConversation.meta.sender.thumbnail} /><AvatarFallback>{getInitials(selectedConversation.meta.sender.name)}</AvatarFallback></Avatar><div><h3 className="font-bold">{selectedConversation.meta.sender.name}</h3><p className="text-xs text-muted-foreground flex items-center"><Eye className="h-3 w-3 mr-1" />Chưa có người xem</p></div></div>
               <div className="flex items-center space-x-4 text-muted-foreground"><LinkIcon className="h-5 w-5 cursor-pointer hover:text-primary" /><RefreshCw className={cn("h-5 w-5 cursor-pointer hover:text-primary", loadingMessages && "animate-spin")} onClick={() => { if (selectedConversation && !loadingMessages) { handleSelectConversation(selectedConversation); } }} /><Smile className="h-5 w-5 cursor-pointer hover:text-primary" /><UserPlus className="h-5 w-5 cursor-pointer hover:text-primary" /></div>
             </header>
-            <div className="flex-1 overflow-y-auto p-4 md:p-6"><div className="space-y-2">{loadingMessages ? <p>Đang tải...</p> : groupedMessages.map((item, index) => { if (item.type === 'date') { return <div key={index} className="text-center my-4"><span className="text-xs text-muted-foreground bg-white px-3 py-1 rounded-full shadow-sm">{item.date}</span></div>; } const msg = item.data; const isOutgoing = msg.message_type === 1; if (msg.private) { return ( <div key={msg.id} className="flex items-center justify-center my-2"> <div className="text-xs text-center text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2 max-w-md"> <p className="font-bold">Thông báo hệ thống</p> <p className="mt-1 whitespace-pre-wrap">{msg.content}</p> </div> </div> ); } if (msg.message_type === 0 || msg.message_type === 1) { return ( <div key={msg.id} className={cn("flex items-start gap-3", isOutgoing && "justify-end")}> {!isOutgoing && <Avatar className="h-8 w-8"><AvatarImage src={msg.sender?.thumbnail} /><AvatarFallback>{getInitials(msg.sender?.name)}</AvatarFallback></Avatar>} <div className={cn("flex flex-col gap-1", isOutgoing ? 'items-end' : 'items-start')}> <div className={cn("rounded-2xl px-3 py-2 max-w-sm md:max-w-md break-words shadow-sm", isOutgoing ? 'bg-green-100 text-gray-800' : 'bg-white text-gray-800')}> {msg.attachments?.map(att => <div key={att.id}>{att.file_type === 'image' ? <a href={att.data_url} target="_blank" rel="noopener noreferrer"><img src={att.data_url} alt="Attachment" className="rounded-lg max-w-full h-auto" /></a> : <video controls className="rounded-lg max-w-full h-auto"><source src={att.data_url} /></video>}</div>)} {msg.content && <p className={cn("whitespace-pre-wrap", msg.attachments && msg.attachments.length > 0 && msg.content ? "mt-2" : "")}>{msg.content}</p>} </div> </div> </div> ); } return null; })}
+            <div className="flex-1 overflow-y-auto p-4 md:p-6"><div className="space-y-2">{loadingMessages ? <p>Đang tải...</p> : groupedMessages.map((item, index) => { 
+              if (item.type === 'date') { 
+                return <div key={index} className="text-center my-4"><span className="text-xs text-muted-foreground bg-white px-3 py-1 rounded-full shadow-sm">{item.date}</span></div>; 
+              } 
+              
+              const msg = item.data; 
+              
+              // Hide system activity messages (e.g., add/remove labels)
+              if (msg.message_type === 2) {
+                return null;
+              }
+
+              // Handle private messages (notes)
+              if (msg.private) {
+                // If it's an AI error note, display it in the main chat
+                if (msg.content?.startsWith('**Lỗi AI')) {
+                  return (
+                    <div key={msg.id} className="flex items-center justify-center my-2">
+                      <div className="text-xs text-center text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2 max-w-md">
+                        <p className="font-bold">Thông báo hệ thống</p>
+                        <p className="mt-1 whitespace-pre-wrap">{msg.content}</p>
+                      </div>
+                    </div>
+                  );
+                }
+                // Otherwise, hide it from main chat (it's shown in the side panel)
+                return null;
+              }
+
+              // Render regular incoming/outgoing messages
+              const isOutgoing = msg.message_type === 1;
+              if (msg.message_type === 0 || msg.message_type === 1) { 
+                return ( 
+                  <div key={msg.id} className={cn("flex items-start gap-3", isOutgoing && "justify-end")}> 
+                    {!isOutgoing && <Avatar className="h-8 w-8"><AvatarImage src={msg.sender?.thumbnail} /><AvatarFallback>{getInitials(msg.sender?.name)}</AvatarFallback></Avatar>} 
+                    <div className={cn("flex flex-col gap-1", isOutgoing ? 'items-end' : 'items-start')}> 
+                      <div className={cn("rounded-2xl px-3 py-2 max-w-sm md:max-w-md break-words shadow-sm", isOutgoing ? 'bg-green-100 text-gray-800' : 'bg-white text-gray-800')}> 
+                        {msg.attachments?.map(att => <div key={att.id}>{att.file_type === 'image' ? <a href={att.data_url} target="_blank" rel="noopener noreferrer"><img src={att.data_url} alt="Attachment" className="rounded-lg max-w-full h-auto" /></a> : <video controls className="rounded-lg max-w-full h-auto"><source src={att.data_url} /></video>}</div>)} 
+                        {msg.content && <p className={cn("whitespace-pre-wrap", msg.attachments && msg.attachments.length > 0 && msg.content ? "mt-2" : "")}>{msg.content}</p>} 
+                      </div> 
+                    </div> 
+                  </div> 
+                ); 
+              } 
+              
+              return null; 
+            })}
             {selectedConversation && aiTypingStatus[selectedConversation.id] && (
               <div className="flex items-start gap-3">
                 <Avatar className="h-8 w-8"><AvatarFallback><Bot className="h-5 w-5 text-blue-600" /></AvatarFallback></Avatar>
