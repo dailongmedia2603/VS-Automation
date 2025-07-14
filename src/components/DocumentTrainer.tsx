@@ -8,8 +8,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import * as pdfjs from 'pdfjs-dist';
 
-// Setup worker from a reliable CDN with a specific, stable version and HTTPS
-pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+// A robust way to set up the worker that is compatible with modern bundlers like Vite
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.mjs',
+  import.meta.url,
+).toString();
 
 interface Document {
   id: number;
