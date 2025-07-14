@@ -17,6 +17,7 @@ import { showSuccess, showError } from "@/utils/toast";
 import { Terminal, Loader2, Link, RefreshCw } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChatwootLabelManager } from "@/components/ChatwootLabelManager";
+import { AutoReplyManager } from "@/components/AutoReplyManager";
 
 const ChatwootSettings = () => {
   const { settings, setSettings, isLoading: isLoadingContext } = useChatwoot();
@@ -145,7 +146,8 @@ const ChatwootSettings = () => {
             </CardContent>
           </Card>
         </TabsContent>
-        <TabsContent value="inbox-config" className="mt-4">
+        <TabsContent value="inbox-config" className="mt-4 space-y-6">
+          <AutoReplyManager />
           <ChatwootLabelManager />
         </TabsContent>
       </Tabs>
