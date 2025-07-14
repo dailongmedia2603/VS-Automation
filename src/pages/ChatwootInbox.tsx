@@ -151,6 +151,7 @@ const ChatwootInbox = () => {
               await supabase.functions.invoke('chatwoot-proxy', {
                 body: { action: 'update_labels', settings, conversationId: convo.id, labels: newLabels },
               });
+              // FIX: Ensure data is synced to local DB for the Edge Function to see
               await supabase.from('chatwoot_conversation_labels').upsert({ conversation_id: convo.id, label_id: aiStarLabelId });
             })
           );
