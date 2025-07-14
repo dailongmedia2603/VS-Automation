@@ -206,9 +206,7 @@ const ChatwootInbox = () => {
     };
 
     fetchInitialSettings();
-  }, []);
 
-  useEffect(() => {
     const typingChannel = supabase.channel('ai-typing-status-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_typing_status' },
         (payload) => {
@@ -263,7 +261,7 @@ const ChatwootInbox = () => {
       clearInterval(intervalId);
       supabase.removeChannel(logChannel);
     };
-  }, [selectedConversation]);
+  }, [selectedConversation, settings]);
 
   useEffect(() => {
     if (messages.length > 0 && selectedConversation && !selectedConversation.meta.sender.phone_number) {
