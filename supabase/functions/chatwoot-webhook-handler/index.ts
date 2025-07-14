@@ -50,6 +50,18 @@ serve(async (req) => {
   }
 
   try {
+    const payload = await req.json();
+
+    // We only care about incoming messages from users
+    if (payload.event !== 'message_created' || payload.message_type !== 'incoming' || payload.private) {
+      return new Response(JSON.stringify({ message: "Event ignored." }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200,
+      });
+    }
+
+    const conversation = payload.conversation;
+    const conversationId = conversation.id;
+
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -65,61 +77,36 @@ serve(async (req) => {
     }
     const trainingConfig = autoReplySettings.config;
 
-    // 2. Get AI API settings
-    const { data: aiSettings, error: aiSettingsError } = await supabaseAdmin
-      .from('ai_settings').select('api_url, api_key').eq('id', 1).single();
-    if (aiSettingsError || !aiSettings) throw new Error("AI settings not found.");
-
-    // 3. Get 'AI Star' label ID
-    const { data: labelData, error: labelError } = await supabaseAdmin
-      .from('chatwoot_labels').select('id').eq('name', AI_STAR_LABEL_NAME).single();
-    if (labelError || !labelData) {
-      console.log(`Label '${AI_STAR_LABEL_NAME}' not found. Skipping.`);
-      return new Response(JSON.stringify({ message: `Label '${AI_STAR_LABEL_NAME}' not found.` }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200,
-      });
-    }
-    const aiStarLabelId = labelData.id;
-
-    // 4. Find unread conversations with the 'AI Star' label
-    const { data: convLabelData, error: convLabelError } = await supabaseAdmin
-      .from('chatwoot_conversation_labels').select('conversation_id').eq('label_id', aiStarLabelId);
-    if (convLabelError) throw convLabelError;
-    if (!convLabelData || convLabelData.length === 0) {
-      return new Response(JSON.stringify({ message: "No conversations with AI Star label." }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200,
-      });
-    }
-    const taggedConvIds = convLabelData.map(item => item.conversation_id);
-
-    const { data: unreadConvos, error: unreadConvosError } = await supabaseAdmin
-      .from('chatwoot_conversations').select('id, unread_count')
-      .in('id', taggedConvIds).gt('unread_count', 0);
-    if (unreadConvosError) throw unreadConvosError;
-    if (!unreadConvos || unreadConvos.length === 0) {
-      return new Response(JSON.stringify({ message: "No unread conversations to process." }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200,
-      });
+    // 2. Check if conversation has 'AI Star' label
+    if (!conversation.labels || !conversation.labels.includes(AI_STAR_LABEL_NAME)) {
+        return new Response(JSON.stringify({ message: "Conversation does not have AI Star label. Skipping." }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200,
+        });
     }
 
-    // 5. Process each conversation
-    for (const convo of unreadConvos) {
-      const conversationId = convo.id;
-      try {
-        // Set typing indicator
-        await supabaseAdmin.from('ai_typing_status').upsert({ conversation_id: conversationId, is_typing: true });
+    // Set typing indicator
+    await supabaseAdmin.from('ai_typing_status').upsert({ conversation_id: conversationId, is_typing: true });
 
-        // Get conversation history
+    try {
+        // 3. Get AI API settings
+        const { data: aiSettings, error: aiSettingsError } = await supabaseAdmin
+          .from('ai_settings').select('api_url, api_key').eq('id', 1).single();
+        if (aiSettingsError || !aiSettings) throw new Error("AI settings not found.");
+
+        // 4. Get conversation history from DB
         const { data: messages, error: messagesError } = await supabaseAdmin
           .from('chatwoot_messages').select('content, message_type, created_at_chatwoot')
           .eq('conversation_id', conversationId).order('created_at_chatwoot', { ascending: true });
-        if (messagesError || !messages || messages.length === 0) {
-          throw new Error(`No messages found for conversation ${conversationId}`);
-        }
-        const conversationHistory = messages.map(formatMessage).join('\n');
+        if (messagesError) throw messagesError;
+        
+        // Add the new message from the webhook to the history, as it might not be in the DB yet
+        const fullHistory = [
+            ...messages.map(formatMessage),
+            `[${new Date(payload.created_at * 1000).toLocaleString('vi-VN')}] User: ${payload.content}`
+        ].join('\n');
 
-        // Build prompt and call AI
-        const systemPrompt = buildSystemPrompt(trainingConfig, conversationHistory);
+        // 5. Build prompt and call AI
+        const systemPrompt = buildSystemPrompt(trainingConfig, fullHistory);
         const { data: proxyResponse, error: proxyError } = await supabaseAdmin.functions.invoke('multi-ai-proxy', {
           body: { messages: [{ role: 'system', content: systemPrompt }], apiUrl: aiSettings.api_url, apiKey: aiSettings.api_key, model: 'gpt-4o' }
         });
@@ -128,30 +115,35 @@ serve(async (req) => {
 
         const aiReply = proxyResponse.choices[0].message.content;
 
-        // Send reply to Chatwoot
+        // 6. Send reply to Chatwoot
         const { data: chatwootSettings } = await supabaseAdmin.from('chatwoot_settings').select('*').eq('id', 1).single();
         const { error: sendMessageError } = await supabaseAdmin.functions.invoke('chatwoot-proxy', {
           body: { action: 'send_message', settings: chatwootSettings, conversationId: conversationId, content: aiReply }
         });
         if (sendMessageError) throw new Error((await sendMessageError.context.json()).error || sendMessageError.message);
 
-      } catch (e) {
+    } catch (e) {
         console.error(`Failed to process conversation ${conversationId}:`, e.message);
-        // Optionally send a private note about the failure
-      } finally {
+        // Send a private note about the failure
+        const { data: chatwootSettings } = await supabaseAdmin.from('chatwoot_settings').select('*').eq('id', 1).single();
+        if (chatwootSettings) {
+            await supabaseAdmin.functions.invoke('chatwoot-proxy', {
+              body: { action: 'send_message', settings: chatwootSettings, conversationId: conversationId, content: `Lỗi AI: ${e.message}`, isPrivate: true }
+            });
+        }
+    } finally {
         // Remove typing indicator
         await supabaseAdmin.from('ai_typing_status').upsert({ conversation_id: conversationId, is_typing: false });
-      }
     }
 
-    return new Response(JSON.stringify({ message: `Processed ${unreadConvos.length} conversations.` }), {
+    return new Response(JSON.stringify({ message: "Webhook processed." }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200,
     });
 
   } catch (error) {
-    console.error('Error in auto-reply handler:', error.message);
+    console.error('Error in webhook handler:', error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500,
     });
   }
-});
+})
