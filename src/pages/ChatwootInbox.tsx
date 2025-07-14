@@ -206,7 +206,9 @@ const ChatwootInbox = () => {
     };
 
     fetchInitialSettings();
+  }, []);
 
+  useEffect(() => {
     const typingChannel = supabase.channel('ai-typing-status-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_typing_status' },
         (payload) => {
