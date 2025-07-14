@@ -2,7 +2,8 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import pdf from 'https://esm.sh/pdf-parse@1.1.1'
-import { Buffer } from "https://deno.land/std@0.168.0/node/buffer.ts";
+// SỬA LỖI: Sử dụng 'node:' specifier để import Buffer một cách chính thống và tương thích.
+import { Buffer } from "node:buffer";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
