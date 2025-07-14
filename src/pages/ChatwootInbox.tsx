@@ -14,7 +14,8 @@ import { cn } from '@/lib/utils';
 import { format, isSameDay } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { ChatwootContactPanel } from '@/components/ChatwootContactPanel';
-import { Search, Phone, Link as LinkIcon, Smile, Paperclip, Image as ImageIcon, SendHorizonal, ThumbsUp, Settings2, CornerDownLeft, Eye, RefreshCw, UserPlus, FileText, X, Filter, Check, PlusCircle, Trash2, Bot } from 'lucide-react';
+import { AiLogViewer } from '@/components/AiLogViewer';
+import { Search, Phone, Smile, Paperclip, Image as ImageIcon, SendHorizonal, ThumbsUp, Settings2, CornerDownLeft, Eye, RefreshCw, UserPlus, FileText, X, Filter, Check, PlusCircle, Trash2, Bot } from 'lucide-react';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 
 // Interfaces
@@ -604,7 +605,22 @@ const ChatwootInbox = () => {
           <>
             <header className="p-3 border-b bg-white flex items-center justify-between shadow-sm">
               <div className="flex items-center space-x-3"><Avatar><AvatarImage src={selectedConversation.meta.sender.thumbnail} /><AvatarFallback>{getInitials(selectedConversation.meta.sender.name)}</AvatarFallback></Avatar><div><h3 className="font-bold">{selectedConversation.meta.sender.name}</h3><p className="text-xs text-muted-foreground flex items-center"><Eye className="h-3 w-3 mr-1" />Chưa có người xem</p></div></div>
-              <div className="flex items-center space-x-4 text-muted-foreground"><LinkIcon className="h-5 w-5 cursor-pointer hover:text-primary" /><RefreshCw className={cn("h-5 w-5 cursor-pointer hover:text-primary", loadingMessages && "animate-spin")} onClick={() => { if (selectedConversation && !loadingMessages) { handleSelectConversation(selectedConversation); } }} /><Smile className="h-5 w-5 cursor-pointer hover:text-primary" /><UserPlus className="h-5 w-5 cursor-pointer hover:text-primary" /></div>
+              <div className="flex items-center space-x-2 text-muted-foreground">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-8">
+                      <Bot className="h-4 w-4 mr-2" />
+                      Log AI
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-96 p-0">
+                    <AiLogViewer conversationId={selectedConversation.id} />
+                  </PopoverContent>
+                </Popover>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { if (selectedConversation && !loadingMessages) { handleSelectConversation(selectedConversation); } }}>
+                  <RefreshCw className={cn("h-5 w-5", loadingMessages && "animate-spin")} />
+                </Button>
+              </div>
             </header>
             <div className="flex-1 overflow-y-auto p-4 md:p-6"><div className="space-y-2">{loadingMessages ? <p>Đang tải...</p> : groupedMessages.map((item, index) => { 
               if (item.type === 'date') { 
@@ -613,14 +629,11 @@ const ChatwootInbox = () => {
               
               const msg = item.data; 
               
-              // Hide system activity messages (e.g., add/remove labels)
               if (msg.message_type === 2) {
                 return null;
               }
 
-              // Handle private messages (notes)
               if (msg.private) {
-                // If it's an AI error note, display it in the main chat
                 if (msg.content?.startsWith('**Lỗi AI')) {
                   return (
                     <div key={msg.id} className="flex items-center justify-center my-2">
@@ -631,11 +644,9 @@ const ChatwootInbox = () => {
                     </div>
                   );
                 }
-                // Otherwise, hide it from main chat (it's shown in the side panel)
                 return null;
               }
 
-              // Render regular incoming/outgoing messages
               const isOutgoing = msg.message_type === 1;
               if (msg.message_type === 0 || msg.message_type === 1) { 
                 return ( 

@@ -7,7 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Helper to format conversation history
 const formatMessage = (msg) => {
     const sender = msg.message_type === 1 ? 'Agent' : 'User';
     const timestamp = new Date(msg.created_at_chatwoot).toLocaleString('vi-VN');
@@ -15,7 +14,6 @@ const formatMessage = (msg) => {
     return `[${timestamp}] ${sender}: ${content}`;
 }
 
-// Helper to build the system prompt
 const buildSystemPrompt = (config, history) => {
     let prompt = `Bạn là một trợ lý AI tên là ${config.role || 'Trợ lý ảo'}. 
 Lĩnh vực kinh doanh của bạn là ${config.industry || 'đa dạng'}.
@@ -57,7 +55,14 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: "Missing conversationId" }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 
-  // Fetch Chatwoot settings early for error reporting
+  const logToDb = async (status, details) => {
+    await supabaseAdmin.from('ai_reply_logs').insert({
+      conversation_id: conversationId,
+      status,
+      details,
+    });
+  };
+
   const { data: chatwootSettings } = await supabaseAdmin.from('chatwoot_settings').select('*').eq('id', 1).single();
 
   const sendErrorNote = async (errorMessage) => {
@@ -116,6 +121,8 @@ serve(async (req) => {
     });
     if (sendMessageError) throw new Error(`Lỗi gửi tin nhắn qua Chatwoot: ${(await sendMessageError.context.json()).error || sendMessageError.message}`);
 
+    await logToDb('success', `AI đã trả lời thành công với nội dung: "${aiReply.substring(0, 100)}..."`);
+
     return new Response(JSON.stringify({ message: `Successfully processed conversation ${conversationId}` }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200,
     });
@@ -123,6 +130,7 @@ serve(async (req) => {
   } catch (e) {
     console.error(`Failed to process conversation ${conversationId}:`, e.message);
     await sendErrorNote(e.message);
+    await logToDb('error', e.message);
     return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } finally {
     await supabaseAdmin.from('ai_typing_status').upsert({ conversation_id: conversationId, is_typing: false });
