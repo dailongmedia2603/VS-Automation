@@ -60,20 +60,6 @@ const TrainingPreview: React.FC<{ config: TrainingConfig }> = ({ config }) => {
           <ListDetail label="Điều kiện bắt buộc" items={config.conditions} prefix="Điều kiện" />
         </div>
       </Section>
-
-      <Section title="Tài liệu tham khảo">
-        {config.documents.length > 0 ? (
-          <ul className="space-y-2">
-            {config.documents.map(doc => (
-              <li key={doc.id} className="text-sm text-slate-700 p-2 bg-slate-50 rounded-md">
-                <strong>{doc.name}</strong> ({doc.type}) - <em>{doc.purpose}</em>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="italic text-slate-400 text-sm">Không có tài liệu nào.</p>
-        )}
-      </Section>
     </div>
   );
 };
