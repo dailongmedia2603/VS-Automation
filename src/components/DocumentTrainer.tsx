@@ -189,15 +189,49 @@ export const DocumentTrainer = () => {
   const handleSave = async (doc: Partial<Document>) => {
     const toastId = showLoading("Đang xử lý và nhúng dữ liệu...");
     try {
-      const { data: savedDocument, error: functionError } = await supabase.functions.invoke('embed-document', { body: { document: doc } });
+      // Step 1: Get the embedding vector from the edge function
+      const textToEmbed = `Tiêu đề: ${doc.title}\nMục đích: ${doc.purpose || ''}\nNội dung: ${doc.content}`;
+      const { data: embeddingData, error: functionError } = await supabase.functions.invoke('embed-document', { body: { textToEmbed } });
 
       if (functionError) {
         const errorData = await functionError.context.json();
         throw new Error(errorData.error || functionError.message);
       }
+      if (embeddingData.error) throw new Error(embeddingData.error);
+      if (!embeddingData.embedding) throw new Error("Không nhận được vector embedding từ server.");
 
-      if (savedDocument && savedDocument.error) {
-        throw new Error(savedDocument.error);
+      // Step 2: Prepare the full document data for saving
+      const documentToSave = {
+        ...doc,
+        embedding: embeddingData.embedding,
+      };
+      
+      // Step 3: Save the data from the client-side
+      let savedDocument;
+      if (documentToSave.id) {
+        // Update existing document
+        const { data, error } = await supabase
+          .from('documents')
+          .update(documentToSave)
+          .eq('id', documentToSave.id)
+          .select()
+          .single();
+        if (error) throw error;
+        savedDocument = data;
+      } else {
+        // Insert new document
+        const { id, ...docWithoutId } = documentToSave;
+        const { data, error } = await supabase
+          .from('documents')
+          .insert(docWithoutId)
+          .select()
+          .single();
+        if (error) throw error;
+        savedDocument = data;
+      }
+
+      if (!savedDocument) {
+        throw new Error("Lưu tài liệu thất bại, không nhận được phản hồi từ cơ sở dữ liệu.");
       }
 
       dismissToast(toastId);
@@ -205,16 +239,14 @@ export const DocumentTrainer = () => {
       setIsDialogOpen(false);
       setEditingDocument(null);
 
-      // Update state directly instead of re-fetching
+      // Step 4: Update state directly with the confirmed data
       setDocuments(prevDocs => {
         const docIndex = prevDocs.findIndex(d => d.id === savedDocument.id);
         if (docIndex > -1) {
-          // It's an update, replace the existing document
           const newDocs = [...prevDocs];
           newDocs[docIndex] = savedDocument;
           return newDocs;
         } else {
-          // It's a new document, add it to the beginning of the list
           return [savedDocument, ...prevDocs];
         }
       });
@@ -233,7 +265,7 @@ export const DocumentTrainer = () => {
       showError("Xóa thất bại: " + error.message);
     } else {
       showSuccess("Đã xóa thành công!");
-      fetchDocuments();
+      setDocuments(prev => prev.filter(d => !ids.includes(d.id)));
       setSelectedIds([]);
       setDocToDelete(null);
       setIsBulkDeleteAlertOpen(false);
