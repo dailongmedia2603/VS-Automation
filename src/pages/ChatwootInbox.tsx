@@ -189,7 +189,7 @@ const ChatwootInbox = () => {
       });
       setConversations(enrichedConversations);
       await syncConversationsToDB(enrichedConversations);
-    } catch (err) { console.error("Lỗi polling cuộc trò chuyện:", err);
+    } catch (err: any) { console.error("Lỗi polling cuộc trò chuyện:", err);
     } finally { if (isInitialLoad) setLoadingConversations(false); }
   }, [settings, isAutoReplyEnabled, aiStarLabelId]);
 
@@ -201,7 +201,7 @@ const ChatwootInbox = () => {
       const newMessages = data.payload.sort((a: Message, b: Message) => a.created_at - b.created_at) || [];
       setMessages(current => newMessages.length > current.length ? newMessages : current);
       await syncMessagesToDB(newMessages, convoId);
-    } catch (err) { console.error("Lỗi polling tin nhắn:", err); }
+    } catch (err: any) { console.error("Lỗi polling tin nhắn:", err); }
   };
 
   useEffect(() => {
@@ -294,7 +294,7 @@ const ChatwootInbox = () => {
             supabase.from('chatwoot_contacts').update({ phone_number: phoneNumber }).eq('id', contactId).then();
             supabase.functions.invoke('chatwoot-proxy', {
               body: { action: 'update_contact', settings, contactId, payload: { phone_number: phoneNumber } }
-            }).catch(err => console.error("Failed to update contact phone number:", err));
+            }).catch((err: any) => console.error("Failed to update contact phone number:", err));
             break;
           }
         }
@@ -313,11 +313,11 @@ const ChatwootInbox = () => {
       const fetchedMessages = data.payload.sort((a: Message, b: Message) => a.created_at - b.created_at) || [];
       setMessages(fetchedMessages);
       await syncMessagesToDB(fetchedMessages, conversation.id);
-    } catch (err) { console.error('Đã xảy ra lỗi khi tải tin nhắn.');
+    } catch (err: any) { console.error('Đã xảy ra lỗi khi tải tin nhắn.');
     } finally { setLoadingMessages(false); }
     if (conversation.unread_count > 0) {
       setConversations(convos => convos.map(c => c.id === conversation.id ? { ...c, unread_count: 0 } : c));
-      supabase.functions.invoke('chatwoot-proxy', { body: { action: 'mark_as_read', settings, conversationId: conversation.id }, }).catch(err => console.error("Lỗi ngầm khi đánh dấu đã đọc:", err.message));
+      supabase.functions.invoke('chatwoot-proxy', { body: { action: 'mark_as_read', settings, conversationId: conversation.id }, }).catch((err: any) => console.error("Lỗi ngầm khi đánh dấu đã đọc:", err.message));
     }
   };
 
@@ -432,8 +432,8 @@ const ChatwootInbox = () => {
     );
   };
 
-  const groupMessagesByDate = (messages: Message[]) => {
-    return messages.reduce((acc, message, index) => {
+  const groupedMessages = useMemo(() => {
+    return messages.reduce((acc: ({ type: 'date'; date: string } | { type: 'message'; data: Message })[], message, index) => {
       const messageDate = new Date(message.created_at * 1000);
       const prevMessage = messages[index - 1];
       const prevMessageDate = prevMessage ? new Date(prevMessage.created_at * 1000) : null;
@@ -442,9 +442,8 @@ const ChatwootInbox = () => {
       }
       acc.push({ type: 'message', data: message });
       return acc;
-    }, [] as ({ type: 'date'; date: string } | { type: 'message'; data: Message })[]);
-  };
-  const groupedMessages = groupMessagesByDate(messages);
+    }, []);
+  }, [messages]);
   
   const filteredConversations = useMemo(() => {
     return conversations
