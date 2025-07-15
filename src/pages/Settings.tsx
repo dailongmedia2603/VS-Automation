@@ -34,6 +34,7 @@ const Settings = () => {
         id: 1,
         api_url: localSettings.apiUrl,
         api_key: localSettings.apiKey,
+        embedding_model_name: localSettings.embeddingModelName,
       };
       const { error } = await supabase.from('ai_settings').upsert(dataToSave);
       if (error) throw error;
@@ -139,6 +140,19 @@ const Settings = () => {
               onChange={(e) => setLocalSettings({ ...localSettings, apiKey: e.target.value })}
               className="bg-slate-100 border-none rounded-lg"
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="embedding-model">Embedding Model Name</Label>
+            <Input
+              id="embedding-model"
+              value={localSettings.embeddingModelName}
+              onChange={(e) => setLocalSettings({ ...localSettings, embeddingModelName: e.target.value })}
+              className="bg-slate-100 border-none rounded-lg"
+              placeholder="VD: text-embedding-ada-002"
+            />
+            <p className="text-xs text-muted-foreground">
+              Quan trọng: Điền tên model embedding mà nhà cung cấp API của bạn hỗ trợ.
+            </p>
           </div>
           <Button onClick={handleSave} disabled={isSaving} className="rounded-lg bg-blue-600 hover:bg-blue-700">
             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

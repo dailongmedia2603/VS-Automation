@@ -5,6 +5,7 @@ import { showError } from '@/utils/toast';
 interface ApiSettings {
   apiUrl: string;
   apiKey: string;
+  embeddingModelName: string;
 }
 
 interface ApiSettingsContextType {
@@ -19,6 +20,7 @@ export const ApiSettingsProvider = ({ children }: { children: ReactNode }) => {
   const [settings, setSettings] = useState<ApiSettings>({
     apiUrl: '',
     apiKey: '',
+    embeddingModelName: '',
   });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -40,6 +42,7 @@ export const ApiSettingsProvider = ({ children }: { children: ReactNode }) => {
           const formattedSettings = {
             apiUrl: data.api_url || '',
             apiKey: data.api_key || '',
+            embeddingModelName: data.embedding_model_name || '',
           };
           setSettings(formattedSettings);
         }

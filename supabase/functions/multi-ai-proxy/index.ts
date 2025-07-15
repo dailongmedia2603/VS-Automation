@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, model, input, apiUrl, apiKey } = await req.json();
+    const { messages, model, input, apiUrl, apiKey, embeddingModelName } = await req.json();
 
     if (!apiKey) throw new Error('Missing "apiKey" in request body. Please provide it in the Settings page.');
     if (!apiUrl) throw new Error('Missing "apiUrl" in request body.');
@@ -26,10 +26,15 @@ serve(async (req) => {
         const baseUrl = v1Index !== -1 ? apiUrl.substring(0, v1Index + 3) : apiUrl.replace(/\/$/, '');
         upstreamUrl = `${baseUrl}/embeddings`;
         
-        // Omit the model name intentionally to let the provider use its default, compatible model.
-        upstreamBody = JSON.stringify({
+        const body: { input: string; model?: string } = {
             input: input,
-        });
+        };
+
+        if (embeddingModelName) {
+            body.model = embeddingModelName;
+        }
+        
+        upstreamBody = JSON.stringify(body);
     } 
     // Otherwise, assume it's a chat completion request
     else if (messages) {

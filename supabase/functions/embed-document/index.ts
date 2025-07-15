@@ -25,7 +25,7 @@ serve(async (req) => {
 
     const { data: aiSettings, error: settingsError } = await supabaseAdmin
       .from('ai_settings')
-      .select('api_key, api_url')
+      .select('api_key, api_url, embedding_model_name')
       .eq('id', 1)
       .single()
 
@@ -40,6 +40,7 @@ serve(async (req) => {
             input: textToEmbed,
             apiUrl: aiSettings.api_url,
             apiKey: aiSettings.api_key,
+            embeddingModelName: aiSettings.embedding_model_name,
         }
     });
 
