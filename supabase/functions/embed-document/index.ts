@@ -33,39 +33,26 @@ serve(async (req) => {
       throw new Error('Không tìm thấy hoặc không đầy đủ thông tin API trong cài đặt.')
     }
     
-    const openAIApiKey = aiSettings.api_key;
-    
-    // Correctly derive the embeddings endpoint from the provided API URL
-    const apiUrl = aiSettings.api_url;
-    const v1Index = apiUrl.lastIndexOf('/v1/');
-    const baseUrl = v1Index !== -1 ? apiUrl.substring(0, v1Index + 3) : apiUrl.replace(/\/$/, '');
-    const embeddingUrl = `${baseUrl}/embeddings`;
-
-    // Combine relevant text fields for a richer embedding
     const textToEmbed = `Tiêu đề: ${document.title}\nMục đích: ${document.purpose || ''}\nNội dung: ${document.content}`;
 
-    const embeddingResponse = await fetch(embeddingUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${openAIApiKey}`,
-        },
-        body: JSON.stringify({
-          input: textToEmbed,
-          model: 'text-embedding-ada-002',
-        }),
-      })
+    const { data: proxyResponse, error: proxyError } = await supabaseAdmin.functions.invoke('multi-ai-proxy', {
+        body: {
+            input: textToEmbed,
+            apiUrl: aiSettings.api_url,
+            apiKey: aiSettings.api_key,
+        }
+    });
 
-    if (!embeddingResponse.ok) {
-        const errorBody = await embeddingResponse.json();
-        throw new Error(`Lỗi tạo embedding: ${errorBody.error.message}`);
+    if (proxyError) throw new Error(`Lỗi gọi AI Proxy: ${(await proxyError.context.json()).error || proxyError.message}`);
+    if (proxyResponse.error) throw new Error(`Lỗi từ AI Proxy: ${proxyResponse.error}`);
+    if (!proxyResponse.data || !proxyResponse.data[0] || !proxyResponse.data[0].embedding) {
+        throw new Error('Phản hồi từ proxy không chứa embedding hợp lệ.');
     }
 
-    const { data: [embeddingData] } = await embeddingResponse.json();
-    const embedding = embeddingData.embedding;
+    const embedding = proxyResponse.data[0].embedding;
 
     const documentToUpsert = {
-        id: document.id, // for updates
+        id: document.id,
         title: document.title,
         purpose: document.purpose,
         document_type: document.document_type,

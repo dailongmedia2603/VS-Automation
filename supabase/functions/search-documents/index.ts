@@ -33,37 +33,24 @@ serve(async (req) => {
       throw new Error('Không tìm thấy hoặc không đầy đủ thông tin API trong cài đặt.')
     }
     
-    const openAIApiKey = aiSettings.api_key;
-    
-    // Correctly derive the embeddings endpoint from the provided API URL
-    const apiUrl = aiSettings.api_url;
-    const v1Index = apiUrl.lastIndexOf('/v1/');
-    const baseUrl = v1Index !== -1 ? apiUrl.substring(0, v1Index + 3) : apiUrl.replace(/\/$/, '');
-    const embeddingUrl = `${baseUrl}/embeddings`;
+    const { data: proxyResponse, error: proxyError } = await supabaseAdmin.functions.invoke('multi-ai-proxy', {
+        body: {
+            input: query,
+            apiUrl: aiSettings.api_url,
+            apiKey: aiSettings.api_key,
+        }
+    });
 
-    // Tạo embedding cho câu truy vấn
-    const embeddingResponse = await fetch(embeddingUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${openAIApiKey}`,
-        },
-        body: JSON.stringify({
-          input: query,
-          model: 'text-embedding-ada-002',
-        }),
-      })
-
-    if (!embeddingResponse.ok) {
-        const errorBody = await embeddingResponse.json();
-        throw new Error(`Lỗi tạo embedding cho câu truy vấn: ${errorBody.error.message}`);
+    if (proxyError) throw new Error(`Lỗi gọi AI Proxy: ${(await proxyError.context.json()).error || proxyError.message}`);
+    if (proxyResponse.error) throw new Error(`Lỗi từ AI Proxy: ${proxyResponse.error}`);
+    if (!proxyResponse.data || !proxyResponse.data[0] || !proxyResponse.data[0].embedding) {
+        throw new Error('Phản hồi từ proxy không chứa embedding hợp lệ.');
     }
 
-    const { data: [embeddingData] } = await embeddingResponse.json();
+    const queryEmbedding = proxyResponse.data[0].embedding;
 
-    // Tìm kiếm trong cơ sở dữ liệu vector
     const { data: documents, error: matchError } = await supabaseAdmin.rpc('match_documents', {
-      query_embedding: embeddingData.embedding,
+      query_embedding: queryEmbedding,
       match_threshold: 0.78, // Ngưỡng tương đồng, có thể điều chỉnh
       match_count: 5, // Số lượng kết quả trả về
     })

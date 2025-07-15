@@ -12,31 +12,48 @@ serve(async (req) => {
   }
 
   try {
-    // Nhận API Key và model từ body của request
-    const { messages, apiUrl, apiKey, model } = await req.json();
+    const { messages, model, input, apiUrl, apiKey } = await req.json();
 
-    if (!apiKey) {
-      throw new Error('Missing "apiKey" in request body. Please provide it in the Settings page.');
-    }
-    if (!messages || !Array.isArray(messages) || messages.length === 0) {
-        throw new Error('Missing or invalid "messages" in request body.');
-    }
-    if (!apiUrl) {
-        throw new Error('Missing "apiUrl" in request body.');
-    }
+    if (!apiKey) throw new Error('Missing "apiKey" in request body. Please provide it in the Settings page.');
+    if (!apiUrl) throw new Error('Missing "apiUrl" in request body.');
 
-    const upstreamResponse = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`, // Sử dụng API Key từ client
-        },
-        body: JSON.stringify({
-            model: model || 'gpt-4o', // Sử dụng model được truyền vào, mặc định là gpt-4o
+    let upstreamUrl;
+    let upstreamBody;
+
+    // Check if it's an embedding request by looking for the 'input' key
+    if (input) {
+        const v1Index = apiUrl.lastIndexOf('/v1/');
+        const baseUrl = v1Index !== -1 ? apiUrl.substring(0, v1Index + 3) : apiUrl.replace(/\/$/, '');
+        upstreamUrl = `${baseUrl}/embeddings`;
+        
+        // Omit the model name intentionally to let the provider use its default, compatible model.
+        upstreamBody = JSON.stringify({
+            input: input,
+        });
+    } 
+    // Otherwise, assume it's a chat completion request
+    else if (messages) {
+        if (!Array.isArray(messages) || messages.length === 0) {
+            throw new Error('Invalid "messages" in request body.');
+        }
+        upstreamUrl = apiUrl;
+        upstreamBody = JSON.stringify({
+            model: model || 'gpt-4o',
             messages: messages,
             max_tokens: 2048,
             stream: false,
-        }),
+        });
+    } else {
+        throw new Error('Request body must contain either "messages" for chat or "input" for embedding.');
+    }
+
+    const upstreamResponse = await fetch(upstreamUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+        },
+        body: upstreamBody,
     });
 
     const responseText = await upstreamResponse.text();
