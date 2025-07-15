@@ -20,7 +20,7 @@ type StaffMember = {
   name: string;
   role: string;
   email: string;
-  avatar_url: string;
+  avatar_url: string | null; // Đã sửa: cho phép avatar_url là null
   status: 'active' | 'inactive';
 };
 
@@ -159,7 +159,7 @@ const Staff = () => {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <Avatar>
-                            <AvatarImage src={staff.avatar_url} alt={staff.name} />
+                            <AvatarImage src={staff.avatar_url ?? undefined} alt={staff.name} /> {/* Đã sửa: sử dụng ?? undefined */}
                             <AvatarFallback>{staff.name.charAt(0)}</AvatarFallback>
                           </Avatar>
                           <div>
