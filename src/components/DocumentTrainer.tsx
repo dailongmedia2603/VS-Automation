@@ -56,42 +56,39 @@ const DocumentDialog = ({ isOpen, onOpenChange, onSave, document, user }: { isOp
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{document?.id ? 'Sửa tài liệu' : 'Thêm tài liệu mới'}</DialogTitle>
+          <DialogDescription>Điền thông tin chi tiết cho tài liệu huấn luyện.</DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="title" className="text-right">Tiêu đề</Label>
-            <Input id="title" value={currentDoc.title || ''} onChange={e => setCurrentDoc(d => ({ ...d, title: e.target.value }))} className="col-span-3" />
+        <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-4">
+          <div className="space-y-2">
+            <Label htmlFor="title">Tiêu đề</Label>
+            <Input id="title" value={currentDoc.title || ''} onChange={e => setCurrentDoc(d => ({ ...d, title: e.target.value }))} className="bg-slate-100 border-none rounded-lg" />
           </div>
-          <div className="grid grid-cols-4 items-start gap-4">
-            <div className="text-right pt-2">
-              <Label htmlFor="purpose">Mục đích</Label>
-              <p className="text-xs text-muted-foreground">Để AI hiểu mục tiêu khi đọc nội dung này.</p>
-            </div>
-            <Textarea id="purpose" value={currentDoc.purpose || ''} onChange={e => setCurrentDoc(d => ({ ...d, purpose: e.target.value }))} className="col-span-3" />
+          <div className="space-y-2">
+            <Label htmlFor="purpose">Mục đích</Label>
+            <Textarea id="purpose" value={currentDoc.purpose || ''} onChange={e => setCurrentDoc(d => ({ ...d, purpose: e.target.value }))} className="bg-slate-100 border-none rounded-lg" />
+            <p className="text-xs text-muted-foreground">Để AI hiểu mục tiêu khi đọc nội dung này.</p>
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="document_type" className="text-right">Loại tài liệu</Label>
-            <Input id="document_type" value={currentDoc.document_type || ''} onChange={e => setCurrentDoc(d => ({ ...d, document_type: e.target.value }))} className="col-span-3" />
+          <div className="space-y-2">
+            <Label htmlFor="document_type">Loại tài liệu</Label>
+            <Input id="document_type" value={currentDoc.document_type || ''} onChange={e => setCurrentDoc(d => ({ ...d, document_type: e.target.value }))} className="bg-slate-100 border-none rounded-lg" />
           </div>
-          <div className="grid grid-cols-4 items-start gap-4">
-            <Label htmlFor="content" className="text-right pt-2">Nội dung</Label>
-            <Textarea id="content" value={currentDoc.content || ''} onChange={e => setCurrentDoc(d => ({ ...d, content: e.target.value }))} className="col-span-3 min-h-[120px]" />
+          <div className="space-y-2">
+            <Label htmlFor="content">Nội dung</Label>
+            <Textarea id="content" value={currentDoc.content || ''} onChange={e => setCurrentDoc(d => ({ ...d, content: e.target.value }))} className="bg-slate-100 border-none rounded-lg min-h-[120px]" />
           </div>
-          <div className="grid grid-cols-4 items-start gap-4">
-            <Label htmlFor="example_customer_message" className="text-right pt-2">Ví dụ tin nhắn KH</Label>
-            <Textarea id="example_customer_message" value={currentDoc.example_customer_message || ''} onChange={e => setCurrentDoc(d => ({ ...d, example_customer_message: e.target.value }))} className="col-span-3" />
+          <div className="space-y-2">
+            <Label htmlFor="example_customer_message">Ví dụ tin nhắn KH</Label>
+            <Textarea id="example_customer_message" value={currentDoc.example_customer_message || ''} onChange={e => setCurrentDoc(d => ({ ...d, example_customer_message: e.target.value }))} className="bg-slate-100 border-none rounded-lg" />
           </div>
-          <div className="grid grid-cols-4 items-start gap-4">
-            <div className="text-right pt-2">
-              <Label htmlFor="example_agent_reply">Ví dụ tin nhắn trả lời</Label>
-              <p className="text-xs text-muted-foreground">Dựa theo nội dung tài liệu để trả lời.</p>
-            </div>
-            <Textarea id="example_agent_reply" value={currentDoc.example_agent_reply || ''} onChange={e => setCurrentDoc(d => ({ ...d, example_agent_reply: e.target.value }))} className="col-span-3" />
+          <div className="space-y-2">
+            <Label htmlFor="example_agent_reply">Ví dụ tin nhắn trả lời</Label>
+            <Textarea id="example_agent_reply" value={currentDoc.example_agent_reply || ''} onChange={e => setCurrentDoc(d => ({ ...d, example_agent_reply: e.target.value }))} className="bg-slate-100 border-none rounded-lg" />
+            <p className="text-xs text-muted-foreground">Dựa theo nội dung tài liệu để trả lời.</p>
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Hủy</Button>
-          <Button onClick={handleSave} disabled={isSaving}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-lg">Hủy</Button>
+          <Button onClick={handleSave} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700 rounded-lg">
             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Lưu
           </Button>
@@ -135,7 +132,7 @@ const DocumentDetailDialog = ({ isOpen, onOpenChange, document }: { isOpen: bool
           </div>
         </div>
         <DialogFooter>
-          <Button onClick={() => onOpenChange(false)}>Đóng</Button>
+          <Button onClick={() => onOpenChange(false)} className="rounded-lg">Đóng</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -378,8 +375,8 @@ export const DocumentTrainer = () => {
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>Bạn có chắc chắn?</AlertDialogTitle><AlertDialogDescription>Hành động này sẽ xóa vĩnh viễn tài liệu "{docToDelete?.title}".</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Hủy</AlertDialogCancel>
-            <AlertDialogAction onClick={() => handleDelete([docToDelete!.id])}>Xóa</AlertDialogAction>
+            <AlertDialogCancel className="rounded-lg">Hủy</AlertDialogCancel>
+            <AlertDialogAction onClick={() => handleDelete([docToDelete!.id])} className="bg-red-600 hover:bg-red-700 rounded-lg">Xóa</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -387,8 +384,8 @@ export const DocumentTrainer = () => {
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>Xóa hàng loạt?</AlertDialogTitle><AlertDialogDescription>Bạn có chắc chắn muốn xóa {selectedIds.length} tài liệu đã chọn không?</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Hủy</AlertDialogCancel>
-            <AlertDialogAction onClick={() => handleDelete(selectedIds)}>Xóa</AlertDialogAction>
+            <AlertDialogCancel className="rounded-lg">Hủy</AlertDialogCancel>
+            <AlertDialogAction onClick={() => handleDelete(selectedIds)} className="bg-red-600 hover:bg-red-700 rounded-lg">Xóa</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

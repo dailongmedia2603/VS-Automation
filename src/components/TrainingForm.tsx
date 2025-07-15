@@ -351,11 +351,11 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig, i
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="doc-type">Loại tài liệu</Label>
-              <Input id="doc-type" placeholder="VD: Bảng giá, Chính sách" value={newDocType} onChange={(e) => setNewDocType(e.target.value)} />
+              <Input id="doc-type" placeholder="VD: Bảng giá, Chính sách" value={newDocType} onChange={(e) => setNewDocType(e.target.value)} className="bg-slate-100 border-none rounded-lg" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="doc-purpose">Mục đích</Label>
-              <Input id="doc-purpose" placeholder="VD: Cung cấp thông tin khuyến mãi tháng 7" value={newDocPurpose} onChange={(e) => setNewDocPurpose(e.target.value)} />
+              <Input id="doc-purpose" placeholder="VD: Cung cấp thông tin khuyến mãi tháng 7" value={newDocPurpose} onChange={(e) => setNewDocPurpose(e.target.value)} className="bg-slate-100 border-none rounded-lg" />
             </div>
             <div className="space-y-2">
               <Label>Tệp tài liệu</Label>
@@ -366,8 +366,8 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig, i
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddDocDialogOpen(false)}>Hủy</Button>
-            <Button onClick={handleAddNewDocument} className="bg-blue-600 hover:bg-blue-700">Thêm</Button>
+            <Button variant="outline" onClick={() => setIsAddDocDialogOpen(false)} className="rounded-lg">Hủy</Button>
+            <Button onClick={handleAddNewDocument} className="bg-blue-600 hover:bg-blue-700 rounded-lg">Thêm</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -382,16 +382,16 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig, i
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="edit-doc-type">Loại tài liệu</Label>
-              <Input id="edit-doc-type" value={newDocType} onChange={(e) => setNewDocType(e.target.value)} />
+              <Input id="edit-doc-type" value={newDocType} onChange={(e) => setNewDocType(e.target.value)} className="bg-slate-100 border-none rounded-lg" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-doc-purpose">Mục đích</Label>
-              <Input id="edit-doc-purpose" value={newDocPurpose} onChange={(e) => setNewDocPurpose(e.target.value)} />
+              <Input id="edit-doc-purpose" value={newDocPurpose} onChange={(e) => setNewDocPurpose(e.target.value)} className="bg-slate-100 border-none rounded-lg" />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDocDialogOpen(false)}>Hủy</Button>
-            <Button onClick={handleUpdateDocument} className="bg-blue-600 hover:bg-blue-700">Cập nhật</Button>
+            <Button variant="outline" onClick={() => setIsEditDocDialogOpen(false)} className="rounded-lg">Hủy</Button>
+            <Button onClick={handleUpdateDocument} className="bg-blue-600 hover:bg-blue-700 rounded-lg">Cập nhật</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
