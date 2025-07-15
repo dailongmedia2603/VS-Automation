@@ -13,10 +13,9 @@ serve(async (req) => {
   }
 
   try {
-    // Expect an array of text chunks
-    const { chunks } = await req.json()
-    if (!chunks || !Array.isArray(chunks) || chunks.length === 0) {
-      throw new Error("Yêu cầu thiếu 'chunks' hoặc chunks rỗng.")
+    const { document } = await req.json()
+    if (!document || !document.content || !document.title) {
+      throw new Error("Yêu cầu thiếu thông tin tài liệu (title, content).")
     }
 
     const supabaseAdmin = createClient(
@@ -24,7 +23,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Get AI API settings
     const { data: aiSettings, error: settingsError } = await supabaseAdmin
       .from('ai_settings')
       .select('api_key, api_url')
@@ -38,7 +36,9 @@ serve(async (req) => {
     const openAIApiKey = aiSettings.api_key;
     const embeddingUrl = `${aiSettings.api_url.replace(/\/v1\/?$/, '')}/v1/embeddings`;
 
-    // Create embeddings for the chunks
+    // Combine relevant text fields for a richer embedding
+    const textToEmbed = `Tiêu đề: ${document.title}\nMục đích: ${document.purpose || ''}\nNội dung: ${document.content}`;
+
     const embeddingResponse = await fetch(embeddingUrl, {
         method: 'POST',
         headers: {
@@ -46,7 +46,7 @@ serve(async (req) => {
           'Authorization': `Bearer ${openAIApiKey}`,
         },
         body: JSON.stringify({
-          input: chunks,
+          input: textToEmbed,
           model: 'text-embedding-3-small',
         }),
       })
@@ -56,21 +56,32 @@ serve(async (req) => {
         throw new Error(`Lỗi tạo embedding: ${errorBody.error.message}`);
     }
 
-    const { data: embeddings } = await embeddingResponse.json();
+    const { data: [embeddingData] } = await embeddingResponse.json();
+    const embedding = embeddingData.embedding;
 
-    const documentsToInsert = chunks.map((chunk, i) => ({
-      content: chunk,
-      embedding: embeddings[i].embedding,
-      metadata: { source: 'manual-input' }, // Mark as manually inputted
-    }))
+    const documentToUpsert = {
+        id: document.id, // for updates
+        title: document.title,
+        purpose: document.purpose,
+        document_type: document.document_type,
+        content: document.content,
+        example_customer_message: document.example_customer_message,
+        example_agent_reply: document.example_agent_reply,
+        creator_name: document.creator_name,
+        embedding: embedding,
+    };
 
-    // Insert into the database
-    const { error: insertError } = await supabaseAdmin.from('documents').insert(documentsToInsert)
-    if (insertError) {
-      throw new Error(`Lỗi lưu vào cơ sở dữ liệu: ${insertError.message}`)
+    const { data: upsertedDocument, error: upsertError } = await supabaseAdmin
+      .from('documents')
+      .upsert(documentToUpsert)
+      .select()
+      .single();
+
+    if (upsertError) {
+      throw new Error(`Lỗi lưu vào cơ sở dữ liệu: ${upsertError.message}`)
     }
 
-    return new Response(JSON.stringify({ message: `Đã xử lý và lưu trữ thành công ${chunks.length} đoạn.` }), {
+    return new Response(JSON.stringify(upsertedDocument), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error) {
