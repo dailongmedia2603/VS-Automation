@@ -6,9 +6,6 @@ interface ApiSettings {
   apiUrl: string;
   apiKey: string;
   embeddingModelName: string;
-  openaiApiUrl: string;
-  openaiApiKey: string;
-  openaiEmbeddingModel: string;
 }
 
 interface ApiSettingsContextType {
@@ -23,10 +20,7 @@ export const ApiSettingsProvider = ({ children }: { children: ReactNode }) => {
   const [settings, setSettings] = useState<ApiSettings>({
     apiUrl: '',
     apiKey: '',
-    embeddingModelName: '',
-    openaiApiUrl: 'https://api.openai.com/v1',
-    openaiApiKey: '',
-    openaiEmbeddingModel: 'text-embedding-3-small',
+    embeddingModelName: 'text-embedding-3-small',
   });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -36,7 +30,7 @@ export const ApiSettingsProvider = ({ children }: { children: ReactNode }) => {
       try {
         const { data, error } = await supabase
           .from('ai_settings')
-          .select('*')
+          .select('api_url, api_key, embedding_model_name')
           .eq('id', 1)
           .single();
 
@@ -48,10 +42,7 @@ export const ApiSettingsProvider = ({ children }: { children: ReactNode }) => {
           const formattedSettings = {
             apiUrl: data.api_url || '',
             apiKey: data.api_key || '',
-            embeddingModelName: data.embedding_model_name || '',
-            openaiApiUrl: data.openai_api_url || 'https://api.openai.com/v1',
-            openaiApiKey: data.openai_api_key || '',
-            openaiEmbeddingModel: data.openai_embedding_model || 'text-embedding-3-small',
+            embeddingModelName: data.embedding_model_name || 'text-embedding-3-small',
           };
           setSettings(formattedSettings);
         }

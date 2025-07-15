@@ -25,20 +25,20 @@ serve(async (req) => {
 
     const { data: aiSettings, error: settingsError } = await supabaseAdmin
       .from('ai_settings')
-      .select('openai_api_key, openai_api_url, openai_embedding_model')
+      .select('api_url, api_key, embedding_model_name')
       .eq('id', 1)
       .single()
 
-    if (settingsError || !aiSettings || !aiSettings.openai_api_key || !aiSettings.openai_api_url) {
-      throw new Error('Vui lòng cấu hình API Embedding của OpenAI trong trang Cài đặt API AI.')
+    if (settingsError || !aiSettings || !aiSettings.api_key || !aiSettings.api_url) {
+      throw new Error('Vui lòng cấu hình API trong trang Cài đặt API AI.')
     }
     
     const { data: proxyResponse, error: proxyError } = await supabaseAdmin.functions.invoke('multi-ai-proxy', {
         body: {
             input: query,
-            apiUrl: aiSettings.openai_api_url,
-            apiKey: aiSettings.openai_api_key,
-            embeddingModelName: aiSettings.openai_embedding_model,
+            apiUrl: aiSettings.api_url,
+            apiKey: aiSettings.api_key,
+            embeddingModelName: aiSettings.embedding_model_name,
         }
     });
 
