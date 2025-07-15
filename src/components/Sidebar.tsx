@@ -160,13 +160,13 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
       </Button>
 
       {/* Logo */}
-      <div className={cn("flex items-center h-10", isCollapsed ? "justify-center" : "px-2")}>
+      <div className={cn("flex items-center", isCollapsed ? "justify-center h-10" : "")}>
         {isCollapsed ? (
           <div className="bg-blue-600 rounded-lg p-2 flex items-center justify-center">
             <Briefcase className="h-5 w-5 text-white" />
           </div>
         ) : (
-          <img src="https://i.postimg.cc/FKZ4J3f4/nen-trong-size-lon.png" alt="HEXO Logo" className="h-10 w-auto" />
+          <img src="https://i.postimg.cc/FKZ4J3f4/nen-trong-size-lon.png" alt="HEXO Logo" className="w-full h-auto" />
         )}
       </div>
 
