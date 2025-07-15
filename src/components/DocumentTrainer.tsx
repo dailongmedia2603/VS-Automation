@@ -11,8 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { PlusCircle, Search, Trash2, Loader2, Edit, FileText, Info, ChevronsUpDown, User, Calendar } from 'lucide-react';
+import { PlusCircle, Search, Trash2, Loader2, Edit, FileText, User, Calendar, MessageSquare, Bot } from 'lucide-react';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -102,37 +101,65 @@ const DocumentDialog = ({ isOpen, onOpenChange, onSave, document, user }: { isOp
   );
 };
 
-const DocumentCard = ({ document, onSelect, isSelected, onEdit, onDelete }: { document: Document, onSelect: (id: number, checked: boolean) => void, isSelected: boolean, onEdit: () => void, onDelete: () => void }) => {
+const DocumentDetailDialog = ({ isOpen, onOpenChange, document }: { isOpen: boolean, onOpenChange: (open: boolean) => void, document: Document | null }) => {
+  if (!document) return null;
+
+  const DetailSection = ({ title, content }: { title: string, content: string | null | undefined }) => (
+    content ? (
+      <div className="space-y-2">
+        <h4 className="text-sm font-semibold text-slate-500">{title}</h4>
+        <div className="p-3 bg-slate-50 rounded-md text-sm text-slate-700 whitespace-pre-wrap">{content}</div>
+      </div>
+    ) : null
+  );
+
   return (
-    <Card className="flex flex-col">
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="text-xl">{document.title}</DialogTitle>
+          <DialogDescription>
+            <div className="flex items-center gap-4 text-xs text-muted-foreground mt-1">
+              <div className="flex items-center gap-1.5"><User className="h-3 w-3" /><span>{document.creator_name || 'Không rõ'}</span></div>
+              <div className="flex items-center gap-1.5"><Calendar className="h-3 w-3" /><span>{format(new Date(document.created_at), 'dd/MM/yyyy')}</span></div>
+              <div className="flex items-center gap-1.5"><FileText className="h-3 w-3" /><span>{document.document_type || 'Chung'}</span></div>
+            </div>
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-4">
+          <DetailSection title="Mục đích" content={document.purpose} />
+          <DetailSection title="Nội dung chính" content={document.content} />
+          <div className="grid grid-cols-2 gap-4">
+            <DetailSection title="Ví dụ tin nhắn khách hàng" content={document.example_customer_message} />
+            <DetailSection title="Ví dụ AI trả lời" content={document.example_agent_reply} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button onClick={() => onOpenChange(false)}>Đóng</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+const DocumentCard = ({ document, onSelect, isSelected, onEdit, onDelete, onView }: { document: Document, onSelect: (id: number, checked: boolean) => void, isSelected: boolean, onEdit: () => void, onDelete: () => void, onView: () => void }) => {
+  return (
+    <Card className="flex flex-col transition-all hover:shadow-md hover:-translate-y-1">
       <CardHeader className="flex flex-row items-start gap-4 space-y-0 p-4">
         <Checkbox checked={isSelected} onCheckedChange={(checked) => onSelect(document.id, !!checked)} className="mt-1" />
-        <div className="flex-1">
+        <div className="flex-1 cursor-pointer" onClick={onView}>
           <CardTitle className="text-base">{document.title}</CardTitle>
-          <div className="flex items-center gap-4 text-xs text-muted-foreground mt-1">
-            <div className="flex items-center gap-1.5"><User className="h-3 w-3" /><span>{document.creator_name || 'Không rõ'}</span></div>
-            <div className="flex items-center gap-1.5"><Calendar className="h-3 w-3" /><span>{format(new Date(document.created_at), 'dd/MM/yyyy')}</span></div>
-          </div>
-        </div>
-        <div className="flex items-center">
-          <Button variant="ghost" size="icon" onClick={onEdit}><Edit className="h-4 w-4" /></Button>
-          <Button variant="ghost" size="icon" onClick={onDelete}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+          <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{document.content}</p>
         </div>
       </CardHeader>
-      <CardContent className="p-4 pt-0 flex-1">
-        <Collapsible>
-          <div className="text-sm text-muted-foreground space-y-1 max-h-24 overflow-hidden">
-            <p>{document.content}</p>
+      <CardContent className="p-4 pt-0 mt-auto">
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5"><User className="h-3 w-3" /><span>{document.creator_name || 'Không rõ'}</span></div>
+          <div className="flex items-center">
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit}><Edit className="h-4 w-4" /></Button>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onDelete}><Trash2 className="h-4 w-4 text-destructive" /></Button>
           </div>
-          <CollapsibleTrigger asChild>
-            <button className="text-sm text-blue-600 font-medium mt-2 flex items-center">
-              Xem thêm <ChevronsUpDown className="h-4 w-4 ml-1" />
-            </button>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <p className="text-sm text-muted-foreground mt-2 whitespace-pre-wrap">{document.content}</p>
-          </CollapsibleContent>
-        </Collapsible>
+        </div>
       </CardContent>
     </Card>
   );
@@ -143,8 +170,10 @@ export const DocumentTrainer = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [editingDocument, setEditingDocument] = useState<Partial<Document> | null>(null);
+  const [viewingDocument, setViewingDocument] = useState<Document | null>(null);
   const [docToDelete, setDocToDelete] = useState<Document | null>(null);
   const [isBulkDeleteAlertOpen, setIsBulkDeleteAlertOpen] = useState(false);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 20 });
@@ -189,7 +218,6 @@ export const DocumentTrainer = () => {
   const handleSave = async (doc: Partial<Document>) => {
     const toastId = showLoading("Đang xử lý và nhúng dữ liệu...");
     try {
-      // Step 1: Get the embedding vector from the edge function
       const textToEmbed = `Tiêu đề: ${doc.title}\nMục đích: ${doc.purpose || ''}\nNội dung: ${doc.content}`;
       const { data: embeddingData, error: functionError } = await supabase.functions.invoke('embed-document', { body: { textToEmbed } });
 
@@ -200,46 +228,27 @@ export const DocumentTrainer = () => {
       if (embeddingData.error) throw new Error(embeddingData.error);
       if (!embeddingData.embedding) throw new Error("Không nhận được vector embedding từ server.");
 
-      // Step 2: Prepare the full document data for saving
-      const documentToSave = {
-        ...doc,
-        embedding: embeddingData.embedding,
-      };
+      const documentToSave = { ...doc, embedding: embeddingData.embedding };
       
-      // Step 3: Save the data from the client-side
       let savedDocument;
       if (documentToSave.id) {
-        // Update existing document
-        const { data, error } = await supabase
-          .from('documents')
-          .update(documentToSave)
-          .eq('id', documentToSave.id)
-          .select()
-          .single();
+        const { data, error } = await supabase.from('documents').update(documentToSave).eq('id', documentToSave.id).select().single();
         if (error) throw error;
         savedDocument = data;
       } else {
-        // Insert new document
         const { id, ...docWithoutId } = documentToSave;
-        const { data, error } = await supabase
-          .from('documents')
-          .insert(docWithoutId)
-          .select()
-          .single();
+        const { data, error } = await supabase.from('documents').insert(docWithoutId).select().single();
         if (error) throw error;
         savedDocument = data;
       }
 
-      if (!savedDocument) {
-        throw new Error("Lưu tài liệu thất bại, không nhận được phản hồi từ cơ sở dữ liệu.");
-      }
+      if (!savedDocument) throw new Error("Lưu tài liệu thất bại.");
 
       dismissToast(toastId);
       showSuccess("Đã lưu tài liệu thành công!");
-      setIsDialogOpen(false);
+      setIsAddEditDialogOpen(false);
       setEditingDocument(null);
 
-      // Step 4: Update state directly with the confirmed data
       setDocuments(prevDocs => {
         const docIndex = prevDocs.findIndex(d => d.id === savedDocument.id);
         if (docIndex > -1) {
@@ -276,10 +285,6 @@ export const DocumentTrainer = () => {
     setSelectedIds(prev => checked ? [...prev, id] : prev.filter(i => i !== id));
   };
 
-  const handleSelectAll = (checked: boolean) => {
-    setSelectedIds(checked ? paginatedDocuments.map(d => d.id) : []);
-  };
-
   return (
     <>
       <div className="space-y-6 mt-6">
@@ -290,7 +295,7 @@ export const DocumentTrainer = () => {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input placeholder="Tìm kiếm tài liệu..." className="pl-9" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
               </div>
-              <Button onClick={() => { setEditingDocument(null); setIsDialogOpen(true); }}>
+              <Button onClick={() => { setEditingDocument(null); setIsAddEditDialogOpen(true); }}>
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Thêm tài liệu
               </Button>
@@ -318,7 +323,8 @@ export const DocumentTrainer = () => {
                     document={doc}
                     isSelected={selectedIds.includes(doc.id)}
                     onSelect={handleSelect}
-                    onEdit={() => { setEditingDocument(doc); setIsDialogOpen(true); }}
+                    onView={() => { setViewingDocument(doc); setIsDetailDialogOpen(true); }}
+                    onEdit={() => { setEditingDocument(doc); setIsAddEditDialogOpen(true); }}
                     onDelete={() => setDocToDelete(doc)}
                   />
                 ))}
@@ -366,7 +372,8 @@ export const DocumentTrainer = () => {
           </div>
         )}
       </div>
-      <DocumentDialog isOpen={isDialogOpen} onOpenChange={setIsDialogOpen} onSave={handleSave} document={editingDocument} user={user} />
+      <DocumentDialog isOpen={isAddEditDialogOpen} onOpenChange={setIsAddEditDialogOpen} onSave={handleSave} document={editingDocument} user={user} />
+      <DocumentDetailDialog isOpen={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen} document={viewingDocument} />
       <AlertDialog open={!!docToDelete} onOpenChange={() => setDocToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>Bạn có chắc chắn?</AlertDialogTitle><AlertDialogDescription>Hành động này sẽ xóa vĩnh viễn tài liệu "{docToDelete?.title}".</AlertDialogDescription></AlertDialogHeader>
