@@ -1,85 +1,79 @@
 import React from 'react';
-import { TrainingConfig } from './TrainingForm';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-
-interface TrainingPreviewProps {
-  config: TrainingConfig;
-}
+import { TrainingConfig, TrainingItem } from './TrainingForm';
 
 const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-  <div>
-    <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">{title}</h3>
-    <div className="text-slate-800 space-y-1">{children}</div>
+  <div className="mb-6">
+    <h3 className="text-lg font-semibold text-slate-800 border-b pb-2 mb-3">{title}</h3>
+    {children}
   </div>
 );
 
-const Value: React.FC<{ label: string; value: string | undefined | null }> = ({ label, value }) => (
-  value ? <p><span className="font-semibold">{label}:</span> {value}</p> : null
+const Detail: React.FC<{ label: string; value?: string | null }> = ({ label, value }) => (
+  <div className="grid grid-cols-3 gap-4 text-sm mb-2">
+    <dt className="font-medium text-slate-500">{label}</dt>
+    <dd className="col-span-2 text-slate-700">{value || <span className="italic text-slate-400">Chưa có</span>}</dd>
+  </div>
 );
 
-const List: React.FC<{ label: string; items: { value: string }[] }> = ({ label, items }) => (
-  items.length > 0 ? (
-    <div>
-      <p className="font-semibold">{label}:</p>
-      <ul className="list-disc pl-6 mt-1">
-        {items.map((item, index) => (
-          <li key={index}>{item.value}</li>
-        ))}
-      </ul>
-    </div>
-  ) : null
+const ListDetail: React.FC<{ label: string; items: TrainingItem[]; prefix?: string }> = ({ label, items, prefix }) => (
+  <div>
+    <dt className="font-medium text-slate-500 text-sm mb-2">{label}</dt>
+    <dd className="col-span-2 text-slate-700 text-sm">
+      {items.length > 0 ? (
+        <ul className="list-disc pl-5 space-y-1">
+          {items.map((item, index) => (
+            <li key={item.id}>{prefix && `${prefix} ${index + 1}: `}{item.value}</li>
+          ))}
+        </ul>
+      ) : (
+        <span className="italic text-slate-400">Chưa có</span>
+      )}
+    </dd>
+  </div>
 );
 
-const PrefixedList: React.FC<{ label: string; items: { value: string }[]; prefix: string }> = ({ label, items, prefix }) => (
-  items.length > 0 ? (
-    <div>
-      <p className="font-semibold">{label}:</p>
-      <ol className="list-none pl-0 mt-1 space-y-1">
-        {items.map((item, index) => (
-          <li key={index}><span className="font-semibold">{prefix} {index + 1}:</span> {item.value}</li>
-        ))}
-      </ol>
-    </div>
-  ) : null
-);
-
-const TrainingPreview: React.FC<TrainingPreviewProps> = ({ config }) => {
+const TrainingPreview: React.FC<{ config: TrainingConfig }> = ({ config }) => {
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Thông tin cơ bản</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Value label="Lĩnh vực / Ngành nghề" value={config.industry} />
-          <Value label="Vai trò của AI" value={config.role} />
-          <List label="Sản phẩm / Dịch vụ" items={config.products} />
-        </CardContent>
-      </Card>
+    <div className="max-h-[70vh] overflow-y-auto p-1">
+      <Section title="Thông tin cơ bản">
+        <Detail label="Lĩnh vực / Ngành nghề" value={config.industry} />
+        <Detail label="Vai trò của AI" value={config.role} />
+        <div className="mt-4">
+          <ListDetail label="Danh sách sản phẩm / dịch vụ" items={config.products} />
+        </div>
+      </Section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Phong cách & Tông giọng</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <Value label="Phong cách trả lời" value={config.style} />
-          <Value label="Tông giọng trả lời" value={config.tone} />
-          <Value label="Ngôn ngữ" value={config.language} />
-          <Value label="Page xưng hô" value={config.pronouns} />
-          <Value label="Khách hàng xưng hô" value={config.customerPronouns} />
-          <Value label="Mục tiêu trò chuyện" value={config.goal} />
-        </CardContent>
-      </Card>
+      <Section title="Phong cách & Tông giọng">
+        <Detail label="Phong cách trả lời" value={config.style} />
+        <Detail label="Tông giọng trả lời" value={config.tone} />
+        <Detail label="Ngôn ngữ trả lời" value={config.language} />
+        <Detail label="Page xưng hô là" value={config.pronouns} />
+        <Detail label="KH xưng hô là" value={config.customerPronouns} />
+        <Detail label="Mục tiêu trò chuyện" value={config.goal} />
+      </Section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Quy trình và Điều kiện</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <PrefixedList label="Quy trình tư vấn" items={config.processSteps} prefix="Bước" />
-          <PrefixedList label="Điều kiện bắt buộc" items={config.conditions} prefix="Điều kiện" />
-        </CardContent>
-      </Card>
+      <Section title="Quy trình và Điều kiện">
+        <div className="mb-4">
+          <ListDetail label="Quy trình tư vấn" items={config.processSteps} prefix="Bước" />
+        </div>
+        <div>
+          <ListDetail label="Điều kiện bắt buộc" items={config.conditions} prefix="Điều kiện" />
+        </div>
+      </Section>
+
+      <Section title="Tài liệu tham khảo">
+        {config.documents.length > 0 ? (
+          <ul className="space-y-2">
+            {config.documents.map(doc => (
+              <li key={doc.id} className="text-sm text-slate-700 p-2 bg-slate-50 rounded-md">
+                <strong>{doc.name}</strong> ({doc.type}) - <em>{doc.purpose}</em>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="italic text-slate-400 text-sm">Không có tài liệu nào.</p>
+        )}
+      </Section>
     </div>
   );
 };
