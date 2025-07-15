@@ -52,8 +52,7 @@ serve(async (req) => {
 
     const embedding = proxyResponse.data[0].embedding;
 
-    const documentToUpsert = {
-        id: document.id,
+    const documentData = {
         title: document.title,
         purpose: document.purpose,
         document_type: document.document_type,
@@ -64,17 +63,35 @@ serve(async (req) => {
         embedding: embedding,
     };
 
-    const { data: upsertedDocument, error: upsertError } = await supabaseAdmin
-      .from('documents')
-      .upsert(documentToUpsert)
-      .select()
-      .single();
+    let savedDocument;
+    let dbError;
 
-    if (upsertError) {
-      throw new Error(`Lỗi lưu vào cơ sở dữ liệu: ${upsertError.message}`)
+    if (document.id) {
+      // This is an update
+      const { data, error } = await supabaseAdmin
+        .from('documents')
+        .update(documentData)
+        .eq('id', document.id)
+        .select()
+        .single();
+      savedDocument = data;
+      dbError = error;
+    } else {
+      // This is an insert
+      const { data, error } = await supabaseAdmin
+        .from('documents')
+        .insert(documentData)
+        .select()
+        .single();
+      savedDocument = data;
+      dbError = error;
     }
 
-    return new Response(JSON.stringify(upsertedDocument), {
+    if (dbError) {
+      throw new Error(`Lỗi lưu vào cơ sở dữ liệu: ${dbError.message}`)
+    }
+
+    return new Response(JSON.stringify(savedDocument), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error) {
