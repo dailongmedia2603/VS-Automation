@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Mail, Phone, Building, Send, Loader2, PlusCircle, Calendar, Clock, Trash2, Pencil, ImagePlus, Bot, ShoppingBag, Check } from "lucide-react";
+import { FileText, Phone, Send, Loader2, PlusCircle, Calendar, Clock, Trash2, Pencil, ImagePlus, Bot, ShoppingBag, Check } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useChatwoot } from '@/contexts/ChatwootContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,28 +15,9 @@ import { cn } from '@/lib/utils';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Conversation, Message, CareScript, CareScriptStatus } from '@/types/chatwoot';
 
 // Interfaces
-interface Conversation {
-  id: number;
-  meta: {
-    sender: {
-      id: number;
-      name: string;
-      email?: string;
-      phone_number?: string;
-      thumbnail?: string;
-      additional_attributes?: {
-        company_name?: string;
-        product_service?: string;
-      };
-    };
-  };
-  labels: string[];
-}
-interface Message { id: number; content: string; created_at: number; private: boolean; sender?: { name: string; thumbnail?: string; }; }
-type CareScriptStatus = 'scheduled' | 'sent' | 'failed';
-interface CareScript { id: number; content: string; scheduled_at: string; status: CareScriptStatus; image_url?: string; }
 interface ChatwootContactPanelProps { 
   selectedConversation: Conversation | null; 
   messages: Message[]; 

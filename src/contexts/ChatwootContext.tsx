@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, ReactNode, useEffect, useMemo } from 'react';
+import { createContext, useState, useContext, ReactNode, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
 

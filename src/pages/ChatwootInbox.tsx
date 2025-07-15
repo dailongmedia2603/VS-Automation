@@ -15,16 +15,11 @@ import { format, isSameDay } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { ChatwootContactPanel } from '@/components/ChatwootContactPanel';
 import { AiLogViewer } from '@/components/AiLogViewer';
-import { Search, Phone, Smile, Paperclip, Image as ImageIcon, SendHorizonal, ThumbsUp, Settings2, CornerDownLeft, Eye, RefreshCw, UserPlus, FileText, X, Filter, Check, PlusCircle, Trash2, Bot } from 'lucide-react';
+import { Search, Phone, Paperclip, Image as ImageIcon, SendHorizonal, ThumbsUp, Settings2, CornerDownLeft, Eye, RefreshCw, FileText, X, Filter, Check, PlusCircle, Trash2, Bot, Loader2 } from 'lucide-react';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
+import { Conversation, Message, CareScript, ChatwootLabel } from '@/types/chatwoot';
 
 // Interfaces
-interface Attachment { id: number; file_type: 'image' | 'video' | 'audio' | 'file'; data_url: string; }
-interface MessageSender { name: string; thumbnail?: string; }
-interface Conversation { id: number; meta: { sender: { id: number; name: string; email?: string; phone_number?: string; thumbnail?: string; additional_attributes?: { company_name?: string; product_service?: string; }; }; }; messages: { content: string, message_type: number }[]; last_activity_at: number; unread_count: number; labels: string[]; status: string; additional_attributes?: { type?: string }; }
-interface Message { id: number; content: string; created_at: number; message_type: number; private: boolean; sender?: MessageSender; attachments?: Attachment[]; }
-interface ChatwootLabel { id: number; name: string; color: string; }
-interface CareScript { id: number; content: string; scheduled_at: string; status: 'scheduled' | 'sent' | 'failed'; image_url?: string; }
 interface Filters {
   hasPhoneNumber: boolean | null;
   selectedLabels: string[];
@@ -140,7 +135,7 @@ const ChatwootInbox = () => {
           return;
       }
 
-      const previewFixPromises = conversationsFromServer.map(async (convo) => {
+      const previewFixPromises = conversationsFromServer.map(async (convo: Conversation) => {
         const lastMessage = convo.messages[0];
         if (lastMessage && lastMessage.message_type === 2) {
           const { data: lastRealMessage } = await supabase
@@ -777,7 +772,19 @@ const ChatwootInbox = () => {
                   )
                 })}
               </div>
-              <div className="relative"><Input placeholder="Trả lời..." className="pr-10" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(e); } }} /><SendHorizonal className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground cursor-pointer" onClick={handleSendMessage} /></div>
+              <form onSubmit={handleSendMessage} className="relative">
+                <Input 
+                  placeholder="Trả lời..." 
+                  className="pr-12" 
+                  value={newMessage} 
+                  onChange={(e) => setNewMessage(e.target.value)} 
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(e); } }}
+                  disabled={sendingMessage}
+                />
+                <Button type="submit" size="icon" className="absolute right-1.5 top-1/2 -translate-y-1/2 h-8 w-9" disabled={sendingMessage}>
+                  {sendingMessage ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendHorizonal className="h-5 w-5" />}
+                </Button>
+              </form>
               <div className="flex justify-between items-center px-2"><div className="flex items-center space-x-4 text-muted-foreground"><Paperclip className="h-5 w-5 cursor-pointer hover:text-primary" onClick={() => fileInputRef.current?.click()} /><ImageIcon className="h-5 w-5 cursor-pointer hover:text-primary" onClick={() => fileInputRef.current?.click()} /></div><div className="flex items-center space-x-4 text-muted-foreground"><ThumbsUp className="h-5 w-5 cursor-pointer hover:text-primary" /><Settings2 className="h-5 w-5 cursor-pointer hover:text-primary" /></div></div>
             </footer>
           </>
