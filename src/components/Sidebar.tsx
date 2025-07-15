@@ -166,7 +166,7 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
             <Briefcase className="h-5 w-5 text-white" />
           </div>
         ) : (
-          <img src="https://i.postimg.cc/FKZ4J3f4/nen-trong-size-lon.png" alt="HEXO Logo" className="h-8 w-auto" />
+          <img src="https://i.postimg.cc/FKZ4J3f4/nen-trong-size-lon.png" alt="HEXO Logo" className="h-10 w-auto" />
         )}
       </div>
 
