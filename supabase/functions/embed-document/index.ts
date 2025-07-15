@@ -34,7 +34,12 @@ serve(async (req) => {
     }
     
     const openAIApiKey = aiSettings.api_key;
-    const embeddingUrl = `${aiSettings.api_url.replace(/\/v1\/?$/, '')}/v1/embeddings`;
+    
+    // Correctly derive the embeddings endpoint from the provided API URL
+    const apiUrl = aiSettings.api_url;
+    const v1Index = apiUrl.lastIndexOf('/v1/');
+    const baseUrl = v1Index !== -1 ? apiUrl.substring(0, v1Index + 3) : apiUrl.replace(/\/$/, '');
+    const embeddingUrl = `${baseUrl}/embeddings`;
 
     // Combine relevant text fields for a richer embedding
     const textToEmbed = `Tiêu đề: ${document.title}\nMục đích: ${document.purpose || ''}\nNội dung: ${document.content}`;
