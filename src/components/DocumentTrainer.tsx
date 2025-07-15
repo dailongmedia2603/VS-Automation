@@ -189,22 +189,36 @@ export const DocumentTrainer = () => {
   const handleSave = async (doc: Partial<Document>) => {
     const toastId = showLoading("Đang xử lý và nhúng dữ liệu...");
     try {
-      const { data, error: functionError } = await supabase.functions.invoke('embed-document', { body: { document: doc } });
+      const { data: savedDocument, error: functionError } = await supabase.functions.invoke('embed-document', { body: { document: doc } });
 
       if (functionError) {
         const errorData = await functionError.context.json();
         throw new Error(errorData.error || functionError.message);
       }
 
-      if (data && data.error) {
-        throw new Error(data.error);
+      if (savedDocument && savedDocument.error) {
+        throw new Error(savedDocument.error);
       }
 
       dismissToast(toastId);
       showSuccess("Đã lưu tài liệu thành công!");
       setIsDialogOpen(false);
       setEditingDocument(null);
-      fetchDocuments();
+
+      // Update state directly instead of re-fetching
+      setDocuments(prevDocs => {
+        const docIndex = prevDocs.findIndex(d => d.id === savedDocument.id);
+        if (docIndex > -1) {
+          // It's an update, replace the existing document
+          const newDocs = [...prevDocs];
+          newDocs[docIndex] = savedDocument;
+          return newDocs;
+        } else {
+          // It's a new document, add it to the beginning of the list
+          return [savedDocument, ...prevDocs];
+        }
+      });
+
     } catch (err: any) {
       dismissToast(toastId);
       showError(`Lỗi huấn luyện: ${err.message}`);
