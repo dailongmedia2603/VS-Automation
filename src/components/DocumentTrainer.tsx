@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PlusCircle, Search, Trash2, Loader2, Edit, FileText, User, Calendar, MessageSquare, Bot } from 'lucide-react';
+import { PlusCircle, Search, Trash2, Loader2, Edit, FileText, User, Calendar, MessageSquare, Bot, Cpu } from 'lucide-react';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -27,6 +27,7 @@ type Document = {
   example_customer_message: string | null;
   example_agent_reply: string | null;
   creator_name: string | null;
+  embedding: number[] | null;
 };
 
 const DocumentDialog = ({ isOpen, onOpenChange, onSave, document, user }: { isOpen: boolean, onOpenChange: (open: boolean) => void, onSave: (doc: Partial<Document>) => void, document: Partial<Document> | null, user: SupabaseUser | null }) => {
@@ -101,14 +102,22 @@ const DocumentDialog = ({ isOpen, onOpenChange, onSave, document, user }: { isOp
 const DocumentDetailDialog = ({ isOpen, onOpenChange, document }: { isOpen: boolean, onOpenChange: (open: boolean) => void, document: Document | null }) => {
   if (!document) return null;
 
-  const DetailSection = ({ title, content }: { title: string, content: string | null | undefined }) => (
-    content ? (
+  const DetailSection = ({ title, content, icon }: { title: string, content: string | null | undefined, icon?: React.ElementType }) => {
+    const Icon = icon;
+    return content ? (
       <div className="space-y-2">
-        <h4 className="text-sm font-semibold text-slate-500">{title}</h4>
-        <div className="p-3 bg-slate-50 rounded-md text-sm text-slate-700 whitespace-pre-wrap">{content}</div>
+        <h4 className="text-sm font-semibold text-slate-500 flex items-center gap-2">
+          {Icon && <Icon className="h-4 w-4" />}
+          {title}
+        </h4>
+        <div className="p-3 bg-slate-50 rounded-md text-sm text-slate-700 whitespace-pre-wrap break-all">{content}</div>
       </div>
-    ) : null
-  );
+    ) : null;
+  };
+
+  const embeddingSnippet = document.embedding 
+    ? `[${document.embedding.slice(0, 4).join(', ')}, ..., ${document.embedding.slice(-4).join(', ')}] (${document.embedding.length} chiều)` 
+    : 'Chưa có';
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -127,9 +136,10 @@ const DocumentDetailDialog = ({ isOpen, onOpenChange, document }: { isOpen: bool
           <DetailSection title="Mục đích" content={document.purpose} />
           <DetailSection title="Nội dung chính" content={document.content} />
           <div className="grid grid-cols-2 gap-4">
-            <DetailSection title="Ví dụ tin nhắn khách hàng" content={document.example_customer_message} />
-            <DetailSection title="Ví dụ AI trả lời" content={document.example_agent_reply} />
+            <DetailSection title="Ví dụ tin nhắn khách hàng" content={document.example_customer_message} icon={MessageSquare} />
+            <DetailSection title="Ví dụ AI trả lời" content={document.example_agent_reply} icon={Bot} />
           </div>
+          <DetailSection title="Vector Embedding (xác nhận)" content={embeddingSnippet} icon={Cpu} />
         </div>
         <DialogFooter>
           <Button onClick={() => onOpenChange(false)} className="rounded-lg">Đóng</Button>

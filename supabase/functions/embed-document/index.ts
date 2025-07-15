@@ -8,6 +8,7 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  console.log("--- embed-document function started ---");
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -17,6 +18,7 @@ serve(async (req) => {
     if (!textToEmbed) {
       throw new Error("Yêu cầu thiếu 'textToEmbed'.")
     }
+    console.log("Received text to embed:", textToEmbed.substring(0, 100) + "...");
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -32,7 +34,9 @@ serve(async (req) => {
     if (settingsError || !aiSettings || !aiSettings.api_key || !aiSettings.api_url) {
       throw new Error('Vui lòng cấu hình API trong trang Cài đặt API AI.')
     }
+    console.log("AI settings loaded successfully.");
 
+    console.log("Calling multi-ai-proxy with model:", aiSettings.embedding_model_name);
     const { data: proxyResponse, error: proxyError } = await supabaseAdmin.functions.invoke('multi-ai-proxy', {
         body: {
             input: textToEmbed,
@@ -42,18 +46,22 @@ serve(async (req) => {
         }
     });
 
+    console.log("Received response from proxy.");
     if (proxyError) throw new Error(`Lỗi gọi AI Proxy: ${(await proxyError.context.json()).error || proxyError.message}`);
     if (proxyResponse.error) throw new Error(`Lỗi từ AI Proxy: ${proxyResponse.error}`);
     if (!proxyResponse.data || !proxyResponse.data[0] || !proxyResponse.data[0].embedding) {
+        console.error("Invalid response from proxy:", proxyResponse);
         throw new Error('Phản hồi từ proxy không chứa embedding hợp lệ.');
     }
 
     const embedding = proxyResponse.data[0].embedding;
+    console.log("Successfully extracted embedding. Vector length:", embedding.length);
 
     return new Response(JSON.stringify({ embedding }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error) {
+    console.error("Error in embed-document:", error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
