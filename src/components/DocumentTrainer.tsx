@@ -184,8 +184,17 @@ export const DocumentTrainer = () => {
   const handleSave = async (doc: Partial<Document>) => {
     const toastId = showLoading("Đang xử lý và nhúng dữ liệu...");
     try {
-      const { error } = await supabase.functions.invoke('embed-document', { body: { document: doc } });
-      if (error) throw new Error(`Lỗi huấn luyện: ${error.message}`);
+      const { data, error: functionError } = await supabase.functions.invoke('embed-document', { body: { document: doc } });
+
+      if (functionError) {
+        const errorData = await functionError.context.json();
+        throw new Error(errorData.error || functionError.message);
+      }
+
+      if (data && data.error) {
+        throw new Error(data.error);
+      }
+
       dismissToast(toastId);
       showSuccess("Đã lưu tài liệu thành công!");
       setIsDialogOpen(false);
@@ -193,7 +202,7 @@ export const DocumentTrainer = () => {
       fetchDocuments();
     } catch (err: any) {
       dismissToast(toastId);
-      showError(err.message);
+      showError(`Lỗi huấn luyện: ${err.message}`);
     }
   };
 
