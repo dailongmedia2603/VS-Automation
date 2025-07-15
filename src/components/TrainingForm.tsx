@@ -1,25 +1,15 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PlusCircle, Trash2, File as FileIcon, Download, Edit, Loader2, Eye, UploadCloud } from 'lucide-react';
+import { PlusCircle, Trash2, Loader2, Eye } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import TrainingPreview from './TrainingPreview';
-import { showError } from '@/utils/toast';
 
 // Type definitions
 export type TrainingItem = { id: string; value: string };
-export type TrainingDocument = {
-  id: string;
-  name: string;
-  type: string;
-  purpose: string;
-  creator: string;
-  url: string;
-  file?: File;
-};
+
 export type TrainingConfig = {
   industry: string;
   products: TrainingItem[];
@@ -32,7 +22,6 @@ export type TrainingConfig = {
   goal: string;
   processSteps: TrainingItem[];
   conditions: TrainingItem[];
-  documents: TrainingDocument[];
 };
 
 export const initialConfig: TrainingConfig = {
@@ -47,7 +36,6 @@ export const initialConfig: TrainingConfig = {
   goal: '',
   processSteps: [],
   conditions: [],
-  documents: [],
 };
 
 interface TrainingFormProps {
@@ -114,75 +102,14 @@ const DynamicPrefixedList = ({ title, description, items, setItems, prefix, butt
   };
 
 export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig, isSaving, onSave }) => {
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [isAddDocDialogOpen, setIsAddDocDialogOpen] = useState(false);
-  const [isEditDocDialogOpen, setIsEditDocDialogOpen] = useState(false);
-  const [editingDoc, setEditingDoc] = useState<TrainingDocument | null>(null);
-  const [newDocType, setNewDocType] = useState('');
-  const [newDocPurpose, setNewDocPurpose] = useState('');
-  const [newDocFile, setNewDocFile] = useState<File | null>(null);
 
-  const handleFieldChange = (field: keyof Omit<TrainingConfig, 'products' | 'processSteps' | 'conditions' | 'documents'>, value: string) => {
+  const handleFieldChange = (field: keyof Omit<TrainingConfig, 'products' | 'processSteps' | 'conditions'>, value: string) => {
     setConfig(prev => ({ ...prev, [field]: value }));
   };
 
   const handleDynamicListChange = (field: 'products' | 'processSteps' | 'conditions', items: TrainingItem[]) => {
     setConfig(prev => ({ ...prev, [field]: items }));
-  };
-  
-  const handleRemoveDocument = (id: string) => {
-    setConfig(prev => ({ ...prev, documents: prev.documents.filter(doc => doc.id !== id) }));
-  };
-
-  const handleAddNewDocument = () => {
-    if (!newDocFile) {
-      showError("Vui lòng chọn một tệp tài liệu.");
-      return;
-    }
-    const newDoc: TrainingDocument = {
-      id: crypto.randomUUID(),
-      name: newDocFile.name,
-      type: newDocType || 'Chưa phân loại',
-      purpose: newDocPurpose,
-      creator: 'Admin',
-      url: '',
-      file: newDocFile,
-    };
-    setConfig(prev => ({ ...prev, documents: [...prev.documents, newDoc] }));
-    setIsAddDocDialogOpen(false);
-    setNewDocType('');
-    setNewDocPurpose('');
-    setNewDocFile(null);
-  };
-
-  const handleOpenEditDialog = (doc: TrainingDocument) => {
-    setEditingDoc(doc);
-    setNewDocType(doc.type);
-    setNewDocPurpose(doc.purpose);
-    setIsEditDocDialogOpen(true);
-  };
-
-  const handleUpdateDocument = () => {
-    if (!editingDoc) return;
-    setConfig(prev => ({
-      ...prev,
-      documents: prev.documents.map(d =>
-        d.id === editingDoc.id ? { ...d, type: newDocType, purpose: newDocPurpose } : d
-      ),
-    }));
-    setIsEditDocDialogOpen(false);
-    setEditingDoc(null);
-    setNewDocType('');
-    setNewDocPurpose('');
-  };
-
-  const handleDownloadDocument = (doc: TrainingDocument) => {
-    if (doc.url) {
-      window.open(doc.url, '_blank');
-    } else {
-      showError("Tài liệu chưa được tải lên. Vui lòng lưu thay đổi trước khi tải xuống.");
-    }
   };
 
   return (
@@ -277,58 +204,6 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig, i
           </div>
         </div>
 
-        <Card className="bg-white rounded-2xl shadow-lg shadow-slate-200/30 border border-slate-200/80">
-          <CardHeader className="p-6 flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-xl font-bold text-slate-900">Bảng tài liệu</CardTitle>
-              <CardDescription className="text-sm text-slate-500 pt-1">Tải lên các tài liệu để AI học hỏi và tham khảo.</CardDescription>
-            </div>
-            <Button onClick={() => setIsAddDocDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold">
-              <PlusCircle className="h-4 w-4 mr-2" />
-              Thêm tài liệu
-            </Button>
-          </CardHeader>
-          <CardContent className="p-6 pt-0">
-            <div className="border rounded-lg overflow-hidden">
-              <Table>
-                <TableHeader className="bg-slate-100/80">
-                  <TableRow>
-                    <TableHead className="px-4 py-3 text-xs font-semibold uppercase text-slate-500 w-[200px]">Loại tài liệu</TableHead>
-                    <TableHead className="px-4 py-3 text-xs font-semibold uppercase text-slate-500 w-[250px]">Mục đích</TableHead>
-                    <TableHead className="px-4 py-3 text-xs font-semibold uppercase text-slate-500">Tài liệu</TableHead>
-                    <TableHead className="px-4 py-3 text-xs font-semibold uppercase text-slate-500 w-[150px]">Người tạo</TableHead>
-                    <TableHead className="px-4 py-3 text-xs font-semibold uppercase text-slate-500 text-right w-[120px]">Thao tác</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {config.documents.length > 0 ? config.documents.map(doc => (
-                    <TableRow key={doc.id} className="hover:bg-slate-50/50 transition-colors">
-                      <TableCell className="px-4 py-3 text-slate-600">{doc.type}</TableCell>
-                      <TableCell className="px-4 py-3 text-slate-600">{doc.purpose || 'Chưa có'}</TableCell>
-                      <TableCell className="px-4 py-3 font-medium text-slate-800">
-                        <div className="flex items-center gap-3">
-                          <FileIcon className="h-5 w-5 text-slate-400 flex-shrink-0" />
-                          <span className="truncate">{doc.name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="px-4 py-3 text-slate-600">{doc.creator}</TableCell>
-                      <TableCell className="px-4 py-3 text-right whitespace-nowrap">
-                        <Button variant="ghost" size="icon" className="text-slate-500 hover:text-slate-800" onClick={() => handleDownloadDocument(doc)}><Download className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" className="text-slate-500 hover:text-slate-800" onClick={() => handleOpenEditDialog(doc)}><Edit className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" className="text-slate-500 hover:text-destructive hover:bg-destructive/10" onClick={() => handleRemoveDocument(doc.id)}><Trash2 className="h-4 w-4" /></Button>
-                      </TableCell>
-                    </TableRow>
-                  )) : (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center h-24 text-slate-500">Chưa có tài liệu nào.</TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-
         <div className="flex justify-end pt-4 gap-3">
           <Button variant="outline" onClick={() => setIsPreviewOpen(true)} className="font-semibold rounded-lg border-slate-300 text-slate-700 hover:bg-slate-100">
             <Eye className="h-4 w-4 mr-2" />
@@ -340,61 +215,6 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig, i
           </Button>
         </div>
       </div>
-
-      {/* Add Document Dialog */}
-      <Dialog open={isAddDocDialogOpen} onOpenChange={setIsAddDocDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Thêm tài liệu mới</DialogTitle>
-            <DialogDescription>Tải lên tài liệu và cung cấp thông tin mô tả để AI hiểu rõ hơn.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="doc-type">Loại tài liệu</Label>
-              <Input id="doc-type" placeholder="VD: Bảng giá, Chính sách" value={newDocType} onChange={(e) => setNewDocType(e.target.value)} className="bg-slate-100 border-none rounded-lg" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="doc-purpose">Mục đích</Label>
-              <Input id="doc-purpose" placeholder="VD: Cung cấp thông tin khuyến mãi tháng 7" value={newDocPurpose} onChange={(e) => setNewDocPurpose(e.target.value)} className="bg-slate-100 border-none rounded-lg" />
-            </div>
-            <div className="space-y-2">
-              <Label>Tệp tài liệu</Label>
-              <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center cursor-pointer hover:border-blue-500 transition-colors" onClick={() => fileInputRef.current?.click()}>
-                {newDocFile ? (<div className="text-slate-800 font-medium flex items-center justify-center gap-2"><FileIcon className="h-5 w-5" /><span>{newDocFile.name}</span></div>) : (<div className="text-slate-500"><UploadCloud className="mx-auto h-10 w-10" /><p className="mt-2 text-sm">Kéo và thả hoặc nhấn để chọn tệp</p></div>)}
-              </div>
-              <input type="file" ref={fileInputRef} className="hidden" onChange={(e) => {if (e.target.files && e.target.files[0]) {setNewDocFile(e.target.files[0]);}}} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddDocDialogOpen(false)} className="rounded-lg">Hủy</Button>
-            <Button onClick={handleAddNewDocument} className="bg-blue-600 hover:bg-blue-700 rounded-lg">Thêm</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Document Dialog */}
-      <Dialog open={isEditDocDialogOpen} onOpenChange={setIsEditDocDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Chỉnh sửa thông tin tài liệu</DialogTitle>
-            <DialogDescription>Cập nhật loại và mục đích cho tệp: <span className="font-medium">{editingDoc?.name}</span></DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-doc-type">Loại tài liệu</Label>
-              <Input id="edit-doc-type" value={newDocType} onChange={(e) => setNewDocType(e.target.value)} className="bg-slate-100 border-none rounded-lg" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-doc-purpose">Mục đích</Label>
-              <Input id="edit-doc-purpose" value={newDocPurpose} onChange={(e) => setNewDocPurpose(e.target.value)} className="bg-slate-100 border-none rounded-lg" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDocDialogOpen(false)} className="rounded-lg">Hủy</Button>
-            <Button onClick={handleUpdateDocument} className="bg-blue-600 hover:bg-blue-700 rounded-lg">Cập nhật</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Preview Dialog */}
       <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
