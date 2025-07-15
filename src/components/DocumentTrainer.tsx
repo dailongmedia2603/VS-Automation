@@ -27,7 +27,7 @@ type Document = {
   example_customer_message: string | null;
   example_agent_reply: string | null;
   creator_name: string | null;
-  embedding: number[] | null;
+  embedding: number[] | string | null;
 };
 
 const DocumentDialog = ({ isOpen, onOpenChange, onSave, document, user }: { isOpen: boolean, onOpenChange: (open: boolean) => void, onSave: (doc: Partial<Document>) => void, document: Partial<Document> | null, user: SupabaseUser | null }) => {
@@ -115,9 +115,22 @@ const DocumentDetailDialog = ({ isOpen, onOpenChange, document }: { isOpen: bool
     ) : null;
   };
 
-  const embeddingSnippet = document.embedding 
-    ? `[${document.embedding.slice(0, 4).join(', ')}, ..., ${document.embedding.slice(-4).join(', ')}] (${document.embedding.length} chiều)` 
-    : 'Chưa có';
+  let embeddingArray: number[] | null = null;
+  if (document.embedding) {
+    if (typeof document.embedding === 'string') {
+      try {
+        embeddingArray = JSON.parse(document.embedding);
+      } catch (e) {
+        console.error("Failed to parse embedding string:", document.embedding);
+      }
+    } else if (Array.isArray(document.embedding)) {
+      embeddingArray = document.embedding;
+    }
+  }
+
+  const embeddingSnippet = embeddingArray
+    ? `[${embeddingArray.slice(0, 4).join(', ')}, ..., ${embeddingArray.slice(-4).join(', ')}] (${embeddingArray.length} chiều)`
+    : (document.embedding ? 'Dữ liệu embedding không hợp lệ' : 'Chưa có');
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
