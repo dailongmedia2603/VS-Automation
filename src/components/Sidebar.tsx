@@ -16,6 +16,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "./ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import hexaLogo from "@/assets/images/logo.png";
 
 interface NavItem {
   name: string;
@@ -166,7 +167,7 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
             <Briefcase className="h-5 w-5 text-white" />
           </div>
         ) : (
-          <img src="https://i.postimg.cc/nL4HGMzH/HEXA.png" alt="HEXA Logo" className="w-full h-auto" />
+          <img src={hexaLogo} alt="HEXA Logo" className="w-full h-auto" />
         )}
       </div>
 
