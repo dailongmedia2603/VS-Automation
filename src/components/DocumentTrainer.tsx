@@ -167,7 +167,12 @@ export const DocumentTrainer = () => {
   }, [fetchDocuments]);
 
   const filteredDocuments = useMemo(() => {
-    return documents.filter(doc => doc.title.toLowerCase().includes(searchQuery.toLowerCase()) || doc.content?.toLowerCase().includes(searchQuery.toLowerCase()));
+    return documents.filter(doc => {
+      const query = searchQuery.toLowerCase();
+      const titleMatch = doc.title ? doc.title.toLowerCase().includes(query) : false;
+      const contentMatch = doc.content ? doc.content.toLowerCase().includes(query) : false;
+      return titleMatch || contentMatch;
+    });
   }, [documents, searchQuery]);
 
   const pageCount = useMemo(() => {
