@@ -51,9 +51,37 @@ serve(async (req) => {
 
     console.log(`Found ${scripts.length} scripts to process.`);
 
-    // 3. Process each script
+    let processedCount = 0;
+    let sentCount = 0;
+    let failedCount = 0;
+
+    // 3. Process each script with "Claim, then Execute" logic
     for (const script of scripts) {
+      processedCount++;
+      let currentScriptStatus = 'failed'; // Default to failed if anything goes wrong
+
       try {
+        // CLAIM: Attempt to update status from 'scheduled' to 'sending'
+        const { data: claimedScript, error: claimError } = await supabaseAdmin
+          .from('care_scripts')
+          .update({ status: 'sending' })
+          .eq('id', script.id)
+          .eq('status', 'scheduled') // Crucial for atomic claim
+          .select()
+          .single();
+
+        if (claimError) {
+          console.error(`Failed to claim script ${script.id}:`, claimError.message);
+          // If claim fails, it means another instance already claimed/processed it, so skip.
+          continue; 
+        }
+        if (!claimedScript) {
+          // This means the script was already processed by another concurrent function instance
+          console.log(`Script ${script.id} already claimed by another instance.`);
+          continue;
+        }
+
+        // EXECUTE: Send message to Chatwoot
         const endpoint = `/api/v1/accounts/${settings.account_id}/conversations/${script.conversation_id}/messages`;
         const upstreamUrl = `${settings.chatwoot_url.replace(/\/$/, '')}${endpoint}`;
 
@@ -79,20 +107,24 @@ serve(async (req) => {
         await supabaseAdmin
           .from('care_scripts')
           .update({ status: 'sent' })
-          .eq('id', script.id)
-
+          .eq('id', script.id); // Update by ID, not by claimedScript.id to avoid race condition on update
+        
+        currentScriptStatus = 'sent';
+        sentCount++;
         console.log(`Successfully sent script ${script.id} to conversation ${script.conversation_id}`);
 
       } catch (e) {
         console.error(`Failed to process script ${script.id}:`, e.message);
+        // Update status to 'failed' if an error occurred during sending
         await supabaseAdmin
           .from('care_scripts')
           .update({ status: 'failed' })
-          .eq('id', script.id)
+          .eq('id', script.id);
+        failedCount++;
       }
     }
 
-    return new Response(JSON.stringify({ message: `Processed ${scripts.length} scripts.` }), {
+    return new Response(JSON.stringify({ message: `Processed ${processedCount} scripts. Sent: ${sentCount}, Failed: ${failedCount}.` }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
