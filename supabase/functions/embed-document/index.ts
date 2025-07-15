@@ -64,31 +64,54 @@ serve(async (req) => {
     };
 
     let savedDocument;
-    let dbError;
 
     if (document.id) {
-      // This is an update
-      const { data, error } = await supabaseAdmin
+      // UPDATE LOGIC
+      const { error: updateError } = await supabaseAdmin
         .from('documents')
         .update(documentData)
+        .eq('id', document.id);
+      
+      if (updateError) {
+        throw new Error(`Lỗi cập nhật cơ sở dữ liệu: ${updateError.message}`);
+      }
+
+      const { data: updatedData, error: fetchError } = await supabaseAdmin
+        .from('documents')
+        .select('*')
         .eq('id', document.id)
-        .select()
         .single();
-      savedDocument = data;
-      dbError = error;
+      
+      if (fetchError) {
+        throw new Error(`Lỗi lấy dữ liệu sau khi cập nhật: ${fetchError.message}`);
+      }
+      savedDocument = updatedData;
+
     } else {
-      // This is an insert
-      const { data, error } = await supabaseAdmin
+      // INSERT LOGIC
+      const { data: insertedData, error: insertError } = await supabaseAdmin
         .from('documents')
         .insert(documentData)
-        .select()
+        .select('id')
         .single();
-      savedDocument = data;
-      dbError = error;
-    }
 
-    if (dbError) {
-      throw new Error(`Lỗi lưu vào cơ sở dữ liệu: ${dbError.message}`)
+      if (insertError) {
+        throw new Error(`Lỗi thêm mới vào cơ sở dữ liệu: ${insertError.message}`);
+      }
+      if (!insertedData || !insertedData.id) {
+        throw new Error('Không thể lấy ID của tài liệu vừa tạo.');
+      }
+
+      const { data: newDocument, error: fetchError } = await supabaseAdmin
+        .from('documents')
+        .select('*')
+        .eq('id', insertedData.id)
+        .single();
+
+      if (fetchError) {
+        throw new Error(`Lỗi lấy dữ liệu sau khi thêm mới: ${fetchError.message}`);
+      }
+      savedDocument = newDocument;
     }
 
     return new Response(JSON.stringify(savedDocument), {
