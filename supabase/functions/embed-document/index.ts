@@ -25,12 +25,12 @@ serve(async (req) => {
 
     const { data: aiSettings, error: settingsError } = await supabaseAdmin
       .from('ai_settings')
-      .select('api_key, api_url, embedding_model_name')
+      .select('openai_api_key, openai_api_url, openai_embedding_model')
       .eq('id', 1)
       .single()
 
-    if (settingsError || !aiSettings || !aiSettings.api_key || !aiSettings.api_url) {
-      throw new Error('Không tìm thấy hoặc không đầy đủ thông tin API trong cài đặt.')
+    if (settingsError || !aiSettings || !aiSettings.openai_api_key || !aiSettings.openai_api_url) {
+      throw new Error('Vui lòng cấu hình API Embedding của OpenAI trong trang Cài đặt API AI.')
     }
     
     const textToEmbed = `Tiêu đề: ${document.title}\nMục đích: ${document.purpose || ''}\nNội dung: ${document.content}`;
@@ -38,9 +38,9 @@ serve(async (req) => {
     const { data: proxyResponse, error: proxyError } = await supabaseAdmin.functions.invoke('multi-ai-proxy', {
         body: {
             input: textToEmbed,
-            apiUrl: aiSettings.api_url,
-            apiKey: aiSettings.api_key,
-            embeddingModelName: aiSettings.embedding_model_name,
+            apiUrl: aiSettings.openai_api_url,
+            apiKey: aiSettings.openai_api_key,
+            embeddingModelName: aiSettings.openai_embedding_model,
         }
     });
 
