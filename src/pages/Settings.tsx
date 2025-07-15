@@ -40,7 +40,7 @@ const Settings = () => {
         id: 1,
         api_url: localSettings.apiUrl,
         api_key: localSettings.apiKey,
-        embedding_model_name: localSettings.embeddingModelName,
+        // embedding_model_name is removed for clarity
         openai_api_url: localSettings.openaiApiUrl,
         openai_api_key: localSettings.openaiApiKey,
         openai_embedding_model: localSettings.openaiEmbeddingModel,
@@ -189,19 +189,6 @@ const Settings = () => {
                   onChange={(e) => setLocalSettings({ ...localSettings, apiKey: e.target.value })}
                   className="bg-slate-100 border-none rounded-lg"
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="embedding-model">Embedding Model Name (của API Chat)</Label>
-                <Input
-                  id="embedding-model"
-                  value={localSettings.embeddingModelName}
-                  onChange={(e) => setLocalSettings({ ...localSettings, embeddingModelName: e.target.value })}
-                  className="bg-slate-100 border-none rounded-lg"
-                  placeholder="VD: text-embedding-ada-002"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Quan trọng: Điền tên model embedding mà nhà cung cấp API Chat của bạn hỗ trợ.
-                </p>
               </div>
               <div className="border-t pt-6">
                 <div className="flex items-center justify-between">
