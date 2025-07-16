@@ -161,8 +161,8 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
       </Button>
 
       {/* Logo */}
-      <div className={cn("flex items-center justify-center", isCollapsed ? "h-10" : "h-16")}>
-        <img src={logo} alt="HEXA Logo" className={cn("transition-all", isCollapsed ? "h-7" : "h-8")} />
+      <div className={cn("flex items-center justify-center", isCollapsed ? "h-16" : "h-20")}>
+        <img src={logo} alt="HEXA Logo" className={cn("transition-all", isCollapsed ? "h-14" : "h-16")} />
       </div>
 
       {/* User Profile */}
