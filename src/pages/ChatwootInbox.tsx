@@ -391,7 +391,7 @@ const ChatwootInbox = () => {
     try {
         const { data, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', {
             body: {
-                action: 'toggle_unread',
+                action: 'mark_as_unread',
                 settings,
                 conversationId,
             },

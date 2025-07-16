@@ -94,19 +94,13 @@ serve(async (req) => {
             });
             break;
 
-          case 'mark_as_read':
+          case 'mark_as_unread': // Changed from toggle_unread
             if (!conversationId) throw new Error("Conversation ID is required.");
-            endpoint = `/api/v1/accounts/${settings.accountId}/conversations/${conversationId}/update_last_seen`;
+            endpoint = `/api/v1/accounts/${settings.accountId}/conversations/${conversationId}/update_last_seen`; // Changed endpoint
             method = 'POST';
-            body = JSON.stringify({});
-            break;
-
-          case 'toggle_unread':
-            if (!conversationId) throw new Error("Conversation ID is required.");
-            // Sửa lỗi: Sử dụng đúng endpoint của Chatwoot
-            endpoint = `/api/v1/accounts/${settings.accountId}/conversations/${conversationId}/toggle_unread`;
-            method = 'POST';
-            body = JSON.stringify({});
+            body = JSON.stringify({
+              last_seen_at: 0 // Send a timestamp from the past (Unix epoch)
+            });
             break;
 
           case 'update_labels':
@@ -131,7 +125,6 @@ serve(async (req) => {
 
         upstreamUrl = `${settings.chatwootUrl.replace(/\/$/, '')}${endpoint}`;
         
-        // Thêm logging để gỡ lỗi
         console.log(`[Chatwoot Proxy] Calling upstream URL: ${method} ${upstreamUrl}`);
 
         upstreamOptions = {
