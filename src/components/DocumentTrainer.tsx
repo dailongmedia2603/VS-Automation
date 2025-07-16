@@ -237,7 +237,13 @@ export const DocumentTrainer = () => {
   const handleSave = async (doc: Partial<Document>) => {
     const toastId = showLoading("Đang xử lý và nhúng dữ liệu...");
     try {
-      const textToEmbed = `Tiêu đề: ${doc.title}\nMục đích: ${doc.purpose || ''}\nNội dung: ${doc.content}`;
+      const textToEmbed = `
+        Tiêu đề: ${doc.title || ''}
+        Mục đích: ${doc.purpose || ''}
+        Nội dung: ${doc.content || ''}
+        Ví dụ câu hỏi của khách: ${doc.example_customer_message || ''}
+        Ví dụ câu trả lời của AI: ${doc.example_agent_reply || ''}
+      `.trim();
       const { data: embeddingData, error: functionError } = await supabase.functions.invoke('embed-document', { body: { textToEmbed } });
 
       if (functionError) {
