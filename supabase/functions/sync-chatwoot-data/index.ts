@@ -44,6 +44,7 @@ async function fetchFromChatwoot(endpoint: string, config: any) {
 }
 
 async function syncConversationData(supabase: SupabaseClient, convo: any, config: any) {
+  console.log(`Syncing data for conversation ID: ${convo.id}`);
   const { sender, messages: initialMessages, labels } = convo;
 
   // 1. Sync Contact
@@ -109,15 +110,14 @@ async function syncConversationData(supabase: SupabaseClient, convo: any, config
       }
     }
     
-    // This is an atomic way to sync many-to-many relationships
     await supabase.from('chatwoot_conversation_labels').delete().eq('conversation_id', convo.id);
     if (labelLinksToInsert.length > 0) {
       await supabase.from('chatwoot_conversation_labels').insert(labelLinksToInsert);
     }
   } else {
-    // If no labels on Chatwoot, ensure no labels in DB for this convo
     await supabase.from('chatwoot_conversation_labels').delete().eq('conversation_id', convo.id);
   }
+  console.log(`Finished syncing conversation ID: ${convo.id}`);
 }
 
 serve(async (req) => {
@@ -126,6 +126,7 @@ serve(async (req) => {
   }
 
   try {
+    console.log("--- Starting sync-chatwoot-data function ---");
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -137,6 +138,7 @@ serve(async (req) => {
     if (settingsError || !settingsData) {
       throw new Error("Chatwoot settings not found in the database.");
     }
+    console.log("Successfully fetched Chatwoot settings.");
 
     const chatwootConfig = {
       url: settingsData.chatwoot_url,
@@ -144,19 +146,20 @@ serve(async (req) => {
       apiToken: settingsData.api_token,
     };
 
-    // Fetch all conversations that are not resolved
     const conversations = await fetchFromChatwoot(`/conversations?status=open&status=pending`, chatwootConfig);
     
     if (!conversations || conversations.length === 0) {
+      console.log("No active conversations to sync.");
       return new Response(JSON.stringify({ message: "No active conversations to sync." }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+    console.log(`Found ${conversations.length} active conversations to sync.`);
 
-    // Process all conversations concurrently
     const syncPromises = conversations.map(convo => syncConversationData(supabaseAdmin, convo, chatwootConfig));
     await Promise.all(syncPromises);
 
+    console.log(`--- Sync complete. Synced ${conversations.length} conversations. ---`);
     return new Response(JSON.stringify({ status: 'success', synced_conversations: conversations.length }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
