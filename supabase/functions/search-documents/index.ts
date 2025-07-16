@@ -52,8 +52,8 @@ serve(async (req) => {
 
     const { data: documents, error: matchError } = await supabaseAdmin.rpc('match_documents', {
       query_embedding: queryEmbedding,
-      match_threshold: 0.78, // Ngưỡng tương đồng, có thể điều chỉnh
-      match_count: 5, // Số lượng kết quả trả về
+      match_threshold: 0.7, // Giảm ngưỡng để linh hoạt hơn
+      match_count: 10, // Tăng số lượng kết quả để có nhiều lựa chọn hơn
     })
 
     if (matchError) {
