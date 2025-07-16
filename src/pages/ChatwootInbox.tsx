@@ -483,6 +483,7 @@ const ChatwootInbox = () => {
     const existingLabels = convo.labels?.filter(labelName => suggestedLabelNames.has(labelName)) || [];
     const lastMessage = convo.messages?.[0];
     const lastMessageContent = (lastMessage && lastMessage.message_type !== 2) ? (lastMessage.content || '[Media]') : '';
+    const isLastMessageIncoming = lastMessage?.message_type === 0;
 
     return (
       <div key={convo.id} onClick={() => handleSelectConversation(convo)} className={cn("p-2.5 flex space-x-3 cursor-pointer rounded-lg", selectedConversation?.id === convo.id && "bg-blue-100")}>
@@ -490,7 +491,17 @@ const ChatwootInbox = () => {
         <div className="flex-1 overflow-hidden">
           <div className="flex justify-between items-center"><p className="font-semibold truncate text-sm">{convo.meta.sender.name}</p><p className="text-xs text-muted-foreground whitespace-nowrap">{format(new Date(convo.last_activity_at * 1000), 'HH:mm')}</p></div>
           <div className="flex justify-between items-start mt-1">
-            <p className={cn("text-sm truncate flex items-center", convo.unread_count > 0 ? "text-black font-bold" : "text-muted-foreground")}><CornerDownLeft className="h-4 w-4 mr-1 flex-shrink-0" />{lastMessageContent}</p>
+            <p className={cn(
+              "text-sm truncate flex items-center",
+              convo.unread_count > 0
+                ? "text-black font-bold"
+                : isLastMessageIncoming
+                  ? "text-red-600"
+                  : "text-muted-foreground"
+            )}>
+              {!isLastMessageIncoming && <CornerDownLeft className="h-4 w-4 mr-1 flex-shrink-0" />}
+              {lastMessageContent}
+            </p>
             <div className="flex items-center gap-2 flex-shrink-0 ml-2">
               {convo.meta.sender.phone_number && <Phone className="h-4 w-4 text-green-600" strokeWidth={2} />}
               {convo.unread_count > 0 && <Badge variant="destructive">{convo.unread_count}</Badge>}
