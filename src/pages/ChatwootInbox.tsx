@@ -62,8 +62,6 @@ const ChatwootInbox = () => {
     selectedLabels: [],
     seenNotReplied: false,
   });
-  const [isAutoReplyEnabled, setIsAutoReplyEnabled] = useState(false);
-  const [aiStarLabelId, setAiStarLabelId] = useState<number | null>(null);
   const [aiTypingStatus, setAiTypingStatus] = useState<Record<number, boolean>>({});
   const [hasNewLog, setHasNewLog] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -142,7 +140,6 @@ const ChatwootInbox = () => {
           return;
       }
 
-      // --- START: NEW PREVIEW FIX LOGIC ---
       const conversationIds = conversationsFromServer.map((c: Conversation) => c.id);
       const { data: latestMessages, error: rpcError } = await supabase.rpc('get_latest_messages', { convo_ids: conversationIds });
 
@@ -155,9 +152,8 @@ const ChatwootInbox = () => {
         conversationsFromServer.forEach((convo: Conversation) => {
           const dbMessage = messageMap.get(convo.id);
           if (dbMessage) {
-            // Overwrite the potentially stale preview from Chatwoot API
             convo.messages = [{
-              id: 0, // This ID is fake, but it's just for the preview
+              id: 0,
               content: dbMessage.content,
               created_at: new Date(dbMessage.created_at_chatwoot).getTime() / 1000,
               message_type: dbMessage.message_type,
@@ -165,30 +161,6 @@ const ChatwootInbox = () => {
             }];
           }
         });
-      }
-      // --- END: NEW PREVIEW FIX LOGIC ---
-
-      if (isAutoReplyEnabled && aiStarLabelId) {
-        const conversationsToTag = conversationsFromServer.filter(
-          (convo: Conversation) => !convo.labels.includes(AI_STAR_LABEL_NAME) && convo.unread_count > 0
-        );
-
-        if (conversationsToTag.length > 0) {
-          await Promise.all(
-            conversationsToTag.map(async (convo: Conversation) => {
-              const newLabels = [...convo.labels, AI_STAR_LABEL_NAME];
-              await supabase.functions.invoke('chatwoot-proxy', {
-                body: { action: 'update_labels', settings, conversationId: convo.id, labels: newLabels },
-              });
-              await supabase.from('chatwoot_conversation_labels').upsert({ conversation_id: convo.id, label_id: aiStarLabelId });
-            })
-          );
-          conversationsFromServer = conversationsFromServer.map((convo: Conversation) =>
-            conversationsToTag.some((taggedConvo: Conversation) => taggedConvo.id === convo.id)
-              ? { ...convo, labels: [...convo.labels, AI_STAR_LABEL_NAME] }
-              : convo
-          );
-        }
       }
 
       const contactIds = conversationsFromServer.map((c: Conversation) => c.meta.sender.id);
@@ -205,7 +177,7 @@ const ChatwootInbox = () => {
       await syncConversationsToDB(enrichedConversations);
     } catch (err: any) { console.error("Lỗi polling cuộc trò chuyện:", err);
     } finally { if (isInitialLoad) setLoadingConversations(false); }
-  }, [settings, isAutoReplyEnabled, aiStarLabelId]);
+  }, [settings]);
 
   const fetchMessages = async (convoId: number) => {
     try {
@@ -223,13 +195,6 @@ const ChatwootInbox = () => {
       const { data: labelsData, error: labelsError } = await supabase.from('chatwoot_labels').select('*').order('name', { ascending: true });
       if (!labelsError && labelsData) {
         setSuggestedLabels(labelsData);
-        const starLabel = labelsData.find(l => l.name === AI_STAR_LABEL_NAME);
-        if (starLabel) setAiStarLabelId(starLabel.id);
-      }
-
-      const { data: autoReplyData, error: autoReplyError } = await supabase.from('auto_reply_settings').select('config').eq('id', 1).single();
-      if (!autoReplyError && autoReplyData?.config && typeof autoReplyData.config === 'object') {
-        setIsAutoReplyEnabled((autoReplyData.config as { enabled?: boolean }).enabled || false);
       }
     };
 

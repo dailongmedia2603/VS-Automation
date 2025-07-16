@@ -7,8 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const AI_STAR_LABEL_NAME = 'AI Star';
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -28,34 +26,14 @@ serve(async (req) => {
       });
     }
 
-    const { data: labelData, error: labelError } = await supabaseAdmin
-      .from('chatwoot_labels').select('id').eq('name', AI_STAR_LABEL_NAME).single();
-    if (labelError || !labelData) {
-      return new Response(JSON.stringify({ message: `Label '${AI_STAR_LABEL_NAME}' not found.` }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200,
-      });
-    }
-    const aiStarLabelId = labelData.id;
-
-    const { data: convLabelData, error: convLabelError } = await supabaseAdmin
-      .from('chatwoot_conversation_labels').select('conversation_id').eq('label_id', aiStarLabelId);
-    if (convLabelError) throw convLabelError;
-    if (!convLabelData || convLabelData.length === 0) {
-      return new Response(JSON.stringify({ message: "No conversations with AI Star label." }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200,
-      });
-    }
-    const conversationIdsWithLabel = convLabelData.map(item => item.conversation_id);
-
     const { data: conversationsToProcess, error: convError } = await supabaseAdmin
       .from('chatwoot_conversations')
       .select('id, unread_count, labels, meta:sender(id, name, thumbnail, additional_attributes)')
-      .in('id', conversationIdsWithLabel)
       .gt('unread_count', 0);
     if (convError) throw convError;
 
     if (!conversationsToProcess || conversationsToProcess.length === 0) {
-      return new Response(JSON.stringify({ message: "No unread conversations with AI Star label to process." }), {
+      return new Response(JSON.stringify({ message: "No unread conversations to process." }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200,
       });
     }
