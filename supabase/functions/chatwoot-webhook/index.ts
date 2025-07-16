@@ -23,14 +23,15 @@ async function handleMessageCreated(supabase: SupabaseClient, payload: any) {
     }, { onConflict: 'id' });
   }
 
-  // Sync Conversation
+  // Sync Conversation on new message
   if (conversation) {
     await supabase.from('chatwoot_conversations').upsert({
       id: conversation.id,
       contact_id: contact?.id,
       status: conversation.status,
       last_activity_at: conversation.last_activity_at,
-    }, { onConflict: 'id', ignoreDuplicates: true });
+      unread_count: conversation.unread_count,
+    }, { onConflict: 'id' });
   }
 
   // Sync Message
