@@ -10,14 +10,6 @@ interface Filters {
   seenNotReplied: boolean;
 }
 
-interface LatestMessage {
-  conversation_id: number;
-  content: string;
-  message_type: number;
-  created_at_chatwoot: string;
-}
-
-const POLLING_INTERVAL = 15000;
 const phoneRegex = /(0[3|5|7|8|9][0-9]{8})\b/;
 const AI_CARE_LABEL = 'AI chăm';
 
@@ -50,153 +42,150 @@ export const useChatwootInbox = () => {
     if (error) { showError("Không thể tải kịch bản chăm sóc."); } else { setScripts(data || []); }
   }, []);
 
-  const syncConversationsToDB = async (convos: Conversation[]) => {
-    if (convos.length === 0) return;
-    const contactsToUpsert = convos.map(c => ({ id: c.meta.sender.id, name: c.meta.sender.name, email: c.meta.sender.email, phone_number: c.meta.sender.phone_number, thumbnail_url: c.meta.sender.thumbnail, }));
-    const conversationsToUpsert = convos.map(c => ({ id: c.id, contact_id: c.meta.sender.id, status: c.status, last_activity_at: new Date(c.last_activity_at * 1000).toISOString(), unread_count: c.unread_count, }));
-    await supabase.from('chatwoot_contacts').upsert(contactsToUpsert, { onConflict: 'id' });
-    await supabase.from('chatwoot_conversations').upsert(conversationsToUpsert, { onConflict: 'id' });
-  };
-
-  const syncMessagesToDB = async (msgs: Message[], convoId: number) => {
-    if (msgs.length === 0) return;
-    const messagesToUpsert = msgs.map(m => ({ id: m.id, conversation_id: convoId, content: m.content, message_type: m.message_type, is_private: m.private, sender_name: m.sender?.name, sender_thumbnail: m.sender?.thumbnail, created_at_chatwoot: new Date(m.created_at * 1000).toISOString(), }));
-    const attachmentsToUpsert = msgs.flatMap(m => m.attachments?.map(a => ({ id: a.id, message_id: m.id, file_type: a.file_type, data_url: a.data_url, })) || []);
-    await supabase.from('chatwoot_messages').upsert(messagesToUpsert, { onConflict: 'id' });
-    if (attachmentsToUpsert.length > 0) {
-      await supabase.from('chatwoot_attachments').upsert(attachmentsToUpsert, { onConflict: 'id' });
-    }
-  };
-
   const fetchConversations = useCallback(async (isInitialLoad = false) => {
-    if (!settings.accountId || !settings.apiToken) {
-      if (isInitialLoad) setLoadingConversations(false);
-      return;
-    }
     if (isInitialLoad) setLoadingConversations(true);
     try {
-      const { data: chatwootData, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', { body: { action: 'list_conversations', settings }, });
-      if (functionError) throw new Error((await functionError.context.json()).error || functionError.message);
-      if (chatwootData.error) throw new Error(chatwootData.error);
-      let conversationsFromServer = chatwootData.data.payload || [];
-      if (conversationsFromServer.length === 0) {
-          setConversations([]);
-          if (isInitialLoad) setLoadingConversations(false);
-          return;
-      }
-
-      const conversationIds = conversationsFromServer.map((c: Conversation) => c.id);
-      
-      const { data: dbData, error: dbError } = await supabase
+      const { data: convosData, error: convosError } = await supabase
         .from('chatwoot_conversations')
-        .select('id, unread_count')
-        .in('id', conversationIds);
+        .select('*, sender:chatwoot_contacts(*)')
+        .order('last_activity_at', { ascending: false });
 
-      const { data: latestMessages, error: rpcError } = await supabase.rpc('get_latest_messages', { convo_ids: conversationIds });
-
-      if (dbError) console.error("Error fetching DB unread counts:", dbError);
-      if (rpcError) console.error("Error fetching latest messages from DB:", rpcError);
-
-      const unreadMap = new Map(dbData?.map(item => [item.id, item.unread_count]));
-      
-      if (latestMessages) {
-        const typedLatestMessages = latestMessages as LatestMessage[];
-        const messageMap = new Map(typedLatestMessages.map(m => [m.conversation_id, m]));
-        
-        conversationsFromServer.forEach((convo: Conversation) => {
-          const dbMessage = messageMap.get(convo.id);
-          if (dbMessage) {
-            convo.messages = [{
-              id: 0,
-              content: dbMessage.content,
-              created_at: new Date(dbMessage.created_at_chatwoot).getTime() / 1000,
-              message_type: dbMessage.message_type,
-              private: false,
-            }];
-          }
-        });
+      if (convosError) throw convosError;
+      if (!convosData) {
+        setConversations([]);
+        if (isInitialLoad) setLoadingConversations(false);
+        return;
       }
 
-      conversationsFromServer.forEach((convo: Conversation) => {
-        const dbUnreadCount = unreadMap.get(convo.id);
-        if (dbUnreadCount !== undefined) {
-          convo.unread_count = dbUnreadCount;
+      const conversationIds = convosData.map(c => c.id);
+      if (conversationIds.length === 0) {
+        setConversations([]);
+        if (isInitialLoad) setLoadingConversations(false);
+        return;
+      }
+
+      const [labelsRes, latestMessagesRes] = await Promise.all([
+        supabase.from('chatwoot_conversation_labels').select('conversation_id, label:chatwoot_labels(name)').in('conversation_id', conversationIds),
+        supabase.rpc('get_latest_messages', { convo_ids: conversationIds })
+      ]);
+
+      if (labelsRes.error) throw labelsRes.error;
+      if (latestMessagesRes.error) throw latestMessagesRes.error;
+
+      const labelsMap = new Map<number, string[]>();
+      labelsRes.data?.forEach(item => {
+        // The type of item.label from the Supabase query is inferred as an array.
+        if (item.label && Array.isArray(item.label) && item.label.length > 0 && item.label[0].name) {
+          const currentLabels = labelsMap.get(item.conversation_id) || [];
+          labelsMap.set(item.conversation_id, [...currentLabels, item.label[0].name]);
         }
       });
 
-      const contactIds = conversationsFromServer.map((c: Conversation) => c.meta.sender.id);
-      const { data: contactsFromDB } = await supabase.from('chatwoot_contacts').select('id, phone_number').in('id', contactIds);
-      const phoneMap = new Map(contactsFromDB?.map(c => [c.id, c.phone_number]));
-      const enrichedConversations = conversationsFromServer.map((convo: Conversation) => {
-          const storedPhoneNumber = phoneMap.get(convo.meta.sender.id);
-          if (storedPhoneNumber && !convo.meta.sender.phone_number) {
-              return { ...convo, meta: { ...convo.meta, sender: { ...convo.meta.sender, phone_number: storedPhoneNumber } } };
-          }
-          return convo;
-      });
-      setConversations(enrichedConversations);
-      await syncConversationsToDB(enrichedConversations);
-    } catch (err: any) { console.error("Lỗi polling cuộc trò chuyện:", err);
-    } finally { if (isInitialLoad) setLoadingConversations(false); }
-  }, [settings]);
+      const messageMap = new Map<number, any>();
+      latestMessagesRes.data?.forEach(msg => messageMap.set(msg.conversation_id, msg));
+
+      const enrichedConversations = convosData.map(convo => ({
+        ...convo,
+        meta: { sender: { ...convo.sender, thumbnail: convo.sender.thumbnail_url } },
+        labels: labelsMap.get(convo.id) || [],
+        messages: messageMap.has(convo.id) ? [{
+          id: 0,
+          content: messageMap.get(convo.id).content,
+          created_at: new Date(messageMap.get(convo.id).created_at_chatwoot).getTime() / 1000,
+          message_type: messageMap.get(convo.id).message_type,
+          private: false,
+        }] : [],
+      }));
+
+      setConversations(enrichedConversations as Conversation[]);
+    } catch (err: any) {
+      console.error("Error fetching conversations from Supabase:", err);
+      showError("Không thể tải cuộc trò chuyện: " + err.message);
+    } finally {
+      if (isInitialLoad) setLoadingConversations(false);
+    }
+  }, []);
 
   const fetchMessages = useCallback(async (convoId: number) => {
     try {
-      const { data, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', { body: { action: 'list_messages', settings, conversationId: convoId }, });
-      if (functionError) throw new Error((await functionError.context.json()).error || functionError.message);
-      if (data.error) throw new Error(data.error);
-      const newMessages = data.payload.sort((a: Message, b: Message) => a.created_at - b.created_at) || [];
-      setMessages(current => newMessages.length > current.length ? newMessages : current);
-      await syncMessagesToDB(newMessages, convoId);
-    } catch (err: any) { console.error("Lỗi polling tin nhắn:", err); }
-  }, [settings]);
+      const { data, error } = await supabase
+        .from('chatwoot_messages')
+        .select('*, attachments:chatwoot_attachments(*)')
+        .eq('conversation_id', convoId)
+        .order('created_at_chatwoot', { ascending: true });
 
-  useEffect(() => {
-    const fetchInitialSettings = async () => {
-      const { data: labelsData, error: labelsError } = await supabase.from('chatwoot_labels').select('*').order('name', { ascending: true });
-      if (!labelsError && labelsData) {
-        setSuggestedLabels(labelsData);
-      }
-    };
-    fetchInitialSettings();
-  }, []);
+      if (error) throw error;
 
-  useEffect(() => {
-    const typingChannel = supabase.channel('ai-typing-status-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_typing_status' },
-        (payload) => {
-          const record = payload.new as { conversation_id: number; is_typing: boolean };
-          setAiTypingStatus(prev => ({ ...prev, [record.conversation_id]: record.is_typing }));
+      const formattedMessages = data.map(msg => ({
+        ...msg,
+        created_at: new Date(msg.created_at_chatwoot).getTime() / 1000,
+        sender: {
+          id: 0,
+          name: msg.sender_name,
+          thumbnail: msg.sender_thumbnail,
         }
-      ).subscribe();
-    return () => { supabase.removeChannel(typingChannel); };
+      }));
+      setMessages(formattedMessages as Message[]);
+    } catch (err: any) {
+      console.error("Error fetching messages from Supabase:", err);
+      showError("Không thể tải tin nhắn: " + err.message);
+    }
   }, []);
 
   useEffect(() => {
-    if (!settings.apiToken || !settings.accountId) {
-      setLoadingConversations(false);
-      return;
-    }
     fetchConversations(true);
-    const intervalId = setInterval(() => fetchConversations(false), POLLING_INTERVAL);
-    return () => clearInterval(intervalId);
-  }, [settings.apiToken, settings.accountId, fetchConversations]);
+    supabase.from('chatwoot_labels').select('*').order('name', { ascending: true })
+      .then(({ data, error }) => {
+        if (!error && data) setSuggestedLabels(data);
+      });
+  }, [fetchConversations]);
 
   useEffect(() => {
-    if (!selectedConversation) return;
-    setHasNewLog(false);
-    const logChannel = supabase
-      .channel(`ai-logs-for-${selectedConversation.id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ai_reply_logs', filter: `conversation_id=eq.${selectedConversation.id}` }, () => { setHasNewLog(true); })
+    const conversationsChannel = supabase.channel('public:chatwoot_conversations')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chatwoot_conversations' }, () => fetchConversations())
       .subscribe();
-    fetchMessages(selectedConversation.id);
-    fetchCareScripts(selectedConversation.id);
-    const intervalId = setInterval(() => fetchMessages(selectedConversation.id), POLLING_INTERVAL);
+
+    const messagesChannel = supabase.channel('public:chatwoot_messages')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chatwoot_messages' }, async (payload) => {
+        const newMessage = payload.new as any;
+        if (newMessage.conversation_id === selectedConversation?.id) {
+          const { data: fullMessage, error } = await supabase.from('chatwoot_messages').select('*, attachments:chatwoot_attachments(*)').eq('id', newMessage.id).single();
+          if (error) return;
+          const formattedMessage = {
+            ...fullMessage,
+            created_at: new Date(fullMessage.created_at_chatwoot).getTime() / 1000,
+            sender: { id: 0, name: fullMessage.sender_name, thumbnail: fullMessage.sender_thumbnail }
+          };
+          setMessages(current => [...current, formattedMessage as Message]);
+        }
+        fetchConversations();
+      }).subscribe();
+
+    const labelsChannel = supabase.channel('public:chatwoot_conversation_labels')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chatwoot_conversation_labels' }, () => fetchConversations())
+      .subscribe();
+    
+    const typingChannel = supabase.channel('ai-typing-status-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_typing_status' }, (payload) => {
+        const record = payload.new as { conversation_id: number; is_typing: boolean };
+        setAiTypingStatus(prev => ({ ...prev, [record.conversation_id]: record.is_typing }));
+      }).subscribe();
+
+    const logChannel = supabase.channel('ai-logs-realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ai_reply_logs' }, (payload) => {
+        if ((payload.new as any).conversation_id === selectedConversation?.id) {
+          setHasNewLog(true);
+        }
+      }).subscribe();
+
     return () => {
-      clearInterval(intervalId);
+      supabase.removeChannel(conversationsChannel);
+      supabase.removeChannel(messagesChannel);
+      supabase.removeChannel(labelsChannel);
+      supabase.removeChannel(typingChannel);
       supabase.removeChannel(logChannel);
     };
-  }, [selectedConversation, settings, fetchMessages, fetchCareScripts]);
+  }, [selectedConversation, fetchConversations]);
 
   useEffect(() => {
     if (messages.length > 0 && selectedConversation && !selectedConversation.meta.sender.phone_number) {
@@ -223,21 +212,17 @@ export const useChatwootInbox = () => {
     setSelectedConversation(conversation);
     setLoadingMessages(true);
     setMessages([]);
-    try {
-      const { data, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', { body: { action: 'list_messages', settings, conversationId: conversation.id }, });
-      if (functionError) throw new Error((await functionError.context.json()).error || functionError.message);
-      if (data.error) throw new Error(data.error);
-      const fetchedMessages = data.payload.sort((a: Message, b: Message) => a.created_at - b.created_at) || [];
-      setMessages(fetchedMessages);
-      await syncMessagesToDB(fetchedMessages, conversation.id);
-    } catch (err: any) { console.error('Đã xảy ra lỗi khi tải tin nhắn.');
-    } finally { setLoadingMessages(false); }
+    setHasNewLog(false);
+    await fetchMessages(conversation.id);
+    await fetchCareScripts(conversation.id);
+    setLoadingMessages(false);
+
     if (conversation.unread_count > 0) {
       setConversations(convos => convos.map(c => c.id === conversation.id ? { ...c, unread_count: 0 } : c));
-      supabase.from('chatwoot_conversations').update({ unread_count: 0 }).eq('id', conversation.id).then();
-      supabase.functions.invoke('chatwoot-proxy', { body: { action: 'mark_as_read', settings, conversationId: conversation.id }, }).catch((err: any) => console.error("Lỗi ngầm khi đánh dấu đã đọc:", err.message));
+      supabase.functions.invoke('chatwoot-proxy', { body: { action: 'mark_as_read', settings, conversationId: conversation.id } })
+        .catch((err: any) => console.error("Lỗi ngầm khi đánh dấu đã đọc:", err.message));
     }
-  }, [settings]);
+  }, [settings, fetchMessages, fetchCareScripts]);
 
   const handleSendMessage = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -265,7 +250,6 @@ export const useChatwootInbox = () => {
             responseData = data;
         }
         setMessages(prev => [...prev, responseData]);
-        await syncMessagesToDB([responseData], selectedConversation.id);
         setNewMessage('');
         setAttachment(null);
         dismissToast(toastId);
@@ -287,14 +271,6 @@ export const useChatwootInbox = () => {
     setSelectedConversation(optimisticConversation);
     setConversations(convos => convos.map(c => c.id === selectedConversation.id ? optimisticConversation : c));
     await supabase.functions.invoke('chatwoot-proxy', { body: { action: 'update_labels', settings, conversationId: selectedConversation.id, labels: newLabels } });
-    const { data: labelData } = await supabase.from('chatwoot_labels').select('id').eq('name', label).single();
-    if (labelData) {
-      if (isLabelApplied) {
-        await supabase.from('chatwoot_conversation_labels').delete().match({ conversation_id: selectedConversation.id, label_id: labelData.id });
-      } else {
-        await supabase.from('chatwoot_conversation_labels').upsert({ conversation_id: selectedConversation.id, label_id: labelData.id });
-      }
-    }
     if (label === AI_CARE_LABEL && !isLabelApplied) {
       try {
         const { error } = await supabase.functions.invoke('trigger-ai-care-script', { body: { conversationId: selectedConversation.id, contactId: selectedConversation.meta.sender.id } });
@@ -309,9 +285,6 @@ export const useChatwootInbox = () => {
 
   const handleNewNote = (newNote: Message) => {
     setMessages(prev => [...prev, newNote]);
-    if (selectedConversation) {
-      syncMessagesToDB([newNote], selectedConversation.id);
-    }
   };
 
   const handleConversationUpdate = (updatedConversation: Conversation) => {
@@ -336,18 +309,13 @@ export const useChatwootInbox = () => {
   }, [conversations, searchQuery, filters]);
 
   return {
-    // State
     conversations, loadingConversations, selectedConversation, messages, loadingMessages,
     newMessage, attachment, sendingMessage, searchQuery, suggestedLabels, scripts,
     isFilterOpen, filters, aiTypingStatus, hasNewLog,
-    // Setters
     setNewMessage, setAttachment, setSearchQuery, setIsFilterOpen, setFilters, setHasNewLog,
-    // Handlers
     handleSelectConversation, handleSendMessage, handleToggleLabel, handleNewNote, handleConversationUpdate,
     fetchCareScripts,
-    // Refs
     messagesEndRef, fileInputRef,
-    // Derived State
     filteredConversations,
   };
 };
