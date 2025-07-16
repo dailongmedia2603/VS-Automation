@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Eye, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import TrainingPreview from '@/components/TrainingPreview';
+import { KeywordActionManager } from '@/components/KeywordActionManager';
 
 const TrainingModule = ({ config, setConfig, onSave, isSaving }: { config: TrainingConfig, setConfig: React.Dispatch<React.SetStateAction<TrainingConfig>>, onSave: () => void, isSaving: boolean }) => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -144,8 +145,9 @@ const TrainingChatbot = () => {
         </p>
       </div>
       <Tabs defaultValue="auto_reply" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 max-w-2xl bg-slate-200/75 p-1.5 rounded-xl h-12">
+        <TabsList className="grid w-full grid-cols-4 max-w-3xl bg-slate-200/75 p-1.5 rounded-xl h-12">
           <TabsTrigger value="auto_reply" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-blue-600 text-slate-600 font-semibold text-base transition-all duration-300">Tự động trả lời</TabsTrigger>
+          <TabsTrigger value="keyword_actions" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-blue-600 text-slate-600 font-semibold text-base transition-all duration-300">Hành động theo từ khoá</TabsTrigger>
           <TabsTrigger value="care_script_suggestion" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-blue-600 text-slate-600 font-semibold text-base transition-all duration-300">Kịch bản chăm sóc</TabsTrigger>
           <TabsTrigger value="internal_docs" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-blue-600 text-slate-600 font-semibold text-base transition-all duration-300">Tài liệu nội bộ</TabsTrigger>
         </TabsList>
@@ -156,6 +158,9 @@ const TrainingChatbot = () => {
             isSaving={!!isSaving['auto_reply']}
             onSave={() => handleSave('auto_reply')}
           />
+        </TabsContent>
+        <TabsContent value="keyword_actions">
+          <KeywordActionManager />
         </TabsContent>
         <TabsContent value="care_script_suggestion">
           <TrainingModule

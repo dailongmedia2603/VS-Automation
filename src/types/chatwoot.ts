@@ -66,3 +66,14 @@ export interface AiLog {
   details: string;
   system_prompt: string | null;
 }
+
+export interface KeywordAction {
+  id: number;
+  type: 'keyword' | 'phone_number';
+  keyword: string | null;
+  action_type: 'stop_auto_reply' | 'reply_with_content';
+  reply_content: string | null;
+  creator_email: string | null;
+  created_at: string;
+  is_active: boolean;
+}
