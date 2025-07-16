@@ -19,12 +19,25 @@ const formatMessage = (msg) => {
 const buildSystemPrompt = (config, history, context) => {
     let contextSection = '';
     if (context && context.length > 0) {
+        const contextParts = context.map(doc => {
+            let docString = `--- Tài liệu: ${doc.title} ---\n`;
+            if (doc.purpose) docString += `Mục đích: ${doc.purpose}\n`;
+            if (doc.content) docString += `Nội dung: ${doc.content}\n`;
+
+            // **PHẦN NÂNG CẤP QUAN TRỌNG**
+            // Nếu có ví dụ cụ thể, hãy nhấn mạnh nó cho AI
+            if (doc.example_customer_message && doc.example_agent_reply) {
+                docString += `\n>>> VÍ DỤ ÁP DỤNG RẤT QUAN TRỌNG:\n`;
+                docString += `Khi khách hàng hỏi một câu tương tự như: "${doc.example_customer_message}"\n`;
+                docString += `Hãy trả lời theo mẫu sau: "${doc.example_agent_reply}"\n`;
+                docString += `<<< KẾT THÚC VÍ DỤ\n`;
+            }
+            return docString;
+        });
+
         contextSection = `
-Dưới đây là một số thông tin liên quan từ tài liệu nội bộ có thể giúp bạn trả lời:
----
-${context.map(c => c.content).join('\n---\n')}
----
-Hãy ưu tiên sử dụng thông tin này để trả lời câu hỏi của khách hàng.
+Dưới đây là một số thông tin và ví dụ từ tài liệu nội bộ có thể giúp bạn trả lời. Hãy ưu tiên sử dụng chúng:
+${contextParts.join('\n---\n')}
 `;
     }
 
