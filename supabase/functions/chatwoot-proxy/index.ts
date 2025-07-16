@@ -94,13 +94,11 @@ serve(async (req) => {
             });
             break;
 
-          case 'mark_as_unread': // Changed from toggle_unread
+          case 'mark_as_unread':
             if (!conversationId) throw new Error("Conversation ID is required.");
-            endpoint = `/api/v1/accounts/${settings.accountId}/conversations/${conversationId}/update_last_seen`; // Changed endpoint
+            endpoint = `/api/v1/accounts/${settings.accountId}/conversations/${conversationId}/unread`;
             method = 'POST';
-            body = JSON.stringify({
-              last_seen_at: 0 // Send a timestamp from the past (Unix epoch)
-            });
+            body = JSON.stringify({});
             break;
 
           case 'update_labels':
