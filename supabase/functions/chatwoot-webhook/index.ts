@@ -12,30 +12,37 @@ async function handleMessageCreated(supabase: SupabaseClient, payload: any) {
   const conversation = payload.conversation;
   const contact = payload.sender;
 
+  const promises = [];
+
   // Sync Contact
   if (contact && contact.type === 'contact') {
-    await supabase.from('chatwoot_contacts').upsert({
-      id: contact.id,
-      name: contact.name,
-      email: contact.email,
-      phone_number: contact.phone_number,
-      thumbnail_url: contact.thumbnail,
-    }, { onConflict: 'id' });
+    promises.push(
+      supabase.from('chatwoot_contacts').upsert({
+        id: contact.id,
+        name: contact.name,
+        email: contact.email,
+        phone_number: contact.phone_number,
+        thumbnail_url: contact.thumbnail,
+      }, { onConflict: 'id' })
+    );
   }
 
   // Sync Conversation on new message
   if (conversation) {
-    await supabase.from('chatwoot_conversations').upsert({
+    const conversationData = {
       id: conversation.id,
       contact_id: contact?.id,
       status: conversation.status,
-      last_activity_at: conversation.last_activity_at,
+      last_activity_at: conversation.last_activity_at ? new Date(conversation.last_activity_at * 1000).toISOString() : new Date().toISOString(),
       unread_count: conversation.unread_count,
-    }, { onConflict: 'id' });
+    };
+    promises.push(
+      supabase.from('chatwoot_conversations').upsert(conversationData, { onConflict: 'id' })
+    );
   }
 
   // Sync Message
-  await supabase.from('chatwoot_messages').upsert({
+  const messageData = {
     id: message.id,
     conversation_id: conversation.id,
     content: message.content,
@@ -43,8 +50,11 @@ async function handleMessageCreated(supabase: SupabaseClient, payload: any) {
     is_private: message.private,
     sender_name: contact?.name,
     sender_thumbnail: contact?.thumbnail,
-    created_at_chatwoot: message.created_at,
-  }, { onConflict: 'id' });
+    created_at_chatwoot: message.created_at ? new Date(message.created_at * 1000).toISOString() : new Date().toISOString(),
+  };
+  promises.push(
+    supabase.from('chatwoot_messages').upsert(messageData, { onConflict: 'id' })
+  );
 
   // Sync Attachments
   if (message.attachments && message.attachments.length > 0) {
@@ -54,8 +64,18 @@ async function handleMessageCreated(supabase: SupabaseClient, payload: any) {
       file_type: att.file_type,
       data_url: att.data_url,
     }));
-    await supabase.from('chatwoot_attachments').upsert(attachmentsToUpsert, { onConflict: 'id' });
+    promises.push(
+      supabase.from('chatwoot_attachments').upsert(attachmentsToUpsert, { onConflict: 'id' })
+    );
   }
+
+  const results = await Promise.all(promises);
+  results.forEach(result => {
+    if (result.error) {
+      console.error('Supabase upsert error:', result.error);
+      throw result.error;
+    }
+  });
 }
 
 async function handleConversationUpdated(supabase: SupabaseClient, payload: any) {
