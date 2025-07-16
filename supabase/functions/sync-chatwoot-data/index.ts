@@ -30,7 +30,17 @@ async function fetchFromChatwoot(endpoint: string, config: any) {
     throw new Error(`Chatwoot API Error for ${endpoint}: ${response.status} ${errorBody}`);
   }
   const data = await response.json();
-  return data.payload || data;
+  // Handle different response structures from Chatwoot API
+  if (Array.isArray(data.payload)) {
+    return data.payload;
+  }
+  if (Array.isArray(data.data)) {
+    return data.data;
+  }
+  if (Array.isArray(data)) {
+    return data;
+  }
+  return []; // Return an empty array as a fallback
 }
 
 async function syncConversationData(supabase: SupabaseClient, convo: any, config: any) {
@@ -85,8 +95,12 @@ async function syncConversationData(supabase: SupabaseClient, convo: any, config
 
   // 5. Sync Labels
   if (labels && labels.length > 0) {
-    const allDbLabels = await supabase.from('chatwoot_labels').select('name, id');
-    const dbLabelMap = new Map(allDbLabels.data.map(l => [l.name, l.id]));
+    const { data: allDbLabels, error } = await supabase.from('chatwoot_labels').select('name, id');
+    if (error) {
+        console.error("Error fetching DB labels:", error);
+        return;
+    }
+    const dbLabelMap = new Map(allDbLabels.map(l => [l.name, l.id]));
     
     const labelLinksToInsert = [];
     for (const labelName of labels) {
