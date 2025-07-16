@@ -142,7 +142,9 @@ export const KeywordActionManager = () => {
                   <TableHead>Loại</TableHead>
                   <TableHead>Từ khoá</TableHead>
                   <TableHead>Hành động</TableHead>
+                  <TableHead>Nội dung trả lời</TableHead>
                   <TableHead>Ngày tạo</TableHead>
+                  <TableHead>Người tạo</TableHead>
                   <TableHead>Kích hoạt</TableHead>
                   <TableHead className="text-right">Thao tác</TableHead>
                 </TableRow>
@@ -151,7 +153,7 @@ export const KeywordActionManager = () => {
                 {isLoading ? (
                   [...Array(3)].map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell colSpan={6}><Skeleton className="h-8 w-full" /></TableCell>
+                      <TableCell colSpan={8}><Skeleton className="h-8 w-full" /></TableCell>
                     </TableRow>
                   ))
                 ) : rules.length > 0 ? (
@@ -160,7 +162,9 @@ export const KeywordActionManager = () => {
                       <TableCell>{rule.type === 'keyword' ? 'Từ khoá' : 'Số điện thoại'}</TableCell>
                       <TableCell className="font-mono">{rule.keyword || '---'}</TableCell>
                       <TableCell>{rule.action_type === 'stop_auto_reply' ? 'Dừng trả lời tự động' : 'Trả lời theo nội dung'}</TableCell>
+                      <TableCell className="max-w-[200px] truncate">{rule.reply_content || '---'}</TableCell>
                       <TableCell>{format(new Date(rule.created_at), 'dd/MM/yyyy')}</TableCell>
+                      <TableCell>{rule.creator_email || 'N/A'}</TableCell>
                       <TableCell>
                         <Switch
                           checked={rule.is_active}
@@ -175,7 +179,7 @@ export const KeywordActionManager = () => {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center h-24">Chưa có quy tắc nào.</TableCell>
+                    <TableCell colSpan={8} className="text-center h-24">Chưa có quy tắc nào.</TableCell>
                   </TableRow>
                 )}
               </TableBody>
