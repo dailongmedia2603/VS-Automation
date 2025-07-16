@@ -11,7 +11,8 @@ const AI_STAR_LABEL_NAME = 'AI Star';
 
 const formatMessage = (msg) => {
     const sender = msg.message_type === 1 ? 'Agent' : 'User';
-    const timestamp = new Date(msg.created_at_chatwoot).toLocaleString('vi-VN');
+    // Sửa đổi: Sử dụng `created_at` (timestamp) thay vì `created_at_chatwoot`
+    const timestamp = new Date(msg.created_at * 1000).toLocaleString('vi-VN');
     const content = msg.content || '[Tệp đính kèm hoặc tin nhắn trống]';
     return `[${timestamp}] ${sender}: ${content}`;
 }
@@ -138,12 +139,25 @@ serve(async (req) => {
     const trainingConfig = autoReplySettingsRes.data.config;
     const aiSettings = aiSettingsRes.data;
 
-    const { data: messages, error: messagesError } = await supabaseAdmin
-      .from('chatwoot_messages').select('content, message_type, created_at_chatwoot')
-      .eq('conversation_id', conversationId).order('created_at_chatwoot', { ascending: true });
-    if (messagesError || !messages || messages.length === 0) {
+    // Sửa đổi: Lấy tin nhắn trực tiếp từ Chatwoot API thay vì từ DB
+    const { data: messagesData, error: messagesError } = await supabaseAdmin.functions.invoke('chatwoot-proxy', {
+        body: {
+            action: 'list_messages',
+            settings: chatwootSettings,
+            conversationId: conversationId,
+        }
+    });
+
+    if (messagesError) {
+        throw new Error(`Lỗi khi tải tin nhắn từ Chatwoot: ${(await messagesError.context.json()).error || messagesError.message}`);
+    }
+    
+    const messages = messagesData.payload.sort((a, b) => a.created_at - b.created_at) || [];
+
+    if (!messages || messages.length === 0) {
       throw new Error(`Không tìm thấy tin nhắn cho cuộc trò chuyện #${conversationId}`);
     }
+    
     const conversationHistory = messages.map(formatMessage).join('\n');
     const lastUserMessage = messages.filter(m => m.message_type === 0).pop()?.content || '';
 
