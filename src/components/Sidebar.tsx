@@ -16,6 +16,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "./ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import logo from '@/assets/images/logo.png';
 
 interface NavItem {
   name: string;
@@ -160,14 +161,8 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
       </Button>
 
       {/* Logo */}
-      <div className={cn("flex items-center", isCollapsed ? "justify-center h-10" : "")}>
-        {isCollapsed ? (
-          <div className="bg-blue-600 rounded-lg p-2 flex items-center justify-center">
-            <Briefcase className="h-5 w-5 text-white" />
-          </div>
-        ) : (
-          <h1 className="text-3xl font-bold text-blue-600 mx-auto">HEXA</h1>
-        )}
+      <div className={cn("flex items-center justify-center", isCollapsed ? "h-10" : "h-16")}>
+        <img src={logo} alt="HEXA Logo" className={cn("transition-all", isCollapsed ? "h-7" : "h-8")} />
       </div>
 
       {/* User Profile */}
