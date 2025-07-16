@@ -157,10 +157,8 @@ serve(async (req) => {
     }
     const labelMap = new Map(chatwootLabels.map((l) => [l.title, l.id]));
 
-    // Lấy tất cả conversation đang mở/pending
-    const conversations = await fetchAllFromChatwoot("/conversations", config, {
-      status: ["open", "pending"],
-    });
+    // Lấy tất cả conversation, không lọc theo status
+    const conversations = await fetchAllFromChatwoot("/conversations", config);
 
     if (conversations.length === 0) {
       return new Response(
