@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/button';
 import { Eye, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import TrainingPreview from '@/components/TrainingPreview';
-import { KeywordActionManager } from '@/components/KeywordActionManager';
 
 const TrainingModule = ({ config, setConfig, onSave, isSaving }: { config: TrainingConfig, setConfig: React.Dispatch<React.SetStateAction<TrainingConfig>>, onSave: () => void, isSaving: boolean }) => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -22,9 +21,9 @@ const TrainingModule = ({ config, setConfig, onSave, isSaving }: { config: Train
   return (
     <>
       <Tabs defaultValue="info" className="w-full">
-        <TabsList className="flex justify-start gap-6">
-          <TabsTrigger value="info" className="text-base font-semibold text-slate-500 transition-colors hover:text-blue-600 data-[state=active]:text-blue-600">Thông tin Train</TabsTrigger>
-          <TabsTrigger value="prompt" className="text-base font-semibold text-slate-500 transition-colors hover:text-blue-600 data-[state=active]:text-blue-600">Cấu hình Prompt</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 max-w-sm bg-slate-200/75 p-1.5 rounded-xl h-12">
+          <TabsTrigger value="info" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-blue-600 text-slate-600 font-semibold text-base transition-all duration-300">Thông tin Train</TabsTrigger>
+          <TabsTrigger value="prompt" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-blue-600 text-slate-600 font-semibold text-base transition-all duration-300">Cấu hình Prompt</TabsTrigger>
         </TabsList>
         <TabsContent value="info">
           <TrainingForm config={config} setConfig={setConfig} />
@@ -145,13 +144,12 @@ const TrainingChatbot = () => {
         </p>
       </div>
       <Tabs defaultValue="auto_reply" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 max-w-3xl bg-slate-200/75 p-1.5 rounded-xl h-12">
+        <TabsList className="grid w-full grid-cols-3 max-w-2xl bg-slate-200/75 p-1.5 rounded-xl h-12">
           <TabsTrigger value="auto_reply" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-blue-600 text-slate-600 font-semibold text-base transition-all duration-300">Tự động trả lời</TabsTrigger>
           <TabsTrigger value="care_script_suggestion" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-blue-600 text-slate-600 font-semibold text-base transition-all duration-300">Kịch bản chăm sóc</TabsTrigger>
           <TabsTrigger value="internal_docs" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-blue-600 text-slate-600 font-semibold text-base transition-all duration-300">Tài liệu nội bộ</TabsTrigger>
-          <TabsTrigger value="keyword_actions" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-blue-600 text-slate-600 font-semibold text-base transition-all duration-300">Hành động theo từ khoá</TabsTrigger>
         </TabsList>
-        <TabsContent value="auto_reply" className="mt-6">
+        <TabsContent value="auto_reply">
           <TrainingModule
             config={autoReplyConfig}
             setConfig={setAutoReplyConfig}
@@ -159,7 +157,7 @@ const TrainingChatbot = () => {
             onSave={() => handleSave('auto_reply')}
           />
         </TabsContent>
-        <TabsContent value="care_script_suggestion" className="mt-6">
+        <TabsContent value="care_script_suggestion">
           <TrainingModule
             config={careScriptConfig}
             setConfig={setCareScriptConfig}
@@ -167,11 +165,8 @@ const TrainingChatbot = () => {
             onSave={() => handleSave('care_script_suggestion')}
           />
         </TabsContent>
-        <TabsContent value="internal_docs" className="mt-6">
+        <TabsContent value="internal_docs">
           <DocumentTrainer />
-        </TabsContent>
-        <TabsContent value="keyword_actions" className="mt-6">
-          <KeywordActionManager />
         </TabsContent>
       </Tabs>
     </main>

@@ -107,50 +107,6 @@ serve(async (req) => {
   try {
     await supabaseAdmin.from('ai_typing_status').upsert({ conversation_id: conversationId, is_typing: true });
 
-    const { data: messagesData, error: messagesError } = await supabaseAdmin.functions.invoke('chatwoot-proxy', {
-        body: { action: 'list_messages', settings: chatwootSettings, conversationId: conversationId }
-    });
-    if (messagesError) throw new Error(`Lỗi khi tải tin nhắn từ Chatwoot: ${(await messagesError.context.json()).error || messagesError.message}`);
-    
-    const messages = messagesData.payload.sort((a, b) => a.created_at - b.created_at) || [];
-    if (!messages || messages.length === 0) throw new Error(`Không tìm thấy tin nhắn cho cuộc trò chuyện #${conversationId}`);
-    
-    const lastUserMessage = messages.filter(m => m.message_type === 0).pop()?.content || '';
-
-    // --- START: KEYWORD ACTION CHECK ---
-    const { data: keywordRules } = await supabaseAdmin.from('keyword_actions').select('*').eq('is_active', true);
-    if (keywordRules && keywordRules.length > 0) {
-      for (const rule of keywordRules) {
-        let match = false;
-        if (rule.type === 'phone_number' && /(0[3|5|7|8|9][0-9]{8})\b/.test(lastUserMessage)) {
-          match = true;
-        } else if (rule.type === 'keyword' && rule.keyword && lastUserMessage.toLowerCase().includes(rule.keyword.toLowerCase())) {
-          match = true;
-        }
-
-        if (match) {
-          if (rule.action_type === 'stop_auto_reply') {
-            const { data: convoDetails } = await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'get_conversation_details', settings: chatwootSettings, conversationId: conversationId } });
-            const newLabels = (convoDetails?.labels || []).filter((l: string) => l !== AI_STAR_LABEL_NAME);
-            await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'update_labels', settings: chatwootSettings, conversationId: conversationId, labels: newLabels } });
-            await logToDb('success', `Dừng trả lời tự động do quy tắc #${rule.id}.`);
-          } else if (rule.action_type === 'reply_with_content' && rule.reply_content) {
-            await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'send_message', settings: chatwootSettings, conversationId: conversationId, content: rule.reply_content } });
-            const { data: convoDetails } = await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'get_conversation_details', settings: chatwootSettings, conversationId: conversationId } });
-            const newLabels = (convoDetails?.labels || []).filter((l: string) => l !== AI_STAR_LABEL_NAME);
-            await Promise.all([
-              supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'update_labels', settings: chatwootSettings, conversationId: conversationId, labels: newLabels } }),
-              supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'mark_as_read', settings: chatwootSettings, conversationId: conversationId } })
-            ]);
-            await logToDb('success', `Đã trả lời theo quy tắc #${rule.id}.`);
-          }
-          await supabaseAdmin.from('ai_typing_status').upsert({ conversation_id: conversationId, is_typing: false });
-          return new Response(JSON.stringify({ message: `Processed with keyword rule #${rule.id}` }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
-        }
-      }
-    }
-    // --- END: KEYWORD ACTION CHECK ---
-
     const [autoReplySettingsRes, aiSettingsRes] = await Promise.all([
         supabaseAdmin.from('auto_reply_settings').select('config').eq('id', 1).single(),
         supabaseAdmin.from('ai_settings').select('api_url, api_key').eq('id', 1).single(),
@@ -164,12 +120,39 @@ serve(async (req) => {
 
     const trainingConfig = autoReplySettingsRes.data.config;
     const aiSettings = aiSettingsRes.data;
+
+    const { data: messagesData, error: messagesError } = await supabaseAdmin.functions.invoke('chatwoot-proxy', {
+        body: {
+            action: 'list_messages',
+            settings: chatwootSettings,
+            conversationId: conversationId,
+        }
+    });
+
+    if (messagesError) {
+        throw new Error(`Lỗi khi tải tin nhắn từ Chatwoot: ${(await messagesError.context.json()).error || messagesError.message}`);
+    }
+    
+    const messages = messagesData.payload.sort((a, b) => a.created_at - b.created_at) || [];
+
+    if (!messages || messages.length === 0) {
+      throw new Error(`Không tìm thấy tin nhắn cho cuộc trò chuyện #${conversationId}`);
+    }
+    
     const conversationHistory = messages.map(formatMessage).join('\n');
+    const lastUserMessage = messages.filter(m => m.message_type === 0).pop()?.content || '';
 
     let context = null;
     if (lastUserMessage) {
-        const richQuery = `Bối cảnh kinh doanh: ${trainingConfig.industry || 'Không rõ'}. Sản phẩm/dịch vụ chính: ${trainingConfig.products?.map(p => p.value).join(', ') || 'Không rõ'}. Câu hỏi của khách hàng: ${lastUserMessage}`.trim().replace(/\s+/g, ' ');
-        const { data: searchResults, error: searchError } = await supabaseAdmin.functions.invoke('search-documents', { body: { query: richQuery } });
+        const richQuery = `
+          Bối cảnh kinh doanh: ${trainingConfig.industry || 'Không rõ'}.
+          Sản phẩm/dịch vụ chính: ${trainingConfig.products && trainingConfig.products.length > 0 ? trainingConfig.products.map(p => p.value).join(', ') : 'Không rõ'}.
+          Câu hỏi của khách hàng: ${lastUserMessage}
+        `.trim().replace(/\s+/g, ' ');
+
+        const { data: searchResults, error: searchError } = await supabaseAdmin.functions.invoke('search-documents', {
+            body: { query: richQuery }
+        });
         if (searchError) console.error("Lỗi tìm kiếm tài liệu:", searchError.message);
         else context = searchResults;
     }
@@ -183,9 +166,14 @@ serve(async (req) => {
 
     const aiReply = proxyResponse.choices[0].message.content;
 
-    await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'send_message', settings: chatwootSettings, conversationId: conversationId, content: aiReply } });
+    const { error: sendMessageError } = await supabaseAdmin.functions.invoke('chatwoot-proxy', {
+      body: { action: 'send_message', settings: chatwootSettings, conversationId: conversationId, content: aiReply }
+    });
+    if (sendMessageError) throw new Error(`Lỗi gửi tin nhắn qua Chatwoot: ${(await sendMessageError.context.json()).error || sendMessageError.message}`);
+
     const { data: convoDetails } = await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'get_conversation_details', settings: chatwootSettings, conversationId: conversationId } });
-    const newLabels = (convoDetails?.labels || []).filter((l: string) => l !== AI_STAR_LABEL_NAME);
+    const currentLabels = convoDetails?.labels || [];
+    const newLabels = currentLabels.filter((label: string) => label !== AI_STAR_LABEL_NAME);
     
     await Promise.all([
         supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'update_labels', settings: chatwootSettings, conversationId: conversationId, labels: newLabels } }),
@@ -194,7 +182,9 @@ serve(async (req) => {
 
     await logToDb('success', `AI đã trả lời thành công với nội dung: "${aiReply.substring(0, 100)}..."`, systemPrompt);
 
-    return new Response(JSON.stringify({ message: `Successfully processed conversation ${conversationId}` }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
+    return new Response(JSON.stringify({ message: `Successfully processed conversation ${conversationId}` }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200,
+    });
 
   } catch (e) {
     console.error(`Failed to process conversation ${conversationId}:`, e.message);
