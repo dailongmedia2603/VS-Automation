@@ -137,11 +137,25 @@ serve(async (req) => {
             if (event.message && event.sender) {
               const psid = event.sender.id;
               const messageContent = event.message.text;
+              const attachments = event.message.attachments;
+
+              if (!messageContent && (!attachments || attachments.length === 0)) {
+                continue;
+              }
 
               const userProfile = await getUserProfile(psid, facebookToken);
               const contact = await findOrCreateContact(psid, userProfile.name, chatwootConfig);
               const conversation = await createConversation(contact, chatwootConfig);
-              await createMessage(conversation.id, messageContent, chatwootConfig);
+              
+              let finalContent = messageContent || '';
+              if (attachments && attachments.length > 0) {
+                  const attachmentText = attachments.map(att => `[Tệp đính kèm: ${att.type}]`).join('\\n');
+                  finalContent = finalContent ? `${finalContent}\\n${attachmentText}` : attachmentText;
+              }
+
+              if (finalContent) {
+                await createMessage(conversation.id, finalContent, chatwootConfig);
+              }
             }
           }
         }
