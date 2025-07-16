@@ -60,6 +60,7 @@ const ChatwootInbox = () => {
   const [aiStarLabelId, setAiStarLabelId] = useState<number | null>(null);
   const [aiTypingStatus, setAiTypingStatus] = useState<Record<number, boolean>>({});
   const [hasNewLog, setHasNewLog] = useState(false);
+  const [updatingConvoIds, setUpdatingConvoIds] = useState<Set<number>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const POLLING_INTERVAL = 15000;
@@ -188,11 +189,22 @@ const ChatwootInbox = () => {
           }
           return convo;
       });
-      setConversations(enrichedConversations);
+
+      setConversations(prevConversations => {
+        const finalConversations = enrichedConversations.map(newConvo => {
+            if (updatingConvoIds.has(newConvo.id)) {
+                const prevConvo = prevConversations.find(p => p.id === newConvo.id);
+                return prevConvo || newConvo;
+            }
+            return newConvo;
+        });
+        return finalConversations;
+      });
+
       await syncConversationsToDB(enrichedConversations);
     } catch (err: any) { console.error("Lỗi polling cuộc trò chuyện:", err);
     } finally { if (isInitialLoad) setLoadingConversations(false); }
-  }, [settings, isAutoReplyEnabled, aiStarLabelId]);
+  }, [settings, isAutoReplyEnabled, aiStarLabelId, updatingConvoIds]);
 
   const fetchMessages = async (convoId: number) => {
     try {
@@ -378,10 +390,12 @@ const ChatwootInbox = () => {
   };
 
   const handleMarkAsUnread = async (e: React.MouseEvent, conversationId: number) => {
-    e.stopPropagation(); // Prevent selecting the conversation
+    e.stopPropagation();
+    const originalConversation = conversations.find(c => c.id === conversationId);
+    if (!originalConversation) return;
 
-    const originalConversations = [...conversations];
-    // Optimistic UI update
+    setUpdatingConvoIds(prev => new Set(prev).add(conversationId));
+
     setConversations(convos => 
         convos.map(c => 
             c.id === conversationId ? { ...c, unread_count: 1 } : c
@@ -389,28 +403,27 @@ const ChatwootInbox = () => {
     );
 
     try {
-        const { data, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', {
-            body: {
-                action: 'mark_as_unread',
-                settings,
-                conversationId,
-            },
+        const { error } = await supabase.functions.invoke('chatwoot-proxy', {
+            body: { action: 'mark_as_unread', settings, conversationId },
         });
 
-        if (functionError) {
-            const errorData = await functionError.context.json();
-            throw new Error(errorData.error || functionError.message);
-        }
-        if (data.error) throw new Error(data.error);
+        if (error) throw error;
         
-        // The API call was successful, we can keep the optimistic update.
-        // A silent refetch in the background to sync the exact state.
-        fetchConversations(false);
-
     } catch (err: any) {
         showError(`Đánh dấu chưa đọc thất bại: ${err.message}`);
-        // Revert optimistic update on error
-        setConversations(originalConversations);
+        setConversations(convos => 
+            convos.map(c => 
+                c.id === conversationId ? originalConversation : c
+            )
+        );
+    } finally {
+        setTimeout(() => {
+            setUpdatingConvoIds(prev => {
+                const next = new Set(prev);
+                next.delete(conversationId);
+                return next;
+            });
+        }, 2000);
     }
   };
 
