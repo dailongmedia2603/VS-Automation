@@ -33,7 +33,7 @@ async function handleMessageCreated(supabase: SupabaseClient, payload: any) {
       id: conversation.id,
       contact_id: contact?.id,
       status: conversation.status,
-      last_activity_at: conversation.last_activity_at ? new Date(conversation.last_activity_at * 1000).toISOString() : new Date().toISOString(),
+      last_activity_at: typeof conversation.last_activity_at === 'number' ? new Date(conversation.last_activity_at * 1000).toISOString() : new Date().toISOString(),
       unread_count: conversation.unread_count,
     };
     promises.push(
@@ -50,7 +50,7 @@ async function handleMessageCreated(supabase: SupabaseClient, payload: any) {
     is_private: message.private,
     sender_name: contact?.name,
     sender_thumbnail: contact?.thumbnail,
-    created_at_chatwoot: message.created_at ? new Date(message.created_at * 1000).toISOString() : new Date().toISOString(),
+    created_at_chatwoot: typeof message.created_at === 'number' ? new Date(message.created_at * 1000).toISOString() : new Date().toISOString(),
   };
   promises.push(
     supabase.from('chatwoot_messages').upsert(messageData, { onConflict: 'id' })
