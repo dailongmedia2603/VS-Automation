@@ -26,6 +26,13 @@ interface Filters {
   seenNotReplied: boolean;
 }
 
+interface LatestMessage {
+  conversation_id: number;
+  content: string;
+  message_type: number;
+  created_at_chatwoot: string;
+}
+
 const getInitials = (name?: string) => {
   if (!name) return 'U';
   const names = name.trim().split(' ');
@@ -135,24 +142,31 @@ const ChatwootInbox = () => {
           return;
       }
 
-      const previewFixPromises = conversationsFromServer.map(async (convo: Conversation) => {
-        const lastMessage = convo.messages[0];
-        if (lastMessage && lastMessage.message_type === 2) {
-          const { data: lastRealMessage } = await supabase
-            .from('chatwoot_messages')
-            .select('content, message_type')
-            .eq('conversation_id', convo.id)
-            .in('message_type', [0, 1])
-            .order('created_at_chatwoot', { ascending: false })
-            .limit(1)
-            .single();
-          
-          if (lastRealMessage) {
-            convo.messages[0] = { ...lastMessage, content: lastRealMessage.content, message_type: lastRealMessage.message_type };
+      // --- START: NEW PREVIEW FIX LOGIC ---
+      const conversationIds = conversationsFromServer.map((c: Conversation) => c.id);
+      const { data: latestMessages, error: rpcError } = await supabase.rpc('get_latest_messages', { convo_ids: conversationIds });
+
+      if (rpcError) {
+        console.error("Error fetching latest messages from DB:", rpcError);
+      } else if (latestMessages) {
+        const typedLatestMessages = latestMessages as LatestMessage[];
+        const messageMap = new Map(typedLatestMessages.map(m => [m.conversation_id, m]));
+        
+        conversationsFromServer.forEach((convo: Conversation) => {
+          const dbMessage = messageMap.get(convo.id);
+          if (dbMessage) {
+            // Overwrite the potentially stale preview from Chatwoot API
+            convo.messages = [{
+              id: 0, // This ID is fake, but it's just for the preview
+              content: dbMessage.content,
+              created_at: new Date(dbMessage.created_at_chatwoot).getTime() / 1000,
+              message_type: dbMessage.message_type,
+              private: false,
+            }];
           }
-        }
-      });
-      await Promise.all(previewFixPromises);
+        });
+      }
+      // --- END: NEW PREVIEW FIX LOGIC ---
 
       if (isAutoReplyEnabled && aiStarLabelId) {
         const conversationsToTag = conversationsFromServer.filter(
