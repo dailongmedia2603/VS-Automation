@@ -10,6 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { PlusCircle, Edit, Trash2, Loader2 } from 'lucide-react';
 import { showSuccess, showError } from '@/utils/toast';
 import { format } from 'date-fns';
@@ -47,6 +48,20 @@ export const KeywordActionManager = () => {
   useEffect(() => {
     fetchRules();
   }, []);
+
+  const handleToggleActive = async (rule: KeywordAction, checked: boolean) => {
+    setRules(prevRules =>
+      prevRules.map(r => (r.id === rule.id ? { ...r, is_active: checked } : r))
+    );
+    const { error } = await supabase
+      .from('keyword_actions')
+      .update({ is_active: checked })
+      .eq('id', rule.id);
+    if (error) {
+      showError(`Cập nhật trạng thái thất bại: ${error.message}`);
+      fetchRules();
+    }
+  };
 
   const handleAddNew = () => {
     setCurrentRule({ type: 'keyword', action_type: 'reply_with_content', is_active: true });
@@ -126,9 +141,9 @@ export const KeywordActionManager = () => {
                 <TableRow>
                   <TableHead>Loại</TableHead>
                   <TableHead>Từ khoá</TableHead>
-                  <TableHead>Loại hành động</TableHead>
-                  <TableHead>Nội dung trả lời</TableHead>
-                  <TableHead>Người tạo</TableHead>
+                  <TableHead>Hành động</TableHead>
+                  <TableHead>Ngày tạo</TableHead>
+                  <TableHead>Kích hoạt</TableHead>
                   <TableHead className="text-right">Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
@@ -144,9 +159,14 @@ export const KeywordActionManager = () => {
                     <TableRow key={rule.id}>
                       <TableCell>{rule.type === 'keyword' ? 'Từ khoá' : 'Số điện thoại'}</TableCell>
                       <TableCell className="font-mono">{rule.keyword || '---'}</TableCell>
-                      <TableCell>{rule.action_type === 'stop_auto_reply' ? 'Dừng trả lời tự động' : 'Nội dung trả lời'}</TableCell>
-                      <TableCell className="max-w-xs truncate">{rule.reply_content || '---'}</TableCell>
-                      <TableCell>{rule.creator_email}</TableCell>
+                      <TableCell>{rule.action_type === 'stop_auto_reply' ? 'Dừng trả lời tự động' : 'Trả lời theo nội dung'}</TableCell>
+                      <TableCell>{format(new Date(rule.created_at), 'dd/MM/yyyy')}</TableCell>
+                      <TableCell>
+                        <Switch
+                          checked={rule.is_active}
+                          onCheckedChange={(checked) => handleToggleActive(rule, checked)}
+                        />
+                      </TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="icon" onClick={() => handleEdit(rule)}><Edit className="h-4 w-4" /></Button>
                         <Button variant="ghost" size="icon" onClick={() => setRuleToDelete(rule)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
@@ -208,6 +228,17 @@ export const KeywordActionManager = () => {
                 onChange={(e) => setCurrentRule({ ...currentRule, reply_content: e.target.value })}
                 disabled={currentRule?.action_type === 'stop_auto_reply'}
                 placeholder={currentRule?.action_type === 'stop_auto_reply' ? 'Không áp dụng' : 'Nhập nội dung tin nhắn trả lời...'}
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+              <div className="space-y-0.5">
+                <Label htmlFor="is_active" className="font-medium">Kích hoạt quy tắc</Label>
+                <p className="text-xs text-muted-foreground">Nếu tắt, quy tắc này sẽ không được áp dụng.</p>
+              </div>
+              <Switch
+                id="is_active"
+                checked={currentRule?.is_active ?? true}
+                onCheckedChange={(checked) => setCurrentRule({ ...currentRule, is_active: checked })}
               />
             </div>
           </div>
