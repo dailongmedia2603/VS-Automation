@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 
-console.log(`[${new Date().toISOString()}] --- CLEAN DEPLOYMENT (v3) ---`);
+console.log(`[${new Date().toISOString()}] --- CLEAN DEPLOYMENT (fb-messenger-gateway v1) ---`);
 
 serve(async (req) => {
   try {
@@ -10,8 +10,8 @@ serve(async (req) => {
 
     // --- Direct Browser Test (GET request without params) ---
     if (req.method === 'GET' && !url.searchParams.has('hub.mode')) {
-        console.log("--- BROWSER TEST SUCCESSFUL (v3) ---");
-        return new Response('SUCCESS: Webhook is online and ready. Version 3.', {
+        console.log("--- BROWSER TEST SUCCESSFUL (fb-messenger-gateway v1) ---");
+        return new Response('SUCCESS: Webhook (fb-messenger-gateway) is online and ready.', {
             headers: { 'Content-Type': 'text/plain' },
             status: 200
         });
@@ -24,7 +24,7 @@ serve(async (req) => {
       const challenge = url.searchParams.get('hub.challenge');
       const verifyToken = Deno.env.get('VERIFY_TOKEN');
 
-      console.log("--- FACEBOOK VERIFICATION ATTEMPT (v3) ---");
+      console.log("--- FACEBOOK VERIFICATION ATTEMPT (fb-messenger-gateway v1) ---");
       console.log("Mode from FB:", mode);
       console.log("Token from FB:", token);
       console.log("My Secret VERIFY_TOKEN:", verifyToken);
@@ -49,7 +49,7 @@ serve(async (req) => {
     return new Response('Method Not Allowed', { status: 405 });
 
   } catch (e) {
-    console.error("--- CRITICAL ERROR IN FUNCTION (v3) ---");
+    console.error("--- CRITICAL ERROR IN FUNCTION (fb-messenger-gateway v1) ---");
     console.error(e);
     return new Response("Internal Server Error", { status: 500 });
   }
