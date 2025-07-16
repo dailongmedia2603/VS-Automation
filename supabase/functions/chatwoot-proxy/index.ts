@@ -104,7 +104,7 @@ serve(async (req) => {
           case 'toggle_unread':
             if (!conversationId) throw new Error("Conversation ID is required.");
             // Sửa lỗi: Sử dụng đúng endpoint của Chatwoot
-            endpoint = `/api/v1/accounts/${settings.accountId}/conversations/${conversationId}/toggle_unread_status`;
+            endpoint = `/api/v1/accounts/${settings.accountId}/conversations/${conversationId}/toggle_unread`;
             method = 'POST';
             body = JSON.stringify({});
             break;
