@@ -61,7 +61,14 @@ async function fetchAllFromChatwoot(endpoint, config, params = {}) {
 }
 
 async function syncConversationData(supabase, convo, config, labelMap) {
-  const { sender, messages: initMessages, labels } = convo;
+  // Sửa lỗi: Kiểm tra xem convo.meta và convo.meta.sender có tồn tại không
+  if (!convo.meta || !convo.meta.sender) {
+    console.warn(`Skipping conversation ID ${convo.id} due to missing sender data.`);
+    return; // Bỏ qua conversation này nếu thiếu dữ liệu sender
+  }
+
+  const { meta, labels } = convo;
+  const sender = meta.sender;
 
   // 1. Sync Contact
   await supabase.from("chatwoot_contacts").upsert({
