@@ -1,104 +1,10 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-// --- Helper Functions for Chatwoot API ---
-
-async function findOrCreateContact(psid, userName, chatwootConfig) {
-  const { url, accountId, apiToken, inboxId } = chatwootConfig;
-  const searchUrl = `${url}/api/v1/accounts/${accountId}/contacts/search`;
-  
-  const searchResponse = await fetch(searchUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'api_access_token': apiToken },
-    body: JSON.stringify({ q: psid }),
-  });
-
-  const searchResult = await searchResponse.json();
-  const existingContact = searchResult.payload.find(c => c.source_id === psid);
-
-  if (existingContact) {
-    return existingContact;
-  }
-
-  const createUrl = `${url}/api/v1/accounts/${accountId}/contacts`;
-  const createResponse = await fetch(createUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'api_access_token': apiToken },
-    body: JSON.stringify({
-      inbox_id: inboxId,
-      name: userName,
-      source_id: psid,
-    }),
-  });
-
-  const createResult = await createResponse.json();
-  return createResult.payload.contact;
-}
-
-async function createConversation(contact, chatwootConfig) {
-  const { url, accountId, apiToken, inboxId } = chatwootConfig;
-  const convUrl = `${url}/api/v1/accounts/${accountId}/conversations`;
-
-  const response = await fetch(convUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'api_access_token': apiToken },
-    body: JSON.stringify({
-      source_id: contact.source_id,
-      inbox_id: inboxId,
-      contact_id: contact.id,
-    }),
-  });
-
-  return await response.json();
-}
-
-async function createMessage(conversationId, messageContent, chatwootConfig) {
-  const { url, accountId, apiToken } = chatwootConfig;
-  const messageUrl = `${url}/api/v1/accounts/${accountId}/conversations/${conversationId}/messages`;
-
-  await fetch(messageUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'api_access_token': apiToken },
-    body: JSON.stringify({
-      content: messageContent,
-      message_type: 'incoming',
-      private: false,
-    }),
-  });
-}
-
-async function getUserProfile(psid, facebookToken) {
-    if (!facebookToken) {
-        console.warn("FACEBOOK_PAGE_ACCESS_TOKEN is not set. Using PSID as username.");
-        return { name: psid };
-    }
-    const url = `https://graph.facebook.com/${psid}?fields=first_name,last_name&access_token=${facebookToken}`;
-    try {
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`Facebook API error: ${response.statusText}`);
-        }
-        const data = await response.json();
-        return { name: `${data.first_name || ''} ${data.last_name || ''}`.trim() || psid };
-    } catch (error) {
-        console.error("Error fetching user profile from Facebook:", error.message);
-        return { name: psid }; // Fallback to PSID
-    }
-}
-
-
-// --- Main Server Logic ---
+console.log("--- DEBUG FUNCTION LOADED ---"); // Ghi log khi function được tải
 
 serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  console.log(`[${new Date().toISOString()}] Received request: ${req.method} ${req.url}`);
 
   // --- Webhook Verification (GET request) ---
   if (req.method === 'GET') {
@@ -108,58 +14,21 @@ serve(async (req) => {
     const challenge = url.searchParams.get('hub.challenge');
     const verifyToken = Deno.env.get('VERIFY_TOKEN');
 
+    console.log("--- GET Request Details ---");
+    console.log("Mode from FB:", mode);
+    console.log("Token from FB:", token);
+    console.log("My Secret VERIFY_TOKEN:", verifyToken); // Log cả token của bạn để so sánh
+
     if (mode === 'subscribe' && token === verifyToken) {
-      console.log("Webhook verified successfully!");
+      console.log("SUCCESS: Verification successful. Returning challenge.");
       return new Response(challenge, { status: 200 });
     } else {
-      console.error("Webhook verification failed. Tokens do not match.");
-      return new Response('Forbidden', { status: 403 });
+      console.error("ERROR: Verification FAILED. Tokens do not match or mode is not 'subscribe'.");
+      return new Response('Forbidden - Verification Failed', { status: 403 });
     }
   }
 
-  // --- Handle Incoming Messages (POST request) ---
-  if (req.method === 'POST') {
-    try {
-      const body = await req.json();
-
-      if (body.object === 'page') {
-        const chatwootConfig = {
-          url: Deno.env.get('CHATWOOT_URL'),
-          accountId: Deno.env.get('CHATWOOT_ACCOUNT_ID'),
-          inboxId: Deno.env.get('CHATWOOT_INBOX_ID'),
-          apiToken: Deno.env.get('CHATWOOT_API_TOKEN'),
-        };
-        const facebookToken = Deno.env.get('FACEBOOK_PAGE_ACCESS_TOKEN');
-
-        for (const entry of body.entry) {
-          for (const event of entry.messaging) {
-            if (event.message && event.sender) {
-              const psid = event.sender.id;
-              const messageContent = event.message.text;
-
-              // 1. Get user profile from Facebook
-              const userProfile = await getUserProfile(psid, facebookToken);
-
-              // 2. Find or create a contact in Chatwoot
-              const contact = await findOrCreateContact(psid, userProfile.name, chatwootConfig);
-
-              // 3. Create a conversation
-              const conversation = await createConversation(contact, chatwootConfig);
-
-              // 4. Post the message to the conversation
-              await createMessage(conversation.id, messageContent, chatwootConfig);
-            }
-          }
-        }
-        return new Response('EVENT_RECEIVED', { status: 200 });
-      } else {
-        return new Response('Not Found', { status: 404 });
-      }
-    } catch (error) {
-      console.error('Error processing webhook event:', error.message);
-      return new Response('Internal Server Error', { status: 500 });
-    }
-  }
-
-  return new Response('Method Not Allowed', { status: 405 });
+  // Đối với các yêu cầu khác (như POST), chỉ cần trả lời OK trong khi gỡ lỗi
+  console.log(`Ignoring ${req.method} request during debug phase.`);
+  return new Response('OK', { status: 200 });
 })
