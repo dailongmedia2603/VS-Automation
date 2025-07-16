@@ -146,15 +146,16 @@ serve(async (req) => {
       apiToken: settingsData.api_token,
     };
 
-    const conversations = await fetchFromChatwoot(`/conversations?status=open&status=pending`, chatwootConfig);
+    // Fetch all conversations without status filter for robustness
+    const conversations = await fetchFromChatwoot(`/conversations`, config);
     
     if (!conversations || conversations.length === 0) {
-      console.log("No active conversations to sync.");
-      return new Response(JSON.stringify({ message: "No active conversations to sync." }), {
+      console.log("No conversations found to sync.");
+      return new Response(JSON.stringify({ message: "No conversations found to sync." }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    console.log(`Found ${conversations.length} active conversations to sync.`);
+    console.log(`Found ${conversations.length} conversations to sync.`);
 
     const syncPromises = conversations.map(convo => syncConversationData(supabaseAdmin, convo, chatwootConfig));
     await Promise.all(syncPromises);
