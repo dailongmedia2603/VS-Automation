@@ -70,7 +70,6 @@ serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
 
-  // SỬA LỖI: Nhận toàn bộ đối tượng conversation thay vì chỉ ID
   const { conversation } = await req.json();
   const conversationId = conversation?.id;
 
@@ -108,15 +107,30 @@ serve(async (req) => {
 
   let systemPrompt = null;
   try {
-    await supabaseAdmin.from('ai_typing_status').upsert({ conversation_id: conversationId, is_typing: true });
-
+    // --- START: NEW SAFETY CHECK ---
     const { data: messagesData, error: messagesError } = await supabaseAdmin.functions.invoke('chatwoot-proxy', {
         body: { action: 'list_messages', settings: chatwootSettings, conversationId: conversationId }
     });
-    if (messagesError) throw new Error(`Lỗi khi tải tin nhắn từ Chatwoot: ${(await messagesError.context.json()).error || messagesError.message}`);
+    if (messagesError) throw new Error(`Lỗi khi tải tin nhắn để kiểm tra: ${(await messagesError.context.json()).error || messagesError.message}`);
     
     const messages = messagesData.payload.sort((a, b) => a.created_at - b.created_at) || [];
-    if (!messages || messages.length === 0) throw new Error(`Không tìm thấy tin nhắn cho cuộc trò chuyện #${conversationId}`);
+    if (!messages || messages.length === 0) {
+        return new Response(JSON.stringify({ message: "No messages in conversation, exiting." }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage.message_type === 1) { // If last message is outgoing (from agent/bot)
+        await logToDb('success', 'Đã dừng lại do tin nhắn cuối cùng đã là câu trả lời của AI/Agent.');
+        const currentLabels = conversation.labels || [];
+        if (currentLabels.includes(AI_STAR_LABEL_NAME)) {
+            const newLabels = currentLabels.filter((l) => l !== AI_STAR_LABEL_NAME);
+            await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'update_labels', settings: chatwootSettings, conversationId: conversationId, labels: newLabels } });
+        }
+        return new Response(JSON.stringify({ message: "Stopped: Last message was outgoing." }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    // --- END: NEW SAFETY CHECK ---
+
+    await supabaseAdmin.from('ai_typing_status').upsert({ conversation_id: conversationId, is_typing: true });
     
     const lastUserMessage = messages.filter(m => m.message_type === 0).pop()?.content || '';
 
@@ -187,14 +201,12 @@ serve(async (req) => {
 
     await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'send_message', settings: chatwootSettings, conversationId: conversationId, content: aiReply } });
     
-    // SỬA LỖI: Sử dụng danh sách tag đã có, không gọi lại API
     const currentLabels = conversation.labels || [];
     const newLabels = currentLabels.filter((l) => l !== AI_STAR_LABEL_NAME);
     
-    await Promise.all([
-        supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'update_labels', settings: chatwootSettings, conversationId: conversationId, labels: newLabels } }),
-        supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'mark_as_read', settings: chatwootSettings, conversationId: conversationId } })
-    ]);
+    // Make calls sequential for safety
+    await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'update_labels', settings: chatwootSettings, conversationId: conversationId, labels: newLabels } });
+    await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'mark_as_read', settings: chatwootSettings, conversationId: conversationId } });
 
     await logToDb('success', `AI đã trả lời thành công với nội dung: "${aiReply.substring(0, 100)}..."`, systemPrompt);
 
