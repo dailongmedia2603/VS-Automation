@@ -5,6 +5,58 @@ import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast
 import { TrainingForm, TrainingConfig, initialConfig } from '@/components/TrainingForm';
 import { DocumentTrainer } from '@/components/DocumentTrainer';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PromptConfigurator } from '@/components/PromptConfigurator';
+import { Button } from '@/components/ui/button';
+import { Eye, Loader2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import TrainingPreview from '@/components/TrainingPreview';
+
+const TrainingModule = ({ config, setConfig, onSave, isSaving }: { config: TrainingConfig, setConfig: React.Dispatch<React.SetStateAction<TrainingConfig>>, onSave: () => void, isSaving: boolean }) => {
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  const setPromptTemplate = (template: TrainingConfig['promptTemplate']) => {
+    setConfig(prev => ({ ...prev, promptTemplate: template }));
+  };
+
+  return (
+    <>
+      <Tabs defaultValue="info" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 max-w-sm bg-slate-200/75 p-1.5 rounded-xl h-12">
+          <TabsTrigger value="info" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-blue-600 text-slate-600 font-semibold text-base transition-all duration-300">Thông tin Train</TabsTrigger>
+          <TabsTrigger value="prompt" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-blue-600 text-slate-600 font-semibold text-base transition-all duration-300">Cấu hình Prompt</TabsTrigger>
+        </TabsList>
+        <TabsContent value="info">
+          <TrainingForm config={config} setConfig={setConfig} />
+        </TabsContent>
+        <TabsContent value="prompt">
+          <PromptConfigurator template={config.promptTemplate} setTemplate={setPromptTemplate} />
+        </TabsContent>
+      </Tabs>
+      <div className="flex justify-end pt-8 gap-3">
+        <Button variant="outline" onClick={() => setIsPreviewOpen(true)} className="font-semibold rounded-lg border-slate-300 text-slate-700 hover:bg-slate-100">
+          <Eye className="h-4 w-4 mr-2" />
+          Preview
+        </Button>
+        <Button onClick={onSave} disabled={isSaving} size="lg" className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold">
+          {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Lưu thay đổi
+        </Button>
+      </div>
+      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+        <DialogContent className="sm:max-w-2xl p-6 rounded-xl">
+          <DialogHeader className="text-left">
+            <DialogTitle className="text-xl font-bold text-slate-900">Xem trước cấu hình huấn luyện</DialogTitle>
+            <DialogDescription className="text-slate-500 pt-1">Đây là tổng quan dữ liệu bạn đã cấu hình. Dữ liệu này sẽ được sử dụng để huấn luyện AI.</DialogDescription>
+          </DialogHeader>
+          <div className="py-4"><TrainingPreview config={config} /></div>
+          <DialogFooter>
+            <Button onClick={() => setIsPreviewOpen(false)} className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-5">Đóng</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};
 
 const TrainingChatbot = () => {
   const [autoReplyConfig, setAutoReplyConfig] = useState<TrainingConfig>(initialConfig);
@@ -44,45 +96,18 @@ const TrainingChatbot = () => {
     const tableName = name === 'auto_reply' ? 'auto_reply_settings' : 'care_script_settings';
 
     setIsSaving(prev => ({ ...prev, [name]: true }));
-    const toastId = showLoading("Đang lưu và tải lên tài liệu...");
+    const toastId = showLoading("Đang lưu cấu hình...");
 
     try {
-        const documentsWithUrls = await Promise.all(
-            configToSave.documents.map(async (doc) => {
-                if (doc.file && !doc.url) { // New file to upload
-                    const sanitizedName = doc.file.name
-                        .normalize("NFD") // Decompose accented characters
-                        .replace(/[\u0300-\u036f]/g, "") // Remove diacritical marks
-                        .replace(/\s+/g, '_') // Replace spaces with underscores
-                        .replace(/[^\w.-_]/g, ''); // Remove any remaining non-word characters except dot, hyphen, underscore
-
-                    const filePath = `public/${doc.id}-${sanitizedName}`;
-                    const { error: uploadError } = await supabase.storage
-                        .from('training_documents')
-                        .upload(filePath, doc.file, { upsert: true });
-
-                    if (uploadError) {
-                        throw new Error(`Lỗi tải lên tệp ${doc.name}: ${uploadError.message}`);
-                    }
-
-                    const { data: urlData } = supabase.storage.from('training_documents').getPublicUrl(filePath);
-                    return { ...doc, url: urlData.publicUrl, file: undefined };
-                }
-                return { ...doc, file: undefined }; // Return existing doc, ensuring file object is removed
-            })
-        );
-
-        const finalConfig = { ...configToSave, documents: documentsWithUrls };
-
         const { error } = await supabase
             .from(tableName)
-            .upsert({ id: 1, config: finalConfig });
+            .upsert({ id: 1, config: configToSave });
 
         if (error) {
             throw new Error(`Lưu cấu hình thất bại: ${error.message}`);
         }
 
-        setConfig(finalConfig);
+        setConfig(configToSave);
 
         dismissToast(toastId);
         showSuccess("Đã lưu thay đổi thành công!");
@@ -125,7 +150,7 @@ const TrainingChatbot = () => {
           <TabsTrigger value="internal_docs" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-blue-600 text-slate-600 font-semibold text-base transition-all duration-300">Tài liệu nội bộ</TabsTrigger>
         </TabsList>
         <TabsContent value="auto_reply">
-          <TrainingForm
+          <TrainingModule
             config={autoReplyConfig}
             setConfig={setAutoReplyConfig}
             isSaving={!!isSaving['auto_reply']}
@@ -133,7 +158,7 @@ const TrainingChatbot = () => {
           />
         </TabsContent>
         <TabsContent value="care_script_suggestion">
-          <TrainingForm
+          <TrainingModule
             config={careScriptConfig}
             setConfig={setCareScriptConfig}
             isSaving={!!isSaving['care_script_suggestion']}

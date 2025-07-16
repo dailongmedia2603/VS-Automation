@@ -11,72 +11,54 @@ const AI_STAR_LABEL_NAME = 'AI Star';
 
 const formatMessage = (msg) => {
     const sender = msg.message_type === 1 ? 'Agent' : 'User';
-    // Sửa đổi: Sử dụng `created_at` (timestamp) thay vì `created_at_chatwoot`
     const timestamp = new Date(msg.created_at * 1000).toLocaleString('vi-VN');
     const content = msg.content || '[Tệp đính kèm hoặc tin nhắn trống]';
     return `[${timestamp}] ${sender}: ${content}`;
 }
 
-const buildSystemPrompt = (config, history, context) => {
-    const trainingDataSection = `
-# YÊU CẦU TƯ VẤN CHO FANPAGE
-Bạn là một trợ lý AI cho fanpage. Hãy dựa vào các thông tin dưới đây để tư vấn cho khách hàng.
+const buildDynamicSystemPrompt = (config, history, context) => {
+  const formatList = (items) => items && items.length > 0 ? items.map(p => `- ${p.value}`).join('\n') : 'Không có thông tin.';
+  const formatNumberedList = (items) => items && items.length > 0 ? items.map((s, i) => `${i + 1}. ${s.value}`).join('\n') : 'Không có quy trình cụ thể.';
 
-## THÔNG TIN HUẤN LUYỆN CHUNG
-- **Vai trò của bạn:** ${config.role || 'Chuyên viên tư vấn'}
-- **Lĩnh vực kinh doanh:** ${config.industry || 'Không có thông tin'}
-- **Sản phẩm/Dịch vụ:** 
-${config.products && config.products.length > 0 ? config.products.map(p => `  - ${p.value}`).join('\n') : '  - Không có thông tin.'}
-- **Phong cách:** ${config.style || 'Thân thiện, chuyên nghiệp'}
-- **Tông giọng:** ${config.tone || 'Nhiệt tình'}
-- **Ngôn ngữ:** ${config.language || 'Tiếng Việt'}
-- **Cách xưng hô (Bạn xưng là):** "${config.pronouns || 'Shop'}"
-- **Cách xưng hô (Khách hàng là):** "${config.customerPronouns || 'bạn'}"
-- **Mục tiêu cuộc trò chuyện:** ${config.goal || 'Hỗ trợ và giải đáp thắc mắc'}
-
-## QUY TRÌNH TƯ VẤN
-${config.processSteps && config.processSteps.length > 0 ? config.processSteps.map((s, i) => `${i + 1}. ${s.value}`).join('\n') : 'Không có quy trình cụ thể.'}
-
-## ĐIỀU KIỆN BẮT BUỘC
-${config.conditions && config.conditions.length > 0 ? config.conditions.map(c => `- ${c.value}`).join('\n') : 'Không có điều kiện đặc biệt.'}
-`;
-    const historySection = `
-# LỊCH SỬ CUỘC TRÒ CHUYỆN
-Dưới đây là toàn bộ lịch sử trò chuyện. Hãy phân tích để hiểu ngữ cảnh và trả lời tin nhắn cuối cùng của khách hàng.
----
-${history}
----
-`;
-    let documentSection = '';
-    if (context && context.length > 0) {
-        const doc = context[0];
-        documentSection = `
-# TÀI LIỆU NỘI BỘ THAM KHẢO
-Hệ thống đã tìm thấy một tài liệu nội bộ có liên quan. Hãy dựa vào đây để trả lời.
-- **Tiêu đề tài liệu:** ${doc.title || 'Không có'}
-- **Mục đích:** ${doc.purpose || 'Không có'}
-- **Loại tài liệu:** ${doc.document_type || 'Không có'}
-- **Nội dung chính:** 
-  ${doc.content || 'Không có'}
-
->>> **VÍ DỤ ÁP DỤNG (RẤT QUAN TRỌNG):**
-- **Khi khách hỏi tương tự:** "${doc.example_customer_message || 'Không có'}"
-- **Hãy trả lời theo mẫu:** "${doc.example_agent_reply || 'Không có'}"
-<<<
-`;
-    } else {
-        documentSection = `
-# TÀI LIỆU NỘI BỘ THAM KHẢO
-Không tìm thấy tài liệu nội bộ nào liên quan. Hãy trả lời dựa trên thông tin huấn luyện chung và lịch sử trò chuyện.
-`;
+  const formatDocumentContext = (docContext) => {
+    if (docContext && docContext.length > 0) {
+      const doc = docContext[0];
+      return `Hệ thống đã tìm thấy một tài liệu nội bộ có liên quan. Hãy dựa vào đây để trả lời.\n- **Tiêu đề tài liệu:** ${doc.title || 'Không có'}\n- **Mục đích:** ${doc.purpose || 'Không có'}\n- **Loại tài liệu:** ${doc.document_type || 'Không có'}\n- **Nội dung chính:** \n  ${doc.content || 'Không có'}\n\n>>> **VÍ DỤ ÁP DỤNG (RẤT QUAN TRỌNG):**\n- **Khi khách hỏi tương tự:** "${doc.example_customer_message || 'Không có'}"\n- **Hãy trả lời theo mẫu:** "${doc.example_agent_reply || 'Không có'}"\n<<<`;
     }
-    const actionSection = `
-# HÀNH ĐỘNG
-Dựa vào TOÀN BỘ thông tin trên, hãy tạo một câu trả lời duy nhất cho tin nhắn cuối cùng của khách hàng.
-**QUAN TRỌNG:** Chỉ trả lời với nội dung tin nhắn, không thêm bất kỳ tiền tố nào như "AI:", "Trả lời:", hay lời chào nào nếu không cần thiết theo ngữ cảnh.
-`;
-    return `${trainingDataSection}\n${historySection}\n${documentSection}\n${actionSection}`;
-}
+    return 'Không tìm thấy tài liệu nội bộ nào liên quan. Hãy trả lời dựa trên thông tin huấn luyện chung và lịch sử trò chuyện.';
+  };
+
+  const dataMap = {
+    '{{industry}}': config.industry || 'Không có thông tin',
+    '{{role}}': config.role || 'Chuyên viên tư vấn',
+    '{{products}}': formatList(config.products),
+    '{{style}}': config.style || 'Thân thiện, chuyên nghiệp',
+    '{{tone}}': config.tone || 'Nhiệt tình',
+    '{{language}}': config.language || 'Tiếng Việt',
+    '{{pronouns}}': config.pronouns || 'Shop',
+    '{{customerPronouns}}': config.customerPronouns || 'bạn',
+    '{{goal}}': config.goal || 'Hỗ trợ và giải đáp thắc mắc',
+    '{{processSteps}}': formatNumberedList(config.processSteps),
+    '{{conditions}}': formatList(config.conditions),
+    '{{conversation_history}}': history,
+    '{{document_context}}': formatDocumentContext(context),
+  };
+
+  if (!config.promptTemplate || config.promptTemplate.length === 0) {
+    throw new Error("Prompt template is not configured.");
+  }
+
+  const finalPrompt = config.promptTemplate.map(block => {
+    let content = block.content;
+    for (const [key, value] of Object.entries(dataMap)) {
+      content = content.replace(new RegExp(key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g'), String(value));
+    }
+    return `# ${block.title.toUpperCase()}\n${content}`;
+  }).join('\n\n');
+
+  return finalPrompt;
+};
+
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -162,7 +144,6 @@ serve(async (req) => {
 
     let context = null;
     if (lastUserMessage) {
-        // NEW: Construct a richer search query with business context
         const richQuery = `
           Bối cảnh kinh doanh: ${trainingConfig.industry || 'Không rõ'}.
           Sản phẩm/dịch vụ chính: ${trainingConfig.products && trainingConfig.products.length > 0 ? trainingConfig.products.map(p => p.value).join(', ') : 'Không rõ'}.
@@ -176,7 +157,7 @@ serve(async (req) => {
         else context = searchResults;
     }
 
-    systemPrompt = buildSystemPrompt(trainingConfig, conversationHistory, context);
+    systemPrompt = buildDynamicSystemPrompt(trainingConfig, conversationHistory, context);
     const { data: proxyResponse, error: proxyError } = await supabaseAdmin.functions.invoke('multi-ai-proxy', {
       body: { messages: [{ role: 'system', content: systemPrompt }], apiUrl: aiSettings.api_url, apiKey: aiSettings.api_key, model: 'gpt-4o' }
     });
