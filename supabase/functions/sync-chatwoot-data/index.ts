@@ -60,11 +60,10 @@ async function fetchAllFromChatwoot(endpoint, config, params = {}) {
   return allItems;
 }
 
-async function syncConversationData(supabase, convo, config, labelMap) {
-  // Sửa lỗi: Kiểm tra xem convo.meta và convo.meta.sender có tồn tại không
+async function syncBasicConversationData(supabase, convo, labelMap) {
   if (!convo.meta || !convo.meta.sender) {
     console.warn(`Skipping conversation ID ${convo.id} due to missing sender data.`);
-    return; // Bỏ qua conversation này nếu thiếu dữ liệu sender
+    return;
   }
 
   const { meta, labels } = convo;
@@ -88,37 +87,7 @@ async function syncConversationData(supabase, convo, config, labelMap) {
     unread_count: convo.unread_count,
   }, { onConflict: "id" });
 
-  // 3. Fetch và Sync Messages
-  const allMessages = await fetchAllFromChatwoot(`/conversations/${convo.id}/messages`, config);
-
-  if (allMessages.length) {
-    const msgs = allMessages.map((msg) => ({
-      id: msg.id,
-      conversation_id: convo.id,
-      content: msg.content,
-      message_type: msg.message_type === "incoming" ? 0 : 1,
-      is_private: msg.private,
-      sender_name: msg.sender?.name,
-      sender_thumbnail: msg.sender?.thumbnail,
-      created_at_chatwoot: toISOStringSafe(msg.created_at),
-    }));
-    await supabase.from("chatwoot_messages").upsert(msgs, { onConflict: "id" });
-
-    // 4. Sync Attachments nếu có
-    const atts = allMessages.flatMap((msg) =>
-      (msg.attachments || []).map((att) => ({
-        id: att.id,
-        message_id: msg.id,
-        file_type: att.file_type,
-        data_url: att.data_url,
-      }))
-    );
-    if (atts.length) {
-      await supabase.from("chatwoot_attachments").upsert(atts, { onConflict: "id" });
-    }
-  }
-
-  // 5. Sync Labels (nhiều-nhiều)
+  // 3. Sync Labels (nhiều-nhiều)
   await supabase.from("chatwoot_conversation_labels").delete().eq("conversation_id", convo.id);
   if (labels?.length) {
     const links = labels
@@ -156,7 +125,7 @@ serve(async (req) => {
       apiToken: settings.api_token,
     };
 
-    // Cải tiến: Sync toàn bộ labels trước để đảm bảo map chính xác
+    // Sync toàn bộ labels trước để đảm bảo map chính xác
     const chatwootLabels = await fetchAllFromChatwoot('/labels', config);
     if (chatwootLabels && chatwootLabels.length > 0) {
       const labelsToUpsert = chatwootLabels.map(l => ({ id: l.id, name: l.title, color: l.color }));
@@ -174,9 +143,9 @@ serve(async (req) => {
       );
     }
 
-    // Đồng bộ song song
+    // Đồng bộ song song chỉ thông tin cơ bản
     await Promise.all(
-      conversations.map((c) => syncConversationData(supabaseAdmin, c, config, labelMap))
+      conversations.map((c) => syncBasicConversationData(supabaseAdmin, c, labelMap))
     );
 
     return new Response(
