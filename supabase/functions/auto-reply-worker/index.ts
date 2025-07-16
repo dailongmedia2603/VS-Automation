@@ -17,53 +17,72 @@ const formatMessage = (msg) => {
 }
 
 const buildSystemPrompt = (config, history, context) => {
-    let contextSection = '';
-    if (context && context.length > 0) {
-        const contextParts = context.map(doc => {
-            let docString = `--- Tài liệu: ${doc.title} ---\n`;
-            if (doc.purpose) docString += `Mục đích: ${doc.purpose}\n`;
-            if (doc.content) docString += `Nội dung: ${doc.content}\n`;
+    // Part 1: General training data from the "Tự động trả lời" tab
+    const trainingDataSection = `
+# YÊU CẦU TƯ VẤN CHO FANPAGE
+Bạn là một trợ lý AI cho fanpage. Hãy dựa vào các thông tin dưới đây để tư vấn cho khách hàng.
 
-            // **PHẦN NÂNG CẤP QUAN TRỌNG**
-            // Nếu có ví dụ cụ thể, hãy nhấn mạnh nó cho AI
-            if (doc.example_customer_message && doc.example_agent_reply) {
-                docString += `\n>>> VÍ DỤ ÁP DỤNG RẤT QUAN TRỌNG:\n`;
-                docString += `Khi khách hàng hỏi một câu tương tự như: "${doc.example_customer_message}"\n`;
-                docString += `Hãy trả lời theo mẫu sau: "${doc.example_agent_reply}"\n`;
-                docString += `<<< KẾT THÚC VÍ DỤ\n`;
-            }
-            return docString;
-        });
+## THÔNG TIN HUẤN LUYỆN CHUNG
+- **Vai trò của bạn:** ${config.role || 'Chuyên viên tư vấn'}
+- **Lĩnh vực kinh doanh:** ${config.industry || 'Không có thông tin'}
+- **Sản phẩm/Dịch vụ:** 
+${config.products && config.products.length > 0 ? config.products.map(p => `  - ${p.value}`).join('\n') : '  - Không có thông tin.'}
+- **Phong cách:** ${config.style || 'Thân thiện, chuyên nghiệp'}
+- **Tông giọng:** ${config.tone || 'Nhiệt tình'}
+- **Ngôn ngữ:** ${config.language || 'Tiếng Việt'}
+- **Cách xưng hô (Bạn xưng là):** "${config.pronouns || 'Shop'}"
+- **Cách xưng hô (Khách hàng là):** "${config.customerPronouns || 'bạn'}"
+- **Mục tiêu cuộc trò chuyện:** ${config.goal || 'Hỗ trợ và giải đáp thắc mắc'}
 
-        contextSection = `
-Dưới đây là một số thông tin và ví dụ từ tài liệu nội bộ có thể giúp bạn trả lời. Hãy ưu tiên sử dụng chúng:
-${contextParts.join('\n---\n')}
-`;
-    }
-
-    let prompt = `Bạn là một trợ lý AI tên là ${config.role || 'Trợ lý ảo'}. 
-Lĩnh vực kinh doanh của bạn là ${config.industry || 'đa dạng'}.
-Phong cách của bạn là ${config.style || 'thân thiện và chuyên nghiệp'}.
-Tông giọng của bạn là ${config.tone || 'nhiệt tình'}.
-Bạn sẽ trả lời bằng ${config.language || 'Tiếng Việt'}.
-Bạn bắt buộc phải xưng hô là "${config.pronouns || 'Shop'}" và gọi khách hàng là "${config.customerPronouns || 'bạn'}". Đây là điều kiện không được vi phạm.
-Mục tiêu của cuộc trò chuyện là ${config.goal || 'giải đáp thắc mắc và hỗ trợ khách hàng'}.
-${contextSection}
-Sản phẩm/dịch vụ của bạn bao gồm:
-${config.products && config.products.length > 0 ? config.products.map(p => `- ${p.value}`).join('\n') : 'Không có thông tin.'}
-
-Quy trình tư vấn bạn cần tuân thủ:
+## QUY TRÌNH TƯ VẤN
 ${config.processSteps && config.processSteps.length > 0 ? config.processSteps.map((s, i) => `${i + 1}. ${s.value}`).join('\n') : 'Không có quy trình cụ thể.'}
 
-Các điều kiện bắt buộc bạn phải tuân thủ:
+## ĐIỀU KIỆN BẮT BUỘC
 ${config.conditions && config.conditions.length > 0 ? config.conditions.map(c => `- ${c.value}`).join('\n') : 'Không có điều kiện đặc biệt.'}
+`;
 
-Dưới đây là lịch sử cuộc trò chuyện:
+    // Part 2: Conversation History
+    const historySection = `
+# LỊCH SỬ CUỘC TRÒ CHUYỆN
+Dưới đây là toàn bộ lịch sử trò chuyện. Hãy phân tích để hiểu ngữ cảnh và trả lời tin nhắn cuối cùng của khách hàng.
 ---
 ${history}
 ---
-Dựa vào thông tin trên và lịch sử trò chuyện, hãy tạo một câu trả lời phù hợp cho tin nhắn cuối cùng của khách hàng. Chỉ trả lời với nội dung tin nhắn, không thêm bất kỳ tiền tố nào như "Agent:" hay "AI:".`;
-    return prompt;
+`;
+
+    // Part 3: Related Internal Document (if found)
+    let documentSection = '';
+    if (context && context.length > 0) {
+        const doc = context[0]; // Use the most relevant document
+        documentSection = `
+# TÀI LIỆU NỘI BỘ THAM KHẢO
+Hệ thống đã tìm thấy một tài liệu nội bộ có liên quan. Hãy dựa vào đây để trả lời.
+- **Tiêu đề tài liệu:** ${doc.title || 'Không có'}
+- **Mục đích:** ${doc.purpose || 'Không có'}
+- **Loại tài liệu:** ${doc.document_type || 'Không có'}
+- **Nội dung chính:** 
+  ${doc.content || 'Không có'}
+
+>>> **VÍ DỤ ÁP DỤNG (RẤT QUAN TRỌNG):**
+- **Khi khách hỏi tương tự:** "${doc.example_customer_message || 'Không có'}"
+- **Hãy trả lời theo mẫu:** "${doc.example_agent_reply || 'Không có'}"
+<<<
+`;
+    } else {
+        documentSection = `
+# TÀI LIỆU NỘI BỘ THAM KHẢO
+Không tìm thấy tài liệu nội bộ nào liên quan. Hãy trả lời dựa trên thông tin huấn luyện chung và lịch sử trò chuyện.
+`;
+    }
+
+    // Part 4: Final Action
+    const actionSection = `
+# HÀNH ĐỘNG
+Dựa vào TOÀN BỘ thông tin trên, hãy tạo một câu trả lời duy nhất cho tin nhắn cuối cùng của khách hàng.
+**QUAN TRỌNG:** Chỉ trả lời với nội dung tin nhắn, không thêm bất kỳ tiền tố nào như "AI:", "Trả lời:", hay lời chào nào nếu không cần thiết theo ngữ cảnh.
+`;
+
+    return `${trainingDataSection}\n${historySection}\n${documentSection}\n${actionSection}`;
 }
 
 serve(async (req) => {
