@@ -46,10 +46,6 @@ serve(async (req) => {
       .eq('name', AI_STAR_LABEL_NAME)
       .single();
 
-    if (labelError || !aiStarLabel) {
-      console.warn(`Label '${AI_STAR_LABEL_NAME}' not found. Skipping auto-tagging.`);
-    }
-
     // 4. Get live conversations from Chatwoot
     const { data: chatwootData, error: functionError } = await supabaseAdmin.functions.invoke('chatwoot-proxy', {
         body: { action: 'list_conversations', settings: chatwootSettings },
@@ -72,31 +68,25 @@ serve(async (req) => {
 
       if (conversationsToTag.length > 0) {
         console.log(`Found ${conversationsToTag.length} new conversations to tag with '${AI_STAR_LABEL_NAME}'.`);
-        await Promise.all(
-          conversationsToTag.map(async (convo) => {
-            try {
-              const newLabels = [...convo.labels, AI_STAR_LABEL_NAME];
-              await supabaseAdmin.functions.invoke('chatwoot-proxy', {
-                body: { action: 'update_labels', settings: chatwootSettings, conversationId: convo.id, labels: newLabels },
-              });
-              await supabaseAdmin.from('chatwoot_conversation_labels').upsert({ conversation_id: convo.id, label_id: aiStarLabel.id });
-              console.log(`Tagged conversation #${convo.id}`);
-            } catch (tagError) {
-              console.error(`Failed to tag conversation #${convo.id}:`, tagError.message);
-            }
-          })
-        );
-        // Refresh conversation list to get updated labels
-        const { data: refreshedChatwootData } = await supabaseAdmin.functions.invoke('chatwoot-proxy', {
-            body: { action: 'list_conversations', settings: chatwootSettings },
+        const taggingPromises = conversationsToTag.map(async (convo) => {
+          try {
+            const newLabels = [...convo.labels, AI_STAR_LABEL_NAME];
+            await supabaseAdmin.functions.invoke('chatwoot-proxy', {
+              body: { action: 'update_labels', settings: chatwootSettings, conversationId: convo.id, labels: newLabels },
+            });
+            await supabaseAdmin.from('chatwoot_conversation_labels').upsert({ conversation_id: convo.id, label_id: aiStarLabel.id });
+            // Modify the object in the main array to avoid a second fetch
+            convo.labels.push(AI_STAR_LABEL_NAME); 
+            console.log(`Tagged conversation #${convo.id}`);
+          } catch (tagError) {
+            console.error(`Failed to tag conversation #${convo.id}:`, tagError.message);
+          }
         });
-        if (refreshedChatwootData && refreshedChatwootData.data.payload) {
-            allConversations = refreshedChatwootData.data.payload;
-        }
+        await Promise.all(taggingPromises);
       }
     }
 
-    // 6. Filter conversations to be processed by the worker
+    // 6. Filter conversations to be processed by the worker (now includes newly tagged ones)
     const conversationsToProcess = allConversations.filter(convo => 
         convo.unread_count > 0 && convo.labels.includes(AI_STAR_LABEL_NAME)
     );
