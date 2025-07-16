@@ -1,0 +1,10 @@
+# This file is used to configure your Supabase project locally
+# and when deploying via the Supabase CLI.
+
+# Ensure JWT verification is disabled for public webhooks
+# so they can be called by external services like Chatwoot or Facebook.
+[functions.chatwoot-webhook]
+verify_jwt = false
+
+[functions.fb-messenger-gateway]
+verify_jwt = false
