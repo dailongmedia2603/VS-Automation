@@ -13,6 +13,19 @@ interface Filters {
 const phoneRegex = /(0[3|5|7|8|9][0-9]{8})\b/;
 const AI_CARE_LABEL = 'AI chăm';
 
+const toISOStringSafe = (timestamp: number | string | undefined | null): string => {
+  if (typeof timestamp === 'number' && !isNaN(timestamp)) {
+    return new Date(timestamp * 1000).toISOString();
+  }
+  if (typeof timestamp === 'string') {
+    const date = new Date(timestamp);
+    if (!isNaN(date.getTime())) {
+      return date.toISOString();
+    }
+  }
+  return new Date().toISOString();
+};
+
 export const useChatwootInbox = () => {
   const { settings } = useChatwoot();
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -107,30 +120,58 @@ export const useChatwootInbox = () => {
   }, []);
 
   const fetchMessages = useCallback(async (convoId: number) => {
+    setLoadingMessages(true);
     try {
-      const { data, error } = await supabase
-        .from('chatwoot_messages')
-        .select('*, attachments:chatwoot_attachments(*)')
-        .eq('conversation_id', convoId)
-        .order('created_at_chatwoot', { ascending: true });
+      const { data: chatwootData, error: proxyError } = await supabase.functions.invoke('chatwoot-proxy', {
+        body: { action: 'list_messages', settings, conversationId: convoId },
+      });
 
-      if (error) throw error;
+      if (proxyError) throw new Error((await proxyError.context.json()).error || proxyError.message);
+      if (chatwootData.error) throw new Error(chatwootData.error);
 
-      const formattedMessages = data.map(msg => ({
-        ...msg,
-        created_at: new Date(msg.created_at_chatwoot).getTime() / 1000,
-        sender: {
-          id: 0,
-          name: msg.sender_name,
-          thumbnail: msg.sender_thumbnail,
+      const messagesPayload = chatwootData.payload || [];
+
+      if (messagesPayload.length > 0) {
+        const messagesToUpsert = messagesPayload.map((msg: any) => ({
+          id: msg.id,
+          conversation_id: convoId,
+          content: msg.content,
+          message_type: msg.message_type === 'incoming' ? 0 : 1,
+          is_private: msg.private,
+          sender_name: msg.sender?.name,
+          sender_thumbnail: msg.sender?.thumbnail,
+          created_at_chatwoot: toISOStringSafe(msg.created_at),
+        }));
+
+        const attachmentsToUpsert = messagesPayload.flatMap((msg: any) =>
+          (msg.attachments || []).map((att: any) => ({
+            id: att.id,
+            message_id: msg.id,
+            file_type: att.file_type,
+            data_url: att.data_url,
+          }))
+        );
+
+        await supabase.from('chatwoot_messages').upsert(messagesToUpsert, { onConflict: 'id' });
+        if (attachmentsToUpsert.length > 0) {
+          await supabase.from('chatwoot_attachments').upsert(attachmentsToUpsert, { onConflict: 'id' });
         }
-      }));
+      }
+
+      const formattedMessages = messagesPayload.map((msg: any) => ({
+        ...msg,
+        created_at: msg.created_at, // Already in seconds
+        attachments: msg.attachments || [],
+      })).sort((a: Message, b: Message) => a.created_at - b.created_at);
+
       setMessages(formattedMessages as Message[]);
     } catch (err: any) {
-      console.error("Error fetching messages from Supabase:", err);
+      console.error("Error fetching messages:", err);
       showError("Không thể tải tin nhắn: " + err.message);
+    } finally {
+      setLoadingMessages(false);
     }
-  }, []);
+  }, [settings]);
 
   useEffect(() => {
     fetchConversations(true);
@@ -149,14 +190,7 @@ export const useChatwootInbox = () => {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chatwoot_messages' }, async (payload) => {
         const newMessage = payload.new as any;
         if (newMessage.conversation_id === selectedConversation?.id) {
-          const { data: fullMessage, error } = await supabase.from('chatwoot_messages').select('*, attachments:chatwoot_attachments(*)').eq('id', newMessage.id).single();
-          if (error) return;
-          const formattedMessage = {
-            ...fullMessage,
-            created_at: new Date(fullMessage.created_at_chatwoot).getTime() / 1000,
-            sender: { id: 0, name: fullMessage.sender_name, thumbnail: fullMessage.sender_thumbnail }
-          };
-          setMessages(current => [...current, formattedMessage as Message]);
+          await fetchMessages(selectedConversation.id);
         }
         fetchConversations();
       }).subscribe();
@@ -185,7 +219,7 @@ export const useChatwootInbox = () => {
       supabase.removeChannel(typingChannel);
       supabase.removeChannel(logChannel);
     };
-  }, [selectedConversation, fetchConversations]);
+  }, [selectedConversation, fetchConversations, fetchMessages]);
 
   useEffect(() => {
     if (messages.length > 0 && selectedConversation && !selectedConversation.meta.sender.phone_number) {
@@ -210,12 +244,10 @@ export const useChatwootInbox = () => {
 
   const handleSelectConversation = useCallback(async (conversation: Conversation) => {
     setSelectedConversation(conversation);
-    setLoadingMessages(true);
     setMessages([]);
     setHasNewLog(false);
     await fetchMessages(conversation.id);
     await fetchCareScripts(conversation.id);
-    setLoadingMessages(false);
 
     if (conversation.unread_count > 0) {
       setConversations(convos => convos.map(c => c.id === conversation.id ? { ...c, unread_count: 0 } : c));
@@ -230,7 +262,6 @@ export const useChatwootInbox = () => {
     setSendingMessage(true);
     const toastId = showLoading("Đang gửi tin nhắn...");
     try {
-        let responseData;
         if (attachment) {
             const formData = new FormData();
             formData.append('content', newMessage.trim());
@@ -239,21 +270,17 @@ export const useChatwootInbox = () => {
             formData.append('attachments[]', attachment, attachment.name);
             formData.append('settings', JSON.stringify(settings));
             formData.append('conversationId', selectedConversation.id.toString());
-            const { data, error } = await supabase.functions.invoke('chatwoot-proxy', { body: formData });
+            const { error } = await supabase.functions.invoke('chatwoot-proxy', { body: formData });
             if (error) throw new Error((await error.context.json()).error || error.message);
-            if (data.error) throw new Error(data.error);
-            responseData = data;
         } else {
-            const { data, error } = await supabase.functions.invoke('chatwoot-proxy', { body: { action: 'send_message', settings, conversationId: selectedConversation.id, content: newMessage.trim() } });
+            const { error } = await supabase.functions.invoke('chatwoot-proxy', { body: { action: 'send_message', settings, conversationId: selectedConversation.id, content: newMessage.trim() } });
             if (error) throw new Error((await error.context.json()).error || error.message);
-            if (data.error) throw new Error(data.error);
-            responseData = data;
         }
-        setMessages(prev => [...prev, responseData]);
         setNewMessage('');
         setAttachment(null);
         dismissToast(toastId);
         showSuccess("Đã gửi tin nhắn thành công!");
+        // Realtime will handle message update
     } catch (err: any) {
         dismissToast(toastId);
         showError(`Gửi tin nhắn thất bại: ${err.message}`);
@@ -283,8 +310,10 @@ export const useChatwootInbox = () => {
     }
   }, [selectedConversation, settings, fetchCareScripts]);
 
-  const handleNewNote = (newNote: Message) => {
-    setMessages(prev => [...prev, newNote]);
+  const handleNewNote = async (newNote: Message) => {
+    if (selectedConversation) {
+      await fetchMessages(selectedConversation.id);
+    }
   };
 
   const handleConversationUpdate = (updatedConversation: Conversation) => {
