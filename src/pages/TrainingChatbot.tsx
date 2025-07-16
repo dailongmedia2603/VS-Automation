@@ -22,9 +22,9 @@ const TrainingModule = ({ config, setConfig, onSave, isSaving }: { config: Train
   return (
     <>
       <Tabs defaultValue="info" className="w-full">
-        <TabsList className="flex items-center gap-2">
-          <TabsTrigger value="info" className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-500 transition-colors hover:text-blue-600 data-[state=active]:bg-blue-100 data-[state=active]:text-blue-600">Thông tin Train</TabsTrigger>
-          <TabsTrigger value="prompt" className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-500 transition-colors hover:text-blue-600 data-[state=active]:bg-blue-100 data-[state=active]:text-blue-600">Cấu hình Prompt</TabsTrigger>
+        <TabsList className="flex justify-start gap-6">
+          <TabsTrigger value="info" className="text-base font-semibold text-slate-500 transition-colors hover:text-blue-600 data-[state=active]:text-blue-600">Thông tin Train</TabsTrigger>
+          <TabsTrigger value="prompt" className="text-base font-semibold text-slate-500 transition-colors hover:text-blue-600 data-[state=active]:text-blue-600">Cấu hình Prompt</TabsTrigger>
         </TabsList>
         <TabsContent value="info">
           <TrainingForm config={config} setConfig={setConfig} />
