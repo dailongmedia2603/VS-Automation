@@ -17,7 +17,6 @@ const formatMessage = (msg) => {
 }
 
 const buildSystemPrompt = (config, history, context) => {
-    // Part 1: General training data from the "Tự động trả lời" tab
     const trainingDataSection = `
 # YÊU CẦU TƯ VẤN CHO FANPAGE
 Bạn là một trợ lý AI cho fanpage. Hãy dựa vào các thông tin dưới đây để tư vấn cho khách hàng.
@@ -40,8 +39,6 @@ ${config.processSteps && config.processSteps.length > 0 ? config.processSteps.ma
 ## ĐIỀU KIỆN BẮT BUỘC
 ${config.conditions && config.conditions.length > 0 ? config.conditions.map(c => `- ${c.value}`).join('\n') : 'Không có điều kiện đặc biệt.'}
 `;
-
-    // Part 2: Conversation History
     const historySection = `
 # LỊCH SỬ CUỘC TRÒ CHUYỆN
 Dưới đây là toàn bộ lịch sử trò chuyện. Hãy phân tích để hiểu ngữ cảnh và trả lời tin nhắn cuối cùng của khách hàng.
@@ -49,11 +46,9 @@ Dưới đây là toàn bộ lịch sử trò chuyện. Hãy phân tích để h
 ${history}
 ---
 `;
-
-    // Part 3: Related Internal Document (if found)
     let documentSection = '';
     if (context && context.length > 0) {
-        const doc = context[0]; // Use the most relevant document
+        const doc = context[0];
         documentSection = `
 # TÀI LIỆU NỘI BỘ THAM KHẢO
 Hệ thống đã tìm thấy một tài liệu nội bộ có liên quan. Hãy dựa vào đây để trả lời.
@@ -74,14 +69,11 @@ Hệ thống đã tìm thấy một tài liệu nội bộ có liên quan. Hãy 
 Không tìm thấy tài liệu nội bộ nào liên quan. Hãy trả lời dựa trên thông tin huấn luyện chung và lịch sử trò chuyện.
 `;
     }
-
-    // Part 4: Final Action
     const actionSection = `
 # HÀNH ĐỘNG
 Dựa vào TOÀN BỘ thông tin trên, hãy tạo một câu trả lời duy nhất cho tin nhắn cuối cùng của khách hàng.
 **QUAN TRỌNG:** Chỉ trả lời với nội dung tin nhắn, không thêm bất kỳ tiền tố nào như "AI:", "Trả lời:", hay lời chào nào nếu không cần thiết theo ngữ cảnh.
 `;
-
     return `${trainingDataSection}\n${historySection}\n${documentSection}\n${actionSection}`;
 }
 
@@ -100,11 +92,12 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: "Missing conversationId" }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 
-  const logToDb = async (status, details) => {
+  const logToDb = async (status, details, system_prompt = null) => {
     await supabaseAdmin.from('ai_reply_logs').insert({
       conversation_id: conversationId,
       status,
       details,
+      system_prompt,
     });
   };
 
@@ -127,6 +120,7 @@ serve(async (req) => {
     }
   };
 
+  let systemPrompt = null;
   try {
     await supabaseAdmin.from('ai_typing_status').upsert({ conversation_id: conversationId, is_typing: true });
 
@@ -135,11 +129,11 @@ serve(async (req) => {
         supabaseAdmin.from('ai_settings').select('api_url, api_key').eq('id', 1).single(),
     ]);
 
-    if (aiSettingsRes.error || !aiSettingsRes.data) throw new Error("Không tìm thấy cấu hình AI. Vui lòng kiểm tra trang Cài đặt API AI.");
+    if (aiSettingsRes.error || !aiSettingsRes.data) throw new Error("Không tìm thấy cấu hình AI.");
     if (autoReplySettingsRes.error || !autoReplySettingsRes.data || !autoReplySettingsRes.data.config?.enabled) {
         return new Response(JSON.stringify({ message: "Auto-reply disabled." }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
-    if (!chatwootSettings) throw new Error("Không tìm thấy cấu hình Chatwoot. Vui lòng kiểm tra trang Cài đặt Chatbot.");
+    if (!chatwootSettings) throw new Error("Không tìm thấy cấu hình Chatwoot.");
 
     const trainingConfig = autoReplySettingsRes.data.config;
     const aiSettings = aiSettingsRes.data;
@@ -153,7 +147,6 @@ serve(async (req) => {
     const conversationHistory = messages.map(formatMessage).join('\n');
     const lastUserMessage = messages.filter(m => m.message_type === 0).pop()?.content || '';
 
-    // Tìm kiếm tài liệu liên quan
     let context = null;
     if (lastUserMessage) {
         const { data: searchResults, error: searchError } = await supabaseAdmin.functions.invoke('search-documents', {
@@ -163,7 +156,7 @@ serve(async (req) => {
         else context = searchResults;
     }
 
-    const systemPrompt = buildSystemPrompt(trainingConfig, conversationHistory, context);
+    systemPrompt = buildSystemPrompt(trainingConfig, conversationHistory, context);
     const { data: proxyResponse, error: proxyError } = await supabaseAdmin.functions.invoke('multi-ai-proxy', {
       body: { messages: [{ role: 'system', content: systemPrompt }], apiUrl: aiSettings.api_url, apiKey: aiSettings.api_key, model: 'gpt-4o' }
     });
@@ -186,7 +179,7 @@ serve(async (req) => {
         supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'mark_as_read', settings: chatwootSettings, conversationId: conversationId } })
     ]);
 
-    await logToDb('success', `AI đã trả lời thành công với nội dung: "${aiReply.substring(0, 100)}..."`);
+    await logToDb('success', `AI đã trả lời thành công với nội dung: "${aiReply.substring(0, 100)}..."`, systemPrompt);
 
     return new Response(JSON.stringify({ message: `Successfully processed conversation ${conversationId}` }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200,
@@ -195,7 +188,7 @@ serve(async (req) => {
   } catch (e) {
     console.error(`Failed to process conversation ${conversationId}:`, e.message);
     await sendErrorNote(e.message);
-    await logToDb('error', e.message);
+    await logToDb('error', e.message, systemPrompt);
     return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } finally {
     await supabaseAdmin.from('ai_typing_status').upsert({ conversation_id: conversationId, is_typing: false });

@@ -148,7 +148,7 @@ const ChatwootInbox = () => {
             .single();
           
           if (lastRealMessage) {
-            convo.messages[0] = { content: lastRealMessage.content, message_type: lastRealMessage.message_type };
+            convo.messages[0] = { ...lastMessage, content: lastRealMessage.content, message_type: lastRealMessage.message_type };
           }
         }
       });
