@@ -1,12 +1,21 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 
-console.log(`[${new Date().toISOString()}] --- FUNCTION DEPLOYED/RESTARTED ---`);
+console.log(`[${new Date().toISOString()}] --- NEW DEBUG VERSION (v2) DEPLOYED ---`);
 
 serve(async (req) => {
   try {
-    console.log(`[${new Date().toISOString()}] Received request: ${req.method} ${req.url}`);
+    console.log(`[${new Date().toISOString()}] Request received: ${req.method} ${req.url}`);
     const url = new URL(req.url);
+
+    // --- Direct Browser Test (GET request without params) ---
+    if (req.method === 'GET' && !url.searchParams.has('hub.mode')) {
+        console.log("--- BROWSER TEST SUCCESSFUL (v2) ---");
+        return new Response('SUCCESS: Webhook is online and ready. Version 2.', {
+            headers: { 'Content-Type': 'text/plain' },
+            status: 200
+        });
+    }
 
     // --- Webhook Verification from Facebook (GET request with params) ---
     if (req.method === 'GET' && url.searchParams.has('hub.mode')) {
@@ -15,7 +24,7 @@ serve(async (req) => {
       const challenge = url.searchParams.get('hub.challenge');
       const verifyToken = Deno.env.get('VERIFY_TOKEN');
 
-      console.log("--- FACEBOOK VERIFICATION ATTEMPT ---");
+      console.log("--- FACEBOOK VERIFICATION ATTEMPT (v2) ---");
       console.log("Mode from FB:", mode);
       console.log("Token from FB:", token);
       console.log("My Secret VERIFY_TOKEN:", verifyToken);
@@ -29,19 +38,9 @@ serve(async (req) => {
       }
     }
 
-    // --- Direct Browser Test (GET request without params) ---
-    if (req.method === 'GET') {
-        console.log("--- BROWSER TEST DETECTED ---");
-        return new Response('Webhook is active. Ready for Facebook verification.', {
-            headers: { 'Content-Type': 'text/plain' },
-            status: 200
-        });
-    }
-
-    // --- Handle Incoming Messages (POST request) ---
+    // --- Handle POST requests ---
     if (req.method === 'POST') {
-      console.log("--- POST request received. Ignoring during debug phase. ---");
-      // The actual message handling logic will be restored later.
+      console.log("--- POST request received. Acknowledged. ---");
       return new Response('EVENT_RECEIVED', { status: 200 });
     }
 
@@ -50,7 +49,7 @@ serve(async (req) => {
     return new Response('Method Not Allowed', { status: 405 });
 
   } catch (e) {
-    console.error("--- CRITICAL ERROR IN FUNCTION ---");
+    console.error("--- CRITICAL ERROR IN FUNCTION (v2) ---");
     console.error(e);
     return new Response("Internal Server Error", { status: 500 });
   }
