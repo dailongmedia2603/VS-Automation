@@ -147,20 +147,17 @@ serve(async (req) => {
     };
 
     // Fetch all conversations without status filter for robustness
-    const conversations = await fetchFromChatwoot(`/conversations`, config);
+    const conversations = await fetchFromChatwoot(`/conversations`, chatwootConfig);
     
-    if (!conversations || conversations.length === 0) {
+    if (!conversations || conversations.length > 0) {
+      console.log(`Found ${conversations.length} conversations to sync.`);
+      const syncPromises = conversations.map(convo => syncConversationData(supabaseAdmin, convo, chatwootConfig));
+      await Promise.all(syncPromises);
+      console.log(`--- Sync complete. Synced ${conversations.length} conversations. ---`);
+    } else {
       console.log("No conversations found to sync.");
-      return new Response(JSON.stringify({ message: "No conversations found to sync." }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
     }
-    console.log(`Found ${conversations.length} conversations to sync.`);
 
-    const syncPromises = conversations.map(convo => syncConversationData(supabaseAdmin, convo, chatwootConfig));
-    await Promise.all(syncPromises);
-
-    console.log(`--- Sync complete. Synced ${conversations.length} conversations. ---`);
     return new Response(JSON.stringify({ status: 'success', synced_conversations: conversations.length }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
