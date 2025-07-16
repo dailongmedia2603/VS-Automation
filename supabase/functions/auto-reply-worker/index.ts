@@ -139,7 +139,6 @@ serve(async (req) => {
     const trainingConfig = autoReplySettingsRes.data.config;
     const aiSettings = aiSettingsRes.data;
 
-    // Sửa đổi: Lấy tin nhắn trực tiếp từ Chatwoot API thay vì từ DB
     const { data: messagesData, error: messagesError } = await supabaseAdmin.functions.invoke('chatwoot-proxy', {
         body: {
             action: 'list_messages',
@@ -163,8 +162,15 @@ serve(async (req) => {
 
     let context = null;
     if (lastUserMessage) {
+        // NEW: Construct a richer search query with business context
+        const richQuery = `
+          Bối cảnh kinh doanh: ${trainingConfig.industry || 'Không rõ'}.
+          Sản phẩm/dịch vụ chính: ${trainingConfig.products && trainingConfig.products.length > 0 ? trainingConfig.products.map(p => p.value).join(', ') : 'Không rõ'}.
+          Câu hỏi của khách hàng: ${lastUserMessage}
+        `.trim().replace(/\s+/g, ' ');
+
         const { data: searchResults, error: searchError } = await supabaseAdmin.functions.invoke('search-documents', {
-            body: { query: lastUserMessage }
+            body: { query: richQuery }
         });
         if (searchError) console.error("Lỗi tìm kiếm tài liệu:", searchError.message);
         else context = searchResults;
