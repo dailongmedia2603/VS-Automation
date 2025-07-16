@@ -141,11 +141,20 @@ const ChatwootInbox = () => {
       }
 
       const conversationIds = conversationsFromServer.map((c: Conversation) => c.id);
+      
+      const { data: dbData, error: dbError } = await supabase
+        .from('chatwoot_conversations')
+        .select('id, unread_count')
+        .in('id', conversationIds);
+
       const { data: latestMessages, error: rpcError } = await supabase.rpc('get_latest_messages', { convo_ids: conversationIds });
 
-      if (rpcError) {
-        console.error("Error fetching latest messages from DB:", rpcError);
-      } else if (latestMessages) {
+      if (dbError) console.error("Error fetching DB unread counts:", dbError);
+      if (rpcError) console.error("Error fetching latest messages from DB:", rpcError);
+
+      const unreadMap = new Map(dbData?.map(item => [item.id, item.unread_count]));
+      
+      if (latestMessages) {
         const typedLatestMessages = latestMessages as LatestMessage[];
         const messageMap = new Map(typedLatestMessages.map(m => [m.conversation_id, m]));
         
@@ -162,6 +171,13 @@ const ChatwootInbox = () => {
           }
         });
       }
+
+      conversationsFromServer.forEach((convo: Conversation) => {
+        const dbUnreadCount = unreadMap.get(convo.id);
+        if (dbUnreadCount !== undefined) {
+          convo.unread_count = dbUnreadCount;
+        }
+      });
 
       const contactIds = conversationsFromServer.map((c: Conversation) => c.meta.sender.id);
       const { data: contactsFromDB } = await supabase.from('chatwoot_contacts').select('id, phone_number').in('id', contactIds);
@@ -296,6 +312,7 @@ const ChatwootInbox = () => {
     } finally { setLoadingMessages(false); }
     if (conversation.unread_count > 0) {
       setConversations(convos => convos.map(c => c.id === conversation.id ? { ...c, unread_count: 0 } : c));
+      supabase.from('chatwoot_conversations').update({ unread_count: 0 }).eq('id', conversation.id).then();
       supabase.functions.invoke('chatwoot-proxy', { body: { action: 'mark_as_read', settings, conversationId: conversation.id }, }).catch((err: any) => console.error("Lỗi ngầm khi đánh dấu đã đọc:", err.message));
     }
   };
