@@ -20,7 +20,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // 1. Check if auto-reply is enabled
+    // 1. Kiểm tra xem tự động trả lời có được bật không và lấy cài đặt Chatwoot
     const { data: autoReplySettings, error: settingsError } = await supabaseAdmin
       .from('auto_reply_settings').select('config').eq('id', 1).single();
     if (settingsError || !autoReplySettings || !autoReplySettings.config?.enabled) {
@@ -29,7 +29,6 @@ serve(async (req) => {
       });
     }
 
-    // 2. Get Chatwoot settings
     const { data: chatwootSettings, error: chatwootSettingsError } = await supabaseAdmin
       .from('chatwoot_settings').select('*').eq('id', 1).single();
     if (chatwootSettingsError || !chatwootSettings) {
@@ -39,83 +38,50 @@ serve(async (req) => {
         });
     }
 
-    // 3. Get AI Star label ID
-    const { data: aiStarLabel, error: labelError } = await supabaseAdmin
-      .from('chatwoot_labels')
-      .select('id')
-      .eq('name', AI_STAR_LABEL_NAME)
-      .single();
-
-    // 4. Get live conversations from Chatwoot
+    // 2. Gọi trực tiếp API Chatwoot để lấy dữ liệu "sống"
     const { data: chatwootData, error: functionError } = await supabaseAdmin.functions.invoke('chatwoot-proxy', {
         body: { action: 'list_conversations', settings: chatwootSettings },
     });
 
     if (functionError) {
-        throw new Error(`Error fetching conversations from Chatwoot: ${(await functionError.context.json()).error || functionError.message}`);
+        throw new Error(`Lỗi khi lấy danh sách cuộc trò chuyện từ Chatwoot: ${(await functionError.context.json()).error || functionError.message}`);
     }
     if (chatwootData.error) {
-        throw new Error(`Error from Chatwoot proxy: ${chatwootData.error}`);
+        throw new Error(`Lỗi từ Chatwoot proxy: ${chatwootData.error}`);
     }
 
-    let allConversations = chatwootData.data.payload || [];
+    const allConversations = chatwootData.data.payload || [];
 
-    // 5. Auto-tag new unread conversations with 'AI Star' if the label exists
-    if (aiStarLabel) {
-      const conversationsToTag = allConversations.filter(convo => 
-        convo.unread_count > 0 && !convo.labels.includes(AI_STAR_LABEL_NAME)
-      );
-
-      if (conversationsToTag.length > 0) {
-        console.log(`Found ${conversationsToTag.length} new conversations to tag with '${AI_STAR_LABEL_NAME}'.`);
-        const taggingPromises = conversationsToTag.map(async (convo) => {
-          try {
-            const newLabels = [...convo.labels, AI_STAR_LABEL_NAME];
-            await supabaseAdmin.functions.invoke('chatwoot-proxy', {
-              body: { action: 'update_labels', settings: chatwootSettings, conversationId: convo.id, labels: newLabels },
-            });
-            await supabaseAdmin.from('chatwoot_conversation_labels').upsert({ conversation_id: convo.id, label_id: aiStarLabel.id });
-            // Modify the object in the main array to avoid a second fetch
-            convo.labels.push(AI_STAR_LABEL_NAME); 
-            console.log(`Tagged conversation #${convo.id}`);
-          } catch (tagError) {
-            console.error(`Failed to tag conversation #${convo.id}:`, tagError.message);
-          }
-        });
-        await Promise.all(taggingPromises);
-      }
-    }
-
-    // 6. Filter conversations to be processed by the worker (now includes newly tagged ones)
+    // 3. Lọc thông minh dựa trên dữ liệu "sống"
     const conversationsToProcess = allConversations.filter(convo => 
         convo.unread_count > 0 && convo.labels.includes(AI_STAR_LABEL_NAME)
     );
 
     if (conversationsToProcess.length === 0) {
-      return new Response(JSON.stringify({ message: "No unread conversations with AI Star tag to process." }), {
+      return new Response(JSON.stringify({ message: "Không có cuộc trò chuyện chưa đọc nào có thẻ AI Star để xử lý." }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200,
       });
     }
 
-    // 7. Trigger AI worker for each valid conversation
+    // 4. Kích hoạt AI cho mỗi cuộc trò chuyện hợp lệ
     for (const convo of conversationsToProcess) {
       try {
-        // No `await` to allow workers to run in parallel
+        // Không cần `await` để các worker có thể chạy song song
         supabaseAdmin.functions.invoke('auto-reply-worker', {
           body: { conversationId: convo.id },
         });
       } catch (e) {
-        console.error(`Failed to trigger worker for conversation ${convo.id}:`, e.message);
+        console.error(`Không thể kích hoạt worker cho cuộc trò chuyện ${convo.id}:`, e.message);
       }
     }
 
-    return new Response(JSON.stringify({ message: `Triggered worker for ${conversationsToProcess.length} conversations.` }), {
+    return new Response(JSON.stringify({ message: `Đã kích hoạt worker cho ${conversationsToProcess.length} cuộc trò chuyện.` }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
 
   } catch (error) {
-    console.error('Error in auto-reply automation:', error.message);
+    console.error('Lỗi trong hệ thống tự động hóa trả lời:', error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,

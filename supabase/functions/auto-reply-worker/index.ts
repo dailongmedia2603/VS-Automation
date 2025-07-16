@@ -130,27 +130,18 @@ serve(async (req) => {
 
         if (match) {
           if (rule.action_type === 'stop_auto_reply') {
-            const { data: convoDetails, error: convoError } = await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'get_conversation_details', settings: chatwootSettings, conversationId: conversationId } });
-            if (convoError) throw new Error(`Lỗi lấy chi tiết hội thoại: ${(await convoError.context.json()).error || convoError.message}`);
+            const { data: convoDetails } = await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'get_conversation_details', settings: chatwootSettings, conversationId: conversationId } });
             const newLabels = (convoDetails?.labels || []).filter((l: string) => l !== AI_STAR_LABEL_NAME);
-            const { error: labelError } = await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'update_labels', settings: chatwootSettings, conversationId: conversationId, labels: newLabels } });
-            if (labelError) throw new Error(`Lỗi cập nhật nhãn: ${(await labelError.context.json()).error || labelError.message}`);
+            await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'update_labels', settings: chatwootSettings, conversationId: conversationId, labels: newLabels } });
             await logToDb('success', `Dừng trả lời tự động do quy tắc #${rule.id}.`);
           } else if (rule.action_type === 'reply_with_content' && rule.reply_content) {
-            const { error: sendError } = await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'send_message', settings: chatwootSettings, conversationId: conversationId, content: rule.reply_content } });
-            if (sendError) throw new Error(`Lỗi gửi tin nhắn theo quy tắc: ${(await sendError.context.json()).error || sendError.message}`);
-            
-            const { data: convoDetails, error: convoError } = await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'get_conversation_details', settings: chatwootSettings, conversationId: conversationId } });
-            if (convoError) throw new Error(`Lỗi lấy chi tiết hội thoại: ${(await convoError.context.json()).error || convoError.message}`);
-            
+            await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'send_message', settings: chatwootSettings, conversationId: conversationId, content: rule.reply_content } });
+            const { data: convoDetails } = await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'get_conversation_details', settings: chatwootSettings, conversationId: conversationId } });
             const newLabels = (convoDetails?.labels || []).filter((l: string) => l !== AI_STAR_LABEL_NAME);
-            
-            const { error: labelError } = await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'update_labels', settings: chatwootSettings, conversationId: conversationId, labels: newLabels } });
-            if (labelError) console.error("Lỗi cập nhật nhãn (không nghiêm trọng):", labelError.message);
-
-            const { error: readError } = await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'mark_as_read', settings: chatwootSettings, conversationId: conversationId } });
-            if (readError) console.error("Lỗi đánh dấu đã đọc (không nghiêm trọng):", readError.message);
-
+            await Promise.all([
+              supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'update_labels', settings: chatwootSettings, conversationId: conversationId, labels: newLabels } }),
+              supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'mark_as_read', settings: chatwootSettings, conversationId: conversationId } })
+            ]);
             await logToDb('success', `Đã trả lời theo quy tắc #${rule.id}.`);
           }
           await supabaseAdmin.from('ai_typing_status').upsert({ conversation_id: conversationId, is_typing: false });
@@ -192,19 +183,14 @@ serve(async (req) => {
 
     const aiReply = proxyResponse.choices[0].message.content;
 
-    const { error: sendMessageError } = await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'send_message', settings: chatwootSettings, conversationId: conversationId, content: aiReply } });
-    if (sendMessageError) throw new Error(`Lỗi gửi tin nhắn qua Chatwoot: ${(await sendMessageError.context.json()).error || sendMessageError.message}`);
-
-    const { data: convoDetails, error: convoError } = await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'get_conversation_details', settings: chatwootSettings, conversationId: conversationId } });
-    if (convoError) throw new Error(`Lỗi lấy chi tiết hội thoại: ${(await convoError.context.json()).error || convoError.message}`);
-    
+    await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'send_message', settings: chatwootSettings, conversationId: conversationId, content: aiReply } });
+    const { data: convoDetails } = await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'get_conversation_details', settings: chatwootSettings, conversationId: conversationId } });
     const newLabels = (convoDetails?.labels || []).filter((l: string) => l !== AI_STAR_LABEL_NAME);
     
-    const { error: labelError } = await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'update_labels', settings: chatwootSettings, conversationId: conversationId, labels: newLabels } });
-    if (labelError) console.error("Lỗi cập nhật nhãn (không nghiêm trọng):", labelError.message);
-
-    const { error: readError } = await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'mark_as_read', settings: chatwootSettings, conversationId: conversationId } });
-    if (readError) console.error("Lỗi đánh dấu đã đọc (không nghiêm trọng):", readError.message);
+    await Promise.all([
+        supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'update_labels', settings: chatwootSettings, conversationId: conversationId, labels: newLabels } }),
+        supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'mark_as_read', settings: chatwootSettings, conversationId: conversationId } })
+    ]);
 
     await logToDb('success', `AI đã trả lời thành công với nội dung: "${aiReply.substring(0, 100)}..."`, systemPrompt);
 
