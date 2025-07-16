@@ -94,9 +94,9 @@ serve(async (req) => {
             });
             break;
 
-          case 'mark_as_unread':
+          case 'mark_as_read':
             if (!conversationId) throw new Error("Conversation ID is required.");
-            endpoint = `/api/v1/accounts/${settings.accountId}/conversations/${conversationId}/unread`;
+            endpoint = `/api/v1/accounts/${settings.accountId}/conversations/${conversationId}/update_last_seen`;
             method = 'POST';
             body = JSON.stringify({});
             break;
@@ -122,9 +122,6 @@ serve(async (req) => {
         }
 
         upstreamUrl = `${settings.chatwootUrl.replace(/\/$/, '')}${endpoint}`;
-        
-        console.log(`[Chatwoot Proxy] Calling upstream URL: ${method} ${upstreamUrl}`);
-
         upstreamOptions = {
             method: method,
             headers: {
