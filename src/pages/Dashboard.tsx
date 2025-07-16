@@ -33,8 +33,8 @@ const Dashboard = () => {
             <CardContent>
               <div className="flex space-x-2">
                 <Button className="bg-blue-100 text-blue-700 hover:bg-blue-200 font-semibold rounded-lg">General</Button>
-                <Button className="bg-blue-100 text-blue-700 hover:bg-blue-200 font-semibold rounded-lg">My File</Button>
-                <Button className="bg-blue-100 text-blue-700 hover:bg-blue-200 font-semibold rounded-lg">Shared with me</Button>
+                <Button variant="ghost" className="text-muted-foreground hover:bg-gray-100 rounded-lg">My File</Button>
+                <Button variant="ghost" className="text-muted-foreground hover:bg-gray-100 rounded-lg">Shared with me</Button>
               </div>
             </CardContent>
           </Card>
