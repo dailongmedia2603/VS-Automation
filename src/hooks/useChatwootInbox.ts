@@ -74,10 +74,9 @@ export const useChatwootInbox = () => {
 
       const labelsMap = new Map<number, string[]>();
       labelsRes.data?.forEach(item => {
-        // The type of item.label from the Supabase query is inferred as an array.
-        if (item.label && Array.isArray(item.label) && item.label.length > 0 && item.label[0].name) {
+        if (item.label && !Array.isArray(item.label)) {
           const currentLabels = labelsMap.get(item.conversation_id) || [];
-          labelsMap.set(item.conversation_id, [...currentLabels, item.label[0].name]);
+          labelsMap.set(item.conversation_id, [...currentLabels, (item.label as any).name]);
         }
       });
 
@@ -86,6 +85,7 @@ export const useChatwootInbox = () => {
 
       const enrichedConversations = convosData.map(convo => ({
         ...convo,
+        last_activity_at: convo.last_activity_at ? new Date(convo.last_activity_at).getTime() / 1000 : 0,
         meta: { sender: { ...convo.sender, thumbnail: convo.sender.thumbnail_url } },
         labels: labelsMap.get(convo.id) || [],
         messages: messageMap.has(convo.id) ? [{
