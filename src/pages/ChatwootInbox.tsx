@@ -10,12 +10,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Command, CommandInput, CommandEmpty, CommandGroup, CommandItem, CommandList, CommandSeparator } from '@/components/ui/command';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from '@/lib/utils';
 import { format, isSameDay } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { ChatwootContactPanel } from '@/components/ChatwootContactPanel';
 import { AiLogViewer } from '@/components/AiLogViewer';
-import { Search, Phone, Paperclip, Image as ImageIcon, SendHorizonal, ThumbsUp, Settings2, CornerDownLeft, Eye, RefreshCw, FileText, X, Filter, Check, PlusCircle, Trash2, Bot, Loader2 } from 'lucide-react';
+import { Search, Phone, Paperclip, Image as ImageIcon, SendHorizonal, ThumbsUp, Settings2, CornerDownLeft, Eye, RefreshCw, FileText, X, Filter, Check, PlusCircle, Trash2, Bot, Loader2, CircleDot } from 'lucide-react';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { Conversation, Message, CareScript, ChatwootLabel } from '@/types/chatwoot';
 
@@ -376,6 +377,43 @@ const ChatwootInbox = () => {
     }
   };
 
+  const handleMarkAsUnread = async (e: React.MouseEvent, conversationId: number) => {
+    e.stopPropagation(); // Prevent selecting the conversation
+
+    const originalConversations = [...conversations];
+    // Optimistic UI update
+    setConversations(convos => 
+        convos.map(c => 
+            c.id === conversationId ? { ...c, unread_count: 1 } : c
+        )
+    );
+
+    try {
+        const { data, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', {
+            body: {
+                action: 'toggle_unread',
+                settings,
+                conversationId,
+            },
+        });
+
+        if (functionError) {
+            const errorData = await functionError.context.json();
+            throw new Error(errorData.error || functionError.message);
+        }
+        if (data.error) throw new Error(data.error);
+        
+        // The API call was successful, we can keep the optimistic update.
+        // A silent refetch in the background to sync the exact state.
+        fetchConversations(false);
+
+    } catch (err: any) {
+        showError(`Đánh dấu chưa đọc thất bại: ${err.message}`);
+        // Revert optimistic update on error
+        setConversations(originalConversations);
+    }
+  };
+
   const handleToggleLabel = async (label: string) => {
     if (!selectedConversation) return;
 
@@ -486,10 +524,34 @@ const ChatwootInbox = () => {
     const isLastMessageIncoming = lastMessage?.message_type === 0;
 
     return (
-      <div key={convo.id} onClick={() => handleSelectConversation(convo)} className={cn("p-2.5 flex space-x-3 cursor-pointer rounded-lg", selectedConversation?.id === convo.id && "bg-blue-100")}>
+      <div key={convo.id} onClick={() => handleSelectConversation(convo)} className={cn("p-2.5 flex space-x-3 cursor-pointer rounded-lg group", selectedConversation?.id === convo.id && "bg-blue-100")}>
         <Avatar className="h-12 w-12"><AvatarImage src={convo.meta.sender.thumbnail} /><AvatarFallback>{getInitials(convo.meta.sender.name)}</AvatarFallback></Avatar>
         <div className="flex-1 overflow-hidden">
-          <div className="flex justify-between items-center"><p className="font-semibold truncate text-sm">{convo.meta.sender.name}</p><p className="text-xs text-muted-foreground whitespace-nowrap">{format(new Date(convo.last_activity_at * 1000), 'HH:mm')}</p></div>
+          <div className="flex justify-between items-center">
+            <p className="font-semibold truncate text-sm">{convo.meta.sender.name}</p>
+            <div className="flex items-center gap-1">
+              <p className="text-xs text-muted-foreground whitespace-nowrap group-hover:hidden">
+                {format(new Date(convo.last_activity_at * 1000), 'HH:mm')}
+              </p>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={(e) => handleMarkAsUnread(e, convo.id)}
+                    >
+                      <CircleDot className="h-4 w-4 text-blue-600" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Đánh dấu là chưa đọc</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          </div>
           <div className="flex justify-between items-start mt-1">
             <p className={cn(
               "text-sm truncate flex items-center",

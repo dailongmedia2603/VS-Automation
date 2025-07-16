@@ -101,6 +101,13 @@ serve(async (req) => {
             body = JSON.stringify({});
             break;
 
+          case 'toggle_unread':
+            if (!conversationId) throw new Error("Conversation ID is required.");
+            endpoint = `/api/v1/accounts/${settings.accountId}/conversations/${conversationId}/toggle_unread`;
+            method = 'POST';
+            body = JSON.stringify({});
+            break;
+
           case 'update_labels':
             if (!conversationId) throw new Error("Conversation ID is required.");
             if (labels === undefined) throw new Error("Labels array is required.");
