@@ -7,6 +7,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Helper to safely create a Date object and convert to ISO string
+const toISOStringSafe = (timestamp: number | undefined | null): string => {
+  if (typeof timestamp === 'number' && !isNaN(timestamp)) {
+    return new Date(timestamp * 1000).toISOString();
+  }
+  return new Date().toISOString();
+};
+
 async function handleMessageCreated(supabase: SupabaseClient, payload: any) {
   const message = payload;
   const conversation = payload.conversation;
@@ -14,7 +22,7 @@ async function handleMessageCreated(supabase: SupabaseClient, payload: any) {
 
   const promises = [];
 
-  // Sync Contact
+  // 1. Sync Contact
   if (contact && contact.type === 'contact') {
     promises.push(
       supabase.from('chatwoot_contacts').upsert({
@@ -23,25 +31,25 @@ async function handleMessageCreated(supabase: SupabaseClient, payload: any) {
         email: contact.email,
         phone_number: contact.phone_number,
         thumbnail_url: contact.thumbnail,
-      }, { onConflict: 'id' })
+      }, { onConflict: 'id' }).then(res => ({ ...res, source: 'contact' }))
     );
   }
 
-  // Sync Conversation on new message
+  // 2. Sync Conversation
   if (conversation) {
     const conversationData = {
       id: conversation.id,
       contact_id: contact?.id,
       status: conversation.status,
-      last_activity_at: typeof conversation.last_activity_at === 'number' ? new Date(conversation.last_activity_at * 1000).toISOString() : new Date().toISOString(),
+      last_activity_at: toISOStringSafe(conversation.last_activity_at),
       unread_count: conversation.unread_count,
     };
     promises.push(
-      supabase.from('chatwoot_conversations').upsert(conversationData, { onConflict: 'id' })
+      supabase.from('chatwoot_conversations').upsert(conversationData, { onConflict: 'id' }).then(res => ({ ...res, source: 'conversation' }))
     );
   }
 
-  // Sync Message
+  // 3. Sync Message
   const messageData = {
     id: message.id,
     conversation_id: conversation.id,
@@ -50,13 +58,13 @@ async function handleMessageCreated(supabase: SupabaseClient, payload: any) {
     is_private: message.private,
     sender_name: contact?.name,
     sender_thumbnail: contact?.thumbnail,
-    created_at_chatwoot: typeof message.created_at === 'number' ? new Date(message.created_at * 1000).toISOString() : new Date().toISOString(),
+    created_at_chatwoot: toISOStringSafe(message.created_at),
   };
   promises.push(
-    supabase.from('chatwoot_messages').upsert(messageData, { onConflict: 'id' })
+    supabase.from('chatwoot_messages').upsert(messageData, { onConflict: 'id' }).then(res => ({ ...res, source: 'message' }))
   );
 
-  // Sync Attachments
+  // 4. Sync Attachments
   if (message.attachments && message.attachments.length > 0) {
     const attachmentsToUpsert = message.attachments.map((att: any) => ({
       id: att.id,
@@ -65,29 +73,35 @@ async function handleMessageCreated(supabase: SupabaseClient, payload: any) {
       data_url: att.data_url,
     }));
     promises.push(
-      supabase.from('chatwoot_attachments').upsert(attachmentsToUpsert, { onConflict: 'id' })
+      supabase.from('chatwoot_attachments').upsert(attachmentsToUpsert, { onConflict: 'id' }).then(res => ({ ...res, source: 'attachments' }))
     );
   }
 
-  const results = await Promise.all(promises);
+  // Execute all promises and log any individual failures
+  const results = await Promise.allSettled(promises);
   results.forEach(result => {
-    if (result.error) {
-      console.error('Supabase upsert error:', result.error);
-      throw result.error;
+    if (result.status === 'rejected') {
+      console.error(`Webhook sub-task failed:`, result.reason);
+    } else if (result.value.error) {
+      console.error(`Error upserting ${result.value.source}:`, result.value.error);
     }
   });
 }
 
 async function handleConversationUpdated(supabase: SupabaseClient, payload: any) {
     const conversation = payload;
-    await supabase
+    const { error } = await supabase
       .from('chatwoot_conversations')
       .update({ 
           unread_count: conversation.unread_count,
           status: conversation.status,
-          last_activity_at: conversation.last_activity_at,
+          last_activity_at: toISOStringSafe(conversation.last_activity_at),
       })
       .eq('id', conversation.id);
+    
+    if (error) {
+        console.error('Error updating conversation:', error);
+    }
 }
 
 serve(async (req) => {
@@ -101,7 +115,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const payload = await req.json()
+    const payload = await req.json();
     const event = payload.event;
 
     switch (event) {
@@ -113,7 +127,8 @@ serve(async (req) => {
         await handleConversationUpdated(supabaseAdmin, payload);
         break;
       default:
-        // Do nothing for other events
+        // Do nothing for other events, but log them for debugging
+        console.log(`Received unhandled event: ${event}`);
         break;
     }
 
@@ -123,8 +138,8 @@ serve(async (req) => {
     })
 
   } catch (error) {
-    console.error('Error in Chatwoot webhook handler:', error.message, error.stack)
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error('Critical error in Chatwoot webhook handler:', error.message, error.stack)
+    return new Response(JSON.stringify({ error: `Critical handler error: ${error.message}` }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     })
