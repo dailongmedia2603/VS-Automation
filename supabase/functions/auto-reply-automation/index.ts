@@ -20,7 +20,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // 1. Kiểm tra xem tự động trả lời có được bật không và lấy cài đặt Chatwoot
     const { data: autoReplySettings, error: settingsError } = await supabaseAdmin
       .from('auto_reply_settings').select('config').eq('id', 1).single();
     if (settingsError || !autoReplySettings || !autoReplySettings.config?.enabled) {
@@ -29,59 +28,55 @@ serve(async (req) => {
       });
     }
 
-    const { data: chatwootSettings, error: chatwootSettingsError } = await supabaseAdmin
-      .from('chatwoot_settings').select('*').eq('id', 1).single();
-    if (chatwootSettingsError || !chatwootSettings) {
-        console.warn("Chatwoot settings not found. Skipping automation.");
-        return new Response(JSON.stringify({ message: "Chatwoot settings not found." }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200,
-        });
+    const { data: labelData, error: labelError } = await supabaseAdmin
+      .from('chatwoot_labels').select('id').eq('name', AI_STAR_LABEL_NAME).single();
+    if (labelError || !labelData) {
+      return new Response(JSON.stringify({ message: `Label '${AI_STAR_LABEL_NAME}' not found.` }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200,
+      });
     }
+    const aiStarLabelId = labelData.id;
 
-    // 2. Gọi trực tiếp API Chatwoot để lấy dữ liệu "sống"
-    const { data: chatwootData, error: functionError } = await supabaseAdmin.functions.invoke('chatwoot-proxy', {
-        body: { action: 'list_conversations', settings: chatwootSettings },
-    });
-
-    if (functionError) {
-        throw new Error(`Lỗi khi lấy danh sách cuộc trò chuyện từ Chatwoot: ${(await functionError.context.json()).error || functionError.message}`);
+    const { data: convLabelData, error: convLabelError } = await supabaseAdmin
+      .from('chatwoot_conversation_labels').select('conversation_id').eq('label_id', aiStarLabelId);
+    if (convLabelError) throw convLabelError;
+    if (!convLabelData || convLabelData.length === 0) {
+      return new Response(JSON.stringify({ message: "No conversations with AI Star label." }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200,
+      });
     }
-    if (chatwootData.error) {
-        throw new Error(`Lỗi từ Chatwoot proxy: ${chatwootData.error}`);
-    }
+    const conversationIdsWithLabel = convLabelData.map(item => item.conversation_id);
 
-    const allConversations = chatwootData.data.payload || [];
+    const { data: conversationsToProcess, error: convError } = await supabaseAdmin
+      .from('chatwoot_conversations')
+      .select('id, unread_count, labels, meta:sender(id, name, thumbnail, additional_attributes)')
+      .in('id', conversationIdsWithLabel)
+      .gt('unread_count', 0);
+    if (convError) throw convError;
 
-    // 3. Lọc thông minh dựa trên dữ liệu "sống"
-    const conversationsToProcess = allConversations.filter(convo => 
-        convo.unread_count > 0 && convo.labels.includes(AI_STAR_LABEL_NAME)
-    );
-
-    if (conversationsToProcess.length === 0) {
-      return new Response(JSON.stringify({ message: "Không có cuộc trò chuyện chưa đọc nào có thẻ AI Star để xử lý." }), {
+    if (!conversationsToProcess || conversationsToProcess.length === 0) {
+      return new Response(JSON.stringify({ message: "No unread conversations with AI Star label to process." }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200,
       });
     }
 
-    // 4. Kích hoạt AI cho mỗi cuộc trò chuyện hợp lệ, truyền toàn bộ đối tượng convo
     for (const convo of conversationsToProcess) {
       try {
-        // Không cần `await` để các worker có thể chạy song song
         supabaseAdmin.functions.invoke('auto-reply-worker', {
-          body: { conversation: convo }, // SỬA LỖI: Gửi toàn bộ đối tượng conversation
-        });
+          body: { conversation: convo },
+        }).catch(e => console.error(`Failed to invoke worker for convo ${convo.id}:`, e.message));
       } catch (e) {
-        console.error(`Không thể kích hoạt worker cho cuộc trò chuyện ${convo.id}:`, e.message);
+        console.error(`Could not invoke worker for convo ${convo.id}:`, e.message);
       }
     }
 
-    return new Response(JSON.stringify({ message: `Đã kích hoạt worker cho ${conversationsToProcess.length} cuộc trò chuyện.` }), {
+    return new Response(JSON.stringify({ message: `Invoked workers for ${conversationsToProcess.length} conversations.` }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
 
   } catch (error) {
-    console.error('Lỗi trong hệ thống tự động hóa trả lời:', error.message);
+    console.error('Error in auto-reply automation:', error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
