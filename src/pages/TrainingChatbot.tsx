@@ -147,11 +147,11 @@ const TrainingChatbot = () => {
       <Tabs defaultValue="auto_reply" className="w-full">
         <TabsList className="grid w-full grid-cols-4 max-w-3xl bg-slate-200/75 p-1.5 rounded-xl h-12">
           <TabsTrigger value="auto_reply" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-blue-600 text-slate-600 font-semibold text-base transition-all duration-300">Tự động trả lời</TabsTrigger>
-          <TabsTrigger value="keyword_actions" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-blue-600 text-slate-600 font-semibold text-base transition-all duration-300">Hành động theo từ khoá</TabsTrigger>
           <TabsTrigger value="care_script_suggestion" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-blue-600 text-slate-600 font-semibold text-base transition-all duration-300">Kịch bản chăm sóc</TabsTrigger>
           <TabsTrigger value="internal_docs" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-blue-600 text-slate-600 font-semibold text-base transition-all duration-300">Tài liệu nội bộ</TabsTrigger>
+          <TabsTrigger value="keyword_actions" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-blue-600 text-slate-600 font-semibold text-base transition-all duration-300">Hành động theo từ khoá</TabsTrigger>
         </TabsList>
-        <TabsContent value="auto_reply">
+        <TabsContent value="auto_reply" className="mt-6">
           <TrainingModule
             config={autoReplyConfig}
             setConfig={setAutoReplyConfig}
@@ -159,10 +159,7 @@ const TrainingChatbot = () => {
             onSave={() => handleSave('auto_reply')}
           />
         </TabsContent>
-        <TabsContent value="keyword_actions">
-          <KeywordActionManager />
-        </TabsContent>
-        <TabsContent value="care_script_suggestion">
+        <TabsContent value="care_script_suggestion" className="mt-6">
           <TrainingModule
             config={careScriptConfig}
             setConfig={setCareScriptConfig}
@@ -170,8 +167,11 @@ const TrainingChatbot = () => {
             onSave={() => handleSave('care_script_suggestion')}
           />
         </TabsContent>
-        <TabsContent value="internal_docs">
+        <TabsContent value="internal_docs" className="mt-6">
           <DocumentTrainer />
+        </TabsContent>
+        <TabsContent value="keyword_actions" className="mt-6">
+          <KeywordActionManager />
         </TabsContent>
       </Tabs>
     </main>
