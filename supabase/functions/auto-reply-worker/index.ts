@@ -70,11 +70,9 @@ serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
 
-  const { conversation } = await req.json();
-  const conversationId = conversation?.id;
-
+  const { conversationId } = await req.json();
   if (!conversationId) {
-    return new Response(JSON.stringify({ error: "Missing conversation object or ID" }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ error: "Missing conversationId" }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 
   const logToDb = async (status, details, system_prompt = null) => {
@@ -107,42 +105,19 @@ serve(async (req) => {
 
   let systemPrompt = null;
   try {
-    // --- START: LOCKING MECHANISM ---
-    const { error: lockError } = await supabaseAdmin
-      .from('ai_typing_status')
-      .update({ is_typing: true })
-      .eq('conversation_id', conversationId)
-      .eq('is_typing', false);
-
-    if (lockError || lockError?.details?.includes('0 rows')) {
-      console.log(`Conversation ${conversationId} is already being processed. Skipping.`);
-      return new Response(JSON.stringify({ message: "Conversation locked, skipping." }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-    // --- END: LOCKING MECHANISM ---
+    await supabaseAdmin.from('ai_typing_status').upsert({ conversation_id: conversationId, is_typing: true });
 
     const { data: messagesData, error: messagesError } = await supabaseAdmin.functions.invoke('chatwoot-proxy', {
         body: { action: 'list_messages', settings: chatwootSettings, conversationId: conversationId }
     });
-    if (messagesError) throw new Error(`Lỗi khi tải tin nhắn để kiểm tra: ${(await messagesError.context.json()).error || messagesError.message}`);
+    if (messagesError) throw new Error(`Lỗi khi tải tin nhắn từ Chatwoot: ${(await messagesError.context.json()).error || messagesError.message}`);
     
     const messages = messagesData.payload.sort((a, b) => a.created_at - b.created_at) || [];
-    if (!messages || messages.length === 0) {
-        return new Response(JSON.stringify({ message: "No messages in conversation, exiting." }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-
-    const lastMessage = messages[messages.length - 1];
-    if (lastMessage.message_type === 1) {
-        await logToDb('success', 'Đã dừng lại do tin nhắn cuối cùng đã là câu trả lời của AI/Agent.');
-        const currentLabels = conversation.labels || [];
-        if (currentLabels.includes(AI_STAR_LABEL_NAME)) {
-            const newLabels = currentLabels.filter((l) => l !== AI_STAR_LABEL_NAME);
-            await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'update_labels', settings: chatwootSettings, conversationId: conversationId, labels: newLabels } });
-        }
-        return new Response(JSON.stringify({ message: "Stopped: Last message was outgoing." }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
+    if (!messages || messages.length === 0) throw new Error(`Không tìm thấy tin nhắn cho cuộc trò chuyện #${conversationId}`);
     
     const lastUserMessage = messages.filter(m => m.message_type === 0).pop()?.content || '';
 
+    // --- START: KEYWORD ACTION CHECK ---
     const { data: keywordRules } = await supabaseAdmin.from('keyword_actions').select('*').eq('is_active', true);
     if (keywordRules && keywordRules.length > 0) {
       for (const rule of keywordRules) {
@@ -154,24 +129,27 @@ serve(async (req) => {
         }
 
         if (match) {
-          const currentLabels = conversation.labels || [];
-          const newLabels = currentLabels.filter((l) => l !== AI_STAR_LABEL_NAME);
-
           if (rule.action_type === 'stop_auto_reply') {
+            const { data: convoDetails } = await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'get_conversation_details', settings: chatwootSettings, conversationId: conversationId } });
+            const newLabels = (convoDetails?.labels || []).filter((l: string) => l !== AI_STAR_LABEL_NAME);
             await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'update_labels', settings: chatwootSettings, conversationId: conversationId, labels: newLabels } });
             await logToDb('success', `Dừng trả lời tự động do quy tắc #${rule.id}.`);
           } else if (rule.action_type === 'reply_with_content' && rule.reply_content) {
             await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'send_message', settings: chatwootSettings, conversationId: conversationId, content: rule.reply_content } });
+            const { data: convoDetails } = await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'get_conversation_details', settings: chatwootSettings, conversationId: conversationId } });
+            const newLabels = (convoDetails?.labels || []).filter((l: string) => l !== AI_STAR_LABEL_NAME);
             await Promise.all([
               supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'update_labels', settings: chatwootSettings, conversationId: conversationId, labels: newLabels } }),
               supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'mark_as_read', settings: chatwootSettings, conversationId: conversationId } })
             ]);
             await logToDb('success', `Đã trả lời theo quy tắc #${rule.id}.`);
           }
+          await supabaseAdmin.from('ai_typing_status').upsert({ conversation_id: conversationId, is_typing: false });
           return new Response(JSON.stringify({ message: `Processed with keyword rule #${rule.id}` }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
         }
       }
     }
+    // --- END: KEYWORD ACTION CHECK ---
 
     const [autoReplySettingsRes, aiSettingsRes] = await Promise.all([
         supabaseAdmin.from('auto_reply_settings').select('config').eq('id', 1).single(),
@@ -206,12 +184,13 @@ serve(async (req) => {
     const aiReply = proxyResponse.choices[0].message.content;
 
     await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'send_message', settings: chatwootSettings, conversationId: conversationId, content: aiReply } });
+    const { data: convoDetails } = await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'get_conversation_details', settings: chatwootSettings, conversationId: conversationId } });
+    const newLabels = (convoDetails?.labels || []).filter((l: string) => l !== AI_STAR_LABEL_NAME);
     
-    const currentLabels = conversation.labels || [];
-    const newLabels = currentLabels.filter((l) => l !== AI_STAR_LABEL_NAME);
-    
-    await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'update_labels', settings: chatwootSettings, conversationId: conversationId, labels: newLabels } });
-    await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'mark_as_read', settings: chatwootSettings, conversationId: conversationId } });
+    await Promise.all([
+        supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'update_labels', settings: chatwootSettings, conversationId: conversationId, labels: newLabels } }),
+        supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'mark_as_read', settings: chatwootSettings, conversationId: conversationId } })
+    ]);
 
     await logToDb('success', `AI đã trả lời thành công với nội dung: "${aiReply.substring(0, 100)}..."`, systemPrompt);
 
@@ -219,29 +198,8 @@ serve(async (req) => {
 
   } catch (e) {
     console.error(`Failed to process conversation ${conversationId}:`, e.message);
-    
-    // --- START: NEW ERROR HANDLING LOGIC ---
-    try {
-      // 1. Quarantine the conversation by removing the trigger tag
-      const currentLabels = conversation.labels || [];
-      const newLabels = currentLabels.filter((l) => l !== AI_STAR_LABEL_NAME);
-      await supabaseAdmin.functions.invoke('chatwoot-proxy', { 
-        body: { 
-          action: 'update_labels', 
-          settings: chatwootSettings, 
-          conversationId: conversationId, 
-          labels: newLabels 
-        } 
-      });
-
-      // 2. Report the error
-      await sendErrorNote(e.message);
-      await logToDb('error', e.message, systemPrompt);
-    } catch (cleanupError) {
-      console.error(`CRITICAL: Failed to cleanup conversation ${conversationId} after an error:`, cleanupError.message);
-    }
-    // --- END: NEW ERROR HANDLING LOGIC ---
-
+    await sendErrorNote(e.message);
+    await logToDb('error', e.message, systemPrompt);
     return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } finally {
     await supabaseAdmin.from('ai_typing_status').upsert({ conversation_id: conversationId, is_typing: false });

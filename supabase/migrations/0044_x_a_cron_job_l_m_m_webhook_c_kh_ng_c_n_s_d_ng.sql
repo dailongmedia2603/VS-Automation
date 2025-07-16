@@ -1,1 +1,0 @@
-SELECT cron.unschedule('keep-chatwoot-webhook-warm');
