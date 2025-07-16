@@ -1,65 +1,59 @@
 import React from 'react';
-import { TrainingConfig, TrainingItem } from './TrainingForm';
+import { TrainingConfig } from './TrainingForm';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
-const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-  <div className="mb-6">
-    <h3 className="text-lg font-semibold text-slate-800 border-b pb-2 mb-3">{title}</h3>
-    {children}
-  </div>
-);
+interface TrainingPreviewProps {
+  config: TrainingConfig;
+}
 
-const Detail: React.FC<{ label: string; value?: string | null }> = ({ label, value }) => (
-  <div className="grid grid-cols-3 gap-4 text-sm mb-2">
-    <dt className="font-medium text-slate-500">{label}</dt>
-    <dd className="col-span-2 text-slate-700">{value || <span className="italic text-slate-400">Chưa có</span>}</dd>
-  </div>
-);
+const TrainingPreview: React.FC<TrainingPreviewProps> = ({ config }) => {
+  const generatePreviewPrompt = () => {
+    const formatList = (items: any[]) => items && items.length > 0 ? items.map(p => `- ${p.value}`).join('\n') : '(Chưa có thông tin)';
+    const formatNumberedList = (items: any[]) => items && items.length > 0 ? items.map((s, i) => `${i + 1}. ${s.value}`).join('\n') : '(Chưa có quy trình)';
 
-const ListDetail: React.FC<{ label: string; items: TrainingItem[]; prefix?: string }> = ({ label, items, prefix }) => (
-  <div>
-    <dt className="font-medium text-slate-500 text-sm mb-2">{label}</dt>
-    <dd className="col-span-2 text-slate-700 text-sm">
-      {items.length > 0 ? (
-        <ul className="list-disc pl-5 space-y-1">
-          {items.map((item, index) => (
-            <li key={item.id}>{prefix && `${prefix} ${index + 1}: `}{item.value}</li>
-          ))}
-        </ul>
-      ) : (
-        <span className="italic text-slate-400">Chưa có</span>
-      )}
-    </dd>
-  </div>
-);
+    const formatDocumentContext = () => {
+      return `(Đây là nơi tài liệu nội bộ liên quan sẽ được chèn vào nếu tìm thấy. Ví dụ:)\n\n- **Tiêu đề:** Báo giá dịch vụ Xây kênh TikTok\n- **Nội dung:** Gói cơ bản là 5.000.000 VNĐ/tháng...`;
+    };
 
-const TrainingPreview: React.FC<{ config: TrainingConfig }> = ({ config }) => {
+    const dataMap = {
+      '{{industry}}': config.industry || '(Chưa cung cấp)',
+      '{{role}}': config.role || '(Chưa cung cấp)',
+      '{{products}}': formatList(config.products),
+      '{{style}}': config.style || '(Chưa cung cấp)',
+      '{{tone}}': config.tone || '(Chưa cung cấp)',
+      '{{language}}': config.language || '(Chưa cung cấp)',
+      '{{pronouns}}': config.pronouns || '(Chưa cung cấp)',
+      '{{customerPronouns}}': config.customerPronouns || '(Chưa cung cấp)',
+      '{{goal}}': config.goal || '(Chưa cung cấp)',
+      '{{processSteps}}': formatNumberedList(config.processSteps),
+      '{{conditions}}': formatList(config.conditions),
+      '{{conversation_history}}': `(Đây là nơi lịch sử trò chuyện với khách hàng sẽ được chèn vào. Ví dụ:)\n\n[10:30:00] User: giá bên em như thế nào?`,
+      '{{document_context}}': formatDocumentContext(),
+    };
+
+    if (!config.promptTemplate || config.promptTemplate.length === 0) {
+      return "### Chưa có cấu hình prompt\n\nVui lòng cấu hình ở tab 'Cấu hình Prompt'.";
+    }
+
+    const finalPrompt = config.promptTemplate.map(block => {
+      let content = block.content;
+      for (const [key, value] of Object.entries(dataMap)) {
+        content = content.replace(new RegExp(key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g'), String(value));
+      }
+      return `### ${block.title.toUpperCase()}\n\n${content}`;
+    }).join('\n\n---\n\n');
+
+    return finalPrompt;
+  };
+
+  const previewContent = generatePreviewPrompt();
+
   return (
-    <div className="max-h-[70vh] overflow-y-auto p-1">
-      <Section title="Thông tin cơ bản">
-        <Detail label="Lĩnh vực / Ngành nghề" value={config.industry} />
-        <Detail label="Vai trò của AI" value={config.role} />
-        <div className="mt-4">
-          <ListDetail label="Danh sách sản phẩm / dịch vụ" items={config.products} />
-        </div>
-      </Section>
-
-      <Section title="Phong cách & Tông giọng">
-        <Detail label="Phong cách trả lời" value={config.style} />
-        <Detail label="Tông giọng trả lời" value={config.tone} />
-        <Detail label="Ngôn ngữ trả lời" value={config.language} />
-        <Detail label="Page xưng hô là" value={config.pronouns} />
-        <Detail label="KH xưng hô là" value={config.customerPronouns} />
-        <Detail label="Mục tiêu trò chuyện" value={config.goal} />
-      </Section>
-
-      <Section title="Quy trình và Điều kiện">
-        <div className="mb-4">
-          <ListDetail label="Quy trình tư vấn" items={config.processSteps} prefix="Bước" />
-        </div>
-        <div>
-          <ListDetail label="Điều kiện bắt buộc" items={config.conditions} prefix="Điều kiện" />
-        </div>
-      </Section>
+    <div className="prose prose-sm max-w-none prose-slate rounded-lg border bg-slate-50 p-4 h-[60vh] overflow-y-auto">
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+        {previewContent}
+      </ReactMarkdown>
     </div>
   );
 };
