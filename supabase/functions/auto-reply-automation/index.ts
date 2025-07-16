@@ -63,12 +63,12 @@ serve(async (req) => {
       });
     }
 
-    // 4. Kích hoạt AI cho mỗi cuộc trò chuyện hợp lệ
+    // 4. Kích hoạt AI cho mỗi cuộc trò chuyện hợp lệ, truyền toàn bộ đối tượng convo
     for (const convo of conversationsToProcess) {
       try {
         // Không cần `await` để các worker có thể chạy song song
         supabaseAdmin.functions.invoke('auto-reply-worker', {
-          body: { conversationId: convo.id },
+          body: { conversation: convo }, // SỬA LỖI: Gửi toàn bộ đối tượng conversation
         });
       } catch (e) {
         console.error(`Không thể kích hoạt worker cho cuộc trò chuyện ${convo.id}:`, e.message);

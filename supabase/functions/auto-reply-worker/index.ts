@@ -70,9 +70,12 @@ serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
 
-  const { conversationId } = await req.json();
+  // SỬA LỖI: Nhận toàn bộ đối tượng conversation thay vì chỉ ID
+  const { conversation } = await req.json();
+  const conversationId = conversation?.id;
+
   if (!conversationId) {
-    return new Response(JSON.stringify({ error: "Missing conversationId" }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ error: "Missing conversation object or ID" }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 
   const logToDb = async (status, details, system_prompt = null) => {
@@ -129,15 +132,14 @@ serve(async (req) => {
         }
 
         if (match) {
+          const currentLabels = conversation.labels || [];
+          const newLabels = currentLabels.filter((l) => l !== AI_STAR_LABEL_NAME);
+
           if (rule.action_type === 'stop_auto_reply') {
-            const { data: convoDetails } = await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'get_conversation_details', settings: chatwootSettings, conversationId: conversationId } });
-            const newLabels = (convoDetails?.labels || []).filter((l: string) => l !== AI_STAR_LABEL_NAME);
             await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'update_labels', settings: chatwootSettings, conversationId: conversationId, labels: newLabels } });
             await logToDb('success', `Dừng trả lời tự động do quy tắc #${rule.id}.`);
           } else if (rule.action_type === 'reply_with_content' && rule.reply_content) {
             await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'send_message', settings: chatwootSettings, conversationId: conversationId, content: rule.reply_content } });
-            const { data: convoDetails } = await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'get_conversation_details', settings: chatwootSettings, conversationId: conversationId } });
-            const newLabels = (convoDetails?.labels || []).filter((l: string) => l !== AI_STAR_LABEL_NAME);
             await Promise.all([
               supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'update_labels', settings: chatwootSettings, conversationId: conversationId, labels: newLabels } }),
               supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'mark_as_read', settings: chatwootSettings, conversationId: conversationId } })
@@ -184,8 +186,10 @@ serve(async (req) => {
     const aiReply = proxyResponse.choices[0].message.content;
 
     await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'send_message', settings: chatwootSettings, conversationId: conversationId, content: aiReply } });
-    const { data: convoDetails } = await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'get_conversation_details', settings: chatwootSettings, conversationId: conversationId } });
-    const newLabels = (convoDetails?.labels || []).filter((l: string) => l !== AI_STAR_LABEL_NAME);
+    
+    // SỬA LỖI: Sử dụng danh sách tag đã có, không gọi lại API
+    const currentLabels = conversation.labels || [];
+    const newLabels = currentLabels.filter((l) => l !== AI_STAR_LABEL_NAME);
     
     await Promise.all([
         supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'update_labels', settings: chatwootSettings, conversationId: conversationId, labels: newLabels } }),
