@@ -219,8 +219,29 @@ serve(async (req) => {
 
   } catch (e) {
     console.error(`Failed to process conversation ${conversationId}:`, e.message);
-    await sendErrorNote(e.message);
-    await logToDb('error', e.message, systemPrompt);
+    
+    // --- START: NEW ERROR HANDLING LOGIC ---
+    try {
+      // 1. Quarantine the conversation by removing the trigger tag
+      const currentLabels = conversation.labels || [];
+      const newLabels = currentLabels.filter((l) => l !== AI_STAR_LABEL_NAME);
+      await supabaseAdmin.functions.invoke('chatwoot-proxy', { 
+        body: { 
+          action: 'update_labels', 
+          settings: chatwootSettings, 
+          conversationId: conversationId, 
+          labels: newLabels 
+        } 
+      });
+
+      // 2. Report the error
+      await sendErrorNote(e.message);
+      await logToDb('error', e.message, systemPrompt);
+    } catch (cleanupError) {
+      console.error(`CRITICAL: Failed to cleanup conversation ${conversationId} after an error:`, cleanupError.message);
+    }
+    // --- END: NEW ERROR HANDLING LOGIC ---
+
     return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } finally {
     await supabaseAdmin.from('ai_typing_status').upsert({ conversation_id: conversationId, is_typing: false });
