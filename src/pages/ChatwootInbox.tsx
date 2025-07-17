@@ -61,8 +61,13 @@ const ChatwootInbox = () => {
   const [hasNewLog, setHasNewLog] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const selectedConversationIdRef = useRef<number | null>(null);
   const POLLING_INTERVAL = 15000;
   const phoneRegex = /(0[3|5|7|8|9][0-9]{8})\b/;
+
+  useEffect(() => {
+    selectedConversationIdRef.current = selectedConversation?.id ?? null;
+  }, [selectedConversation]);
 
   const handleClearFilters = () => {
     setFilters({
@@ -190,7 +195,7 @@ const ChatwootInbox = () => {
       
       setConversations(prevConversations => {
         const updatedList = enrichedConversations.map(serverConvo => {
-          if (selectedConversation && serverConvo.id === selectedConversation.id) {
+          if (selectedConversationIdRef.current && serverConvo.id === selectedConversationIdRef.current) {
             return { ...serverConvo, unread_count: 0 };
           }
           return serverConvo;
@@ -201,7 +206,7 @@ const ChatwootInbox = () => {
       await syncConversationsToDB(enrichedConversations);
     } catch (err: any) { console.error("Lỗi polling cuộc trò chuyện:", err);
     } finally { if (isInitialLoad) setLoadingConversations(false); }
-  }, [settings, isAutoReplyEnabled, aiStarLabelId, selectedConversation]);
+  }, [settings, isAutoReplyEnabled, aiStarLabelId]);
 
   const fetchMessages = async (convoId: number) => {
     try {
