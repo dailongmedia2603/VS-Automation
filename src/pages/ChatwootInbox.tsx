@@ -33,7 +33,6 @@ const getInitials = (name?: string) => {
   return name.substring(0, 2).toUpperCase();
 };
 
-const AI_STAR_LABEL_NAME = 'AI Star';
 const AI_CARE_LABEL = 'AI chăm';
 
 const ChatwootInbox = () => {
