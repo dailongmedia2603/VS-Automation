@@ -490,6 +490,7 @@ const ChatwootInbox = () => {
     const lastMessage = convo.messages?.[0];
     const lastMessageContent = (lastMessage && lastMessage.message_type !== 2) ? (lastMessage.content || '[Media]') : '';
     const isLastMessageIncoming = lastMessage?.message_type === 0;
+    const isAiTyping = aiTypingStatus[convo.id];
 
     return (
       <div key={convo.id} onClick={() => handleSelectConversation(convo)} className={cn("p-2.5 flex space-x-3 cursor-pointer rounded-lg", selectedConversation?.id === convo.id && "bg-blue-100")}>
@@ -497,17 +498,28 @@ const ChatwootInbox = () => {
         <div className="flex-1 overflow-hidden">
           <div className="flex justify-between items-center"><p className="font-semibold truncate text-sm">{convo.meta.sender.name}</p><p className="text-xs text-muted-foreground whitespace-nowrap">{format(new Date(convo.last_activity_at * 1000), 'HH:mm')}</p></div>
           <div className="flex justify-between items-start mt-1">
-            <p className={cn(
-              "text-sm truncate flex items-center",
-              convo.unread_count > 0
-                ? "text-black font-bold"
-                : isLastMessageIncoming
-                  ? "text-red-600"
-                  : "text-muted-foreground"
-            )}>
-              {!isLastMessageIncoming && <CornerDownLeft className="h-4 w-4 mr-1 flex-shrink-0" />}
-              {lastMessageContent}
-            </p>
+            {isAiTyping ? (
+              <div className="flex items-center gap-2 text-sm text-blue-600 font-medium">
+                <Bot className="h-4 w-4 flex-shrink-0" />
+                <div className="flex items-center space-x-1">
+                  <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-pulse" style={{ animationDelay: '0s' }}></span>
+                  <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></span>
+                  <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></span>
+                </div>
+              </div>
+            ) : (
+              <p className={cn(
+                "text-sm truncate flex items-center",
+                convo.unread_count > 0
+                  ? "text-black font-bold"
+                  : isLastMessageIncoming
+                    ? "text-red-600"
+                    : "text-muted-foreground"
+              )}>
+                {!isLastMessageIncoming && <CornerDownLeft className="h-4 w-4 mr-1 flex-shrink-0" />}
+                {lastMessageContent}
+              </p>
+            )}
             <div className="flex items-center gap-2 flex-shrink-0 ml-2">
               {convo.meta.sender.phone_number && <Phone className="h-4 w-4 text-green-600" strokeWidth={2} />}
               {convo.unread_count > 0 && <Badge variant="destructive">{convo.unread_count}</Badge>}
