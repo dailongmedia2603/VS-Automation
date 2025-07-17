@@ -7,8 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const AI_STAR_LABEL_NAME = 'AI Star';
-
 const formatMessage = (msg) => {
     const sender = msg.message_type === 1 ? 'Agent' : 'User';
     const timestamp = new Date(msg.created_at * 1000).toLocaleString('vi-VN');
@@ -70,9 +68,9 @@ serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
 
-  const { conversationId, labels } = await req.json();
-  if (!conversationId || !labels) {
-    return new Response(JSON.stringify({ error: "Missing conversationId or labels" }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  const { conversationId } = await req.json();
+  if (!conversationId) {
+    return new Response(JSON.stringify({ error: "Missing conversationId" }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 
   const logToDb = async (status, details, system_prompt = null) => {
@@ -170,14 +168,14 @@ serve(async (req) => {
       body: { action: 'send_message', settings: chatwootSettings, conversationId: conversationId, content: aiReply }
     });
     if (sendMessageError) throw new Error(`Lỗi gửi tin nhắn qua Chatwoot: ${(await sendMessageError.context.json()).error || sendMessageError.message}`);
-
-    const currentLabels = labels || [];
-    const newLabels = currentLabels.filter((label: string) => label !== AI_STAR_LABEL_NAME);
     
-    await Promise.all([
-        supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'update_labels', settings: chatwootSettings, conversationId: conversationId, labels: newLabels } }),
-        supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'mark_as_read', settings: chatwootSettings, conversationId: conversationId } })
-    ]);
+    await supabaseAdmin.functions.invoke('chatwoot-proxy', {
+      body: {
+        action: 'mark_as_read',
+        settings: chatwootSettings,
+        conversationId: conversationId,
+      },
+    });
 
     await logToDb('success', `AI đã trả lời thành công với nội dung: "${aiReply.substring(0, 100)}..."`, systemPrompt);
 

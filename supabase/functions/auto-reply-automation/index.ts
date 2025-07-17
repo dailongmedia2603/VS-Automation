@@ -7,8 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const AI_STAR_LABEL_NAME = 'AI Star';
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -52,13 +50,11 @@ serve(async (req) => {
 
     const allConversations = chatwootData.data.payload || [];
 
-    // 3. Lọc thông minh dựa trên dữ liệu "sống"
-    const conversationsToProcess = allConversations.filter(convo => 
-        convo.unread_count > 0 && convo.labels.includes(AI_STAR_LABEL_NAME)
-    );
+    // 3. Lọc các cuộc trò chuyện chưa đọc để xử lý
+    const conversationsToProcess = allConversations.filter(convo => convo.unread_count > 0);
 
     if (conversationsToProcess.length === 0) {
-      return new Response(JSON.stringify({ message: "Không có cuộc trò chuyện chưa đọc nào có thẻ AI Star để xử lý." }), {
+      return new Response(JSON.stringify({ message: "Không có cuộc trò chuyện nào chưa đọc để xử lý." }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200,
       });
     }
@@ -68,7 +64,7 @@ serve(async (req) => {
       try {
         // Không cần `await` để các worker có thể chạy song song
         supabaseAdmin.functions.invoke('auto-reply-worker', {
-          body: { conversationId: convo.id, labels: convo.labels },
+          body: { conversationId: convo.id },
         });
       } catch (e) {
         console.error(`Không thể kích hoạt worker cho cuộc trò chuyện ${convo.id}:`, e.message);
