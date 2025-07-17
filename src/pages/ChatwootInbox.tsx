@@ -133,7 +133,7 @@ const ChatwootInbox = () => {
       const { data: chatwootData, error: functionError } = await supabase.functions.invoke('chatwoot-proxy', { body: { action: 'list_conversations', settings }, });
       if (functionError) throw new Error((await functionError.context.json()).error || functionError.message);
       if (chatwootData.error) throw new Error(chatwootData.error);
-      let conversationsFromServer = chatwootData.data.payload || [];
+      const conversationsFromServer = chatwootData.data.payload || [];
       if (conversationsFromServer.length === 0) {
           setConversations([]);
           if (isInitialLoad) setLoadingConversations(false);
@@ -159,29 +159,6 @@ const ChatwootInbox = () => {
       });
       await Promise.all(previewFixPromises);
 
-      if (isAutoReplyEnabled && aiStarLabelId) {
-        const conversationsToTag = conversationsFromServer.filter(
-          (convo: Conversation) => !convo.labels.includes(AI_STAR_LABEL_NAME) && convo.unread_count > 0
-        );
-
-        if (conversationsToTag.length > 0) {
-          await Promise.all(
-            conversationsToTag.map(async (convo: Conversation) => {
-              const newLabels = [...convo.labels, AI_STAR_LABEL_NAME];
-              await supabase.functions.invoke('chatwoot-proxy', {
-                body: { action: 'update_labels', settings, conversationId: convo.id, labels: newLabels },
-              });
-              await supabase.from('chatwoot_conversation_labels').upsert({ conversation_id: convo.id, label_id: aiStarLabelId });
-            })
-          );
-          conversationsFromServer = conversationsFromServer.map((convo: Conversation) =>
-            conversationsToTag.some((taggedConvo: Conversation) => taggedConvo.id === convo.id)
-              ? { ...convo, labels: [...convo.labels, AI_STAR_LABEL_NAME] }
-              : convo
-          );
-        }
-      }
-
       const contactIds = conversationsFromServer.map((c: Conversation) => c.meta.sender.id);
       const { data: contactsFromDB } = await supabase.from('chatwoot_contacts').select('id, phone_number').in('id', contactIds);
       const phoneMap = new Map(contactsFromDB?.map(c => [c.id, c.phone_number]));
@@ -206,7 +183,7 @@ const ChatwootInbox = () => {
       await syncConversationsToDB(enrichedConversations);
     } catch (err: any) { console.error("Lỗi polling cuộc trò chuyện:", err);
     } finally { if (isInitialLoad) setLoadingConversations(false); }
-  }, [settings, isAutoReplyEnabled, aiStarLabelId]);
+  }, [settings]);
 
   const fetchMessages = async (convoId: number) => {
     try {
