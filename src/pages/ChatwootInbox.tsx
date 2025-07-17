@@ -62,7 +62,7 @@ const ChatwootInbox = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const selectedConversationIdRef = useRef<number | null>(null);
-  const POLLING_INTERVAL = 15000;
+  const POLLING_INTERVAL = 30000;
   const phoneRegex = /(0[3|5|7|8|9][0-9]{8})\b/;
 
   useEffect(() => {
