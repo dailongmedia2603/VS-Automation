@@ -96,9 +96,11 @@ serve(async (req) => {
 
           case 'mark_as_read':
             if (!conversationId) throw new Error("Conversation ID is required.");
-            endpoint = `/api/v1/accounts/${settings.accountId}/conversations/${conversationId}/update_last_seen`;
-            method = 'POST';
-            body = JSON.stringify({});
+            // Thay vì gọi /update_last_seen, chúng ta gọi GET chi tiết cuộc trò chuyện.
+            // Tác dụng phụ của việc này là Chatwoot sẽ tự động cập nhật agent_last_seen_at.
+            endpoint = `/api/v1/accounts/${settings.accountId}/conversations/${conversationId}`;
+            method = 'GET';
+            body = null;
             break;
 
           case 'update_labels':
