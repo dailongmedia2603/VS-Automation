@@ -369,6 +369,22 @@ const ChatwootInbox = () => {
 
         setMessages(prev => [...prev, responseData]);
         await syncMessagesToDB([responseData], selectedConversation.id);
+
+        // Cập nhật danh sách cuộc trò chuyện ngay lập tức
+        setConversations(prevConvos => {
+            const convoToUpdate = prevConvos.find(c => c.id === selectedConversation.id);
+            if (!convoToUpdate) return prevConvos;
+
+            const updatedConvo = {
+                ...convoToUpdate,
+                messages: [responseData, ...convoToUpdate.messages.slice(1)],
+                last_activity_at: responseData.created_at,
+            };
+
+            const otherConvos = prevConvos.filter(c => c.id !== selectedConversation.id);
+            return [updatedConvo, ...otherConvos];
+        });
+
         setNewMessage('');
         setAttachment(null);
         dismissToast(toastId);
