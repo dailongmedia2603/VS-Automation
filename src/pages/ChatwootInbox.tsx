@@ -187,11 +187,21 @@ const ChatwootInbox = () => {
           }
           return convo;
       });
-      setConversations(enrichedConversations);
+      
+      setConversations(prevConversations => {
+        const updatedList = enrichedConversations.map(serverConvo => {
+          if (selectedConversation && serverConvo.id === selectedConversation.id) {
+            return { ...serverConvo, unread_count: 0 };
+          }
+          return serverConvo;
+        });
+        return updatedList;
+      });
+
       await syncConversationsToDB(enrichedConversations);
     } catch (err: any) { console.error("Lỗi polling cuộc trò chuyện:", err);
     } finally { if (isInitialLoad) setLoadingConversations(false); }
-  }, [settings, isAutoReplyEnabled, aiStarLabelId]);
+  }, [settings, isAutoReplyEnabled, aiStarLabelId, selectedConversation]);
 
   const fetchMessages = async (convoId: number) => {
     try {
