@@ -317,7 +317,13 @@ const ChatwootInbox = () => {
     } finally { setLoadingMessages(false); }
     if (conversation.unread_count > 0) {
       setConversations(convos => convos.map(c => c.id === conversation.id ? { ...c, unread_count: 0 } : c));
-      supabase.functions.invoke('chatwoot-proxy', { body: { action: 'mark_as_read', settings, conversationId: conversation.id }, }).catch((err: any) => console.error("Lỗi ngầm khi đánh dấu đã đọc:", err.message));
+      supabase.functions.invoke('chatwoot-proxy', {
+        body: {
+          action: 'mark_as_read',
+          settings,
+          conversationId: conversation.id,
+        },
+      }).catch((err: any) => console.error("Lỗi ngầm khi đánh dấu đã đọc:", err.message));
     }
   };
 
