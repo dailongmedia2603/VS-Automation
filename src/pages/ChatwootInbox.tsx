@@ -116,8 +116,8 @@ const ChatwootInbox = () => {
   const syncMessagesToDB = async (msgs: Message[], convoId: number) => {
     if (msgs.length === 0) return;
     
-    // Lọc để chỉ bao gồm các tin nhắn thực tế (loại 0: đến, loại 1: đi)
-    const actualMessages = msgs.filter(m => m.message_type === 0 || m.message_type === 1);
+    // Lọc để chỉ bao gồm các tin nhắn công khai thực tế (loại 0: đến, loại 1: đi và không riêng tư)
+    const actualMessages = msgs.filter(m => (m.message_type === 0 || m.message_type === 1) && !m.private);
 
     if (actualMessages.length === 0) return;
 
