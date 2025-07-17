@@ -55,8 +55,6 @@ const ChatwootInbox = () => {
     selectedLabels: [],
     seenNotReplied: false,
   });
-  const [isAutoReplyEnabled, setIsAutoReplyEnabled] = useState(false);
-  const [aiStarLabelId, setAiStarLabelId] = useState<number | null>(null);
   const [aiTypingStatus, setAiTypingStatus] = useState<Record<number, boolean>>({});
   const [hasNewLog, setHasNewLog] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -178,15 +176,13 @@ const ChatwootInbox = () => {
           return convo;
       });
       
-      setConversations(prevConversations => {
-        const updatedList = enrichedConversations.map(serverConvo => {
-          if (selectedConversationIdRef.current && serverConvo.id === selectedConversationIdRef.current) {
-            return { ...serverConvo, unread_count: 0 };
-          }
-          return serverConvo;
-        });
-        return updatedList;
+      const updatedList = enrichedConversations.map((serverConvo: Conversation) => {
+        if (selectedConversationIdRef.current && serverConvo.id === selectedConversationIdRef.current) {
+          return { ...serverConvo, unread_count: 0 };
+        }
+        return serverConvo;
       });
+      setConversations(updatedList);
 
       await syncConversationsToDB(enrichedConversations);
     } catch (err: any) { console.error("Lỗi polling cuộc trò chuyện:", err);
@@ -209,13 +205,6 @@ const ChatwootInbox = () => {
       const { data: labelsData, error: labelsError } = await supabase.from('chatwoot_labels').select('*').order('name', { ascending: true });
       if (!labelsError && labelsData) {
         setSuggestedLabels(labelsData);
-        const starLabel = labelsData.find(l => l.name === AI_STAR_LABEL_NAME);
-        if (starLabel) setAiStarLabelId(starLabel.id);
-      }
-
-      const { data: autoReplyData, error: autoReplyError } = await supabase.from('auto_reply_settings').select('config').eq('id', 1).single();
-      if (!autoReplyError && autoReplyData?.config && typeof autoReplyData.config === 'object') {
-        setIsAutoReplyEnabled((autoReplyData.config as { enabled?: boolean }).enabled || false);
       }
     };
 
