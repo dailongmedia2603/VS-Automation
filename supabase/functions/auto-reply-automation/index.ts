@@ -68,7 +68,7 @@ serve(async (req) => {
       try {
         // Không cần `await` để các worker có thể chạy song song
         supabaseAdmin.functions.invoke('auto-reply-worker', {
-          body: { conversationId: convo.id },
+          body: { conversationId: convo.id, labels: convo.labels },
         });
       } catch (e) {
         console.error(`Không thể kích hoạt worker cho cuộc trò chuyện ${convo.id}:`, e.message);

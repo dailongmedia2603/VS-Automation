@@ -70,9 +70,9 @@ serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
 
-  const { conversationId } = await req.json();
-  if (!conversationId) {
-    return new Response(JSON.stringify({ error: "Missing conversationId" }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  const { conversationId, labels } = await req.json();
+  if (!conversationId || !labels) {
+    return new Response(JSON.stringify({ error: "Missing conversationId or labels" }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 
   const logToDb = async (status, details, system_prompt = null) => {
@@ -171,8 +171,7 @@ serve(async (req) => {
     });
     if (sendMessageError) throw new Error(`Lỗi gửi tin nhắn qua Chatwoot: ${(await sendMessageError.context.json()).error || sendMessageError.message}`);
 
-    const { data: convoDetails } = await supabaseAdmin.functions.invoke('chatwoot-proxy', { body: { action: 'get_conversation_details', settings: chatwootSettings, conversationId: conversationId } });
-    const currentLabels = convoDetails?.labels || [];
+    const currentLabels = labels || [];
     const newLabels = currentLabels.filter((label: string) => label !== AI_STAR_LABEL_NAME);
     
     await Promise.all([
