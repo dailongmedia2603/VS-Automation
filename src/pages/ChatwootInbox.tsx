@@ -115,9 +115,17 @@ const ChatwootInbox = () => {
 
   const syncMessagesToDB = async (msgs: Message[], convoId: number) => {
     if (msgs.length === 0) return;
-    const messagesToUpsert = msgs.map(m => ({ id: m.id, conversation_id: convoId, content: m.content, message_type: m.message_type, is_private: m.private, sender_name: m.sender?.name, sender_thumbnail: m.sender?.thumbnail, created_at_chatwoot: new Date(m.created_at * 1000).toISOString(), }));
-    const attachmentsToUpsert = msgs.flatMap(m => m.attachments?.map(a => ({ id: a.id, message_id: m.id, file_type: a.file_type, data_url: a.data_url, })) || []);
+    
+    // Lọc để chỉ bao gồm các tin nhắn thực tế (loại 0: đến, loại 1: đi)
+    const actualMessages = msgs.filter(m => m.message_type === 0 || m.message_type === 1);
+
+    if (actualMessages.length === 0) return;
+
+    const messagesToUpsert = actualMessages.map(m => ({ id: m.id, conversation_id: convoId, content: m.content, message_type: m.message_type, is_private: m.private, sender_name: m.sender?.name, sender_thumbnail: m.sender?.thumbnail, created_at_chatwoot: new Date(m.created_at * 1000).toISOString(), }));
+    const attachmentsToUpsert = actualMessages.flatMap(m => m.attachments?.map(a => ({ id: a.id, message_id: m.id, file_type: a.file_type, data_url: a.data_url, })) || []);
+    
     await supabase.from('chatwoot_messages').upsert(messagesToUpsert, { onConflict: 'id' });
+    
     if (attachmentsToUpsert.length > 0) {
       await supabase.from('chatwoot_attachments').upsert(attachmentsToUpsert, { onConflict: 'id' });
     }
