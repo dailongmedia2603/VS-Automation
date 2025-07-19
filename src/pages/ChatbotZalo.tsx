@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { format, isSameDay } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import { Search, SendHorizonal, RefreshCw, Loader2, Bug, CornerDownLeft } from 'lucide-react';
+import { Search, SendHorizonal, RefreshCw, Loader2, Bug, CornerDownLeft, Image as ImageIcon, Paperclip, FileText, X } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import { ZaloDataDebugger } from '@/components/ZaloDataDebugger';
 import type { ZaloUser, ZaloConversation, ZaloMessageDb, ZaloMessage } from '@/types/zalo';
@@ -32,7 +32,10 @@ const ChatbotZalo = () => {
   const [newMessage, setNewMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [attachment, setAttachment] = useState<File | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const defaultAvatar = 'https://s120-ava-talk.zadn.vn/a/a/c/2/1/120/90898606938dd183dbf5c748e3dae52d.jpg';
   
   const [isDebugVisible, setIsDebugVisible] = useState(false);
@@ -184,49 +187,86 @@ const ChatbotZalo = () => {
     }
   };
 
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+        const file = event.target.files[0];
+        if (file.size > 25 * 1024 * 1024) { // 25MB limit
+            showError("Tệp quá lớn. Vui lòng chọn tệp nhỏ hơn 25MB.");
+            return;
+        }
+        setAttachment(file);
+    }
+    if (event.target) {
+        event.target.value = "";
+    }
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !selectedConversation) return;
+    if ((!newMessage.trim() && !attachment) || !selectedConversation) return;
+
     setSendingMessage(true);
     const content = newMessage.trim();
-    const conversationId = selectedConversation.threadId;
-    const conversationName = selectedConversation.name;
+    const currentAttachment = attachment;
+    
     setNewMessage('');
+    setAttachment(null);
+
     const tempId = Date.now();
     const tempMessage: ZaloMessage = {
         id: tempId,
         content: content,
-        imageUrl: null,
+        imageUrl: currentAttachment ? URL.createObjectURL(currentAttachment) : null,
         createdAt: new Date().toISOString(),
         isOutgoing: true,
     };
     setMessages(prev => [...prev, tempMessage]);
-    const { data: newMessageFromDb, error } = await supabase
-        .from('zalo_messages')
-        .insert({
-            threadId: conversationId,
-            message_content: content,
-            threadId_name: conversationName,
-            direction: 'out',
-        })
-        .select()
-        .single();
-    setSendingMessage(false);
-    if (error) {
-        showError("Gửi tin nhắn thất bại: " + error.message);
-        setMessages(prev => prev.filter(m => m.id !== tempId));
-    } else if (newMessageFromDb) {
-        setMessages(prev => prev.map(m => m.id === tempId ? {
-            id: newMessageFromDb.id,
-            content: newMessageFromDb.message_content,
-            imageUrl: newMessageFromDb.message_image,
-            createdAt: newMessageFromDb.created_at,
-            isOutgoing: newMessageFromDb.direction === 'out',
-        } : m));
-        
+
+    try {
+        let attachmentUrl: string | null = null;
+        if (currentAttachment) {
+            const filePath = `public/zalo-attachments/${user!.id}/${Date.now()}-${currentAttachment.name}`;
+            const { error: uploadError } = await supabase.storage
+                .from('zalo_attachments')
+                .upload(filePath, currentAttachment);
+
+            if (uploadError) throw uploadError;
+
+            const { data: { publicUrl } } = supabase.storage
+                .from('zalo_attachments')
+                .getPublicUrl(filePath);
+            
+            attachmentUrl = publicUrl;
+        }
+
+        const { data: newMessageFromDb, error } = await supabase
+            .from('zalo_messages')
+            .insert({
+                threadId: selectedConversation.threadId,
+                message_content: content || null,
+                message_image: attachmentUrl,
+                threadId_name: selectedConversation.name,
+                direction: 'out',
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        if (newMessageFromDb) {
+            setMessages(prev => prev.map(m => m.id === tempId ? {
+                id: newMessageFromDb.id,
+                content: newMessageFromDb.message_content,
+                imageUrl: newMessageFromDb.message_image,
+                createdAt: newMessageFromDb.created_at,
+                isOutgoing: newMessageFromDb.direction === 'out',
+            } : m));
+        }
+
         try {
           const payload = {
             content: content,
+            attachmentUrl: attachmentUrl,
             recipient: {
               id: selectedConversation.threadId,
               name: selectedConversation.name,
@@ -238,6 +278,15 @@ const ChatbotZalo = () => {
           await supabase.functions.invoke('n8n-zalo-webhook-proxy', { body: payload });
         } catch (webhookError: any) {
           console.error("Failed to trigger n8n webhook:", webhookError.message);
+        }
+
+    } catch (error: any) {
+        showError("Gửi tin nhắn thất bại: " + error.message);
+        setMessages(prev => prev.filter(m => m.id !== tempId));
+    } finally {
+        setSendingMessage(false);
+        if (tempMessage.imageUrl && tempMessage.imageUrl.startsWith('blob:')) {
+            URL.revokeObjectURL(tempMessage.imageUrl);
         }
     }
   };
@@ -288,6 +337,8 @@ const ChatbotZalo = () => {
 
   return (
     <div className="flex flex-col h-full bg-white">
+      <input type="file" ref={imageInputRef} onChange={handleFileSelect} className="hidden" accept="image/*" />
+      <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" />
       <div className="p-3 border-b flex items-center justify-between">
         <h2 className="text-lg font-bold">Hộp thư Zalo</h2>
         <Button variant="outline" onClick={() => setIsDebugVisible(!isDebugVisible)}>
@@ -375,12 +426,32 @@ const ChatbotZalo = () => {
                 <div ref={messagesEndRef} />
               </div>
               <footer className="p-2 border-t bg-white space-y-2">
-                <form onSubmit={handleSendMessage} className="relative">
-                  <Input placeholder="Nhập tin nhắn Zalo..." className="pr-12" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} disabled={sendingMessage} />
-                  <Button type="submit" size="icon" className="absolute right-1.5 top-1/2 -translate-y-1/2 h-8 w-9" disabled={sendingMessage}>
-                    {sendingMessage ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendHorizonal className="h-5 w-5" />}
+                {attachment && (
+                  <div className="px-3 py-2 bg-slate-100 rounded-lg flex items-center justify-between animate-in fade-in">
+                    <div className="flex items-center gap-2 text-sm overflow-hidden">
+                      <FileText className="h-4 w-4 text-slate-500 flex-shrink-0" />
+                      <span className="text-slate-700 truncate">{attachment.name}</span>
+                      <span className="text-slate-500 flex-shrink-0">({(attachment.size / 1024).toFixed(1)} KB)</span>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={() => setAttachment(null)}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+                <div className="flex items-center">
+                  <Button type="button" variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground" onClick={() => imageInputRef.current?.click()}>
+                      <ImageIcon className="h-5 w-5" />
                   </Button>
-                </form>
+                  <Button type="button" variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground" onClick={() => fileInputRef.current?.click()}>
+                      <Paperclip className="h-5 w-5" />
+                  </Button>
+                  <form onSubmit={handleSendMessage} className="relative flex-1">
+                    <Input placeholder="Nhập tin nhắn Zalo..." className="pr-12" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} disabled={sendingMessage} />
+                    <Button type="submit" size="icon" className="absolute right-1.5 top-1/2 -translate-y-1/2 h-8 w-9" disabled={sendingMessage || (!newMessage.trim() && !attachment)}>
+                      {sendingMessage ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendHorizonal className="h-5 w-5" />}
+                    </Button>
+                  </form>
+                </div>
               </footer>
             </>
           ) : (
