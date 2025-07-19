@@ -12,6 +12,7 @@ import TrainingChatbot from "./pages/TrainingChatbot";
 import Staff from "./pages/Staff";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
+import Integrations from "./pages/Integrations";
 import { AppLayout } from "./components/AppLayout";
 import { ApiSettingsProvider } from "@/contexts/ApiSettingsContext";
 import { ChatwootProvider } from "@/contexts/ChatwootContext";
@@ -42,6 +43,7 @@ const App = () => (
                     <Route path="/training-chatbot" element={<TrainingChatbot />} />
                     <Route path="/staff" element={<Staff />} />
                     <Route path="/chatbot-zalo" element={<ChatbotZalo />} />
+                    <Route path="/integrations" element={<Integrations />} />
                   </Route>
                 </Route>
                 <Route path="*" element={<NotFound />} />

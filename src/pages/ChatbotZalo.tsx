@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { type User } from '@supabase/supabase-js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -185,11 +186,13 @@ const ChatbotZalo = () => {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedConversation) return;
+
     setSendingMessage(true);
     const content = newMessage.trim();
     const conversationId = selectedConversation.threadId;
     const conversationName = selectedConversation.name;
     setNewMessage('');
+
     const tempId = Date.now();
     const tempMessage: ZaloMessage = {
         id: tempId,
@@ -199,6 +202,7 @@ const ChatbotZalo = () => {
         isOutgoing: true,
     };
     setMessages(prev => [...prev, tempMessage]);
+
     const { error } = await supabase
         .from('zalo_messages')
         .insert({
@@ -206,12 +210,31 @@ const ChatbotZalo = () => {
             message_content: content,
             threadId_name: conversationName,
         });
+
     setSendingMessage(false);
+
     if (error) {
         showError("Gửi tin nhắn thất bại: " + error.message);
         setMessages(prev => prev.filter(m => m.id !== tempId));
     } else {
         fetchZaloData();
+        // Trigger n8n webhook
+        try {
+          const payload = {
+            content: content,
+            recipient: {
+              id: selectedConversation.threadId,
+              name: selectedConversation.name,
+              avatar: selectedConversation.avatar,
+            },
+            status: 'đã xem',
+            sentAt: new Date().toISOString(),
+          };
+          await supabase.functions.invoke('n8n-zalo-webhook-proxy', { body: payload });
+        } catch (webhookError: any) {
+          console.error("Failed to trigger n8n webhook:", webhookError.message);
+          // Don't show error to user, as the message was sent successfully
+        }
     }
   };
 

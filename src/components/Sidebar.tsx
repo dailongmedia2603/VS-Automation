@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   ChevronLeft,
   MessageCircle,
+  Plug,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link, useLocation } from "react-router-dom";
@@ -42,6 +43,7 @@ const chatbotNavItems: NavItem[] = [
 
 const supportNavItems: NavItem[] = [
     { name: "Cài đặt API AI", icon: Settings, href: "/settings" },
+    { name: "Tích hợp", icon: Plug, href: "/integrations" },
 ];
 
 interface SidebarProps {
