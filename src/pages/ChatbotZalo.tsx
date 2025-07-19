@@ -80,24 +80,22 @@ const ChatbotZalo = () => {
 
       const usersMap = new Map<string, ZaloUser>();
       (usersData as ZaloUser[]).forEach(user => {
-        // Ensure userId is treated as a string for the map key
-        usersMap.set(String(user.userId), user);
+        // Trim whitespace from userId to ensure correct matching
+        usersMap.set(String(user.userId).trim(), user);
       });
 
       const conversationsMap = new Map<string, ZaloConversation>();
       (messagesData as ZaloMessageDb[]).forEach(msg => {
-        const threadIdStr = String(msg.threadId);
+        // Trim whitespace from threadId to ensure correct matching
+        const threadIdStr = String(msg.threadId).trim();
         if (!conversationsMap.has(threadIdStr) && msg.message_content) {
-          // Find the corresponding user for the conversation thread.
           const user = usersMap.get(threadIdStr);
           
           conversationsMap.set(threadIdStr, {
             threadId: threadIdStr,
-            // Use the user's display name or Zalo name if available, otherwise fallback to the name from the message.
             name: user?.displayName || user?.zaloName || msg.threadId_name,
-            // Use the user's avatar from zalo_user table. If not found or empty, it will be an empty string,
-            // causing the UI to show the fallback initials.
-            avatar: user?.avatar || '',
+            // Use the user's avatar. If not found, it will be undefined, and the fallback will be shown.
+            avatar: user?.avatar,
             lastMessage: msg.message_content,
             lastActivityAt: msg.created_at,
             unreadCount: 0, // No unread info from DB
