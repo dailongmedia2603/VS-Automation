@@ -88,11 +88,16 @@ const ChatbotZalo = () => {
       (messagesData as ZaloMessageDb[]).forEach(msg => {
         const threadIdStr = String(msg.threadId);
         if (!conversationsMap.has(threadIdStr) && msg.message_content) {
+          // Find the corresponding user for the conversation thread.
           const user = usersMap.get(threadIdStr);
+          
           conversationsMap.set(threadIdStr, {
             threadId: threadIdStr,
+            // Use the user's display name or Zalo name if available, otherwise fallback to the name from the message.
             name: user?.displayName || user?.zaloName || msg.threadId_name,
-            avatar: user?.avatar || `https://i.pravatar.cc/150?u=${threadIdStr}`,
+            // Use the user's avatar from zalo_user table. If not found or empty, it will be an empty string,
+            // causing the UI to show the fallback initials.
+            avatar: user?.avatar || '',
             lastMessage: msg.message_content,
             lastActivityAt: msg.created_at,
             unreadCount: 0, // No unread info from DB
