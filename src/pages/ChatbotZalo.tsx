@@ -118,40 +118,56 @@ const ChatbotZalo = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Realtime subscription for new messages
+  // Realtime subscription for ALL new messages
   useEffect(() => {
-    if (!selectedConversation) {
-      return;
-    }
-
-    const channel = supabase.channel(`zalo_messages_for_${selectedConversation.threadId}`)
+    const channel = supabase
+      .channel('zalo-messages-realtime-channel')
       .on(
         'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'zalo_messages',
-          filter: `threadId=eq.${selectedConversation.threadId}`,
-        },
+        { event: 'INSERT', schema: 'public', table: 'zalo_messages' },
         (payload) => {
           const newMessageDb = payload.new as ZaloMessageDb;
-          const formattedMessage: ZaloMessage = {
-            id: newMessageDb.id,
-            content: newMessageDb.message_content,
-            imageUrl: newMessageDb.message_image,
-            createdAt: newMessageDb.created_at,
-            isOutgoing: false, // Assume incoming for realtime
-          };
-          setMessages((prevMessages) => [...prevMessages, formattedMessage]);
+
+          // 1. Update the conversation list on the left
+          setConversations((prevConvos) => {
+            const convoIndex = prevConvos.findIndex(c => c.threadId === String(newMessageDb.threadId));
+            
+            if (convoIndex > -1) {
+              // Conversation exists, update it and move to top
+              const updatedConvo = {
+                ...prevConvos[convoIndex],
+                lastMessage: newMessageDb.message_content || '[Hình ảnh]',
+                lastActivityAt: newMessageDb.created_at,
+              };
+              const newConvos = [...prevConvos];
+              newConvos.splice(convoIndex, 1);
+              return [updatedConvo, ...newConvos];
+            } else {
+              // This is a new conversation, refetch the whole list to get user info
+              fetchZaloData();
+              return prevConvos;
+            }
+          });
+
+          // 2. Update the currently open chat window
+          if (selectedConversation && String(newMessageDb.threadId) === selectedConversation.threadId) {
+            const formattedMessage: ZaloMessage = {
+              id: newMessageDb.id,
+              content: newMessageDb.message_content,
+              imageUrl: newMessageDb.message_image,
+              createdAt: newMessageDb.created_at,
+              isOutgoing: false, // All realtime events are assumed to be incoming
+            };
+            setMessages((prevMessages) => [...prevMessages, formattedMessage]);
+          }
         }
       )
       .subscribe();
 
-    // Cleanup function to remove the subscription when the component unmounts or conversation changes
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [selectedConversation]);
+  }, [selectedConversation, fetchZaloData]);
 
   const handleSelectConversation = async (conversation: ZaloConversation) => {
     setSelectedConversation(conversation);
@@ -185,31 +201,43 @@ const ChatbotZalo = () => {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedConversation) return;
+
     setSendingMessage(true);
+    const content = newMessage.trim();
+    const conversationId = selectedConversation.threadId;
+    const conversationName = selectedConversation.name;
+    setNewMessage('');
+
+    // Optimistic UI update for outgoing message
+    const tempId = Date.now();
     const tempMessage: ZaloMessage = {
-        id: Date.now(),
-        content: newMessage.trim(),
+        id: tempId,
+        content: content,
         imageUrl: null,
         createdAt: new Date().toISOString(),
         isOutgoing: true,
     };
-    // Don't add to local state immediately, let the realtime subscription handle it for consistency
-    // setMessages(prev => [...prev, tempMessage]); 
-    setNewMessage('');
+    setMessages(prev => [...prev, tempMessage]);
+
     const { error } = await supabase
         .from('zalo_messages')
         .insert({
-            threadId: selectedConversation.threadId,
-            message_content: tempMessage.content,
-            threadId_name: selectedConversation.name,
+            threadId: conversationId,
+            message_content: content,
+            threadId_name: conversationName,
         });
+
+    setSendingMessage(false);
+
     if (error) {
         showError("Gửi tin nhắn thất bại: " + error.message);
+        // Rollback optimistic update on error
+        setMessages(prev => prev.filter(m => m.id !== tempId));
     } else {
-        // The realtime subscription will catch this insert and update the UI
-        fetchZaloData(); // Refresh conversation list to show new last message
+        // The insert was successful. The realtime subscription will handle incoming messages.
+        // We just need to refresh the conversation list to update its order.
+        fetchZaloData();
     }
-    setSendingMessage(false);
   };
 
   const groupedMessages = useMemo(() => {
