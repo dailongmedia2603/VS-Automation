@@ -53,45 +53,16 @@ const ChatbotZalo = () => {
     }
     if (isInitialLoad) setLoadingConversations(true);
     try {
-      const fetchAllUsers = async () => {
-        const PAGE_SIZE = 1000;
-        let allUsers: ZaloUser[] = [];
-        let page = 0;
-        let hasMore = true;
-        while (hasMore) {
-          const from = page * PAGE_SIZE;
-          const to = from + PAGE_SIZE - 1;
-          const { data: users, error } = await supabase
-            .from('zalo_user')
-            .select('userId::text, displayName, zaloName, avatar')
-            .range(from, to);
-          if (error) throw error;
-          if (users && users.length > 0) {
-            allUsers = allUsers.concat(users);
-            page++;
-            if (users.length < PAGE_SIZE) hasMore = false;
-          } else {
-            hasMore = false;
-          }
-        }
-        return allUsers;
-      };
-
-      const [usersData, messagesResponse, seenStatusesResponse] = await Promise.all([
-        fetchAllUsers(),
-        supabase.from('zalo_messages').select('id, threadId::text, message_content, message_image, created_at, threadId_name').order('created_at', { ascending: false }),
+      const [conversationsResponse, seenStatusesResponse] = await Promise.all([
+        supabase.rpc('get_zalo_conversations'),
         supabase.from('zalo_conversation_seen_status').select('conversation_thread_id, last_seen_at').eq('user_id', user.id)
       ]);
 
-      if (messagesResponse.error) throw messagesResponse.error;
+      if (conversationsResponse.error) throw conversationsResponse.error;
       if (seenStatusesResponse.error) throw seenStatusesResponse.error;
 
-      const messagesData = messagesResponse.data as ZaloMessageDb[];
+      const conversationsData = conversationsResponse.data;
       const seenStatuses = seenStatusesResponse.data;
-
-      const usersMap = new Map<string, ZaloUser>();
-      usersData.forEach(u => usersMap.set(u.userId.trim(), u));
-      setDebugUsersMap(usersMap);
 
       const seenMap = new Map<string, number>();
       if (seenStatuses) {
@@ -100,34 +71,17 @@ const ChatbotZalo = () => {
         });
       }
 
-      const conversationsMap = new Map<string, ZaloConversation>();
-      messagesData.forEach(msg => {
-        const threadIdStr = msg.threadId.trim();
-        if (!conversationsMap.has(threadIdStr)) {
-          const userDetails = usersMap.get(threadIdStr);
-          let lastMessageContent = msg.message_content || (msg.message_image ? '[Hình ảnh]' : '');
-          
-          if (lastMessageContent) {
-            const lastSeenTimestamp = seenMap.get(threadIdStr) || 0;
-            const lastMessageTimestamp = new Date(msg.created_at).getTime();
-            const isUnread = lastMessageTimestamp > lastSeenTimestamp;
-
-            conversationsMap.set(threadIdStr, {
-              threadId: threadIdStr,
-              name: userDetails?.displayName || userDetails?.zaloName || msg.threadId_name || 'Unknown User',
-              avatar: userDetails?.avatar,
-              lastMessage: lastMessageContent,
-              lastActivityAt: msg.created_at,
-              unreadCount: isUnread ? 1 : 0,
-            });
-          }
-        }
+      const finalConversations = conversationsData.map((convo: any) => {
+        const lastSeenTimestamp = seenMap.get(convo.threadId) || 0;
+        const lastMessageTimestamp = new Date(convo.lastActivityAt).getTime();
+        const isUnread = lastMessageTimestamp > lastSeenTimestamp;
+        return {
+          ...convo,
+          unreadCount: isUnread ? 1 : 0,
+        };
       });
 
-      const sortedConversations = Array.from(conversationsMap.values())
-        .sort((a, b) => new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime());
-
-      setConversations(sortedConversations);
+      setConversations(finalConversations);
 
     } catch (error: any) {
       console.error("Error fetching Zalo data:", error);
