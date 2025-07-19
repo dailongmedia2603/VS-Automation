@@ -61,6 +61,7 @@ const ChatbotZalo = () => {
   const [sendingMessage, setSendingMessage] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const defaultAvatar = 'https://s120-ava-talk.zadn.vn/a/a/c/2/1/120/90898606938dd183dbf5c748e3dae52d.jpg';
 
   const fetchZaloData = useCallback(async () => {
     setLoadingConversations(true);
@@ -214,7 +215,10 @@ const ChatbotZalo = () => {
 
   const renderConversationItem = (convo: ZaloConversation) => (
     <div key={convo.threadId} onClick={() => handleSelectConversation(convo)} className={cn("p-2.5 flex space-x-3 cursor-pointer rounded-lg", selectedConversation?.threadId === convo.threadId && "bg-blue-100")}>
-      <Avatar className="h-12 w-12"><AvatarImage src={convo.avatar} /><AvatarFallback>{getInitials(convo.name)}</AvatarFallback></Avatar>
+      <Avatar className="h-12 w-12">
+        <AvatarImage src={convo.avatar || defaultAvatar} />
+        <AvatarFallback>{getInitials(convo.name)}</AvatarFallback>
+      </Avatar>
       <div className="flex-1 overflow-hidden">
         <div className="flex justify-between items-center"><p className="font-semibold truncate text-sm">{convo.name}</p><p className="text-xs text-muted-foreground whitespace-nowrap">{format(new Date(convo.lastActivityAt), 'HH:mm')}</p></div>
         <div className="flex justify-between items-start mt-1">
@@ -254,7 +258,7 @@ const ChatbotZalo = () => {
             <header className="p-3 border-b bg-white flex items-center justify-between shadow-sm">
               <div className="flex items-center space-x-3">
                 <Avatar>
-                  <AvatarImage src={selectedConversation.avatar} />
+                  <AvatarImage src={selectedConversation.avatar || defaultAvatar} />
                   <AvatarFallback>{getInitials(selectedConversation.name)}</AvatarFallback>
                 </Avatar>
                 <div><h3 className="font-bold">{selectedConversation.name}</h3><p className="text-xs text-muted-foreground">Online</p></div>
@@ -274,7 +278,12 @@ const ChatbotZalo = () => {
                   const msg = item.data;
                   return (
                     <div key={msg.id} className={cn("flex items-start gap-3", msg.isOutgoing && "justify-end")}>
-                      {!msg.isOutgoing && <Avatar className="h-8 w-8"><AvatarImage src={selectedConversation.avatar} /><AvatarFallback>{getInitials(selectedConversation.name)}</AvatarFallback></Avatar>}
+                      {!msg.isOutgoing && (
+                        <Avatar className="h-8 w-8">
+                          <AvatarImage src={selectedConversation.avatar || defaultAvatar} />
+                          <AvatarFallback>{getInitials(selectedConversation.name)}</AvatarFallback>
+                        </Avatar>
+                      )}
                       <div className={cn("rounded-2xl px-3 py-2 max-w-sm md:max-w-md break-words shadow-sm", msg.isOutgoing ? 'bg-blue-500 text-white' : 'bg-white text-gray-800')}>
                         <p className="whitespace-pre-wrap">{msg.content}</p>
                       </div>
