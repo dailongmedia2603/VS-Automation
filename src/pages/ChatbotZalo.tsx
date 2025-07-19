@@ -34,9 +34,10 @@ const ChatbotZalo = () => {
   
   const [isDebugVisible, setIsDebugVisible] = useState(false);
   const [debugUsersMap, setDebugUsersMap] = useState<Map<string, ZaloUser>>(new Map());
+  const POLLING_INTERVAL = 5000; // Poll every 5 seconds
 
-  const fetchZaloData = useCallback(async () => {
-    setLoadingConversations(true);
+  const fetchZaloData = useCallback(async (isInitialLoad = false) => {
+    if (isInitialLoad) setLoadingConversations(true);
     try {
       const fetchAllUsers = async () => {
         const PAGE_SIZE = 1000;
@@ -104,70 +105,69 @@ const ChatbotZalo = () => {
 
     } catch (error: any) {
       console.error("Error fetching Zalo data:", error);
-      showError("Lỗi tải dữ liệu Zalo: " + error.message);
+      if (isInitialLoad) showError("Lỗi tải dữ liệu Zalo: " + error.message);
     } finally {
-      setLoadingConversations(false);
+      if (isInitialLoad) setLoadingConversations(false);
     }
   }, []);
 
+  const fetchMessagesForSelectedConvo = useCallback(async () => {
+    if (!selectedConversation) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('zalo_messages')
+        .select('id, message_content, created_at, message_image')
+        .eq('threadId', selectedConversation.threadId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      const formattedMessages: ZaloMessage[] = data.map(msg => ({
+        id: msg.id,
+        content: msg.message_content,
+        imageUrl: msg.message_image,
+        createdAt: msg.created_at,
+        isOutgoing: false, // Known issue: Cannot determine direction from DB
+      }));
+
+      setMessages(currentMessages => {
+        const optimisticMessages = currentMessages.filter(m => m.isOutgoing);
+        const dbMessageIds = new Set(formattedMessages.map(m => m.id));
+        const nonReplacedOptimistic = optimisticMessages.filter(m => !dbMessageIds.has(m.id));
+        
+        const newCombined = [...formattedMessages, ...nonReplacedOptimistic];
+        
+        if (newCombined.length !== currentMessages.length || 
+            newCombined.some((msg, i) => msg.id !== currentMessages[i]?.id)) {
+          return newCombined;
+        }
+        return currentMessages;
+      });
+
+    } catch (error: any) {
+      console.error(`Error polling messages for ${selectedConversation.threadId}:`, error);
+    }
+  }, [selectedConversation]);
+
+  // Poll for conversation list
   useEffect(() => {
-    fetchZaloData();
+    fetchZaloData(true);
+    const intervalId = setInterval(() => fetchZaloData(false), POLLING_INTERVAL);
+    return () => clearInterval(intervalId);
   }, [fetchZaloData]);
+
+  // Poll for messages of the selected conversation
+  useEffect(() => {
+    if (selectedConversation) {
+      const intervalId = setInterval(fetchMessagesForSelectedConvo, POLLING_INTERVAL);
+      return () => clearInterval(intervalId);
+    }
+  }, [selectedConversation, fetchMessagesForSelectedConvo]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
-
-  // Realtime subscription for ALL new messages
-  useEffect(() => {
-    const channel = supabase
-      .channel('zalo-messages-realtime-channel')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'zalo_messages' },
-        (payload) => {
-          const newMessageDb = payload.new as ZaloMessageDb;
-
-          // 1. Update the conversation list on the left
-          setConversations((prevConvos) => {
-            const convoIndex = prevConvos.findIndex(c => c.threadId === String(newMessageDb.threadId));
-            
-            if (convoIndex > -1) {
-              // Conversation exists, update it and move to top
-              const updatedConvo = {
-                ...prevConvos[convoIndex],
-                lastMessage: newMessageDb.message_content || '[Hình ảnh]',
-                lastActivityAt: newMessageDb.created_at,
-              };
-              const newConvos = [...prevConvos];
-              newConvos.splice(convoIndex, 1);
-              return [updatedConvo, ...newConvos];
-            } else {
-              // This is a new conversation, refetch the whole list to get user info
-              fetchZaloData();
-              return prevConvos;
-            }
-          });
-
-          // 2. Update the currently open chat window
-          if (selectedConversation && String(newMessageDb.threadId) === selectedConversation.threadId) {
-            const formattedMessage: ZaloMessage = {
-              id: newMessageDb.id,
-              content: newMessageDb.message_content,
-              imageUrl: newMessageDb.message_image,
-              createdAt: newMessageDb.created_at,
-              isOutgoing: false, // All realtime events are assumed to be incoming
-            };
-            setMessages((prevMessages) => [...prevMessages, formattedMessage]);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [selectedConversation, fetchZaloData]);
 
   const handleSelectConversation = async (conversation: ZaloConversation) => {
     setSelectedConversation(conversation);
@@ -208,7 +208,6 @@ const ChatbotZalo = () => {
     const conversationName = selectedConversation.name;
     setNewMessage('');
 
-    // Optimistic UI update for outgoing message
     const tempId = Date.now();
     const tempMessage: ZaloMessage = {
         id: tempId,
@@ -231,11 +230,8 @@ const ChatbotZalo = () => {
 
     if (error) {
         showError("Gửi tin nhắn thất bại: " + error.message);
-        // Rollback optimistic update on error
         setMessages(prev => prev.filter(m => m.id !== tempId));
     } else {
-        // The insert was successful. The realtime subscription will handle incoming messages.
-        // We just need to refresh the conversation list to update its order.
         fetchZaloData();
     }
   };
@@ -318,7 +314,7 @@ const ChatbotZalo = () => {
                   <div><h3 className="font-bold">{selectedConversation.name}</h3><p className="text-xs text-muted-foreground">Online</p></div>
                 </div>
                 <div className="flex items-center space-x-2 text-muted-foreground">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={fetchZaloData} disabled={loadingConversations}>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => fetchZaloData(true)} disabled={loadingConversations}>
                     <RefreshCw className={cn("h-5 w-5", loadingConversations && "animate-spin")} />
                   </Button>
                 </div>
