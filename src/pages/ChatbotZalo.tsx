@@ -31,7 +31,7 @@ interface ZaloMessageDb {
 interface ZaloConversation {
   threadId: string;
   name: string;
-  avatar: string;
+  avatar?: string; // Made optional to handle cases where user is not found
   lastMessage: string;
   lastActivityAt: string;
   unreadCount: number;
@@ -65,50 +65,59 @@ const ChatbotZalo = () => {
   const fetchZaloData = useCallback(async () => {
     setLoadingConversations(true);
     try {
-      const { data: messagesData, error: messagesError } = await supabase
-        .from('zalo_messages')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // Step 1: Fetch data concurrently
+      const [usersResponse, messagesResponse] = await Promise.all([
+        supabase.from('zalo_user').select('*'),
+        supabase.from('zalo_messages').select('*').order('created_at', { ascending: false })
+      ]);
 
-      if (messagesError) throw messagesError;
+      if (usersResponse.error) throw usersResponse.error;
+      if (messagesResponse.error) throw messagesResponse.error;
 
-      const { data: usersData, error: usersError } = await supabase
-        .from('zalo_user')
-        .select('*');
+      const usersData = usersResponse.data as ZaloUser[];
+      const messagesData = messagesResponse.data as ZaloMessageDb[];
 
-      if (usersError) throw usersError;
-
+      // Step 2: Create a User Lookup Map
       const usersMap = new Map<string, ZaloUser>();
-      (usersData as ZaloUser[]).forEach(user => {
-        // Trim whitespace from userId to ensure correct matching
-        usersMap.set(String(user.userId).trim(), user);
+      usersData.forEach(user => {
+        // Ensure userId is treated as a string for consistent matching
+        const userIdStr = String(user.userId).trim();
+        usersMap.set(userIdStr, user);
       });
 
+      // Step 3: Build conversations and attach avatars
       const conversationsMap = new Map<string, ZaloConversation>();
-      (messagesData as ZaloMessageDb[]).forEach(msg => {
-        // Trim whitespace from threadId to ensure correct matching
+      messagesData.forEach(msg => {
+        // Ensure threadId is treated as a string
         const threadIdStr = String(msg.threadId).trim();
+        
+        // Only create a conversation entry for the newest message
         if (!conversationsMap.has(threadIdStr) && msg.message_content) {
+          // Look up the user in our map
           const user = usersMap.get(threadIdStr);
-          
+
           conversationsMap.set(threadIdStr, {
             threadId: threadIdStr,
-            name: user?.displayName || user?.zaloName || msg.threadId_name,
-            // Use the user's avatar. If not found, it will be undefined, and the fallback will be shown.
+            // Use user's display name, fallback to Zalo name, then to the name from the message
+            name: user?.displayName || user?.zaloName || msg.threadId_name || 'Unknown User',
+            // CRITICAL: Use the avatar from the user map. It will be undefined if not found.
             avatar: user?.avatar,
             lastMessage: msg.message_content,
             lastActivityAt: msg.created_at,
-            unreadCount: 0, // No unread info from DB
+            unreadCount: 0, // Zalo DB doesn't have unread count
           });
         }
       });
 
+      // Sort conversations by the most recent activity
       const sortedConversations = Array.from(conversationsMap.values())
         .sort((a, b) => new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime());
 
+      // Step 4: Update UI
       setConversations(sortedConversations);
 
     } catch (error: any) {
+      console.error("Error fetching Zalo data:", error);
       showError("Lỗi tải dữ liệu Zalo: " + error.message);
     } finally {
       setLoadingConversations(false);
