@@ -79,20 +79,19 @@ const ChatbotZalo = () => {
 
       if (usersError) throw usersError;
 
-      const usersMap = new Map<string, ZaloUser>();
+      const usersMap = new Map<number, ZaloUser>();
       (usersData as ZaloUser[]).forEach(user => {
-        if (user.displayName) usersMap.set(user.displayName, user);
-        if (user.zaloName) usersMap.set(user.zaloName, user);
+        usersMap.set(user.userId, user);
       });
 
       const conversationsMap = new Map<number, ZaloConversation>();
       (messagesData as ZaloMessageDb[]).forEach(msg => {
         if (!conversationsMap.has(msg.threadId) && msg.message_content) {
-          const user = usersMap.get(msg.threadId_name);
+          const user = usersMap.get(msg.threadId);
           conversationsMap.set(msg.threadId, {
             threadId: msg.threadId,
-            name: msg.threadId_name,
-            avatar: user?.avatar || `https://i.pravatar.cc/150?u=${encodeURIComponent(msg.threadId_name)}`,
+            name: user?.displayName || user?.zaloName || msg.threadId_name,
+            avatar: user?.avatar || `https://i.pravatar.cc/150?u=${msg.threadId}`,
             lastMessage: msg.message_content,
             lastActivityAt: msg.created_at,
             unreadCount: 0, // Không có thông tin chưa đọc từ DB
