@@ -30,11 +30,16 @@ const ChatbotZalo = () => {
   const [sendingMessage, setSendingMessage] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const selectedConversationIdRef = useRef<string | null>(null);
   const defaultAvatar = 'https://s120-ava-talk.zadn.vn/a/a/c/2/1/120/90898606938dd183dbf5c748e3dae52d.jpg';
   
   const [isDebugVisible, setIsDebugVisible] = useState(false);
   const [debugUsersMap, setDebugUsersMap] = useState<Map<string, ZaloUser>>(new Map());
   const POLLING_INTERVAL = 5000; // Poll every 5 seconds
+
+  useEffect(() => {
+    selectedConversationIdRef.current = selectedConversation?.threadId ?? null;
+  }, [selectedConversation]);
 
   const fetchZaloData = useCallback(async (isInitialLoad = false) => {
     if (isInitialLoad) setLoadingConversations(true);
@@ -77,6 +82,7 @@ const ChatbotZalo = () => {
       });
       setDebugUsersMap(usersMap);
 
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
       const conversationsMap = new Map<string, ZaloConversation>();
       messagesData.forEach(msg => {
         const threadIdStr = msg.threadId.trim();
@@ -87,13 +93,14 @@ const ChatbotZalo = () => {
             lastMessageContent = '[Hình ảnh]';
           }
           if (lastMessageContent) {
+            const isUnread = new Date(msg.created_at) > twentyFourHoursAgo;
             conversationsMap.set(threadIdStr, {
               threadId: threadIdStr,
               name: user?.displayName || user?.zaloName || msg.threadId_name || 'Unknown User',
               avatar: user?.avatar,
               lastMessage: lastMessageContent,
               lastActivityAt: msg.created_at,
-              unreadCount: 0,
+              unreadCount: isUnread ? 1 : 0,
             });
           }
         }
@@ -101,7 +108,15 @@ const ChatbotZalo = () => {
 
       const sortedConversations = Array.from(conversationsMap.values())
         .sort((a, b) => new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime());
-      setConversations(sortedConversations);
+
+      const finalConversations = sortedConversations.map(convo => {
+        if (selectedConversationIdRef.current && convo.threadId === selectedConversationIdRef.current) {
+          return { ...convo, unreadCount: 0 };
+        }
+        return convo;
+      });
+
+      setConversations(finalConversations);
 
     } catch (error: any) {
       console.error("Error fetching Zalo data:", error);
@@ -170,7 +185,16 @@ const ChatbotZalo = () => {
   }, [messages]);
 
   const handleSelectConversation = async (conversation: ZaloConversation) => {
-    setSelectedConversation(conversation);
+    if (conversation.unreadCount > 0) {
+      const updatedConvo = { ...conversation, unreadCount: 0 };
+      setConversations(convos => 
+        convos.map(c => c.threadId === conversation.threadId ? updatedConvo : c)
+      );
+      setSelectedConversation(updatedConvo);
+    } else {
+      setSelectedConversation(conversation);
+    }
+
     setLoadingMessages(true);
     setMessages([]);
     try {
@@ -255,6 +279,9 @@ const ChatbotZalo = () => {
     );
   }, [conversations, searchQuery]);
 
+  const unreadConversations = filteredConversations.filter(c => c.unreadCount > 0);
+  const readConversations = filteredConversations.filter(c => c.unreadCount === 0);
+
   const renderConversationItem = (convo: ZaloConversation) => (
     <div key={convo.threadId} onClick={() => handleSelectConversation(convo)} className={cn("p-2.5 flex space-x-3 cursor-pointer rounded-lg", selectedConversation?.threadId === convo.threadId && "bg-blue-100")}>
       <Avatar className="h-12 w-12">
@@ -293,9 +320,16 @@ const ChatbotZalo = () => {
           <div className="flex-1 overflow-y-auto p-2 space-y-1">
             {loadingConversations ? ([...Array(8)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)) : (
               <>
-                {filteredConversations.length > 0 ? (
-                  filteredConversations.map(renderConversationItem)
-                ) : (
+                {unreadConversations.length > 0 && (
+                  <div className="mb-4 p-2 bg-blue-50/50 rounded-lg">
+                    <h3 className="px-1 pb-1 text-xs font-bold uppercase text-blue-600 tracking-wider">Chưa xem</h3>
+                    <div className="space-y-1">{unreadConversations.map(renderConversationItem)}</div>
+                  </div>
+                )}
+                {readConversations.length > 0 && (
+                  <div className="space-y-1">{readConversations.map(renderConversationItem)}</div>
+                )}
+                {filteredConversations.length === 0 && !loadingConversations && (
                   <p className="p-4 text-sm text-center text-muted-foreground">Không có cuộc trò chuyện nào.</p>
                 )}
               </>
