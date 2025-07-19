@@ -30,16 +30,11 @@ const ChatbotZalo = () => {
   const [sendingMessage, setSendingMessage] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const selectedConversationIdRef = useRef<string | null>(null);
   const defaultAvatar = 'https://s120-ava-talk.zadn.vn/a/a/c/2/1/120/90898606938dd183dbf5c748e3dae52d.jpg';
   
   const [isDebugVisible, setIsDebugVisible] = useState(false);
   const [debugUsersMap, setDebugUsersMap] = useState<Map<string, ZaloUser>>(new Map());
   const POLLING_INTERVAL = 5000; // Poll every 5 seconds
-
-  useEffect(() => {
-    selectedConversationIdRef.current = selectedConversation?.threadId ?? null;
-  }, [selectedConversation]);
 
   const fetchZaloData = useCallback(async (isInitialLoad = false) => {
     if (isInitialLoad) setLoadingConversations(true);
@@ -82,7 +77,6 @@ const ChatbotZalo = () => {
       });
       setDebugUsersMap(usersMap);
 
-      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
       const conversationsMap = new Map<string, ZaloConversation>();
       messagesData.forEach(msg => {
         const threadIdStr = msg.threadId.trim();
@@ -93,7 +87,11 @@ const ChatbotZalo = () => {
             lastMessageContent = '[Hình ảnh]';
           }
           if (lastMessageContent) {
-            const isUnread = new Date(msg.created_at) > twentyFourHoursAgo;
+            const lastSeenTimestampStr = localStorage.getItem(`zalo-seen-${threadIdStr}`);
+            const lastSeenTimestamp = lastSeenTimestampStr ? parseInt(lastSeenTimestampStr, 10) : 0;
+            const lastMessageTimestamp = new Date(msg.created_at).getTime();
+            const isUnread = lastMessageTimestamp > lastSeenTimestamp;
+
             conversationsMap.set(threadIdStr, {
               threadId: threadIdStr,
               name: user?.displayName || user?.zaloName || msg.threadId_name || 'Unknown User',
@@ -109,14 +107,7 @@ const ChatbotZalo = () => {
       const sortedConversations = Array.from(conversationsMap.values())
         .sort((a, b) => new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime());
 
-      const finalConversations = sortedConversations.map(convo => {
-        if (selectedConversationIdRef.current && convo.threadId === selectedConversationIdRef.current) {
-          return { ...convo, unreadCount: 0 };
-        }
-        return convo;
-      });
-
-      setConversations(finalConversations);
+      setConversations(sortedConversations);
 
     } catch (error: any) {
       console.error("Error fetching Zalo data:", error);
@@ -185,6 +176,8 @@ const ChatbotZalo = () => {
   }, [messages]);
 
   const handleSelectConversation = async (conversation: ZaloConversation) => {
+    localStorage.setItem(`zalo-seen-${conversation.threadId}`, Date.now().toString());
+
     if (conversation.unreadCount > 0) {
       const updatedConvo = { ...conversation, unreadCount: 0 };
       setConversations(convos => 
