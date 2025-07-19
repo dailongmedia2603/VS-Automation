@@ -11,38 +11,7 @@ import { vi } from 'date-fns/locale';
 import { Search, SendHorizonal, RefreshCw, Loader2, Bug } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import { ZaloDataDebugger } from '@/components/ZaloDataDebugger';
-
-// --- Types for Zalo data ---
-interface ZaloUser {
-  userId: string;
-  displayName: string;
-  zaloName: string;
-  avatar: string;
-}
-
-interface ZaloMessageDb {
-  id: number;
-  threadId: string;
-  message_content: string;
-  created_at: string;
-  threadId_name: string;
-}
-
-interface ZaloConversation {
-  threadId: string;
-  name: string;
-  avatar?: string;
-  lastMessage: string;
-  lastActivityAt: string;
-  unreadCount: number;
-}
-
-interface ZaloMessage {
-  id: number;
-  content: string;
-  createdAt: string;
-  isOutgoing: boolean; 
-}
+import type { ZaloUser, ZaloConversation, ZaloMessageDb, ZaloMessage } from '@/types/zalo';
 
 const getInitials = (name?: string) => {
   if (!name) return 'U';

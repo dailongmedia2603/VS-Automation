@@ -2,22 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CheckCircle2, XCircle } from 'lucide-react';
-
-interface ZaloUser {
-  userId: string;
-  displayName: string;
-  zaloName: string;
-  avatar: string;
-}
-
-interface ZaloConversation {
-  threadId: string;
-  name: string;
-  avatar?: string;
-  lastMessage: string;
-  lastActivityAt: string;
-  unreadCount: number;
-}
+import type { ZaloUser, ZaloConversation } from '@/types/zalo';
 
 interface ZaloDataDebuggerProps {
   usersMap: Map<string, ZaloUser>;
