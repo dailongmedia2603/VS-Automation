@@ -201,6 +201,16 @@ const ChatbotZalo = () => {
     }
   };
 
+  const sanitizeFileName = (fileName: string) => {
+    // Remove diacritics
+    let sanitized = fileName.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    // Replace spaces with underscores
+    sanitized = sanitized.replace(/\s+/g, '_');
+    // Remove special characters except for underscore, hyphen, and period
+    sanitized = sanitized.replace(/[^a-zA-Z0-9._-]/g, '');
+    return sanitized;
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if ((!newMessage.trim() && !attachment) || !selectedConversation) return;
@@ -225,7 +235,8 @@ const ChatbotZalo = () => {
     try {
         let attachmentUrl: string | null = null;
         if (currentAttachment) {
-            const filePath = `public/zalo-attachments/${user!.id}/${Date.now()}-${currentAttachment.name}`;
+            const sanitizedFileName = sanitizeFileName(currentAttachment.name);
+            const filePath = `${user!.id}/${Date.now()}-${sanitizedFileName}`;
             const { error: uploadError } = await supabase.storage
                 .from('zalo_attachments')
                 .upload(filePath, currentAttachment);
