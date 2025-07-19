@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { type User } from '@supabase/supabase-js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -21,6 +22,7 @@ const getInitials = (name?: string) => {
 };
 
 const ChatbotZalo = () => {
+  const [user, setUser] = useState<User | null>(null);
   const [conversations, setConversations] = useState<ZaloConversation[]>([]);
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [selectedConversation, setSelectedConversation] = useState<ZaloConversation | null>(null);
@@ -34,9 +36,21 @@ const ChatbotZalo = () => {
   
   const [isDebugVisible, setIsDebugVisible] = useState(false);
   const [debugUsersMap, setDebugUsersMap] = useState<Map<string, ZaloUser>>(new Map());
-  const POLLING_INTERVAL = 5000; // Poll every 5 seconds
+  const POLLING_INTERVAL = 5000;
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    getUser();
+  }, []);
 
   const fetchZaloData = useCallback(async (isInitialLoad = false) => {
+    if (!user) {
+      if (isInitialLoad) setLoadingConversations(false);
+      return;
+    }
     if (isInitialLoad) setLoadingConversations(true);
     try {
       const fetchAllUsers = async () => {
@@ -63,39 +77,45 @@ const ChatbotZalo = () => {
         return allUsers;
       };
 
-      const [usersData, messagesResponse] = await Promise.all([
+      const [usersData, messagesResponse, seenStatusesResponse] = await Promise.all([
         fetchAllUsers(),
-        supabase.from('zalo_messages').select('id, threadId::text, message_content, message_image, created_at, threadId_name').order('created_at', { ascending: false })
+        supabase.from('zalo_messages').select('id, threadId::text, message_content, message_image, created_at, threadId_name').order('created_at', { ascending: false }),
+        supabase.from('zalo_conversation_seen_status').select('conversation_thread_id, last_seen_at').eq('user_id', user.id)
       ]);
 
       if (messagesResponse.error) throw messagesResponse.error;
+      if (seenStatusesResponse.error) throw seenStatusesResponse.error;
+
       const messagesData = messagesResponse.data as ZaloMessageDb[];
+      const seenStatuses = seenStatusesResponse.data;
 
       const usersMap = new Map<string, ZaloUser>();
-      usersData.forEach(user => {
-        usersMap.set(user.userId.trim(), user);
-      });
+      usersData.forEach(u => usersMap.set(u.userId.trim(), u));
       setDebugUsersMap(usersMap);
+
+      const seenMap = new Map<string, number>();
+      if (seenStatuses) {
+        seenStatuses.forEach(status => {
+          seenMap.set(status.conversation_thread_id, new Date(status.last_seen_at).getTime());
+        });
+      }
 
       const conversationsMap = new Map<string, ZaloConversation>();
       messagesData.forEach(msg => {
         const threadIdStr = msg.threadId.trim();
         if (!conversationsMap.has(threadIdStr)) {
-          const user = usersMap.get(threadIdStr);
-          let lastMessageContent = msg.message_content;
-          if (!lastMessageContent && msg.message_image) {
-            lastMessageContent = '[Hình ảnh]';
-          }
+          const userDetails = usersMap.get(threadIdStr);
+          let lastMessageContent = msg.message_content || (msg.message_image ? '[Hình ảnh]' : '');
+          
           if (lastMessageContent) {
-            const lastSeenTimestampStr = localStorage.getItem(`zalo-seen-${threadIdStr}`);
-            const lastSeenTimestamp = lastSeenTimestampStr ? parseInt(lastSeenTimestampStr, 10) : 0;
+            const lastSeenTimestamp = seenMap.get(threadIdStr) || 0;
             const lastMessageTimestamp = new Date(msg.created_at).getTime();
             const isUnread = lastMessageTimestamp > lastSeenTimestamp;
 
             conversationsMap.set(threadIdStr, {
               threadId: threadIdStr,
-              name: user?.displayName || user?.zaloName || msg.threadId_name || 'Unknown User',
-              avatar: user?.avatar,
+              name: userDetails?.displayName || userDetails?.zaloName || msg.threadId_name || 'Unknown User',
+              avatar: userDetails?.avatar,
               lastMessage: lastMessageContent,
               lastActivityAt: msg.created_at,
               unreadCount: isUnread ? 1 : 0,
@@ -115,55 +135,47 @@ const ChatbotZalo = () => {
     } finally {
       if (isInitialLoad) setLoadingConversations(false);
     }
-  }, []);
+  }, [user]);
 
   const fetchMessagesForSelectedConvo = useCallback(async () => {
     if (!selectedConversation) return;
-
     try {
       const { data, error } = await supabase
         .from('zalo_messages')
         .select('id, message_content, created_at, message_image')
         .eq('threadId', selectedConversation.threadId)
         .order('created_at', { ascending: true });
-
       if (error) throw error;
-
       const formattedMessages: ZaloMessage[] = data.map(msg => ({
         id: msg.id,
         content: msg.message_content,
         imageUrl: msg.message_image,
         createdAt: msg.created_at,
-        isOutgoing: false, // Known issue: Cannot determine direction from DB
+        isOutgoing: false,
       }));
-
       setMessages(currentMessages => {
         const optimisticMessages = currentMessages.filter(m => m.isOutgoing);
         const dbMessageIds = new Set(formattedMessages.map(m => m.id));
         const nonReplacedOptimistic = optimisticMessages.filter(m => !dbMessageIds.has(m.id));
-        
         const newCombined = [...formattedMessages, ...nonReplacedOptimistic];
-        
-        if (newCombined.length !== currentMessages.length || 
-            newCombined.some((msg, i) => msg.id !== currentMessages[i]?.id)) {
+        if (newCombined.length !== currentMessages.length || newCombined.some((msg, i) => msg.id !== currentMessages[i]?.id)) {
           return newCombined;
         }
         return currentMessages;
       });
-
     } catch (error: any) {
       console.error(`Error polling messages for ${selectedConversation.threadId}:`, error);
     }
   }, [selectedConversation]);
 
-  // Poll for conversation list
   useEffect(() => {
-    fetchZaloData(true);
-    const intervalId = setInterval(() => fetchZaloData(false), POLLING_INTERVAL);
-    return () => clearInterval(intervalId);
-  }, [fetchZaloData]);
+    if (user) {
+      fetchZaloData(true);
+      const intervalId = setInterval(() => fetchZaloData(false), POLLING_INTERVAL);
+      return () => clearInterval(intervalId);
+    }
+  }, [user, fetchZaloData]);
 
-  // Poll for messages of the selected conversation
   useEffect(() => {
     if (selectedConversation) {
       const intervalId = setInterval(fetchMessagesForSelectedConvo, POLLING_INTERVAL);
@@ -176,7 +188,19 @@ const ChatbotZalo = () => {
   }, [messages]);
 
   const handleSelectConversation = async (conversation: ZaloConversation) => {
-    localStorage.setItem(`zalo-seen-${conversation.threadId}`, Date.now().toString());
+    if (user && conversation.unreadCount > 0) {
+      const { error } = await supabase
+        .from('zalo_conversation_seen_status')
+        .upsert({
+          user_id: user.id,
+          conversation_thread_id: conversation.threadId,
+          last_seen_at: new Date().toISOString(),
+        });
+      if (error) {
+        console.error("Failed to update seen status:", error);
+        showError("Không thể cập nhật trạng thái đã xem.");
+      }
+    }
 
     if (conversation.unreadCount > 0) {
       const updatedConvo = { ...conversation, unreadCount: 0 };
@@ -196,9 +220,7 @@ const ChatbotZalo = () => {
         .select('id, message_content, created_at, message_image')
         .eq('threadId', conversation.threadId)
         .order('created_at', { ascending: true });
-
       if (error) throw error;
-
       const formattedMessages: ZaloMessage[] = data.map(msg => ({
         id: msg.id,
         content: msg.message_content,
@@ -207,7 +229,6 @@ const ChatbotZalo = () => {
         isOutgoing: false,
       }));
       setMessages(formattedMessages);
-
     } catch (error: any) {
       showError("Lỗi tải tin nhắn: " + error.message);
     } finally {
@@ -218,13 +239,11 @@ const ChatbotZalo = () => {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedConversation) return;
-
     setSendingMessage(true);
     const content = newMessage.trim();
     const conversationId = selectedConversation.threadId;
     const conversationName = selectedConversation.name;
     setNewMessage('');
-
     const tempId = Date.now();
     const tempMessage: ZaloMessage = {
         id: tempId,
@@ -234,7 +253,6 @@ const ChatbotZalo = () => {
         isOutgoing: true,
     };
     setMessages(prev => [...prev, tempMessage]);
-
     const { error } = await supabase
         .from('zalo_messages')
         .insert({
@@ -242,9 +260,7 @@ const ChatbotZalo = () => {
             message_content: content,
             threadId_name: conversationName,
         });
-
     setSendingMessage(false);
-
     if (error) {
         showError("Gửi tin nhắn thất bại: " + error.message);
         setMessages(prev => prev.filter(m => m.id !== tempId));
