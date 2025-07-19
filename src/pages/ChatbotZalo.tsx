@@ -101,7 +101,7 @@ const ChatbotZalo = () => {
         isOutgoing: msg.direction === 'out',
       }));
       setMessages(currentMessages => {
-        const optimisticMessages = currentMessages.filter(m => m.isOutgoing);
+        const optimisticMessages = currentMessages.filter(m => m.isOutgoing && m.id > 1000000000); // Filter for temp IDs
         const dbMessageIds = new Set(formattedMessages.map(m => m.id));
         const nonReplacedOptimistic = optimisticMessages.filter(m => !dbMessageIds.has(m.id));
         const newCombined = [...formattedMessages, ...nonReplacedOptimistic];
@@ -326,26 +326,26 @@ const ChatbotZalo = () => {
                 </div>
               </header>
               <div className="flex-1 overflow-y-auto p-4 md:p-6">
-                <div className="space-y-2">
+                <div className="space-y-4">
                   {loadingMessages ? <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div> : groupedMessages.map((item, index) => {
                     if (item.type === 'date') {
                       return <div key={index} className="text-center my-4"><span className="text-xs text-muted-foreground bg-white px-3 py-1 rounded-full shadow-sm">{item.date}</span></div>;
                     }
                     const msg = item.data;
                     return (
-                      <div key={msg.id} className={cn("flex items-end gap-3", msg.isOutgoing && "justify-end")}>
+                      <div key={msg.id} className={cn("flex items-start gap-3", msg.isOutgoing && "justify-end")}>
                         {!msg.isOutgoing && (
                           <Avatar className="h-8 w-8 flex-shrink-0">
                             <AvatarImage src={selectedConversation.avatar || defaultAvatar} />
                             <AvatarFallback>{getInitials(selectedConversation.name)}</AvatarFallback>
                           </Avatar>
                         )}
-                        <div className={cn("flex flex-col gap-1", msg.isOutgoing ? 'items-end' : 'items-start')}>
-                            <div className={cn("rounded-2xl px-3 py-2 max-w-sm md:max-w-md break-words shadow-sm", msg.isOutgoing ? 'bg-blue-500 text-white' : 'bg-white text-gray-800')}>
+                        <div className="flex flex-col gap-1 max-w-sm md:max-w-md">
+                            <div className={cn("rounded-2xl px-3 py-2 break-words shadow-sm", msg.isOutgoing ? 'bg-blue-500 text-white' : 'bg-white text-gray-800')}>
                               {msg.imageUrl && <img src={msg.imageUrl} alt="Zalo attachment" className="rounded-lg max-w-full h-auto mb-2" />}
                               {msg.content && <p className="whitespace-pre-wrap">{msg.content}</p>}
                             </div>
-                            <p className="text-xs text-muted-foreground px-1">
+                            <p className={cn("text-xs text-muted-foreground px-1", msg.isOutgoing ? 'text-right' : 'text-left')}>
                                 {format(new Date(msg.createdAt), 'HH:mm')}
                             </p>
                         </div>
