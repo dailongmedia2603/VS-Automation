@@ -21,6 +21,7 @@ export interface ZaloMessageDb {
   message_image: string | null;
   created_at: string;
   threadId_name: string;
+  direction?: 'in' | 'out';
 }
 
 export interface ZaloMessage {
