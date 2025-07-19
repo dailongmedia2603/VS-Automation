@@ -101,12 +101,14 @@ const ChatbotZalo = () => {
         isOutgoing: msg.direction === 'out',
       }));
       setMessages(currentMessages => {
-        const optimisticMessages = currentMessages.filter(m => m.isOutgoing && m.id > 1000000000); // Filter for temp IDs
-        const dbMessageIds = new Set(formattedMessages.map(m => m.id));
-        const nonReplacedOptimistic = optimisticMessages.filter(m => !dbMessageIds.has(m.id));
-        const newCombined = [...formattedMessages, ...nonReplacedOptimistic];
-        if (newCombined.length !== currentMessages.length || newCombined.some((msg, i) => msg.id !== currentMessages[i]?.id)) {
-          return newCombined;
+        const optimisticMessages = currentMessages.filter(m => m.id > 1000000000); // Filter for temp IDs
+        const newCombined = [...formattedMessages, ...optimisticMessages];
+        
+        // Simple deduplication based on ID
+        const uniqueMessages = Array.from(new Map(newCombined.map(m => [m.id, m])).values());
+
+        if (uniqueMessages.length !== currentMessages.length || uniqueMessages.some((msg, i) => msg.id !== currentMessages[i]?.id)) {
+          return uniqueMessages;
         }
         return currentMessages;
       });
@@ -186,11 +188,13 @@ const ChatbotZalo = () => {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedConversation) return;
+
     setSendingMessage(true);
     const content = newMessage.trim();
     const conversationId = selectedConversation.threadId;
     const conversationName = selectedConversation.name;
     setNewMessage('');
+
     const tempId = Date.now();
     const tempMessage: ZaloMessage = {
         id: tempId,
@@ -200,20 +204,32 @@ const ChatbotZalo = () => {
         isOutgoing: true,
     };
     setMessages(prev => [...prev, tempMessage]);
-    const { error } = await supabase
+
+    const { data: newMessageFromDb, error } = await supabase
         .from('zalo_messages')
         .insert({
             threadId: conversationId,
             message_content: content,
             threadId_name: conversationName,
             direction: 'out',
-        });
+        })
+        .select()
+        .single();
+
     setSendingMessage(false);
+
     if (error) {
         showError("Gửi tin nhắn thất bại: " + error.message);
         setMessages(prev => prev.filter(m => m.id !== tempId));
-    } else {
-        fetchZaloData();
+    } else if (newMessageFromDb) {
+        setMessages(prev => prev.map(m => m.id === tempId ? {
+            id: newMessageFromDb.id,
+            content: newMessageFromDb.message_content,
+            imageUrl: newMessageFromDb.message_image,
+            createdAt: newMessageFromDb.created_at,
+            isOutgoing: newMessageFromDb.direction === 'out',
+        } : m));
+        
         try {
           const payload = {
             content: content,
@@ -335,22 +351,22 @@ const ChatbotZalo = () => {
                     return (
                       <div key={msg.id} className={cn("flex items-start gap-3", msg.isOutgoing && "justify-end")}>
                         {!msg.isOutgoing && (
-                          <Avatar className="h-8 w-8 flex-shrink-0">
+                          <Avatar className="h-8 w-8 flex-shrink-0 self-end">
                             <AvatarImage src={selectedConversation.avatar || defaultAvatar} />
                             <AvatarFallback>{getInitials(selectedConversation.name)}</AvatarFallback>
                           </Avatar>
                         )}
-                        <div className="flex flex-col gap-1 max-w-sm md:max-w-md">
+                        <div className={cn("flex flex-col max-w-sm md:max-w-md", msg.isOutgoing ? 'items-end' : 'items-start')}>
                             <div className={cn("rounded-2xl px-3 py-2 break-words shadow-sm", msg.isOutgoing ? 'bg-blue-500 text-white' : 'bg-white text-gray-800')}>
                               {msg.imageUrl && <img src={msg.imageUrl} alt="Zalo attachment" className="rounded-lg max-w-full h-auto mb-2" />}
                               {msg.content && <p className="whitespace-pre-wrap">{msg.content}</p>}
                             </div>
-                            <p className={cn("text-xs text-muted-foreground px-1", msg.isOutgoing ? 'text-right' : 'text-left')}>
+                            <p className="text-[10px] text-muted-foreground px-1 mt-1">
                                 {format(new Date(msg.createdAt), 'HH:mm')}
                             </p>
                         </div>
                          {msg.isOutgoing && (
-                          <Avatar className="h-8 w-8 flex-shrink-0">
+                          <Avatar className="h-8 w-8 flex-shrink-0 self-end">
                             <AvatarFallback>{getInitials(user?.email)}</AvatarFallback>
                           </Avatar>
                         )}
