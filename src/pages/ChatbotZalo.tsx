@@ -32,7 +32,6 @@ const ChatbotZalo = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const defaultAvatar = 'https://s120-ava-talk.zadn.vn/a/a/c/2/1/120/90898606938dd183dbf5c748e3dae52d.jpg';
   
-  // Debugger state
   const [isDebugVisible, setIsDebugVisible] = useState(false);
   const [debugUsersMap, setDebugUsersMap] = useState<Map<string, ZaloUser>>(new Map());
 
@@ -119,6 +118,41 @@ const ChatbotZalo = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Realtime subscription for new messages
+  useEffect(() => {
+    if (!selectedConversation) {
+      return;
+    }
+
+    const channel = supabase.channel(`zalo_messages_for_${selectedConversation.threadId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'zalo_messages',
+          filter: `threadId=eq.${selectedConversation.threadId}`,
+        },
+        (payload) => {
+          const newMessageDb = payload.new as ZaloMessageDb;
+          const formattedMessage: ZaloMessage = {
+            id: newMessageDb.id,
+            content: newMessageDb.message_content,
+            imageUrl: newMessageDb.message_image,
+            createdAt: newMessageDb.created_at,
+            isOutgoing: false, // Assume incoming for realtime
+          };
+          setMessages((prevMessages) => [...prevMessages, formattedMessage]);
+        }
+      )
+      .subscribe();
+
+    // Cleanup function to remove the subscription when the component unmounts or conversation changes
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedConversation]);
+
   const handleSelectConversation = async (conversation: ZaloConversation) => {
     setSelectedConversation(conversation);
     setLoadingMessages(true);
@@ -137,7 +171,7 @@ const ChatbotZalo = () => {
         content: msg.message_content,
         imageUrl: msg.message_image,
         createdAt: msg.created_at,
-        isOutgoing: false, // This needs to be determined by sender in a real scenario
+        isOutgoing: false,
       }));
       setMessages(formattedMessages);
 
@@ -159,7 +193,8 @@ const ChatbotZalo = () => {
         createdAt: new Date().toISOString(),
         isOutgoing: true,
     };
-    setMessages(prev => [...prev, tempMessage]);
+    // Don't add to local state immediately, let the realtime subscription handle it for consistency
+    // setMessages(prev => [...prev, tempMessage]); 
     setNewMessage('');
     const { error } = await supabase
         .from('zalo_messages')
@@ -170,10 +205,9 @@ const ChatbotZalo = () => {
         });
     if (error) {
         showError("Gửi tin nhắn thất bại: " + error.message);
-        setMessages(prev => prev.filter(m => m.id !== tempMessage.id));
     } else {
-        showSuccess("Đã gửi tin nhắn!");
-        fetchZaloData();
+        // The realtime subscription will catch this insert and update the UI
+        fetchZaloData(); // Refresh conversation list to show new last message
     }
     setSendingMessage(false);
   };
