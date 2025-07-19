@@ -12,8 +12,9 @@ import { Search, SendHorizonal, RefreshCw, Loader2 } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 
 // --- Types for Zalo data ---
+// Changed userId and threadId to string to handle large bigint values from Supabase
 interface ZaloUser {
-  userId: number;
+  userId: string;
   displayName: string;
   zaloName: string;
   avatar: string;
@@ -21,14 +22,14 @@ interface ZaloUser {
 
 interface ZaloMessageDb {
   id: number;
-  threadId: number;
+  threadId: string;
   message_content: string;
   created_at: string;
   threadId_name: string;
 }
 
 interface ZaloConversation {
-  threadId: number;
+  threadId: string;
   name: string;
   avatar: string;
   lastMessage: string;
@@ -40,8 +41,6 @@ interface ZaloMessage {
   id: number;
   content: string;
   createdAt: string;
-  // Lưu ý: Bảng zalo_messages không có thông tin người gửi (agent/user).
-  // Do đó, tất cả tin nhắn sẽ được hiển thị như tin nhắn đến.
   isOutgoing: boolean; 
 }
 
@@ -79,22 +78,24 @@ const ChatbotZalo = () => {
 
       if (usersError) throw usersError;
 
-      const usersMap = new Map<number, ZaloUser>();
+      const usersMap = new Map<string, ZaloUser>();
       (usersData as ZaloUser[]).forEach(user => {
-        usersMap.set(user.userId, user);
+        // Ensure userId is treated as a string for the map key
+        usersMap.set(String(user.userId), user);
       });
 
-      const conversationsMap = new Map<number, ZaloConversation>();
+      const conversationsMap = new Map<string, ZaloConversation>();
       (messagesData as ZaloMessageDb[]).forEach(msg => {
-        if (!conversationsMap.has(msg.threadId) && msg.message_content) {
-          const user = usersMap.get(msg.threadId);
-          conversationsMap.set(msg.threadId, {
-            threadId: msg.threadId,
+        const threadIdStr = String(msg.threadId);
+        if (!conversationsMap.has(threadIdStr) && msg.message_content) {
+          const user = usersMap.get(threadIdStr);
+          conversationsMap.set(threadIdStr, {
+            threadId: threadIdStr,
             name: user?.displayName || user?.zaloName || msg.threadId_name,
-            avatar: user?.avatar || `https://i.pravatar.cc/150?u=${msg.threadId}`,
+            avatar: user?.avatar || `https://i.pravatar.cc/150?u=${threadIdStr}`,
             lastMessage: msg.message_content,
             lastActivityAt: msg.created_at,
-            unreadCount: 0, // Không có thông tin chưa đọc từ DB
+            unreadCount: 0, // No unread info from DB
           });
         }
       });
@@ -136,7 +137,6 @@ const ChatbotZalo = () => {
         id: msg.id,
         content: msg.message_content,
         createdAt: msg.created_at,
-        // Vì không có thông tin người gửi, tạm thời coi tất cả là tin nhắn đến
         isOutgoing: false,
       }));
       setMessages(formattedMessages);
@@ -154,7 +154,6 @@ const ChatbotZalo = () => {
 
     setSendingMessage(true);
     
-    // Tin nhắn gửi từ đây được coi là tin nhắn đi (isOutgoing = true)
     const tempMessage: ZaloMessage = {
         id: Date.now(),
         content: newMessage.trim(),
@@ -174,11 +173,9 @@ const ChatbotZalo = () => {
 
     if (error) {
         showError("Gửi tin nhắn thất bại: " + error.message);
-        // Xóa tin nhắn tạm thời nếu gửi lỗi
         setMessages(prev => prev.filter(m => m.id !== tempMessage.id));
     } else {
         showSuccess("Đã gửi tin nhắn!");
-        // Tải lại dữ liệu để đồng bộ
         fetchZaloData();
     }
     setSendingMessage(false);
