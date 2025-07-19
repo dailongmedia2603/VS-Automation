@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { format, isSameDay } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import { Search, SendHorizonal, RefreshCw, Loader2, Bug } from 'lucide-react';
+import { Search, SendHorizonal, RefreshCw, Loader2, Bug, CornerDownLeft } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import { ZaloDataDebugger } from '@/components/ZaloDataDebugger';
 import type { ZaloUser, ZaloConversation, ZaloMessageDb, ZaloMessage } from '@/types/zalo';
@@ -67,7 +67,7 @@ const ChatbotZalo = () => {
       const finalConversations = conversationsData.map((convo: any) => {
         const lastSeenTimestamp = seenMap.get(convo.threadId) || 0;
         const lastMessageTimestamp = new Date(convo.lastActivityAt).getTime();
-        const isUnread = lastMessageTimestamp > lastSeenTimestamp;
+        const isUnread = convo.lastMessageDirection !== 'out' && lastMessageTimestamp > lastSeenTimestamp;
         return {
           ...convo,
           unreadCount: isUnread ? 1 : 0,
@@ -104,7 +104,6 @@ const ChatbotZalo = () => {
         const optimisticMessages = currentMessages.filter(m => m.id > 1000000000); // Filter for temp IDs
         const newCombined = [...formattedMessages, ...optimisticMessages];
         
-        // Simple deduplication based on ID
         const uniqueMessages = Array.from(new Map(newCombined.map(m => [m.id, m])).values());
 
         if (uniqueMessages.length !== currentMessages.length || uniqueMessages.some((msg, i) => msg.id !== currentMessages[i]?.id)) {
@@ -188,13 +187,11 @@ const ChatbotZalo = () => {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedConversation) return;
-
     setSendingMessage(true);
     const content = newMessage.trim();
     const conversationId = selectedConversation.threadId;
     const conversationName = selectedConversation.name;
     setNewMessage('');
-
     const tempId = Date.now();
     const tempMessage: ZaloMessage = {
         id: tempId,
@@ -204,7 +201,6 @@ const ChatbotZalo = () => {
         isOutgoing: true,
     };
     setMessages(prev => [...prev, tempMessage]);
-
     const { data: newMessageFromDb, error } = await supabase
         .from('zalo_messages')
         .insert({
@@ -215,9 +211,7 @@ const ChatbotZalo = () => {
         })
         .select()
         .single();
-
     setSendingMessage(false);
-
     if (error) {
         showError("Gửi tin nhắn thất bại: " + error.message);
         setMessages(prev => prev.filter(m => m.id !== tempId));
@@ -270,23 +264,27 @@ const ChatbotZalo = () => {
   const unreadConversations = filteredConversations.filter(c => c.unreadCount > 0);
   const readConversations = filteredConversations.filter(c => c.unreadCount === 0);
 
-  const renderConversationItem = (convo: ZaloConversation) => (
-    <div key={convo.threadId} onClick={() => handleSelectConversation(convo)} className={cn("p-2.5 flex space-x-3 cursor-pointer rounded-lg", selectedConversation?.threadId === convo.threadId && "bg-blue-100")}>
-      <Avatar className="h-12 w-12">
-        <AvatarImage src={convo.avatar || defaultAvatar} />
-        <AvatarFallback>{getInitials(convo.name)}</AvatarFallback>
-      </Avatar>
-      <div className="flex-1 overflow-hidden">
-        <div className="flex justify-between items-center"><p className="font-semibold truncate text-sm">{convo.name}</p><p className="text-xs text-muted-foreground whitespace-nowrap">{format(new Date(convo.lastActivityAt), 'HH:mm')}</p></div>
-        <div className="flex justify-between items-start mt-1">
-          <p className={cn("text-sm truncate flex items-center", convo.unreadCount > 0 ? "text-black font-bold" : "text-muted-foreground")}>
-            {convo.lastMessage}
-          </p>
-          {convo.unreadCount > 0 && <Badge variant="destructive">{convo.unreadCount}</Badge>}
+  const renderConversationItem = (convo: ZaloConversation) => {
+    const isLastMessageOutgoing = convo.lastMessageDirection === 'out';
+    return (
+      <div key={convo.threadId} onClick={() => handleSelectConversation(convo)} className={cn("p-2.5 flex space-x-3 cursor-pointer rounded-lg", selectedConversation?.threadId === convo.threadId && "bg-blue-100")}>
+        <Avatar className="h-12 w-12">
+          <AvatarImage src={convo.avatar || defaultAvatar} />
+          <AvatarFallback>{getInitials(convo.name)}</AvatarFallback>
+        </Avatar>
+        <div className="flex-1 overflow-hidden">
+          <div className="flex justify-between items-center"><p className="font-semibold truncate text-sm">{convo.name}</p><p className="text-xs text-muted-foreground whitespace-nowrap">{format(new Date(convo.lastActivityAt), 'HH:mm')}</p></div>
+          <div className="flex justify-between items-start mt-1">
+            <p className={cn("text-sm truncate flex items-center", convo.unreadCount > 0 ? "text-black font-bold" : "text-muted-foreground")}>
+              {isLastMessageOutgoing && <CornerDownLeft className="h-4 w-4 mr-1 flex-shrink-0" />}
+              {convo.lastMessage}
+            </p>
+            {convo.unreadCount > 0 && <Badge variant="destructive">{convo.unreadCount}</Badge>}
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="flex flex-col h-full bg-white">
@@ -361,7 +359,7 @@ const ChatbotZalo = () => {
                               {msg.imageUrl && <img src={msg.imageUrl} alt="Zalo attachment" className="rounded-lg max-w-full h-auto mb-2" />}
                               {msg.content && <p className="whitespace-pre-wrap">{msg.content}</p>}
                             </div>
-                            <p className="text-[10px] text-muted-foreground px-1 mt-1">
+                            <p className="text-xs text-muted-foreground px-1 mt-1">
                                 {format(new Date(msg.createdAt), 'HH:mm')}
                             </p>
                         </div>
