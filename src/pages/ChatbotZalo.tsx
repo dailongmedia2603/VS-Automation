@@ -1,77 +1,49 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
-import { Command, CommandInput, CommandEmpty, CommandGroup, CommandItem, CommandList, CommandSeparator } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
-import { format, isSameDay, subMinutes } from 'date-fns';
+import { format, isSameDay } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import { ChatwootContactPanel } from '@/components/ChatwootContactPanel';
-import { AiLogViewer } from '@/components/AiLogViewer';
-import { Search, Phone, Paperclip, Image as ImageIcon, SendHorizonal, ThumbsUp, Settings2, CornerDownLeft, Eye, RefreshCw, FileText, X, Filter, Check, PlusCircle, Trash2, Bot, Loader2 } from 'lucide-react';
-import { showSuccess } from '@/utils/toast';
-import { Conversation, Message, CareScript, ChatwootLabel } from '@/types/chatwoot';
+import { Search, SendHorizonal, RefreshCw, Loader2 } from 'lucide-react';
+import { showError, showSuccess } from '@/utils/toast';
 
-// --- Dữ liệu mẫu ---
-const MOCK_LABELS: ChatwootLabel[] = [
-  { id: 1, name: 'Khách VIP', color: '#7c3aed' },
-  { id: 2, name: 'Cần tư vấn', color: '#db2777' },
-  { id: 3, name: 'Khiếu nại', color: '#e11d48' },
-  { id: 4, name: 'AI chăm', color: '#2563eb' },
-];
+// --- Types for Zalo data ---
+interface ZaloUser {
+  userId: number;
+  displayName: string;
+  zaloName: string;
+  avatar: string;
+}
 
-const MOCK_CONVERSATIONS: Conversation[] = [
-  {
-    id: 1,
-    messages: [],
-    meta: {
-      sender: { id: 1, name: 'Nguyễn Thị Thảo', thumbnail: 'https://i.pravatar.cc/150?u=thaonguyen' }
-    },
-    status: 'open',
-    unread_count: 2,
-    last_activity_at: new Date().getTime() / 1000,
-    labels: ['Cần tư vấn'],
-  },
-  {
-    id: 2,
-    messages: [],
-    meta: {
-      sender: { id: 2, name: 'Trần Văn Hùng', thumbnail: 'https://i.pravatar.cc/150?u=hungtran', phone_number: '0987654321' }
-    },
-    status: 'open',
-    unread_count: 0,
-    last_activity_at: new Date().getTime() / 1000 - 600,
-    labels: ['Khách VIP'],
-  },
-  {
-    id: 3,
-    messages: [],
-    meta: {
-      sender: { id: 3, name: 'Lê Minh Anh', thumbnail: 'https://i.pravatar.cc/150?u=minhanh' }
-    },
-    status: 'open',
-    unread_count: 0,
-    last_activity_at: new Date().getTime() / 1000 - 1200,
-    labels: [],
-  },
-];
+interface ZaloMessageDb {
+  id: number;
+  threadId: number;
+  message_content: string;
+  created_at: string;
+  threadId_name: string;
+}
 
-const MOCK_MESSAGES: { [key: number]: Message[] } = {
-  1: [
-    { id: 101, content: 'Chào shop, mình muốn hỏi về sản phẩm Zalo AI.', created_at: subMinutes(new Date(), 5).getTime() / 1000, message_type: 0, private: false, sender: { id: 1, name: 'Nguyễn Thị Thảo', thumbnail: 'https://i.pravatar.cc/150?u=thaonguyen' } },
-    { id: 102, content: 'Dạ chào bạn, Zalo AI có thể giúp bạn tự động hóa việc chăm sóc khách hàng ạ. Bạn cần tư vấn cụ thể về tính năng nào ạ?', created_at: subMinutes(new Date(), 4).getTime() / 1000, message_type: 1, private: false },
-    { id: 103, content: 'Mình muốn biết về giá.', created_at: subMinutes(new Date(), 2).getTime() / 1000, message_type: 0, private: false, sender: { id: 1, name: 'Nguyễn Thị Thảo', thumbnail: 'https://i.pravatar.cc/150?u=thaonguyen' } },
-  ],
-  2: [
-    { id: 201, content: 'Shop ơi, check đơn hàng giúp mình với.', created_at: subMinutes(new Date(), 20).getTime() / 1000, message_type: 0, private: false, sender: { id: 2, name: 'Trần Văn Hùng', thumbnail: 'https://i.pravatar.cc/150?u=hungtran' } },
-  ],
-  3: [],
-};
+interface ZaloConversation {
+  threadId: number;
+  name: string;
+  avatar: string;
+  lastMessage: string;
+  lastActivityAt: string;
+  unreadCount: number;
+}
+
+interface ZaloMessage {
+  id: number;
+  content: string;
+  createdAt: string;
+  // Lưu ý: Bảng zalo_messages không có thông tin người gửi (agent/user).
+  // Do đó, tất cả tin nhắn sẽ được hiển thị như tin nhắn đến.
+  isOutgoing: boolean; 
+}
 
 const getInitials = (name?: string) => {
   if (!name) return 'U';
@@ -81,87 +53,143 @@ const getInitials = (name?: string) => {
 };
 
 const ChatbotZalo = () => {
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [conversations, setConversations] = useState<ZaloConversation[]>([]);
   const [loadingConversations, setLoadingConversations] = useState(true);
-  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [selectedConversation, setSelectedConversation] = useState<ZaloConversation | null>(null);
+  const [messages, setMessages] = useState<ZaloMessage[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [newMessage, setNewMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [suggestedLabels, setSuggestedLabels] = useState<ChatwootLabel[]>(MOCK_LABELS);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    // Giả lập tải dữ liệu
-    setTimeout(() => {
-      setConversations(MOCK_CONVERSATIONS);
+  const fetchZaloData = useCallback(async () => {
+    setLoadingConversations(true);
+    try {
+      const { data: messagesData, error: messagesError } = await supabase
+        .from('zalo_messages')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (messagesError) throw messagesError;
+
+      const { data: usersData, error: usersError } = await supabase
+        .from('zalo_user')
+        .select('*');
+
+      if (usersError) throw usersError;
+
+      const usersMap = new Map<string, ZaloUser>();
+      (usersData as ZaloUser[]).forEach(user => {
+        if (user.displayName) usersMap.set(user.displayName, user);
+        if (user.zaloName) usersMap.set(user.zaloName, user);
+      });
+
+      const conversationsMap = new Map<number, ZaloConversation>();
+      (messagesData as ZaloMessageDb[]).forEach(msg => {
+        if (!conversationsMap.has(msg.threadId) && msg.message_content) {
+          const user = usersMap.get(msg.threadId_name);
+          conversationsMap.set(msg.threadId, {
+            threadId: msg.threadId,
+            name: msg.threadId_name,
+            avatar: user?.avatar || `https://i.pravatar.cc/150?u=${encodeURIComponent(msg.threadId_name)}`,
+            lastMessage: msg.message_content,
+            lastActivityAt: msg.created_at,
+            unreadCount: 0, // Không có thông tin chưa đọc từ DB
+          });
+        }
+      });
+
+      const sortedConversations = Array.from(conversationsMap.values())
+        .sort((a, b) => new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime());
+
+      setConversations(sortedConversations);
+
+    } catch (error: any) {
+      showError("Lỗi tải dữ liệu Zalo: " + error.message);
+    } finally {
       setLoadingConversations(false);
-    }, 1000);
+    }
   }, []);
 
   useEffect(() => {
-    if (selectedConversation) {
-      setLoadingMessages(true);
-      setTimeout(() => {
-        setMessages(MOCK_MESSAGES[selectedConversation.id] || []);
-        setLoadingMessages(false);
-      }, 500);
-    }
-  }, [selectedConversation]);
+    fetchZaloData();
+  }, [fetchZaloData]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSelectConversation = (conversation: Conversation) => {
+  const handleSelectConversation = async (conversation: ZaloConversation) => {
     setSelectedConversation(conversation);
-    const updatedConversations = conversations.map(c => 
-      c.id === conversation.id ? { ...c, unread_count: 0 } : c
-    );
-    setConversations(updatedConversations);
+    setLoadingMessages(true);
+    setMessages([]);
+    try {
+      const { data, error } = await supabase
+        .from('zalo_messages')
+        .select('id, message_content, created_at')
+        .eq('threadId', conversation.threadId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      const formattedMessages: ZaloMessage[] = data.map(msg => ({
+        id: msg.id,
+        content: msg.message_content,
+        createdAt: msg.created_at,
+        // Vì không có thông tin người gửi, tạm thời coi tất cả là tin nhắn đến
+        isOutgoing: false,
+      }));
+      setMessages(formattedMessages);
+
+    } catch (error: any) {
+      showError("Lỗi tải tin nhắn: " + error.message);
+    } finally {
+      setLoadingMessages(false);
+    }
   };
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedConversation) return;
 
     setSendingMessage(true);
-    const sentMessage: Message = {
-      id: Date.now(),
-      content: newMessage,
-      created_at: new Date().getTime() / 1000,
-      message_type: 1,
-      private: false,
+    
+    // Tin nhắn gửi từ đây được coi là tin nhắn đi (isOutgoing = true)
+    const tempMessage: ZaloMessage = {
+        id: Date.now(),
+        content: newMessage.trim(),
+        createdAt: new Date().toISOString(),
+        isOutgoing: true,
     };
+    setMessages(prev => [...prev, tempMessage]);
+    setNewMessage('');
 
-    setTimeout(() => {
-      setMessages(prev => [...prev, sentMessage]);
-      setNewMessage('');
-      setSendingMessage(false);
-      showSuccess("Đã gửi tin nhắn!");
-    }, 500);
-  };
+    const { error } = await supabase
+        .from('zalo_messages')
+        .insert({
+            threadId: selectedConversation.threadId,
+            message_content: tempMessage.content,
+            threadId_name: selectedConversation.name,
+        });
 
-  const handleToggleLabel = (label: string) => {
-    if (!selectedConversation) return;
-
-    const currentLabels = selectedConversation.labels || [];
-    const isLabelApplied = currentLabels.includes(label);
-    const newLabels = isLabelApplied
-      ? currentLabels.filter(l => l !== label)
-      : [...currentLabels, label];
-
-    const updatedConversation = { ...selectedConversation, labels: newLabels };
-    setSelectedConversation(updatedConversation);
-    setConversations(convos => convos.map(c => c.id === selectedConversation.id ? updatedConversation : c));
+    if (error) {
+        showError("Gửi tin nhắn thất bại: " + error.message);
+        // Xóa tin nhắn tạm thời nếu gửi lỗi
+        setMessages(prev => prev.filter(m => m.id !== tempMessage.id));
+    } else {
+        showSuccess("Đã gửi tin nhắn!");
+        // Tải lại dữ liệu để đồng bộ
+        fetchZaloData();
+    }
+    setSendingMessage(false);
   };
 
   const groupedMessages = useMemo(() => {
-    return messages.reduce((acc: ({ type: 'date'; date: string } | { type: 'message'; data: Message })[], message, index) => {
-      const messageDate = new Date(message.created_at * 1000);
+    return messages.reduce((acc: ({ type: 'date'; date: string } | { type: 'message'; data: ZaloMessage })[], message, index) => {
+      const messageDate = new Date(message.createdAt);
       const prevMessage = messages[index - 1];
-      const prevMessageDate = prevMessage ? new Date(prevMessage.created_at * 1000) : null;
+      const prevMessageDate = prevMessage ? new Date(prevMessage.createdAt) : null;
       if (!prevMessageDate || !isSameDay(messageDate, prevMessageDate)) {
         acc.push({ type: 'date', date: format(messageDate, 'dd MMM yyyy', { locale: vi }) });
       }
@@ -172,26 +200,20 @@ const ChatbotZalo = () => {
 
   const filteredConversations = useMemo(() => {
     return conversations.filter(convo =>
-      convo.meta.sender.name.toLowerCase().includes(searchQuery.toLowerCase())
+      convo.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [conversations, searchQuery]);
 
-  const unreadConversations = filteredConversations.filter(c => c.unread_count > 0);
-  const readConversations = filteredConversations.filter(c => !c.unread_count || c.unread_count === 0);
-
-  const renderConversationItem = (convo: Conversation) => (
-    <div key={convo.id} onClick={() => handleSelectConversation(convo)} className={cn("p-2.5 flex space-x-3 cursor-pointer rounded-lg", selectedConversation?.id === convo.id && "bg-blue-100")}>
-      <Avatar className="h-12 w-12"><AvatarImage src={convo.meta.sender.thumbnail} /><AvatarFallback>{getInitials(convo.meta.sender.name)}</AvatarFallback></Avatar>
+  const renderConversationItem = (convo: ZaloConversation) => (
+    <div key={convo.threadId} onClick={() => handleSelectConversation(convo)} className={cn("p-2.5 flex space-x-3 cursor-pointer rounded-lg", selectedConversation?.threadId === convo.threadId && "bg-blue-100")}>
+      <Avatar className="h-12 w-12"><AvatarImage src={convo.avatar} /><AvatarFallback>{getInitials(convo.name)}</AvatarFallback></Avatar>
       <div className="flex-1 overflow-hidden">
-        <div className="flex justify-between items-center"><p className="font-semibold truncate text-sm">{convo.meta.sender.name}</p><p className="text-xs text-muted-foreground whitespace-nowrap">{format(new Date(convo.last_activity_at * 1000), 'HH:mm')}</p></div>
+        <div className="flex justify-between items-center"><p className="font-semibold truncate text-sm">{convo.name}</p><p className="text-xs text-muted-foreground whitespace-nowrap">{format(new Date(convo.lastActivityAt), 'HH:mm')}</p></div>
         <div className="flex justify-between items-start mt-1">
-          <p className={cn("text-sm truncate flex items-center", convo.unread_count > 0 ? "text-black font-bold" : "text-muted-foreground")}>
-            {MOCK_MESSAGES[convo.id]?.slice(-1)[0]?.content || 'Không có tin nhắn'}
+          <p className={cn("text-sm truncate flex items-center", convo.unreadCount > 0 ? "text-black font-bold" : "text-muted-foreground")}>
+            {convo.lastMessage}
           </p>
-          <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-            {convo.meta.sender.phone_number && <Phone className="h-4 w-4 text-green-600" strokeWidth={2} />}
-            {convo.unread_count > 0 && <Badge variant="destructive">{convo.unread_count}</Badge>}
-          </div>
+          {convo.unreadCount > 0 && <Badge variant="destructive">{convo.unreadCount}</Badge>}
         </div>
       </div>
     </div>
@@ -207,11 +229,13 @@ const ChatbotZalo = () => {
           </div>
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
-          {loadingConversations ? ([...Array(5)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)) : (
+          {loadingConversations ? ([...Array(8)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)) : (
             <>
-              {unreadConversations.length > 0 && (<div className="mb-4 p-2 bg-blue-50/50 rounded-lg"><h3 className="px-1 pb-1 text-xs font-bold uppercase text-blue-600 tracking-wider">Chưa đọc</h3><div className="space-y-1">{unreadConversations.map(renderConversationItem)}</div></div>)}
-              {readConversations.length > 0 && (<div className="space-y-1">{readConversations.map(renderConversationItem)}</div>)}
-              {filteredConversations.length === 0 && !loadingConversations && (<p className="p-4 text-sm text-center text-muted-foreground">Không có cuộc trò chuyện nào.</p>)}
+              {filteredConversations.length > 0 ? (
+                filteredConversations.map(renderConversationItem)
+              ) : (
+                <p className="p-4 text-sm text-center text-muted-foreground">Không có cuộc trò chuyện nào.</p>
+              )}
             </>
           )}
         </div>
@@ -220,9 +244,17 @@ const ChatbotZalo = () => {
         {selectedConversation ? (
           <>
             <header className="p-3 border-b bg-white flex items-center justify-between shadow-sm">
-              <div className="flex items-center space-x-3"><Avatar><AvatarImage src={selectedConversation.meta.sender.thumbnail} /><AvatarFallback>{getInitials(selectedConversation.meta.sender.name)}</AvatarFallback></Avatar><div><h3 className="font-bold">{selectedConversation.meta.sender.name}</h3><p className="text-xs text-muted-foreground">Online</p></div></div>
+              <div className="flex items-center space-x-3">
+                <Avatar>
+                  <AvatarImage src={selectedConversation.avatar} />
+                  <AvatarFallback>{getInitials(selectedConversation.name)}</AvatarFallback>
+                </Avatar>
+                <div><h3 className="font-bold">{selectedConversation.name}</h3><p className="text-xs text-muted-foreground">Online</p></div>
+              </div>
               <div className="flex items-center space-x-2 text-muted-foreground">
-                <Button variant="ghost" size="icon" className="h-8 w-8"><RefreshCw className="h-5 w-5" /></Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={fetchZaloData} disabled={loadingConversations}>
+                  <RefreshCw className={cn("h-5 w-5", loadingConversations && "animate-spin")} />
+                </Button>
               </div>
             </header>
             <div className="flex-1 overflow-y-auto p-4 md:p-6">
@@ -232,11 +264,10 @@ const ChatbotZalo = () => {
                     return <div key={index} className="text-center my-4"><span className="text-xs text-muted-foreground bg-white px-3 py-1 rounded-full shadow-sm">{item.date}</span></div>;
                   }
                   const msg = item.data;
-                  const isOutgoing = msg.message_type === 1;
                   return (
-                    <div key={msg.id} className={cn("flex items-start gap-3", isOutgoing && "justify-end")}>
-                      {!isOutgoing && <Avatar className="h-8 w-8"><AvatarImage src={msg.sender?.thumbnail} /><AvatarFallback>{getInitials(msg.sender?.name)}</AvatarFallback></Avatar>}
-                      <div className={cn("rounded-2xl px-3 py-2 max-w-sm md:max-w-md break-words shadow-sm", isOutgoing ? 'bg-blue-500 text-white' : 'bg-white text-gray-800')}>
+                    <div key={msg.id} className={cn("flex items-start gap-3", msg.isOutgoing && "justify-end")}>
+                      {!msg.isOutgoing && <Avatar className="h-8 w-8"><AvatarImage src={selectedConversation.avatar} /><AvatarFallback>{getInitials(selectedConversation.name)}</AvatarFallback></Avatar>}
+                      <div className={cn("rounded-2xl px-3 py-2 max-w-sm md:max-w-md break-words shadow-sm", msg.isOutgoing ? 'bg-blue-500 text-white' : 'bg-white text-gray-800')}>
                         <p className="whitespace-pre-wrap">{msg.content}</p>
                       </div>
                     </div>
@@ -246,17 +277,6 @@ const ChatbotZalo = () => {
               <div ref={messagesEndRef} />
             </div>
             <footer className="p-2 border-t bg-white space-y-2">
-              <div className="flex flex-wrap gap-2 px-2">
-                {suggestedLabels.map(label => {
-                  const isApplied = selectedConversation?.labels.includes(label.name);
-                  return (
-                    <Button key={label.id} variant="outline" size="sm" className={cn("text-xs h-7 transition-all", isApplied && "text-white")} style={{ backgroundColor: isApplied ? label.color : 'transparent', borderColor: label.color, color: isApplied ? 'white' : label.color }} onClick={() => handleToggleLabel(label.name)}>
-                      {isApplied && <Check className="h-3 w-3 mr-1.5" />}
-                      {label.name}
-                    </Button>
-                  )
-                })}
-              </div>
               <form onSubmit={handleSendMessage} className="relative">
                 <Input placeholder="Nhập tin nhắn Zalo..." className="pr-12" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} disabled={sendingMessage} />
                 <Button type="submit" size="icon" className="absolute right-1.5 top-1/2 -translate-y-1/2 h-8 w-9" disabled={sendingMessage}>
@@ -274,14 +294,6 @@ const ChatbotZalo = () => {
           </div>
         )}
       </section>
-      <ChatwootContactPanel
-        selectedConversation={selectedConversation}
-        messages={messages}
-        onNewNote={() => {}}
-        scripts={[]}
-        fetchCareScripts={async () => {}}
-        onConversationUpdate={() => {}}
-      />
     </div>
   );
 };
