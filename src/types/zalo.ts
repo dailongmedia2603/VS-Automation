@@ -29,6 +29,7 @@ export interface ZaloMessage {
   id: number;
   content: string | null;
   imageUrl: string | null;
+  attachmentName: string | null;
   createdAt: string;
   isOutgoing: boolean;
 }

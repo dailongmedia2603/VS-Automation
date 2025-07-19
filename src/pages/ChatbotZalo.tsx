@@ -22,6 +22,29 @@ const getInitials = (name?: string | null) => {
   return name.substring(0, 2).toUpperCase();
 };
 
+const isImageUrl = (url: string): boolean => {
+  if (!url) return false;
+  return /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
+};
+
+const getFileNameFromUrl = (url: string): string => {
+  if (!url) return '';
+  try {
+    const decodedUrl = decodeURIComponent(url);
+    const urlParts = decodedUrl.split('/');
+    const lastPart = urlParts[urlParts.length - 1];
+    const nameParts = lastPart.split('-');
+    if (nameParts.length > 1) {
+      nameParts.shift();
+      return nameParts.join('-');
+    }
+    return lastPart;
+  } catch (e) {
+    console.error("Failed to decode or parse URL", e);
+    return 'file';
+  }
+};
+
 const ChatbotZalo = () => {
   const { user } = useAuth();
   const [conversations, setConversations] = useState<ZaloConversation[]>([]);
@@ -100,6 +123,7 @@ const ChatbotZalo = () => {
         id: msg.id,
         content: msg.message_content,
         imageUrl: msg.message_image,
+        attachmentName: msg.message_image ? getFileNameFromUrl(msg.message_image) : null,
         createdAt: msg.created_at,
         isOutgoing: msg.direction === 'out',
       }));
@@ -176,6 +200,7 @@ const ChatbotZalo = () => {
         id: msg.id,
         content: msg.message_content,
         imageUrl: msg.message_image,
+        attachmentName: msg.message_image ? getFileNameFromUrl(msg.message_image) : null,
         createdAt: msg.created_at,
         isOutgoing: msg.direction === 'out',
       }));
@@ -202,11 +227,8 @@ const ChatbotZalo = () => {
   };
 
   const sanitizeFileName = (fileName: string) => {
-    // Remove diacritics
     let sanitized = fileName.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    // Replace spaces with underscores
     sanitized = sanitized.replace(/\s+/g, '_');
-    // Remove special characters except for underscore, hyphen, and period
     sanitized = sanitized.replace(/[^a-zA-Z0-9._-]/g, '');
     return sanitized;
   };
@@ -227,6 +249,7 @@ const ChatbotZalo = () => {
         id: tempId,
         content: content,
         imageUrl: currentAttachment ? URL.createObjectURL(currentAttachment) : null,
+        attachmentName: currentAttachment ? currentAttachment.name : null,
         createdAt: new Date().toISOString(),
         isOutgoing: true,
     };
@@ -269,6 +292,7 @@ const ChatbotZalo = () => {
                 id: newMessageFromDb.id,
                 content: newMessageFromDb.message_content,
                 imageUrl: newMessageFromDb.message_image,
+                attachmentName: newMessageFromDb.message_image ? getFileNameFromUrl(newMessageFromDb.message_image) : null,
                 createdAt: newMessageFromDb.created_at,
                 isOutgoing: newMessageFromDb.direction === 'out',
             } : m));
@@ -417,9 +441,17 @@ const ChatbotZalo = () => {
                           </Avatar>
                         )}
                         <div className={cn("flex flex-col max-w-sm md:max-w-md", msg.isOutgoing ? 'items-end' : 'items-start')}>
-                            <div className={cn("rounded-2xl px-3 py-2 break-words shadow-sm", msg.isOutgoing ? 'bg-blue-500 text-white' : 'bg-white text-gray-800')}>
-                              {msg.imageUrl && <img src={msg.imageUrl} alt="Zalo attachment" className="rounded-lg max-w-full h-auto mb-2" />}
-                              {msg.content && <p className="whitespace-pre-wrap">{msg.content}</p>}
+                            <div className={cn("rounded-2xl break-words shadow-sm", msg.isOutgoing ? 'bg-blue-500 text-white' : 'bg-white text-gray-800', !msg.content && !msg.imageUrl ? 'p-0' : 'px-3 py-2')}>
+                              {msg.imageUrl && isImageUrl(msg.imageUrl) && (
+                                <img src={msg.imageUrl} alt="Zalo attachment" className="rounded-lg max-w-full h-auto" />
+                              )}
+                              {msg.imageUrl && !isImageUrl(msg.imageUrl) && (
+                                <a href={msg.imageUrl} target="_blank" rel="noopener noreferrer" className={cn("flex items-center gap-2 p-2 rounded-lg", msg.isOutgoing ? 'hover:bg-blue-600' : 'hover:bg-slate-100')}>
+                                  <FileText className="h-6 w-6 flex-shrink-0" />
+                                  <span className="font-medium truncate">{msg.attachmentName || 'Tệp đính kèm'}</span>
+                                </a>
+                              )}
+                              {msg.content && <p className={cn("whitespace-pre-wrap", msg.imageUrl && "mt-2")}>{msg.content}</p>}
                             </div>
                             <p className="text-xs text-muted-foreground px-1 mt-1">
                                 {format(new Date(msg.createdAt), 'HH:mm')}
