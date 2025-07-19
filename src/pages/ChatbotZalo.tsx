@@ -39,31 +39,23 @@ const ChatbotZalo = () => {
   const fetchZaloData = useCallback(async () => {
     setLoadingConversations(true);
     try {
-      // Helper function to fetch all records from a table with pagination
       const fetchAllUsers = async () => {
-        const PAGE_SIZE = 1000; // Supabase's max limit per request
+        const PAGE_SIZE = 1000;
         let allUsers: ZaloUser[] = [];
         let page = 0;
         let hasMore = true;
-
         while (hasMore) {
           const from = page * PAGE_SIZE;
           const to = from + PAGE_SIZE - 1;
-
           const { data: users, error } = await supabase
             .from('zalo_user')
             .select('userId::text, displayName, zaloName, avatar')
             .range(from, to);
-
           if (error) throw error;
-
           if (users && users.length > 0) {
             allUsers = allUsers.concat(users);
             page++;
-            // If we receive less than a full page, we know we're done
-            if (users.length < PAGE_SIZE) {
-              hasMore = false;
-            }
+            if (users.length < PAGE_SIZE) hasMore = false;
           } else {
             hasMore = false;
           }
@@ -71,46 +63,44 @@ const ChatbotZalo = () => {
         return allUsers;
       };
 
-      // Step 1: Fetch data concurrently
       const [usersData, messagesResponse] = await Promise.all([
         fetchAllUsers(),
-        supabase.from('zalo_messages').select('id, threadId::text, message_content, created_at, threadId_name').order('created_at', { ascending: false })
+        supabase.from('zalo_messages').select('id, threadId::text, message_content, message_image, created_at, threadId_name').order('created_at', { ascending: false })
       ]);
 
       if (messagesResponse.error) throw messagesResponse.error;
-
       const messagesData = messagesResponse.data as ZaloMessageDb[];
 
-      // Step 2: Create a User Lookup Map
       const usersMap = new Map<string, ZaloUser>();
       usersData.forEach(user => {
         usersMap.set(user.userId.trim(), user);
       });
-      
-      // Update debugger state
       setDebugUsersMap(usersMap);
 
-      // Step 3: Build conversations and attach avatars
       const conversationsMap = new Map<string, ZaloConversation>();
       messagesData.forEach(msg => {
         const threadIdStr = msg.threadId.trim();
-        
-        if (!conversationsMap.has(threadIdStr) && msg.message_content) {
+        if (!conversationsMap.has(threadIdStr)) {
           const user = usersMap.get(threadIdStr);
-          conversationsMap.set(threadIdStr, {
-            threadId: threadIdStr,
-            name: user?.displayName || user?.zaloName || msg.threadId_name || 'Unknown User',
-            avatar: user?.avatar,
-            lastMessage: msg.message_content,
-            lastActivityAt: msg.created_at,
-            unreadCount: 0,
-          });
+          let lastMessageContent = msg.message_content;
+          if (!lastMessageContent && msg.message_image) {
+            lastMessageContent = '[Hình ảnh]';
+          }
+          if (lastMessageContent) {
+            conversationsMap.set(threadIdStr, {
+              threadId: threadIdStr,
+              name: user?.displayName || user?.zaloName || msg.threadId_name || 'Unknown User',
+              avatar: user?.avatar,
+              lastMessage: lastMessageContent,
+              lastActivityAt: msg.created_at,
+              unreadCount: 0,
+            });
+          }
         }
       });
 
       const sortedConversations = Array.from(conversationsMap.values())
         .sort((a, b) => new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime());
-
       setConversations(sortedConversations);
 
     } catch (error: any) {
@@ -136,7 +126,7 @@ const ChatbotZalo = () => {
     try {
       const { data, error } = await supabase
         .from('zalo_messages')
-        .select('id, message_content, created_at')
+        .select('id, message_content, created_at, message_image')
         .eq('threadId', conversation.threadId)
         .order('created_at', { ascending: true });
 
@@ -145,8 +135,9 @@ const ChatbotZalo = () => {
       const formattedMessages: ZaloMessage[] = data.map(msg => ({
         id: msg.id,
         content: msg.message_content,
+        imageUrl: msg.message_image,
         createdAt: msg.created_at,
-        isOutgoing: false,
+        isOutgoing: false, // This needs to be determined by sender in a real scenario
       }));
       setMessages(formattedMessages);
 
@@ -160,18 +151,16 @@ const ChatbotZalo = () => {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedConversation) return;
-
     setSendingMessage(true);
-    
     const tempMessage: ZaloMessage = {
         id: Date.now(),
         content: newMessage.trim(),
+        imageUrl: null,
         createdAt: new Date().toISOString(),
         isOutgoing: true,
     };
     setMessages(prev => [...prev, tempMessage]);
     setNewMessage('');
-
     const { error } = await supabase
         .from('zalo_messages')
         .insert({
@@ -179,7 +168,6 @@ const ChatbotZalo = () => {
             message_content: tempMessage.content,
             threadId_name: selectedConversation.name,
         });
-
     if (error) {
         showError("Gửi tin nhắn thất bại: " + error.message);
         setMessages(prev => prev.filter(m => m.id !== tempMessage.id));
@@ -289,7 +277,8 @@ const ChatbotZalo = () => {
                           </Avatar>
                         )}
                         <div className={cn("rounded-2xl px-3 py-2 max-w-sm md:max-w-md break-words shadow-sm", msg.isOutgoing ? 'bg-blue-500 text-white' : 'bg-white text-gray-800')}>
-                          <p className="whitespace-pre-wrap">{msg.content}</p>
+                          {msg.imageUrl && <img src={msg.imageUrl} alt="Zalo attachment" className="rounded-lg max-w-full h-auto mb-2" />}
+                          {msg.content && <p className="whitespace-pre-wrap">{msg.content}</p>}
                         </div>
                       </div>
                     );

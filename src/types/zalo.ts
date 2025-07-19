@@ -17,14 +17,16 @@ export interface ZaloConversation {
 export interface ZaloMessageDb {
   id: number;
   threadId: string;
-  message_content: string;
+  message_content: string | null;
+  message_image: string | null;
   created_at: string;
   threadId_name: string;
 }
 
 export interface ZaloMessage {
   id: number;
-  content: string;
+  content: string | null;
+  imageUrl: string | null;
   createdAt: string;
   isOutgoing: boolean;
 }
