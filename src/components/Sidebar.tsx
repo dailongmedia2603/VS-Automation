@@ -18,6 +18,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Button } from "./ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import hexaLogo from "@/assets/images/logo.png";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface NavItem {
   name: string;
@@ -57,33 +58,35 @@ interface StaffProfile {
 
 export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps) {
   const location = useLocation();
+  const { user } = useAuth();
   const [profile, setProfile] = useState<StaffProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
 
   useEffect(() => {
     const fetchProfile = async () => {
+      if (!user || !user.email) {
+        setProfile(null);
+        setLoadingProfile(false);
+        return;
+      }
+
       setLoadingProfile(true);
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user && user.email) {
-          const { data: staffProfile, error } = await supabase
-            .from('staff')
-            .select('name, role, avatar_url')
-            .eq('email', user.email)
-            .single();
-          
-          if (error) {
-            console.warn('Error fetching staff profile, falling back to auth user:', error.message);
-            setProfile({
-                name: user.user_metadata?.full_name || user.email || 'Người dùng',
-                role: 'Thành viên',
-                avatar_url: user.user_metadata?.avatar_url
-            });
-          } else {
-            setProfile(staffProfile);
-          }
+        const { data: staffProfile, error } = await supabase
+          .from('staff')
+          .select('name, role, avatar_url')
+          .eq('email', user.email)
+          .single();
+        
+        if (error) {
+          console.warn('Error fetching staff profile, falling back to auth user:', error.message);
+          setProfile({
+              name: user.user_metadata?.full_name || user.email || 'Người dùng',
+              role: 'Thành viên',
+              avatar_url: user.user_metadata?.avatar_url
+          });
         } else {
-          setProfile(null);
+          setProfile(staffProfile);
         }
       } catch (e) {
         console.error('Exception fetching profile', e);
@@ -94,15 +97,7 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
     };
   
     fetchProfile();
-  
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, _session) => {
-        fetchProfile();
-    });
-  
-    return () => {
-      authListener?.subscription.unsubscribe();
-    };
-  }, []);
+  }, [user]);
 
   const getInitials = (name?: string | null) => {
     if (!name) return '...';

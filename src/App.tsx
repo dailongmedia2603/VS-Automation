@@ -11,39 +11,47 @@ import ChatwootInbox from "./pages/ChatwootInbox";
 import TrainingChatbot from "./pages/TrainingChatbot";
 import Staff from "./pages/Staff";
 import NotFound from "./pages/NotFound";
+import Login from "./pages/Login";
 import { AppLayout } from "./components/AppLayout";
 import { ApiSettingsProvider } from "@/contexts/ApiSettingsContext";
 import { ChatwootProvider } from "@/contexts/ChatwootContext";
 import ChatbotZalo from "./pages/ChatbotZalo";
+import { AuthProvider } from "./contexts/AuthContext";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
 const App = () => (
-  <ApiSettingsProvider>
-    <ChatwootProvider>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              <Route element={<AppLayout />}>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/projects" element={<Projects />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="/chatbot-settings" element={<ChatwootSettings />} />
-                <Route path="/chatbot-inbox" element={<ChatwootInbox />} />
-                <Route path="/training-chatbot" element={<TrainingChatbot />} />
-                <Route path="/staff" element={<Staff />} />
-                <Route path="/chatbot-zalo" element={<ChatbotZalo />} />
-              </Route>
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
-      </QueryClientProvider>
-    </ChatwootProvider>
-  </ApiSettingsProvider>
+  <BrowserRouter>
+    <AuthProvider>
+      <ApiSettingsProvider>
+        <ChatwootProvider>
+          <QueryClientProvider client={queryClient}>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route element={<ProtectedRoute />}>
+                  <Route element={<AppLayout />}>
+                    <Route path="/" element={<Dashboard />} />
+                    <Route path="/projects" element={<Projects />} />
+                    <Route path="/settings" element={<Settings />} />
+                    <Route path="/chatbot-settings" element={<ChatwootSettings />} />
+                    <Route path="/chatbot-inbox" element={<ChatwootInbox />} />
+                    <Route path="/training-chatbot" element={<TrainingChatbot />} />
+                    <Route path="/staff" element={<Staff />} />
+                    <Route path="/chatbot-zalo" element={<ChatbotZalo />} />
+                  </Route>
+                </Route>
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </TooltipProvider>
+          </QueryClientProvider>
+        </ChatwootProvider>
+      </ApiSettingsProvider>
+    </AuthProvider>
+  </BrowserRouter>
 );
 
 export default App;

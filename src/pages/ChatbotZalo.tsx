@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { type User } from '@supabase/supabase-js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -13,6 +12,7 @@ import { Search, SendHorizonal, RefreshCw, Loader2, Bug } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import { ZaloDataDebugger } from '@/components/ZaloDataDebugger';
 import type { ZaloUser, ZaloConversation, ZaloMessageDb, ZaloMessage } from '@/types/zalo';
+import { useAuth } from '@/contexts/AuthContext';
 
 const getInitials = (name?: string) => {
   if (!name) return 'U';
@@ -22,7 +22,7 @@ const getInitials = (name?: string) => {
 };
 
 const ChatbotZalo = () => {
-  const [user, setUser] = useState<User | null>(null);
+  const { user } = useAuth();
   const [conversations, setConversations] = useState<ZaloConversation[]>([]);
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [selectedConversation, setSelectedConversation] = useState<ZaloConversation | null>(null);
@@ -37,14 +37,6 @@ const ChatbotZalo = () => {
   const [isDebugVisible, setIsDebugVisible] = useState(false);
   const [debugUsersMap, setDebugUsersMap] = useState<Map<string, ZaloUser>>(new Map());
   const POLLING_INTERVAL = 5000;
-
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-    };
-    getUser();
-  }, []);
 
   const fetchZaloData = useCallback(async (isInitialLoad = false) => {
     if (!user) {
