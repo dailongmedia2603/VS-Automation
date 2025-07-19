@@ -39,16 +39,46 @@ const ChatbotZalo = () => {
   const fetchZaloData = useCallback(async () => {
     setLoadingConversations(true);
     try {
-      // Step 1: Fetch data concurrently, casting bigint to text to prevent precision loss
-      const [usersResponse, messagesResponse] = await Promise.all([
-        supabase.from('zalo_user').select('userId::text, displayName, zaloName, avatar'),
+      // Helper function to fetch all records from a table with pagination
+      const fetchAllUsers = async () => {
+        const PAGE_SIZE = 1000; // Supabase's max limit per request
+        let allUsers: ZaloUser[] = [];
+        let page = 0;
+        let hasMore = true;
+
+        while (hasMore) {
+          const from = page * PAGE_SIZE;
+          const to = from + PAGE_SIZE - 1;
+
+          const { data: users, error } = await supabase
+            .from('zalo_user')
+            .select('userId::text, displayName, zaloName, avatar')
+            .range(from, to);
+
+          if (error) throw error;
+
+          if (users && users.length > 0) {
+            allUsers = allUsers.concat(users);
+            page++;
+            // If we receive less than a full page, we know we're done
+            if (users.length < PAGE_SIZE) {
+              hasMore = false;
+            }
+          } else {
+            hasMore = false;
+          }
+        }
+        return allUsers;
+      };
+
+      // Step 1: Fetch data concurrently
+      const [usersData, messagesResponse] = await Promise.all([
+        fetchAllUsers(),
         supabase.from('zalo_messages').select('id, threadId::text, message_content, created_at, threadId_name').order('created_at', { ascending: false })
       ]);
 
-      if (usersResponse.error) throw usersResponse.error;
       if (messagesResponse.error) throw messagesResponse.error;
 
-      const usersData = usersResponse.data as ZaloUser[];
       const messagesData = messagesResponse.data as ZaloMessageDb[];
 
       // Step 2: Create a User Lookup Map
