@@ -8,6 +8,7 @@ import {
   ArrowRight,
   LayoutDashboard,
   ChevronLeft,
+  MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link, useLocation } from "react-router-dom";
@@ -35,6 +36,7 @@ const chatbotNavItems: NavItem[] = [
     { name: "Hộp thư Chatbot", icon: MessageSquare, href: "/chatbot-inbox" },
     { name: "Cài đặt Chatbot", icon: Settings, href: "/chatbot-settings" },
     { name: "Training Chatbot", icon: GraduationCap, href: "/training-chatbot" },
+    { name: "Chatbot Zalo", icon: MessageCircle, href: "/chatbot-zalo" },
 ]
 
 const supportNavItems: NavItem[] = [

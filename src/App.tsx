@@ -14,6 +14,7 @@ import NotFound from "./pages/NotFound";
 import { AppLayout } from "./components/AppLayout";
 import { ApiSettingsProvider } from "@/contexts/ApiSettingsContext";
 import { ChatwootProvider } from "@/contexts/ChatwootContext";
+import ChatbotZalo from "./pages/ChatbotZalo";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +35,7 @@ const App = () => (
                 <Route path="/chatbot-inbox" element={<ChatwootInbox />} />
                 <Route path="/training-chatbot" element={<TrainingChatbot />} />
                 <Route path="/staff" element={<Staff />} />
+                <Route path="/chatbot-zalo" element={<ChatbotZalo />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
