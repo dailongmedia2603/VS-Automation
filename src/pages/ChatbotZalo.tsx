@@ -8,8 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { format, isSameDay } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import { Search, SendHorizonal, RefreshCw, Loader2 } from 'lucide-react';
+import { Search, SendHorizonal, RefreshCw, Loader2, Bug } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
+import { ZaloDataDebugger } from '@/components/ZaloDataDebugger';
 
 // --- Types for Zalo data ---
 interface ZaloUser {
@@ -61,6 +62,10 @@ const ChatbotZalo = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const defaultAvatar = 'https://s120-ava-talk.zadn.vn/a/a/c/2/1/120/90898606938dd183dbf5c748e3dae52d.jpg';
+  
+  // Debugger state
+  const [isDebugVisible, setIsDebugVisible] = useState(false);
+  const [debugUsersMap, setDebugUsersMap] = useState<Map<string, ZaloUser>>(new Map());
 
   const fetchZaloData = useCallback(async () => {
     setLoadingConversations(true);
@@ -82,6 +87,9 @@ const ChatbotZalo = () => {
       usersData.forEach(user => {
         usersMap.set(user.userId.trim(), user);
       });
+      
+      // Update debugger state
+      setDebugUsersMap(usersMap);
 
       // Step 3: Build conversations and attach avatars
       const conversationsMap = new Map<string, ZaloConversation>();
@@ -224,6 +232,10 @@ const ChatbotZalo = () => {
     <div className="flex flex-col h-full bg-white">
       <div className="p-3 border-b flex items-center justify-between">
         <h2 className="text-lg font-bold">Hộp thư Zalo</h2>
+        <Button variant="outline" onClick={() => setIsDebugVisible(!isDebugVisible)}>
+          <Bug className="h-4 w-4 mr-2" />
+          Bật/Tắt Gỡ lỗi
+        </Button>
       </div>
       <div className="flex-1 flex overflow-hidden">
         <aside className="w-80 border-r flex flex-col">
@@ -305,6 +317,7 @@ const ChatbotZalo = () => {
           )}
         </section>
       </div>
+      {isDebugVisible && <div className="p-4 border-t"><ZaloDataDebugger usersMap={debugUsersMap} conversations={conversations} /></div>}
     </div>
   );
 };
