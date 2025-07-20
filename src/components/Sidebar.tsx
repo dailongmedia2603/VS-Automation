@@ -238,7 +238,7 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
         </div>
         
         <div>
-            <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>Chatbot</p>
+            <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>CHATBOT FANPAGE</p>
             <nav className="flex flex-col space-y-1">
                 {chatbotNavItems.map(renderLink)}
             </nav>
