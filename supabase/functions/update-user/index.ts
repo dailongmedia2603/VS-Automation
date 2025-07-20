@@ -22,8 +22,9 @@ serve(async (req) => {
     );
 
     // Step 1: Update user metadata in auth.users
+    // CORRECTED: The key should be 'user_metadata', not 'data'.
     const authUpdateData = {
-      data: {
+      user_metadata: {
         full_name: name,
         avatar_url: avatar_url
       }
