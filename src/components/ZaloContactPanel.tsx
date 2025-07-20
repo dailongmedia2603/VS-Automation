@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Phone, Send, Loader2, PlusCircle, Calendar, Clock, Trash2, Pencil, ImagePlus } from "lucide-react";
+import { FileText, Phone, Send, Loader2, PlusCircle, Calendar, Clock, Trash2, Pencil, ImagePlus, User as UserIcon, VenetianMask, PhoneCall } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ZaloConversation, ZaloNote, ZaloCareScript, CareScriptStatus } from '@/types/zalo';
+import { ZaloConversation, ZaloNote, ZaloCareScript, CareScriptStatus, ZaloUser } from '@/types/zalo';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface ZaloContactPanelProps { 
@@ -39,6 +39,7 @@ export const ZaloContactPanel = ({ selectedConversation }: ZaloContactPanelProps
   const { user } = useAuth();
   const [notes, setNotes] = useState<ZaloNote[]>([]);
   const [scripts, setScripts] = useState<ZaloCareScript[]>([]);
+  const [contactDetails, setContactDetails] = useState<ZaloUser | null>(null);
   const [note, setNote] = useState('');
   const [isSendingNote, setIsSendingNote] = useState(false);
   const [isScriptDialogOpen, setIsScriptDialogOpen] = useState(false);
@@ -64,13 +65,25 @@ export const ZaloContactPanel = ({ selectedConversation }: ZaloContactPanelProps
     else setScripts(data || []);
   };
 
+  const fetchContactDetails = async (threadId: string) => {
+    const { data, error } = await supabase.from('zalo_user').select('*').eq('userId', threadId).single();
+    if (error) {
+      console.warn("Không tìm thấy chi tiết người dùng Zalo:", error.message);
+      setContactDetails(null);
+    } else {
+      setContactDetails(data);
+    }
+  };
+
   useEffect(() => {
     if (selectedConversation) {
       fetchNotes(selectedConversation.threadId);
       fetchCareScripts(selectedConversation.threadId);
+      fetchContactDetails(selectedConversation.threadId);
     } else {
       setNotes([]);
       setScripts([]);
+      setContactDetails(null);
     }
   }, [selectedConversation]);
 
@@ -199,6 +212,11 @@ export const ZaloContactPanel = ({ selectedConversation }: ZaloContactPanelProps
             <div className="flex items-center space-x-3">
               <Avatar className="h-12 w-12"><AvatarImage src={selectedConversation.avatar} /><AvatarFallback>{getInitials(selectedConversation.name)}</AvatarFallback></Avatar>
               <h3 className="font-bold text-lg">{selectedConversation.name}</h3>
+            </div>
+            <div className="space-y-3 text-sm text-muted-foreground">
+              <div className="flex items-center"><PhoneCall className="h-4 w-4 mr-3 flex-shrink-0" /><span className={cn(contactDetails?.phoneNumber && "text-green-600 font-medium")}>{contactDetails?.phoneNumber || 'Chưa có'}</span></div>
+              <div className="flex items-center"><UserIcon className="h-4 w-4 mr-3 flex-shrink-0" /><span>{contactDetails?.zaloName || 'Chưa có'}</span></div>
+              <div className="flex items-center"><VenetianMask className="h-4 w-4 mr-3 flex-shrink-0" /><span>{contactDetails?.gender === 'male' ? 'Nam' : contactDetails?.gender === 'female' ? 'Nữ' : 'Chưa rõ'}</span></div>
             </div>
           </div>
           <div className="flex-1 flex flex-col bg-slate-50 overflow-hidden">

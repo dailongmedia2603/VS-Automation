@@ -2,7 +2,9 @@ export interface ZaloUser {
   userId: string;
   displayName: string;
   zaloName: string;
+  phoneNumber: string | null;
   avatar: string;
+  gender: string | null;
 }
 
 export interface ZaloConversation {
