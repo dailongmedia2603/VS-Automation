@@ -117,20 +117,16 @@ const Staff = () => {
         showSuccess("Đã thêm nhân sự thành công!");
       } else {
         // Editing an existing user
-        const { error: userUpdateError } = await supabase.functions.invoke('update-user', {
+        const { error } = await supabase.functions.invoke('update-user', {
           body: {
             userId: selectedStaff.id,
             name: selectedStaff.name,
             avatar_url: selectedStaff.avatar_url,
+            role: selectedStaff.role,
+            status: selectedStaff.status,
           },
         });
-        if (userUpdateError) throw userUpdateError;
-
-        const { error: staffUpdateError } = await supabase.from('staff').update({
-          role: selectedStaff.role,
-          status: selectedStaff.status,
-        }).eq('id', selectedStaff.id);
-        if (staffUpdateError) throw staffUpdateError;
+        if (error) throw error;
         showSuccess("Đã cập nhật thông tin nhân sự!");
       }
       

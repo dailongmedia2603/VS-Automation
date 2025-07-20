@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { userId, name, avatar_url } = await req.json();
+    const { userId, name, avatar_url, role, status } = await req.json();
     if (!userId) throw new Error("User ID is required.");
 
     const supabaseAdmin = createClient(
@@ -21,15 +21,26 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const updateData = {
+    // Step 1: Update user metadata in auth.users
+    const authUpdateData = {
       data: {
         full_name: name,
         avatar_url: avatar_url
       }
     };
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.admin.updateUserById(userId, authUpdateData);
+    if (authError) throw authError;
 
-    const { data: { user }, error } = await supabaseAdmin.auth.admin.updateUserById(userId, updateData);
-    if (error) throw error;
+    // Step 2: Update role and status in public.staff
+    const staffUpdateData = {
+        role: role,
+        status: status,
+    };
+    const { error: staffError } = await supabaseAdmin
+        .from('staff')
+        .update(staffUpdateData)
+        .eq('id', userId);
+    if (staffError) throw staffError;
 
     return new Response(JSON.stringify(user), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
