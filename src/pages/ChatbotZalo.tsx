@@ -137,7 +137,7 @@ const ChatbotZalo = () => {
         imageUrl: msg.message_image,
         attachmentName: msg.message_image ? getFileNameFromUrl(msg.message_image) : null,
         createdAt: msg.created_at,
-        isOutgoing: msg.direction?.trim().toLowerCase() === 'out',
+        isOutgoing: msg.direction === 'out',
       }));
       setMessages(currentMessages => {
         const optimisticMessages = currentMessages.filter(m => m.id > 1000000000); // Filter for temp IDs
@@ -231,7 +231,7 @@ const ChatbotZalo = () => {
         imageUrl: msg.message_image,
         attachmentName: msg.message_image ? getFileNameFromUrl(msg.message_image) : null,
         createdAt: msg.created_at,
-        isOutgoing: msg.direction?.trim().toLowerCase() === 'out',
+        isOutgoing: msg.direction === 'out',
       }));
       setMessages(formattedMessages);
     } catch (error: any) {
@@ -323,7 +323,7 @@ const ChatbotZalo = () => {
                 imageUrl: newMessageFromDb.message_image,
                 attachmentName: newMessageFromDb.message_image ? getFileNameFromUrl(newMessageFromDb.message_image) : null,
                 createdAt: newMessageFromDb.created_at,
-                isOutgoing: newMessageFromDb.direction?.trim().toLowerCase() === 'out',
+                isOutgoing: newMessageFromDb.direction === 'out',
             } : m));
         }
 
@@ -402,7 +402,7 @@ const ChatbotZalo = () => {
   const readConversations = filteredConversations.filter(c => c.unreadCount === 0);
 
   const renderConversationItem = (convo: ZaloConversation) => {
-    const isLastMessageOutgoing = convo.lastMessageDirection?.trim().toLowerCase() === 'out';
+    const isLastMessageOutgoing = convo.lastMessageDirection === 'out';
     return (
       <div key={convo.threadId} onClick={() => handleSelectConversation(convo)} className={cn("p-2.5 flex space-x-3 cursor-pointer rounded-lg", selectedConversation?.threadId === convo.threadId && "bg-blue-100")}>
         <Avatar className="h-12 w-12">
