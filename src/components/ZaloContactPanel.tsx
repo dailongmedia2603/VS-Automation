@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Phone, Send, Loader2, PlusCircle, Calendar, Clock, Trash2, Pencil, ImagePlus, User as UserIcon, VenetianMask, PhoneCall } from "lucide-react";
+import { FileText, Phone, Send, Loader2, PlusCircle, Calendar, Clock, Trash2, Pencil, ImagePlus, User as UserIcon, VenetianMask, PhoneCall, Bot } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -52,6 +52,7 @@ export const ZaloContactPanel = ({ selectedConversation }: ZaloContactPanelProps
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [scriptForImageUpload, setScriptForImageUpload] = useState<ZaloCareScript | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [isSuggestingScript, setIsSuggestingScript] = useState(false);
 
   const fetchNotes = async (threadId: string) => {
     const { data, error } = await supabase.from('zalo_notes').select('*').eq('thread_id', threadId).order('created_at', { ascending: false });
@@ -187,6 +188,35 @@ export const ZaloContactPanel = ({ selectedConversation }: ZaloContactPanelProps
     }
   };
 
+  const handleSuggestScript = async () => {
+    if (!selectedConversation) return;
+    setIsSuggestingScript(true);
+    const toastId = showLoading("AI đang phân tích và tạo kịch bản...");
+    try {
+      const { data, error: functionError } = await supabase.functions.invoke('suggest-zalo-care-script', {
+        body: { threadId: selectedConversation.threadId },
+      });
+      if (functionError) throw new Error((await functionError.context.json()).error || functionError.message);
+      if (data.error) throw new Error(data.error);
+      
+      const { content, scheduled_at } = data;
+      const scheduledDate = new Date(scheduled_at);
+      
+      setEditingScript(null);
+      setScriptContent(content);
+      setScriptDate(format(scheduledDate, "yyyy-MM-dd"));
+      setScriptHour(scheduledDate.getHours());
+      setIsScriptDialogOpen(true);
+      dismissToast(toastId);
+      showSuccess("AI đã đề xuất kịch bản!");
+    } catch (err: any) {
+      dismissToast(toastId);
+      showError(`Gợi ý thất bại: ${err.message}`);
+    } finally {
+      setIsSuggestingScript(false);
+    }
+  };
+
   const getGenderText = (gender: string | null | undefined) => {
     if (gender === '0') return 'Nam';
     if (gender === '1') return 'Nữ';
@@ -289,11 +319,15 @@ export const ZaloContactPanel = ({ selectedConversation }: ZaloContactPanelProps
               <div className="h-full flex flex-col items-center justify-center text-center p-6">
                 <div className="flex items-center justify-center h-16 w-16 bg-slate-200/70 rounded-full mb-4"><Calendar className="h-8 w-8 text-slate-400" /></div>
                 <p className="text-md font-semibold text-slate-800">Chưa có kịch bản chăm sóc</p>
-                <p className="text-sm text-slate-500 mt-1">Tạo kịch bản mới để bắt đầu chăm sóc khách hàng tự động.</p>
+                <p className="text-sm text-slate-500 mt-1">Tạo kịch bản mới hoặc để AI gợi ý cho bạn.</p>
               </div>
             )}
           </div>
-          <div className="p-4 border-t border-slate-100 bg-white flex-shrink-0">
+          <div className="p-4 border-t border-slate-100 bg-white flex-shrink-0 space-y-2">
+            <Button onClick={handleSuggestScript} className="w-full rounded-xl bg-white border-blue-600 border text-blue-600 hover:bg-blue-50 h-12 text-base font-semibold" disabled={isSuggestingScript}>
+              {isSuggestingScript ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Bot className="mr-2 h-5 w-5" />}
+              {isSuggestingScript ? 'AI đang phân tích...' : 'Gợi ý AI'}
+            </Button>
             <Button onClick={openCreateDialog} className="w-full rounded-xl bg-blue-600 hover:bg-blue-700 h-12 text-base font-semibold"><PlusCircle className="mr-2 h-5 w-5" />Tạo kịch bản mới</Button>
           </div>
         </div>
