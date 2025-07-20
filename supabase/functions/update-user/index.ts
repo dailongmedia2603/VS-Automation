@@ -31,15 +31,17 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabaseAdmin.auth.admin.updateUserById(userId, authUpdateData);
     if (authError) throw authError;
 
-    // Step 2: Update role and status in public.staff
-    const staffUpdateData = {
+    // Step 2: Upsert role and status in public.staff
+    // Upsert will create a new record if one doesn't exist, or update it if it does.
+    const staffUpsertData = {
+        id: userId,
         role: role,
         status: status,
     };
     const { error: staffError } = await supabaseAdmin
         .from('staff')
-        .update(staffUpdateData)
-        .eq('id', userId);
+        .upsert(staffUpsertData);
+        
     if (staffError) throw staffError;
 
     return new Response(JSON.stringify(user), {
