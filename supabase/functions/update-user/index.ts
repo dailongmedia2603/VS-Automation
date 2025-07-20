@@ -32,7 +32,7 @@ serve(async (req) => {
     if (authError) throw authError;
 
     // Step 2: Upsert role and status in public.staff
-    // Upsert will create a new record if one doesn't exist, or update it if it does.
+    // This will update the record if it exists, or create it if it doesn't.
     const staffUpsertData = {
         id: userId,
         role: role,
