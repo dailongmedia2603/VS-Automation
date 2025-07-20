@@ -33,3 +33,24 @@ export interface ZaloMessage {
   createdAt: string;
   isOutgoing: boolean;
 }
+
+export type CareScriptStatus = 'scheduled' | 'sent' | 'failed';
+
+export interface ZaloCareScript {
+  id: number;
+  thread_id: string;
+  content: string;
+  scheduled_at: string;
+  status: CareScriptStatus;
+  image_url?: string;
+  created_at: string;
+}
+
+export interface ZaloNote {
+  id: number;
+  thread_id: string;
+  user_id: string;
+  user_email: string;
+  content: string;
+  created_at: string;
+}

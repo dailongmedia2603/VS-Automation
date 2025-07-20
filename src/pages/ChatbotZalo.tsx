@@ -12,6 +12,7 @@ import { vi } from 'date-fns/locale';
 import { Search, SendHorizonal, RefreshCw, Loader2, Bug, CornerDownLeft, Image as ImageIcon, Paperclip, FileText, X } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import { ZaloDataDebugger } from '@/components/ZaloDataDebugger';
+import { ZaloContactPanel } from '@/components/ZaloContactPanel';
 import type { ZaloUser, ZaloConversation, ZaloMessageDb, ZaloMessage } from '@/types/zalo';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -408,106 +409,109 @@ const ChatbotZalo = () => {
             )}
           </div>
         </aside>
-        <section className="flex-1 flex flex-col bg-slate-50">
-          {selectedConversation ? (
-            <>
-              <header className="p-3 border-b bg-white flex items-center justify-between shadow-sm">
-                <div className="flex items-center space-x-3">
-                  <Avatar>
-                    <AvatarImage src={selectedConversation.avatar || defaultAvatar} />
-                    <AvatarFallback>{getInitials(selectedConversation.name)}</AvatarFallback>
-                  </Avatar>
-                  <div><h3 className="font-bold">{selectedConversation.name}</h3><p className="text-xs text-muted-foreground">Online</p></div>
-                </div>
-                <div className="flex items-center space-x-2 text-muted-foreground">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => fetchZaloData(true)} disabled={loadingConversations}>
-                    <RefreshCw className={cn("h-5 w-5", loadingConversations && "animate-spin")} />
-                  </Button>
-                </div>
-              </header>
-              <div className="flex-1 overflow-y-auto p-4 md:p-6">
-                <div className="space-y-4">
-                  {loadingMessages ? <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div> : groupedMessages.map((item, index) => {
-                    if (item.type === 'date') {
-                      return <div key={index} className="text-center my-4"><span className="text-xs text-muted-foreground bg-white px-3 py-1 rounded-full shadow-sm">{item.date}</span></div>;
-                    }
-                    const msg = item.data;
-                    return (
-                      <div key={msg.id} className={cn("flex items-start gap-3", msg.isOutgoing && "justify-end")}>
-                        {!msg.isOutgoing && (
-                          <Avatar className="h-8 w-8 flex-shrink-0 self-end">
-                            <AvatarImage src={selectedConversation.avatar || defaultAvatar} />
-                            <AvatarFallback>{getInitials(selectedConversation.name)}</AvatarFallback>
-                          </Avatar>
-                        )}
-                        <div className={cn("flex flex-col max-w-sm md:max-w-md", msg.isOutgoing ? 'items-end' : 'items-start')}>
-                            <div className={cn("rounded-2xl break-words shadow-sm", msg.isOutgoing ? 'bg-blue-500 text-white' : 'bg-white text-gray-800', !msg.content && !msg.imageUrl ? 'p-0' : 'px-3 py-2')}>
-                              {msg.imageUrl && isImageUrl(msg.imageUrl) && (
-                                <img src={msg.imageUrl} alt="Zalo attachment" className="rounded-lg max-w-full h-auto" />
-                              )}
-                              {msg.imageUrl && !isImageUrl(msg.imageUrl) && (
-                                <a href={msg.imageUrl} target="_blank" rel="noopener noreferrer" className={cn("flex items-center gap-2 p-2 rounded-lg", msg.isOutgoing ? 'hover:bg-blue-600' : 'hover:bg-slate-100')}>
-                                  <FileText className="h-6 w-6 flex-shrink-0" />
-                                  <span className="font-medium truncate">{msg.attachmentName || 'Tệp đính kèm'}</span>
-                                </a>
-                              )}
-                              {msg.content && <p className={cn("whitespace-pre-wrap", msg.imageUrl && "mt-2")}>{msg.content}</p>}
-                            </div>
-                            <p className="text-xs text-muted-foreground px-1 mt-1">
-                                {format(new Date(msg.createdAt), 'HH:mm')}
-                            </p>
-                        </div>
-                         {msg.isOutgoing && (
-                          <Avatar className="h-8 w-8 flex-shrink-0 self-end">
-                            <AvatarFallback>{getInitials(user?.email)}</AvatarFallback>
-                          </Avatar>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-                <div ref={messagesEndRef} />
-              </div>
-              <footer className="p-2 border-t bg-white space-y-2">
-                {attachment && (
-                  <div className="px-3 py-2 bg-slate-100 rounded-lg flex items-center justify-between animate-in fade-in">
-                    <div className="flex items-center gap-2 text-sm overflow-hidden">
-                      <FileText className="h-4 w-4 text-slate-500 flex-shrink-0" />
-                      <span className="text-slate-700 truncate">{attachment.name}</span>
-                      <span className="text-slate-500 flex-shrink-0">({(attachment.size / 1024).toFixed(1)} KB)</span>
-                    </div>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={() => setAttachment(null)}>
-                      <X className="h-4 w-4" />
+        <div className="flex-1 flex">
+          <section className="flex-1 flex flex-col bg-slate-50">
+            {selectedConversation ? (
+              <>
+                <header className="p-3 border-b bg-white flex items-center justify-between shadow-sm">
+                  <div className="flex items-center space-x-3">
+                    <Avatar>
+                      <AvatarImage src={selectedConversation.avatar || defaultAvatar} />
+                      <AvatarFallback>{getInitials(selectedConversation.name)}</AvatarFallback>
+                    </Avatar>
+                    <div><h3 className="font-bold">{selectedConversation.name}</h3><p className="text-xs text-muted-foreground">Online</p></div>
+                  </div>
+                  <div className="flex items-center space-x-2 text-muted-foreground">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => fetchZaloData(true)} disabled={loadingConversations}>
+                      <RefreshCw className={cn("h-5 w-5", loadingConversations && "animate-spin")} />
                     </Button>
                   </div>
-                )}
-                <div className="flex items-center">
-                  <Button type="button" variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground" onClick={() => imageInputRef.current?.click()}>
-                      <ImageIcon className="h-5 w-5" />
-                  </Button>
-                  <Button type="button" variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground" onClick={() => fileInputRef.current?.click()}>
-                      <Paperclip className="h-5 w-5" />
-                  </Button>
-                  <form onSubmit={handleSendMessage} className="relative flex-1">
-                    <Input placeholder="Nhập tin nhắn Zalo..." className="pr-12" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} disabled={sendingMessage} />
-                    <Button type="submit" size="icon" className="absolute right-1.5 top-1/2 -translate-y-1/2 h-8 w-9" disabled={sendingMessage || (!newMessage.trim() && !attachment)}>
-                      {sendingMessage ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendHorizonal className="h-5 w-5" />}
-                    </Button>
-                  </form>
+                </header>
+                <div className="flex-1 overflow-y-auto p-4 md:p-6">
+                  <div className="space-y-4">
+                    {loadingMessages ? <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div> : groupedMessages.map((item, index) => {
+                      if (item.type === 'date') {
+                        return <div key={index} className="text-center my-4"><span className="text-xs text-muted-foreground bg-white px-3 py-1 rounded-full shadow-sm">{item.date}</span></div>;
+                      }
+                      const msg = item.data;
+                      return (
+                        <div key={msg.id} className={cn("flex items-start gap-3", msg.isOutgoing && "justify-end")}>
+                          {!msg.isOutgoing && (
+                            <Avatar className="h-8 w-8 flex-shrink-0 self-end">
+                              <AvatarImage src={selectedConversation.avatar || defaultAvatar} />
+                              <AvatarFallback>{getInitials(selectedConversation.name)}</AvatarFallback>
+                            </Avatar>
+                          )}
+                          <div className={cn("flex flex-col max-w-sm md:max-w-md", msg.isOutgoing ? 'items-end' : 'items-start')}>
+                              <div className={cn("rounded-2xl break-words shadow-sm", msg.isOutgoing ? 'bg-blue-500 text-white' : 'bg-white text-gray-800', !msg.content && !msg.imageUrl ? 'p-0' : 'px-3 py-2')}>
+                                {msg.imageUrl && isImageUrl(msg.imageUrl) && (
+                                  <img src={msg.imageUrl} alt="Zalo attachment" className="rounded-lg max-w-full h-auto" />
+                                )}
+                                {msg.imageUrl && !isImageUrl(msg.imageUrl) && (
+                                  <a href={msg.imageUrl} target="_blank" rel="noopener noreferrer" className={cn("flex items-center gap-2 p-2 rounded-lg", msg.isOutgoing ? 'hover:bg-blue-600' : 'hover:bg-slate-100')}>
+                                    <FileText className="h-6 w-6 flex-shrink-0" />
+                                    <span className="font-medium truncate">{msg.attachmentName || 'Tệp đính kèm'}</span>
+                                  </a>
+                                )}
+                                {msg.content && <p className={cn("whitespace-pre-wrap", msg.imageUrl && "mt-2")}>{msg.content}</p>}
+                              </div>
+                              <p className="text-xs text-muted-foreground px-1 mt-1">
+                                  {format(new Date(msg.createdAt), 'HH:mm')}
+                              </p>
+                          </div>
+                           {msg.isOutgoing && (
+                            <Avatar className="h-8 w-8 flex-shrink-0 self-end">
+                              <AvatarFallback>{getInitials(user?.email)}</AvatarFallback>
+                            </Avatar>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div ref={messagesEndRef} />
                 </div>
-              </footer>
-            </>
-          ) : (
-            <div className="flex-1 flex items-center justify-center text-center text-muted-foreground">
-              <div className="flex flex-col items-center gap-4">
-                <img src="https://stc-zmp3.zadn.vn/zalo-pc/images/logo-zalo.svg" alt="Zalo Logo" className="w-24 h-24" />
-                <p>Chọn một cuộc trò chuyện Zalo để bắt đầu.</p>
+                <footer className="p-2 border-t bg-white space-y-2">
+                  {attachment && (
+                    <div className="px-3 py-2 bg-slate-100 rounded-lg flex items-center justify-between animate-in fade-in">
+                      <div className="flex items-center gap-2 text-sm overflow-hidden">
+                        <FileText className="h-4 w-4 text-slate-500 flex-shrink-0" />
+                        <span className="text-slate-700 truncate">{attachment.name}</span>
+                        <span className="text-slate-500 flex-shrink-0">({(attachment.size / 1024).toFixed(1)} KB)</span>
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={() => setAttachment(null)}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                  <div className="flex items-center">
+                    <Button type="button" variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground" onClick={() => imageInputRef.current?.click()}>
+                        <ImageIcon className="h-5 w-5" />
+                    </Button>
+                    <Button type="button" variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground" onClick={() => fileInputRef.current?.click()}>
+                        <Paperclip className="h-5 w-5" />
+                    </Button>
+                    <form onSubmit={handleSendMessage} className="relative flex-1">
+                      <Input placeholder="Nhập tin nhắn Zalo..." className="pr-12" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} disabled={sendingMessage} />
+                      <Button type="submit" size="icon" className="absolute right-1.5 top-1/2 -translate-y-1/2 h-8 w-9" disabled={sendingMessage || (!newMessage.trim() && !attachment)}>
+                        {sendingMessage ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendHorizonal className="h-5 w-5" />}
+                      </Button>
+                    </form>
+                  </div>
+                </footer>
+              </>
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-center text-muted-foreground">
+                <div className="flex flex-col items-center gap-4">
+                  <img src="https://stc-zmp3.zadn.vn/zalo-pc/images/logo-zalo.svg" alt="Zalo Logo" className="w-24 h-24" />
+                  <p>Chọn một cuộc trò chuyện Zalo để bắt đầu.</p>
+                </div>
               </div>
-            </div>
-          )}
-        </section>
+            )}
+          </section>
+          <ZaloContactPanel selectedConversation={selectedConversation} />
+        </div>
+        {isDebugVisible && <div className="p-4 border-t"><ZaloDataDebugger usersMap={debugUsersMap} conversations={conversations} /></div>}
       </div>
-      {isDebugVisible && <div className="p-4 border-t"><ZaloDataDebugger usersMap={debugUsersMap} conversations={conversations} /></div>}
     </div>
   );
 };
