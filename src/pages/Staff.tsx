@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, Edit, Trash2, Search, Loader2, Upload } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Search, Loader2 } from 'lucide-react';
 import { showSuccess, showError } from '@/utils/toast';
 import { cn } from '@/lib/utils';
 
@@ -34,9 +34,6 @@ const Staff = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<Partial<StaffMember> | null>(null);
   const [staffToDelete, setStaffToDelete] = useState<StaffMember | null>(null);
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const fetchStaff = async () => {
     setIsLoading(true);
@@ -57,15 +54,11 @@ const Staff = () => {
 
   const handleAddNew = () => {
     setSelectedStaff({ name: '', role: '', email: '', status: 'active', avatar_url: '', password: '' });
-    setAvatarFile(null);
-    setAvatarPreview(null);
     setIsDialogOpen(true);
   };
 
   const handleEdit = (staff: StaffMember) => {
     setSelectedStaff(staff);
-    setAvatarFile(null);
-    setAvatarPreview(staff.avatar_url);
     setIsDialogOpen(true);
   };
 
@@ -87,14 +80,6 @@ const Staff = () => {
     }
   };
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setAvatarFile(file);
-      setAvatarPreview(URL.createObjectURL(file));
-    }
-  };
-
   const handleSave = async () => {
     if (!selectedStaff || !selectedStaff.name || !selectedStaff.email) {
       showError("Tên và email không được để trống.");
@@ -103,15 +88,6 @@ const Staff = () => {
     setIsSaving(true);
 
     try {
-      let avatarUrl = selectedStaff.avatar_url;
-      if (avatarFile) {
-        const filePath = `public/${Date.now()}-${avatarFile.name}`;
-        const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, avatarFile);
-        if (uploadError) throw uploadError;
-        const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
-        avatarUrl = publicUrl;
-      }
-
       if (!selectedStaff.id) {
         // Adding a new user
         if (!selectedStaff.password) {
@@ -119,15 +95,25 @@ const Staff = () => {
           setIsSaving(false);
           return;
         }
-        const { error } = await supabase.functions.invoke('create-user', {
-          body: {
-            email: selectedStaff.email,
-            password: selectedStaff.password,
-            name: selectedStaff.name,
-            avatar_url: avatarUrl,
-          },
+        const { data: { user }, error: signUpError } = await supabase.auth.signUp({
+          email: selectedStaff.email,
+          password: selectedStaff.password,
+          options: {
+            data: {
+              full_name: selectedStaff.name,
+              avatar_url: selectedStaff.avatar_url || `https://i.pravatar.cc/150?u=${selectedStaff.email}`
+            }
+          }
         });
-        if (error) throw error;
+        if (signUpError) throw signUpError;
+        if (!user) throw new Error("Không thể tạo người dùng.");
+
+        const { error: staffInsertError } = await supabase.from('staff').insert({
+          id: user.id,
+          role: selectedStaff.role,
+          status: selectedStaff.status,
+        });
+        if (staffInsertError) throw staffInsertError;
         showSuccess("Đã thêm nhân sự thành công!");
       } else {
         // Editing an existing user
@@ -135,7 +121,7 @@ const Staff = () => {
           body: {
             userId: selectedStaff.id,
             name: selectedStaff.name,
-            avatar_url: avatarUrl,
+            avatar_url: selectedStaff.avatar_url,
             role: selectedStaff.role,
             status: selectedStaff.status,
           },
@@ -253,17 +239,6 @@ const Staff = () => {
             <DialogDescription>Điền thông tin chi tiết cho nhân viên.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="flex flex-col items-center gap-4">
-              <Avatar className="h-24 w-24">
-                <AvatarImage src={avatarPreview ?? undefined} />
-                <AvatarFallback className="text-3xl">{selectedStaff?.name?.charAt(0) || '?'}</AvatarFallback>
-              </Avatar>
-              <input type="file" accept="image/*" ref={avatarInputRef} onChange={handleAvatarChange} className="hidden" />
-              <Button type="button" variant="outline" onClick={() => avatarInputRef.current?.click()}>
-                <Upload className="mr-2 h-4 w-4" />
-                Tải ảnh lên
-              </Button>
-            </div>
             <div className="space-y-2"><Label htmlFor="name">Tên nhân viên</Label><Input id="name" value={selectedStaff?.name || ''} onChange={(e) => setSelectedStaff({ ...selectedStaff, name: e.target.value })} className="bg-slate-100 border-none rounded-lg" /></div>
             <div className="space-y-2"><Label htmlFor="email">Email</Label><Input id="email" type="email" value={selectedStaff?.email || ''} onChange={(e) => setSelectedStaff({ ...selectedStaff, email: e.target.value })} className="bg-slate-100 border-none rounded-lg" disabled={!!selectedStaff?.id} /></div>
             {!selectedStaff?.id && (

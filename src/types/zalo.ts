@@ -15,6 +15,7 @@ export interface ZaloConversation {
   lastActivityAt: string;
   unreadCount: number;
   lastMessageDirection?: 'in' | 'out' | null;
+  labels: string[];
 }
 
 export interface ZaloMessageDb {
@@ -55,4 +56,10 @@ export interface ZaloNote {
   user_email: string;
   content: string;
   created_at: string;
+}
+
+export interface ZaloLabel {
+  id: number;
+  name: string;
+  color: string;
 }
