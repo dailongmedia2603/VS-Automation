@@ -16,12 +16,13 @@ import { showSuccess, showError } from '@/utils/toast';
 import { cn } from '@/lib/utils';
 
 type StaffMember = {
-  id: number;
+  id: string; // Now UUID from auth.users
   name: string;
   role: string;
   email: string;
-  avatar_url: string | null; // Đã sửa: cho phép avatar_url là null
+  avatar_url: string | null;
   status: 'active' | 'inactive';
+  password?: string;
 };
 
 const Staff = () => {
@@ -36,13 +37,15 @@ const Staff = () => {
 
   const fetchStaff = async () => {
     setIsLoading(true);
-    const { data, error } = await supabase.from('staff').select('*').order('name', { ascending: true });
-    if (error) {
-      showError("Không thể tải danh sách nhân sự: " + error.message);
-    } else {
+    try {
+      const { data, error } = await supabase.functions.invoke('list-users');
+      if (error) throw error;
       setStaffList(data as StaffMember[] || []);
+    } catch (error: any) {
+      showError("Không thể tải danh sách nhân sự: " + error.message);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   useEffect(() => {
@@ -50,7 +53,7 @@ const Staff = () => {
   }, []);
 
   const handleAddNew = () => {
-    setSelectedStaff({ name: '', role: '', email: '', status: 'active', avatar_url: '' });
+    setSelectedStaff({ name: '', role: '', email: '', status: 'active', avatar_url: '', password: '' });
     setIsDialogOpen(true);
   };
 
@@ -62,15 +65,19 @@ const Staff = () => {
   const handleDelete = async () => {
     if (!staffToDelete) return;
     setIsSaving(true);
-    const { error } = await supabase.from('staff').delete().eq('id', staffToDelete.id);
-    if (error) {
-      showError("Xóa nhân sự thất bại: " + error.message);
-    } else {
+    try {
+      const { error } = await supabase.functions.invoke('delete-user', {
+        body: { userId: staffToDelete.id },
+      });
+      if (error) throw error;
       showSuccess("Đã xóa nhân sự thành công!");
       setStaffList(staffList.filter(s => s.id !== staffToDelete.id));
       setIsAlertOpen(false);
+    } catch (error: any) {
+      showError("Xóa nhân sự thất bại: " + error.message);
+    } finally {
+      setIsSaving(false);
     }
-    setIsSaving(false);
   };
 
   const handleSave = async () => {
@@ -80,26 +87,51 @@ const Staff = () => {
     }
     setIsSaving(true);
 
-    const staffData = {
-      name: selectedStaff.name,
-      role: selectedStaff.role,
-      email: selectedStaff.email,
-      status: selectedStaff.status,
-      avatar_url: selectedStaff.avatar_url || `https://i.pravatar.cc/150?u=${selectedStaff.email}`
-    };
+    try {
+      // Adding a new user
+      if (!selectedStaff.id) {
+        if (!selectedStaff.password) {
+          showError("Mật khẩu không được để trống khi thêm nhân viên mới.");
+          setIsSaving(false);
+          return;
+        }
+        const { data: { user }, error: signUpError } = await supabase.auth.signUp({
+          email: selectedStaff.email,
+          password: selectedStaff.password,
+          options: {
+            data: {
+              full_name: selectedStaff.name,
+              avatar_url: selectedStaff.avatar_url || `https://i.pravatar.cc/150?u=${selectedStaff.email}`
+            }
+          }
+        });
+        if (signUpError) throw signUpError;
+        if (!user) throw new Error("Không thể tạo người dùng.");
 
-    const { error } = selectedStaff.id
-      ? await supabase.from('staff').update(staffData).eq('id', selectedStaff.id)
-      : await supabase.from('staff').insert(staffData);
-
-    if (error) {
-      showError("Lưu thông tin thất bại: " + error.message);
-    } else {
-      showSuccess("Đã lưu thông tin nhân sự!");
+        const { error: staffInsertError } = await supabase.from('staff').insert({
+          id: user.id,
+          role: selectedStaff.role,
+          status: selectedStaff.status,
+        });
+        if (staffInsertError) throw staffInsertError;
+        showSuccess("Đã thêm nhân sự thành công!");
+      } else {
+        // Editing an existing user
+        const { error: staffUpdateError } = await supabase.from('staff').update({
+          role: selectedStaff.role,
+          status: selectedStaff.status,
+        }).eq('id', selectedStaff.id);
+        if (staffUpdateError) throw staffUpdateError;
+        showSuccess("Đã cập nhật thông tin nhân sự!");
+      }
+      
       setIsDialogOpen(false);
       fetchStaff();
+    } catch (error: any) {
+      showError("Lưu thông tin thất bại: " + error.message);
+    } finally {
+      setIsSaving(false);
     }
-    setIsSaving(false);
   };
 
   const filteredStaff = useMemo(() => {
@@ -159,7 +191,7 @@ const Staff = () => {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <Avatar>
-                            <AvatarImage src={staff.avatar_url ?? undefined} alt={staff.name} /> {/* Đã sửa: sử dụng ?? undefined */}
+                            <AvatarImage src={staff.avatar_url ?? undefined} alt={staff.name} />
                             <AvatarFallback>{staff.name.charAt(0)}</AvatarFallback>
                           </Avatar>
                           <div>
@@ -203,7 +235,10 @@ const Staff = () => {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2"><Label htmlFor="name">Tên nhân viên</Label><Input id="name" value={selectedStaff?.name || ''} onChange={(e) => setSelectedStaff({ ...selectedStaff, name: e.target.value })} className="bg-slate-100 border-none rounded-lg" /></div>
-            <div className="space-y-2"><Label htmlFor="email">Email</Label><Input id="email" type="email" value={selectedStaff?.email || ''} onChange={(e) => setSelectedStaff({ ...selectedStaff, email: e.target.value })} className="bg-slate-100 border-none rounded-lg" /></div>
+            <div className="space-y-2"><Label htmlFor="email">Email</Label><Input id="email" type="email" value={selectedStaff?.email || ''} onChange={(e) => setSelectedStaff({ ...selectedStaff, email: e.target.value })} className="bg-slate-100 border-none rounded-lg" disabled={!!selectedStaff?.id} /></div>
+            {!selectedStaff?.id && (
+              <div className="space-y-2"><Label htmlFor="password">Mật khẩu</Label><Input id="password" type="password" value={selectedStaff?.password || ''} onChange={(e) => setSelectedStaff({ ...selectedStaff, password: e.target.value })} className="bg-slate-100 border-none rounded-lg" /></div>
+            )}
             <div className="space-y-2"><Label htmlFor="role">Chức vụ</Label><Input id="role" value={selectedStaff?.role || ''} onChange={(e) => setSelectedStaff({ ...selectedStaff, role: e.target.value })} className="bg-slate-100 border-none rounded-lg" /></div>
             <div className="space-y-2"><Label htmlFor="status">Trạng thái</Label><Select value={selectedStaff?.status || 'active'} onValueChange={(value) => setSelectedStaff({ ...selectedStaff, status: value as 'active' | 'inactive' })}><SelectTrigger className="bg-slate-100 border-none rounded-lg"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Hoạt động</SelectItem><SelectItem value="inactive">Tạm nghỉ</SelectItem></SelectContent></Select></div>
           </div>
@@ -219,7 +254,7 @@ const Staff = () => {
 
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Bạn có chắc chắn muốn xóa?</AlertDialogTitle><AlertDialogDescription>Hành động này không thể hoàn tác. Nhân sự "{staffToDelete?.name}" sẽ bị xóa vĩnh viễn.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogHeader><AlertDialogTitle>Bạn có chắc chắn muốn xóa?</AlertDialogTitle><AlertDialogDescription>Hành động này không thể hoàn tác. Nhân sự "{staffToDelete?.name}" sẽ bị xóa vĩnh viễn khỏi hệ thống.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel onClick={() => setStaffToDelete(null)} className="rounded-lg">Hủy</AlertDialogCancel><AlertDialogAction onClick={handleDelete} disabled={isSaving} className="rounded-lg bg-red-600 hover:bg-red-700">{isSaving ? 'Đang xóa...' : 'Xóa'}</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
