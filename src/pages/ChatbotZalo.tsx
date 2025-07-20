@@ -457,7 +457,7 @@ const ChatbotZalo = () => {
                                     <span className="font-medium truncate">{msg.attachmentName || 'Tệp đính kèm'}</span>
                                   </a>
                                 )}
-                                {msg.content && <p className={cn("whitespace-pre-wrap", msg.imageUrl && "mt-2")}>{msg.content}</p>}
+                                {msg.content && <p className={cn("whitespace-pre-wrap break-words", msg.imageUrl && "mt-2")}>{msg.content}</p>}
                               </div>
                               <p className="text-xs text-muted-foreground px-1 mt-1">
                                   {format(new Date(msg.createdAt), 'HH:mm')}
