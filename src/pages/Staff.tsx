@@ -88,8 +88,8 @@ const Staff = () => {
     setIsSaving(true);
 
     try {
-      // Adding a new user
       if (!selectedStaff.id) {
+        // Adding a new user
         if (!selectedStaff.password) {
           showError("Mật khẩu không được để trống khi thêm nhân viên mới.");
           setIsSaving(false);
@@ -117,6 +117,15 @@ const Staff = () => {
         showSuccess("Đã thêm nhân sự thành công!");
       } else {
         // Editing an existing user
+        const { error: userUpdateError } = await supabase.functions.invoke('update-user', {
+          body: {
+            userId: selectedStaff.id,
+            name: selectedStaff.name,
+            avatar_url: selectedStaff.avatar_url,
+          },
+        });
+        if (userUpdateError) throw userUpdateError;
+
         const { error: staffUpdateError } = await supabase.from('staff').update({
           role: selectedStaff.role,
           status: selectedStaff.status,
