@@ -187,6 +187,12 @@ export const ZaloContactPanel = ({ selectedConversation }: ZaloContactPanelProps
     }
   };
 
+  const getGenderText = (gender: string | null | undefined) => {
+    if (gender === '0') return 'Nam';
+    if (gender === '1') return 'Nữ';
+    return 'Chưa rõ';
+  };
+
   if (!selectedConversation) {
     return (
       <aside className="hidden lg:flex lg:w-80 border-l bg-white flex-col items-center justify-center text-center p-4">
@@ -216,7 +222,7 @@ export const ZaloContactPanel = ({ selectedConversation }: ZaloContactPanelProps
             <div className="space-y-3 text-sm text-muted-foreground">
               <div className="flex items-center"><PhoneCall className="h-4 w-4 mr-3 flex-shrink-0" /><span className={cn(contactDetails?.phoneNumber && "text-green-600 font-medium")}>{contactDetails?.phoneNumber || 'Chưa có'}</span></div>
               <div className="flex items-center"><UserIcon className="h-4 w-4 mr-3 flex-shrink-0" /><span>{contactDetails?.zaloName || 'Chưa có'}</span></div>
-              <div className="flex items-center"><VenetianMask className="h-4 w-4 mr-3 flex-shrink-0" /><span>{contactDetails?.gender === 'male' ? 'Nam' : contactDetails?.gender === 'female' ? 'Nữ' : 'Chưa rõ'}</span></div>
+              <div className="flex items-center"><VenetianMask className="h-4 w-4 mr-3 flex-shrink-0" /><span>{getGenderText(contactDetails?.gender)}</span></div>
             </div>
           </div>
           <div className="flex-1 flex flex-col bg-slate-50 overflow-hidden">
