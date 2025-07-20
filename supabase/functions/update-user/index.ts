@@ -22,8 +22,9 @@ serve(async (req) => {
     );
 
     // Step 1: Update user metadata in auth.users
+    // CORRECTED: The key should be 'user_metadata', not 'data'.
     const authUpdateData = {
-      data: {
+      user_metadata: {
         full_name: name,
         avatar_url: avatar_url
       }
@@ -32,7 +33,6 @@ serve(async (req) => {
     if (authError) throw authError;
 
     // Step 2: Upsert role and status in public.staff
-    // This will update the record if it exists, or create it if it doesn't.
     const staffUpsertData = {
         id: userId,
         role: role,
