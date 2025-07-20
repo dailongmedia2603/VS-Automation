@@ -66,6 +66,14 @@ const ChatbotZalo = () => {
   const [debugUsersMap, setDebugUsersMap] = useState<Map<string, ZaloUser>>(new Map());
   const POLLING_INTERVAL = 5000;
 
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, loadingMessages]);
+
   const fetchZaloData = useCallback(async (isInitialLoad = false) => {
     if (!user) {
       if (isInitialLoad) setLoadingConversations(false);
@@ -158,10 +166,6 @@ const ChatbotZalo = () => {
       return () => clearInterval(intervalId);
     }
   }, [selectedConversation, fetchMessagesForSelectedConvo]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
 
   const handleSelectConversation = async (conversation: ZaloConversation) => {
     if (user && conversation.unreadCount > 0) {
