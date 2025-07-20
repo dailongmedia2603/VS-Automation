@@ -67,7 +67,7 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
 
   useEffect(() => {
     const fetchProfile = async () => {
-      if (!user || !user.email) {
+      if (!user) {
         setProfile(null);
         setLoadingProfile(false);
         return;
@@ -75,23 +75,31 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
 
       setLoadingProfile(true);
       try {
-        const { data: staffProfile, error } = await supabase
+        // Fetch from both auth.users and public.staff to get the most up-to-date info
+        const { data: staffData, error: staffError } = await supabase
           .from('staff')
-          .select('name, role, avatar_url')
-          .eq('email', user.email)
+          .select('role')
+          .eq('id', user.id)
           .single();
-        
-        if (error) {
-          console.warn('Error fetching staff profile, falling back to auth user:', error.message);
-          setProfile({
-              name: user.user_metadata?.full_name || user.email || 'Người dùng',
-              role: 'Thành viên',
-              avatar_url: user.user_metadata?.avatar_url
-          });
-        } else {
-          setProfile(staffProfile);
+
+        if (staffError && staffError.code !== 'PGRST116') { // Ignore 'not found' error
+          throw staffError;
         }
-      } catch (e) {
+        
+        // The user object from useAuth() might be stale, so we refresh it
+        const { data: { user: refreshedUser } } = await supabase.auth.getUser();
+
+        if (refreshedUser) {
+            setProfile({
+                name: refreshedUser.user_metadata?.full_name || refreshedUser.email || 'Người dùng',
+                role: staffData?.role || 'Thành viên',
+                avatar_url: refreshedUser.user_metadata?.avatar_url
+            });
+        } else {
+            setProfile(null);
+        }
+
+      } catch (e: any) {
         console.error('Exception fetching profile', e);
         setProfile(null);
       } finally {
@@ -100,7 +108,7 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
     };
   
     fetchProfile();
-  }, [user]);
+  }, [user, location]); // Re-fetch on location change to catch updates
 
   const handleLogout = async () => {
     try {
