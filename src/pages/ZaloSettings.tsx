@@ -1,4 +1,5 @@
 import { ZaloAutoReplyManager } from "@/components/ZaloAutoReplyManager";
+import { ZaloLabelManager } from "@/components/ZaloLabelManager";
 
 const ZaloSettings = () => {
   return (
@@ -6,7 +7,7 @@ const ZaloSettings = () => {
       <h2 className="text-3xl font-bold tracking-tight">Cài đặt Chatbot Zalo</h2>
       <div className="space-y-6">
         <ZaloAutoReplyManager />
-        {/* Các component cài đặt Zalo khác có thể được thêm vào đây trong tương lai */}
+        <ZaloLabelManager />
       </div>
     </main>
   );
