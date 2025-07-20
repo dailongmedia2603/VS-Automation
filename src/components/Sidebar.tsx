@@ -43,7 +43,6 @@ const chatbotNavItems: NavItem[] = [
 
 const zaloNavItems: NavItem[] = [
     { name: "Chatbot Zalo", icon: MessageCircle, href: "/chatbot-zalo" },
-    { name: "Cài đặt Zalo", icon: Settings, href: "/zalo-settings" },
 ];
 
 const supportNavItems: NavItem[] = [

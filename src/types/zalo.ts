@@ -56,9 +56,3 @@ export interface ZaloNote {
   content: string;
   created_at: string;
 }
-
-export interface ZaloLabel {
-  id: number;
-  name: string;
-  color: string;
-}
