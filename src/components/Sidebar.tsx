@@ -5,11 +5,11 @@ import {
   Settings,
   MessageSquare,
   GraduationCap,
-  ArrowRight,
   LayoutDashboard,
   ChevronLeft,
   MessageCircle,
   Plug,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link, useLocation } from "react-router-dom";
@@ -20,6 +20,7 @@ import { Button } from "./ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import hexaLogo from "@/assets/images/logo.png";
 import { useAuth } from "@/contexts/AuthContext";
+import { showSuccess, showError } from "@/utils/toast";
 
 interface NavItem {
   name: string;
@@ -100,6 +101,16 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
   
     fetchProfile();
   }, [user]);
+
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      showSuccess("Đăng xuất thành công!");
+    } catch (error: any) {
+      showError("Đăng xuất thất bại: " + error.message);
+    }
+  };
 
   const getInitials = (name?: string | null) => {
     if (!name) return '...';
@@ -192,7 +203,9 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
                         <p className="text-xs text-gray-500 truncate" title={profile.role || 'Thành viên'}>{profile.role || 'Thành viên'}</p>
                     </div>
                 </div>
-                <ArrowRight className="h-5 w-5 text-gray-400 cursor-pointer hover:text-gray-600 flex-shrink-0" />
+                <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={handleLogout}>
+                  <LogOut className="h-5 w-5 text-gray-500 hover:text-red-500" />
+                </Button>
             </>
         ) : (
             <div className="flex items-center space-x-3">
