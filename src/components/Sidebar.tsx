@@ -39,8 +39,11 @@ const chatbotNavItems: NavItem[] = [
     { name: "Hộp thư Chatbot", icon: MessageSquare, href: "/chatbot-inbox" },
     { name: "Cài đặt Chatbot", icon: Settings, href: "/chatbot-settings" },
     { name: "Training Chatbot", icon: GraduationCap, href: "/training-chatbot" },
-    { name: "Chatbot Zalo", icon: MessageCircle, href: "/chatbot-zalo" },
 ]
+
+const zaloNavItems: NavItem[] = [
+    { name: "Chatbot Zalo", icon: MessageCircle, href: "/chatbot-zalo" },
+];
 
 const supportNavItems: NavItem[] = [
     { name: "Cài đặt API AI", icon: Settings, href: "/settings" },
@@ -75,7 +78,6 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
 
       setLoadingProfile(true);
       try {
-        // Fetch from both auth.users and public.staff to get the most up-to-date info
         const { data: staffData, error: staffError } = await supabase
           .from('staff')
           .select('role')
@@ -86,7 +88,6 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
           throw staffError;
         }
         
-        // The user object from useAuth() might be stale, so we refresh it
         const { data: { user: refreshedUser } } = await supabase.auth.getUser();
 
         if (refreshedUser) {
@@ -240,6 +241,13 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
             <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>Chatbot</p>
             <nav className="flex flex-col space-y-1">
                 {chatbotNavItems.map(renderLink)}
+            </nav>
+        </div>
+
+        <div>
+            <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>Chatbot Zalo</p>
+            <nav className="flex flex-col space-y-1">
+                {zaloNavItems.map(renderLink)}
             </nav>
         </div>
       </div>
