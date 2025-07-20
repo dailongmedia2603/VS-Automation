@@ -58,6 +58,7 @@ const ChatbotZalo = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [attachment, setAttachment] = useState<File | null>(null);
   const [availableLabels, setAvailableLabels] = useState<ZaloLabel[]>([]);
+  const [aiCareTriggerLabelId, setAiCareTriggerLabelId] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -155,15 +156,24 @@ const ChatbotZalo = () => {
   }, [selectedConversation]);
 
   useEffect(() => {
-    const fetchLabels = async () => {
-      const { data, error } = await supabase.from('zalo_labels').select('*');
-      if (error) {
+    const fetchInitialSettings = async () => {
+      const [labelsRes, settingsRes] = await Promise.all([
+        supabase.from('zalo_labels').select('*'),
+        supabase.from('zalo_care_settings').select('config').eq('id', 1).single()
+      ]);
+
+      if (labelsRes.error) {
         showError("Không thể tải danh sách thẻ.");
       } else {
-        setAvailableLabels(data || []);
+        setAvailableLabels(labelsRes.data || []);
+      }
+
+      if (settingsRes.data?.config && typeof settingsRes.data.config === 'object') {
+        const config = settingsRes.data.config as { trigger_label_id?: number };
+        setAiCareTriggerLabelId(config.trigger_label_id || null);
       }
     };
-    fetchLabels();
+    fetchInitialSettings();
   }, []);
 
   useEffect(() => {
@@ -362,6 +372,10 @@ const ChatbotZalo = () => {
       await supabase.from('zalo_conversation_labels').delete().match({ thread_id: selectedConversation.threadId, label_id: label.id });
     } else {
       await supabase.from('zalo_conversation_labels').insert({ thread_id: selectedConversation.threadId, label_id: label.id });
+      if (label.id === aiCareTriggerLabelId) {
+        supabase.functions.invoke('trigger-zalo-ai-care-script', { body: { threadId: selectedConversation.threadId } })
+          .catch(err => showError(`Lỗi kích hoạt AI: ${err.message}`));
+      }
     }
   };
 
