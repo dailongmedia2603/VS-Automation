@@ -95,25 +95,15 @@ const Staff = () => {
           setIsSaving(false);
           return;
         }
-        const { data: { user }, error: signUpError } = await supabase.auth.signUp({
-          email: selectedStaff.email,
-          password: selectedStaff.password,
-          options: {
-            data: {
-              full_name: selectedStaff.name,
-              avatar_url: selectedStaff.avatar_url || `https://i.pravatar.cc/150?u=${selectedStaff.email}`
-            }
-          }
+        const { error } = await supabase.functions.invoke('create-user', {
+          body: {
+            email: selectedStaff.email,
+            password: selectedStaff.password,
+            name: selectedStaff.name,
+            avatar_url: selectedStaff.avatar_url,
+          },
         });
-        if (signUpError) throw signUpError;
-        if (!user) throw new Error("Không thể tạo người dùng.");
-
-        const { error: staffInsertError } = await supabase.from('staff').insert({
-          id: user.id,
-          role: selectedStaff.role,
-          status: selectedStaff.status,
-        });
-        if (staffInsertError) throw staffInsertError;
+        if (error) throw error;
         showSuccess("Đã thêm nhân sự thành công!");
       } else {
         // Editing an existing user
