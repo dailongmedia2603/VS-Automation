@@ -465,7 +465,8 @@ const ChatbotZalo = () => {
                           </div>
                            {msg.isOutgoing && (
                             <Avatar className="h-8 w-8 flex-shrink-0 self-end">
-                              <AvatarFallback>{getInitials(user?.email)}</AvatarFallback>
+                              <AvatarImage src={user?.user_metadata?.avatar_url ?? undefined} />
+                              <AvatarFallback>{getInitials(user?.user_metadata?.full_name || user?.email)}</AvatarFallback>
                             </Avatar>
                           )}
                         </div>
