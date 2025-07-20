@@ -9,11 +9,11 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { format, isSameDay } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import { Search, SendHorizonal, RefreshCw, Loader2, Bug, CornerDownLeft, Image as ImageIcon, Paperclip, FileText, X } from 'lucide-react';
+import { Search, SendHorizonal, RefreshCw, Loader2, Bug, CornerDownLeft, Image as ImageIcon, Paperclip, FileText, X, Check } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import { ZaloDataDebugger } from '@/components/ZaloDataDebugger';
 import { ZaloContactPanel } from '@/components/ZaloContactPanel';
-import type { ZaloUser, ZaloConversation, ZaloMessageDb, ZaloMessage } from '@/types/zalo';
+import type { ZaloUser, ZaloConversation, ZaloMessage, ZaloLabel } from '@/types/zalo';
 import { useAuth } from '@/contexts/AuthContext';
 
 const getInitials = (name?: string | null) => {
@@ -57,6 +57,7 @@ const ChatbotZalo = () => {
   const [sendingMessage, setSendingMessage] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [attachment, setAttachment] = useState<File | null>(null);
+  const [availableLabels, setAvailableLabels] = useState<ZaloLabel[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -105,6 +106,7 @@ const ChatbotZalo = () => {
         const isUnread = convo.lastMessageDirection !== 'out' && lastMessageTimestamp > lastSeenTimestamp;
         return {
           ...convo,
+          labels: convo.labels || [],
           unreadCount: isUnread ? 1 : 0,
         };
       });
@@ -151,6 +153,18 @@ const ChatbotZalo = () => {
       console.error(`Error polling messages for ${selectedConversation.threadId}:`, error);
     }
   }, [selectedConversation]);
+
+  useEffect(() => {
+    const fetchLabels = async () => {
+      const { data, error } = await supabase.from('zalo_labels').select('*');
+      if (error) {
+        showError("Không thể tải danh sách thẻ.");
+      } else {
+        setAvailableLabels(data || []);
+      }
+    };
+    fetchLabels();
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -331,6 +345,26 @@ const ChatbotZalo = () => {
     }
   };
 
+  const handleToggleLabel = async (label: ZaloLabel) => {
+    if (!selectedConversation) return;
+
+    const currentLabels = selectedConversation.labels || [];
+    const isApplied = currentLabels.includes(label.name);
+    const newLabels = isApplied
+      ? currentLabels.filter(l => l !== label.name)
+      : [...currentLabels, label.name];
+
+    const optimisticConversation = { ...selectedConversation, labels: newLabels };
+    setSelectedConversation(optimisticConversation);
+    setConversations(convos => convos.map(c => c.threadId === selectedConversation.threadId ? optimisticConversation : c));
+
+    if (isApplied) {
+      await supabase.from('zalo_conversation_labels').delete().match({ thread_id: selectedConversation.threadId, label_id: label.id });
+    } else {
+      await supabase.from('zalo_conversation_labels').insert({ thread_id: selectedConversation.threadId, label_id: label.id });
+    }
+  };
+
   const groupedMessages = useMemo(() => {
     return messages.reduce((acc: ({ type: 'date'; date: string } | { type: 'message'; data: ZaloMessage })[], message, index) => {
       const messageDate = new Date(message.createdAt);
@@ -370,6 +404,28 @@ const ChatbotZalo = () => {
             </p>
             {convo.unreadCount > 0 && <Badge variant="destructive">{convo.unreadCount}</Badge>}
           </div>
+          {convo.labels && convo.labels.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              {convo.labels.map(labelName => {
+                const labelInfo = availableLabels.find(l => l.name === labelName);
+                const color = labelInfo?.color || '#6B7280';
+                return (
+                  <Badge
+                    key={labelName}
+                    variant="outline"
+                    className="text-xs font-normal px-2 py-0.5"
+                    style={{
+                      backgroundColor: `${color}20`,
+                      color: color,
+                      borderColor: color,
+                    }}
+                  >
+                    {labelName}
+                  </Badge>
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -488,6 +544,31 @@ const ChatbotZalo = () => {
                       </Button>
                     </div>
                   )}
+                  <div className="flex flex-wrap gap-2 px-2">
+                    {availableLabels.map(label => {
+                      const isApplied = selectedConversation?.labels?.includes(label.name);
+                      return (
+                        <Button
+                          key={label.id}
+                          variant="outline"
+                          size="sm"
+                          className={cn(
+                            "text-xs h-7 transition-all",
+                            isApplied ? "text-white" : "text-foreground"
+                          )}
+                          style={{
+                            backgroundColor: isApplied ? label.color : `${label.color}20`,
+                            borderColor: isApplied ? label.color : `${label.color}50`,
+                            color: isApplied ? 'white' : label.color,
+                          }}
+                          onClick={() => handleToggleLabel(label)}
+                        >
+                          {isApplied && <Check className="h-3 w-3 mr-1.5" />}
+                          {label.name}
+                        </Button>
+                      )
+                    })}
+                  </div>
                   <div className="flex items-center">
                     <Button type="button" variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground" onClick={() => imageInputRef.current?.click()}>
                         <ImageIcon className="h-5 w-5" />
