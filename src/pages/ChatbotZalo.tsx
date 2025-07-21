@@ -60,6 +60,7 @@ const ChatbotZalo = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const messageInputRef = useRef<HTMLInputElement>(null);
   const defaultAvatar = 'https://s120-ava-talk.zadn.vn/a/a/c/2/1/120/90898606938dd183dbf5c748e3dae52d.jpg';
   
   const [isDebugVisible, setIsDebugVisible] = useState(false);
@@ -73,6 +74,15 @@ const ChatbotZalo = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages, loadingMessages]);
+
+  useEffect(() => {
+    if (selectedConversation && messageInputRef.current) {
+      const timer = setTimeout(() => {
+        messageInputRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedConversation]);
 
   const fetchZaloData = useCallback(async (isInitialLoad = false) => {
     if (!user) {
@@ -138,24 +148,20 @@ const ChatbotZalo = () => {
       }));
       
       setMessages(currentMessages => {
-        // Lấy "dấu hiệu" của các tin nhắn đi đã được xác nhận từ server
         const realOutgoingSignatures = new Set(
           formattedMessages
             .filter(m => m.isOutgoing)
             .map(m => `${m.content || ''}::${m.attachmentName || ''}`)
         );
 
-        // Lọc ra những tin nhắn "tạm" (optimistic) mà chưa được server xác nhận
         const stillPendingOptimistic = currentMessages.filter(m => {
-          if (m.id <= 1000000000) return false; // Không phải tin nhắn tạm
+          if (m.id <= 1000000000) return false;
           const optimisticSignature = `${m.content || ''}::${m.attachmentName || ''}`;
           return !realOutgoingSignatures.has(optimisticSignature);
         });
 
-        // Kết hợp danh sách tin nhắn thật từ server và các tin nhắn tạm còn chờ xử lý
         const finalMessages = [...formattedMessages, ...stillPendingOptimistic];
         
-        // Sắp xếp lại để đảm bảo thứ tự thời gian chính xác
         finalMessages.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
         return finalMessages;
@@ -483,7 +489,7 @@ const ChatbotZalo = () => {
                         <Paperclip className="h-5 w-5" />
                     </Button>
                     <form onSubmit={handleSendMessage} className="relative flex-1">
-                      <Input placeholder="Nhập tin nhắn Zalo..." className="pr-12" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} disabled={sendingMessage} />
+                      <Input ref={messageInputRef} placeholder="Nhập tin nhắn Zalo..." className="pr-12" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} disabled={sendingMessage} />
                       <Button type="submit" size="icon" className="absolute right-1.5 top-1/2 -translate-y-1/2 h-8 w-9" disabled={sendingMessage || (!newMessage.trim() && !attachment)}>
                         {sendingMessage ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendHorizonal className="h-5 w-5" />}
                       </Button>
