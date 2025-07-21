@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 import { format, isSameDay } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { Search, SendHorizonal, RefreshCw, Loader2, CornerDownLeft, Image as ImageIcon, Paperclip, FileText, X, Check, Bot } from 'lucide-react';
-import { showError } from '@/utils/toast';
+import { showError, showSuccess } from '@/utils/toast';
 import { ZaloContactPanel } from '@/components/ZaloContactPanel';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ZaloConversation, ZaloMessage, ZaloLabel } from '@/types/zalo';
@@ -61,6 +61,7 @@ const ChatbotZalo = () => {
   const [attachment, setAttachment] = useState<File | null>(null);
   const [zaloLabels, setZaloLabels] = useState<ZaloLabel[]>([]);
   const [hasNewLog, setHasNewLog] = useState(false);
+  const [triggerLabelId, setTriggerLabelId] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -91,6 +92,15 @@ const ChatbotZalo = () => {
         showError("Không thể tải danh sách thẻ Zalo: " + error.message);
       } else {
         setZaloLabels(data || []);
+      }
+
+      const { data: settingsData } = await supabase
+        .from('zalo_care_settings')
+        .select('config')
+        .eq('id', 1)
+        .single();
+      if (settingsData?.config && (settingsData.config as any).trigger_label_id) {
+        setTriggerLabelId((settingsData.config as any).trigger_label_id);
       }
     };
     fetchInitialData();
@@ -384,6 +394,17 @@ const ChatbotZalo = () => {
     );
 
     if (isApplied) {
+      if (label.id === triggerLabelId) {
+        try {
+          const { error: cancelError } = await supabase.functions.invoke('cancel-zalo-care-scripts', {
+            body: { threadId: selectedConversation.threadId }
+          });
+          if (cancelError) throw cancelError;
+          showSuccess("Đã hủy các kịch bản chăm sóc tự động.");
+        } catch (err: any) {
+          showError(`Không thể hủy kịch bản: ${err.message}`);
+        }
+      }
       const { error } = await supabase
         .from('zalo_conversation_labels')
         .delete()
