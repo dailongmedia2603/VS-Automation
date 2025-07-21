@@ -53,6 +53,9 @@ serve(async (req) => {
     systemPrompt = systemPrompt.replace(/{{current_date}}/g, new Date().toLocaleDateString('vi-VN'));
     systemPrompt = systemPrompt.replace(/{{contact_name}}/g, contactName);
     systemPrompt = systemPrompt.replace(/{{conversation_history}}/g, conversationHistory);
+    
+    // Add a strict instruction for JSON output
+    systemPrompt += `\n\n**QUAN TRỌNG:** Chỉ trả lời bằng một đối tượng JSON hợp lệ duy nhất, không có bất kỳ văn bản nào khác. Định dạng phải là: {"content": "nội dung tin nhắn", "scheduled_at": "YYYY-MM-DDTHH:mm:ss.sssZ"}`;
 
     const { data: proxyResponse, error: proxyError } = await supabaseAdmin.functions.invoke('multi-ai-proxy', {
       body: {
