@@ -278,53 +278,30 @@ const ChatbotZalo = () => {
             attachmentUrl = publicUrl;
         }
 
-        const { data: newMessageFromDb, error } = await supabase
-            .from('zalo_messages')
-            .insert({
-                threadId: selectedConversation.threadId,
-                message_content: content || null,
-                message_image: attachmentUrl,
-                threadId_name: selectedConversation.name,
-                direction: 'out',
-            })
-            .select()
-            .single();
-
+        const payload = {
+          content: content,
+          attachmentUrl: attachmentUrl,
+          recipient: {
+            id: selectedConversation.threadId,
+            name: selectedConversation.name,
+            avatar: selectedConversation.avatar,
+          },
+          status: 'đã xem',
+          sentAt: new Date().toISOString(),
+        };
+        
+        const { error } = await supabase.functions.invoke('n8n-zalo-webhook-proxy', { body: payload });
         if (error) throw error;
 
-        if (newMessageFromDb) {
-            setMessages(prev => prev.map(m => m.id === tempId ? {
-                id: newMessageFromDb.id,
-                content: newMessageFromDb.message_content,
-                imageUrl: newMessageFromDb.message_image,
-                attachmentName: newMessageFromDb.message_image ? getFileNameFromUrl(newMessageFromDb.message_image) : null,
-                createdAt: newMessageFromDb.created_at,
-                isOutgoing: newMessageFromDb.direction === 'out',
-            } : m));
-        }
-
-        try {
-          const payload = {
-            content: content,
-            attachmentUrl: attachmentUrl,
-            recipient: {
-              id: selectedConversation.threadId,
-              name: selectedConversation.name,
-              avatar: selectedConversation.avatar,
-            },
-            status: 'đã xem',
-            sentAt: new Date().toISOString(),
-          };
-          await supabase.functions.invoke('n8n-zalo-webhook-proxy', { body: payload });
-        } catch (webhookError: any) {
-          console.error("Failed to trigger n8n webhook:", webhookError.message);
-        }
+        // We no longer insert directly. n8n and polling will handle it.
+        // The optimistic message will be replaced by the real one on the next poll.
 
     } catch (error: any) {
         showError("Gửi tin nhắn thất bại: " + error.message);
         setMessages(prev => prev.filter(m => m.id !== tempId));
     } finally {
         setSendingMessage(false);
+        // Clean up the temporary blob URL
         if (tempMessage.imageUrl && tempMessage.imageUrl.startsWith('blob:')) {
             URL.revokeObjectURL(tempMessage.imageUrl);
         }
