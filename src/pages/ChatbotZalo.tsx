@@ -13,6 +13,7 @@ import { Search, SendHorizonal, RefreshCw, Loader2, Bug, CornerDownLeft, Image a
 import { showError, showSuccess } from '@/utils/toast';
 import { ZaloDataDebugger } from '@/components/ZaloDataDebugger';
 import { ZaloContactPanel } from '@/components/ZaloContactPanel';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ZaloUser, ZaloConversation, ZaloMessageDb, ZaloMessage, ZaloLabel } from '@/types/zalo';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -405,11 +406,23 @@ const ChatbotZalo = () => {
     );
   }, [conversations, searchQuery]);
 
+  const labelColorMap = useMemo(() => {
+    const map = new Map<string, string>();
+    zaloLabels.forEach(label => {
+        map.set(label.name, label.color);
+    });
+    return map;
+  }, [zaloLabels]);
+
   const unreadConversations = filteredConversations.filter(c => c.unreadCount > 0);
   const readConversations = filteredConversations.filter(c => c.unreadCount === 0);
 
   const renderConversationItem = (convo: ZaloConversation) => {
     const isLastMessageOutgoing = convo.lastMessageDirection === 'out';
+    const MAX_VISIBLE_LABELS = 2;
+    const visibleLabels = convo.labels?.slice(0, MAX_VISIBLE_LABELS) || [];
+    const hiddenLabelsCount = convo.labels ? convo.labels.length - visibleLabels.length : 0;
+
     return (
       <div key={convo.threadId} onClick={() => handleSelectConversation(convo)} className={cn("p-2.5 flex space-x-3 cursor-pointer rounded-lg", selectedConversation?.threadId === convo.threadId && "bg-blue-100")}>
         <Avatar className="h-12 w-12">
@@ -425,6 +438,48 @@ const ChatbotZalo = () => {
             </p>
             {convo.unreadCount > 0 && <Badge variant="destructive">{convo.unreadCount}</Badge>}
           </div>
+          {convo.labels && convo.labels.length > 0 && (
+            <div className="flex items-center flex-wrap gap-1 mt-1.5">
+              {visibleLabels.map(labelName => {
+                const color = labelColorMap.get(labelName) || '#6B7280';
+                return (
+                  <Badge
+                    key={labelName}
+                    variant="outline"
+                    className="text-xs font-normal px-1.5 py-0.5"
+                    style={{
+                      backgroundColor: `${color}20`,
+                      color: color,
+                      borderColor: `${color}50`,
+                    }}
+                  >
+                    {labelName}
+                  </Badge>
+                )
+              })}
+              {hiddenLabelsCount > 0 && (
+                <TooltipProvider delayDuration={100}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Badge
+                        variant="outline"
+                        className="text-xs font-normal px-1.5 py-0.5 cursor-default"
+                      >
+                        +{hiddenLabelsCount}
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <div className="flex flex-col gap-1 p-1">
+                        {convo.labels.slice(MAX_VISIBLE_LABELS).map(labelName => (
+                          <span key={labelName} className="text-xs">{labelName}</span>
+                        ))}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );
