@@ -9,11 +9,11 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { format, isSameDay } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import { Search, SendHorizonal, RefreshCw, Loader2, Bug, CornerDownLeft, Image as ImageIcon, Paperclip, FileText, X } from 'lucide-react';
+import { Search, SendHorizonal, RefreshCw, Loader2, Bug, CornerDownLeft, Image as ImageIcon, Paperclip, FileText, X, Check } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
 import { ZaloDataDebugger } from '@/components/ZaloDataDebugger';
 import { ZaloContactPanel } from '@/components/ZaloContactPanel';
-import type { ZaloUser, ZaloConversation, ZaloMessageDb, ZaloMessage } from '@/types/zalo';
+import type { ZaloUser, ZaloConversation, ZaloMessageDb, ZaloMessage, ZaloLabel } from '@/types/zalo';
 import { useAuth } from '@/contexts/AuthContext';
 
 const getInitials = (name?: string | null) => {
@@ -57,6 +57,7 @@ const ChatbotZalo = () => {
   const [sendingMessage, setSendingMessage] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [attachment, setAttachment] = useState<File | null>(null);
+  const [zaloLabels, setZaloLabels] = useState<ZaloLabel[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -83,6 +84,18 @@ const ChatbotZalo = () => {
       return () => clearTimeout(timer);
     }
   }, [selectedConversation]);
+
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      const { data, error } = await supabase.from('zalo_labels').select('*').order('name', { ascending: true });
+      if (error) {
+        showError("Không thể tải danh sách thẻ Zalo: " + error.message);
+      } else {
+        setZaloLabels(data || []);
+      }
+    };
+    fetchInitialData();
+  }, []);
 
   const fetchZaloData = useCallback(async (isInitialLoad = false) => {
     if (!user) {
@@ -331,6 +344,48 @@ const ChatbotZalo = () => {
     );
   };
 
+  const handleToggleLabel = async (label: ZaloLabel) => {
+    if (!selectedConversation) return;
+
+    const currentLabels = selectedConversation.labels || [];
+    const isApplied = currentLabels.includes(label.name);
+    
+    const newLabels = isApplied
+      ? currentLabels.filter(l => l !== label.name)
+      : [...currentLabels, label.name];
+
+    const updatedConversation = { ...selectedConversation, labels: newLabels };
+    setSelectedConversation(updatedConversation);
+    setConversations(convos => 
+      convos.map(c => c.threadId === selectedConversation.threadId ? updatedConversation : c)
+    );
+
+    if (isApplied) {
+      const { error } = await supabase
+        .from('zalo_conversation_labels')
+        .delete()
+        .match({ thread_id: selectedConversation.threadId, label_id: label.id });
+      if (error) {
+        showError(`Gỡ thẻ thất bại: ${error.message}`);
+        setSelectedConversation(selectedConversation);
+        setConversations(convos => 
+          convos.map(c => c.threadId === selectedConversation.threadId ? selectedConversation : c)
+        );
+      }
+    } else {
+      const { error } = await supabase
+        .from('zalo_conversation_labels')
+        .insert({ thread_id: selectedConversation.threadId, label_id: label.id });
+      if (error) {
+        showError(`Gắn thẻ thất bại: ${error.message}`);
+        setSelectedConversation(selectedConversation);
+        setConversations(convos => 
+          convos.map(c => c.threadId === selectedConversation.threadId ? selectedConversation : c)
+        );
+      }
+    }
+  };
+
   const groupedMessages = useMemo(() => {
     return messages.reduce((acc: ({ type: 'date'; date: string } | { type: 'message'; data: ZaloMessage })[], message, index) => {
       const messageDate = new Date(message.createdAt);
@@ -488,6 +543,31 @@ const ChatbotZalo = () => {
                       </Button>
                     </div>
                   )}
+                  <div className="flex flex-wrap gap-2 px-2">
+                    {zaloLabels.map(label => {
+                      const isApplied = selectedConversation?.labels?.includes(label.name);
+                      return (
+                        <Button
+                          key={label.id}
+                          variant="outline"
+                          size="sm"
+                          className={cn(
+                            "text-xs h-7 transition-all",
+                            isApplied ? "text-white" : "text-foreground"
+                          )}
+                          style={{
+                            backgroundColor: isApplied ? label.color : `${label.color}20`,
+                            borderColor: isApplied ? label.color : `${label.color}50`,
+                            color: isApplied ? 'white' : label.color,
+                          }}
+                          onClick={() => handleToggleLabel(label)}
+                        >
+                          {isApplied && <Check className="h-3 w-3 mr-1.5" />}
+                          {label.name}
+                        </Button>
+                      )
+                    })}
+                  </div>
                   <div className="flex items-center">
                     <Button type="button" variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground" onClick={() => imageInputRef.current?.click()}>
                         <ImageIcon className="h-5 w-5" />
