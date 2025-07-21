@@ -329,12 +329,12 @@ export const ZaloContactPanel = ({ selectedConversation, onConversationUpdate }:
                   <div key={n.id} className={cn("bg-white p-4 rounded-xl shadow-sm border border-slate-100 transition-colors", index === 0 && "bg-blue-50 border-blue-200")}>
                     <div className="flex items-start space-x-3">
                       <Avatar className="h-8 w-8 border"><AvatarFallback>{getInitials(n.user_email)}</AvatarFallback></Avatar>
-                      <div className="flex-1">
+                      <div className="flex-1 overflow-hidden">
                         <div className="flex items-center justify-between">
-                          <p className="text-sm font-semibold text-slate-800">{n.user_email || 'Hệ thống'}</p>
-                          <p className="text-xs text-slate-400">{format(new Date(n.created_at), 'dd/MM/yy HH:mm', { locale: vi })}</p>
+                          <p className="text-sm font-semibold text-slate-800 truncate" title={n.user_email || 'Hệ thống'}>{n.user_email || 'Hệ thống'}</p>
+                          <p className="text-xs text-slate-400 flex-shrink-0 ml-2">{format(new Date(n.created_at), 'dd/MM/yy HH:mm', { locale: vi })}</p>
                         </div>
-                        <p className="text-sm text-slate-600 mt-1 leading-relaxed">{n.content}</p>
+                        <p className="text-sm text-slate-600 mt-1 leading-relaxed break-words">{n.content}</p>
                       </div>
                     </div>
                   </div>
