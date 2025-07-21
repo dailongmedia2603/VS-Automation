@@ -136,17 +136,31 @@ const ChatbotZalo = () => {
         createdAt: msg.created_at,
         isOutgoing: msg.direction === 'out',
       }));
+      
       setMessages(currentMessages => {
-        const optimisticMessages = currentMessages.filter(m => m.id > 1000000000); // Filter for temp IDs
-        const newCombined = [...formattedMessages, ...optimisticMessages];
-        
-        const uniqueMessages = Array.from(new Map(newCombined.map(m => [m.id, m])).values());
+        // Lấy "dấu hiệu" của các tin nhắn đi đã được xác nhận từ server
+        const realOutgoingSignatures = new Set(
+          formattedMessages
+            .filter(m => m.isOutgoing)
+            .map(m => `${m.content || ''}::${m.attachmentName || ''}`)
+        );
 
-        if (uniqueMessages.length !== currentMessages.length || uniqueMessages.some((msg, i) => msg.id !== currentMessages[i]?.id)) {
-          return uniqueMessages;
-        }
-        return currentMessages;
+        // Lọc ra những tin nhắn "tạm" (optimistic) mà chưa được server xác nhận
+        const stillPendingOptimistic = currentMessages.filter(m => {
+          if (m.id <= 1000000000) return false; // Không phải tin nhắn tạm
+          const optimisticSignature = `${m.content || ''}::${m.attachmentName || ''}`;
+          return !realOutgoingSignatures.has(optimisticSignature);
+        });
+
+        // Kết hợp danh sách tin nhắn thật từ server và các tin nhắn tạm còn chờ xử lý
+        const finalMessages = [...formattedMessages, ...stillPendingOptimistic];
+        
+        // Sắp xếp lại để đảm bảo thứ tự thời gian chính xác
+        finalMessages.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+        return finalMessages;
       });
+
     } catch (error: any) {
       console.error(`Error polling messages for ${selectedConversation.threadId}:`, error);
     }
@@ -293,15 +307,11 @@ const ChatbotZalo = () => {
         const { error } = await supabase.functions.invoke('n8n-zalo-webhook-proxy', { body: payload });
         if (error) throw error;
 
-        // We no longer insert directly. n8n and polling will handle it.
-        // The optimistic message will be replaced by the real one on the next poll.
-
     } catch (error: any) {
         showError("Gửi tin nhắn thất bại: " + error.message);
         setMessages(prev => prev.filter(m => m.id !== tempId));
     } finally {
         setSendingMessage(false);
-        // Clean up the temporary blob URL
         if (tempMessage.imageUrl && tempMessage.imageUrl.startsWith('blob:')) {
             URL.revokeObjectURL(tempMessage.imageUrl);
         }
