@@ -63,12 +63,6 @@ export const ZaloContactPanel = ({ selectedConversation, onConversationUpdate, i
     else setNotes(data || []);
   };
 
-  const fetchCareScripts = useCallback(async (threadId: string) => {
-    const { data, error } = await supabase.from('zalo_care_scripts').select('*').eq('thread_id', threadId).order('created_at', { ascending: false });
-    if (error) showError("Không thể tải kịch bản chăm sóc.");
-    else setScripts(data || []);
-  }, []);
-
   const fetchContactDetails = async (threadId: string) => {
     const { data, error } = await supabase.from('zalo_user').select('*').eq('userId', threadId).single();
     if (error) {
@@ -80,37 +74,58 @@ export const ZaloContactPanel = ({ selectedConversation, onConversationUpdate, i
   };
 
   useEffect(() => {
-    if (selectedConversation) {
-      setDisplayName(selectedConversation.name);
-      setIsEditingName(false);
-      fetchNotes(selectedConversation.threadId);
-      fetchCareScripts(selectedConversation.threadId);
-      fetchContactDetails(selectedConversation.threadId);
-
-      const channel = supabase.channel(`zalo_care_scripts:${selectedConversation.threadId}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'zalo_care_scripts',
-            filter: `thread_id=eq.${selectedConversation.threadId}`,
-          },
-          () => {
-            fetchCareScripts(selectedConversation.threadId);
-          }
-        )
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    } else {
+    if (!selectedConversation) {
       setNotes([]);
       setScripts([]);
       setContactDetails(null);
+      return;
     }
-  }, [selectedConversation, fetchCareScripts]);
+
+    const threadId = selectedConversation.threadId;
+
+    // Initial fetches
+    setDisplayName(selectedConversation.name);
+    setIsEditingName(false);
+    fetchNotes(threadId);
+    fetchContactDetails(threadId);
+
+    const getScripts = async () => {
+        const { data, error } = await supabase
+            .from('zalo_care_scripts')
+            .select('*')
+            .eq('thread_id', threadId)
+            .order('created_at', { ascending: false });
+        
+        if (error) {
+            showError("Không thể tải kịch bản chăm sóc.");
+        } else {
+            setScripts(data || []);
+        }
+    };
+    getScripts();
+
+    // Set up real-time subscription
+    const channel = supabase.channel(`realtime-zalo-scripts:${threadId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'zalo_care_scripts',
+          filter: `thread_id=eq.${threadId}`,
+        },
+        () => {
+          // When a change is received, re-fetch the scripts
+          getScripts();
+        }
+      )
+      .subscribe();
+
+    // Cleanup function
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedConversation]);
 
   const handleSaveName = async () => {
     if (!selectedConversation || !displayName.trim() || displayName.trim() === selectedConversation.name) {
@@ -194,7 +209,6 @@ export const ZaloContactPanel = ({ selectedConversation, onConversationUpdate, i
     if (error) { showError("Lưu kịch bản thất bại: " + error.message); } 
     else { 
       showSuccess(`Đã ${editingScript ? 'cập nhật' : 'tạo'} kịch bản!`); 
-      fetchCareScripts(selectedConversation.threadId); 
       setIsScriptDialogOpen(false); 
     }
   };
@@ -205,7 +219,6 @@ export const ZaloContactPanel = ({ selectedConversation, onConversationUpdate, i
     if (error) { showError("Xóa kịch bản thất bại: " + error.message); } 
     else { 
       showSuccess("Đã xóa kịch bản."); 
-      fetchCareScripts(selectedConversation.threadId); 
       setScriptToDelete(null); 
     }
   };
@@ -231,7 +244,6 @@ export const ZaloContactPanel = ({ selectedConversation, onConversationUpdate, i
       if (updateError) throw new Error(`Lỗi cập nhật kịch bản: ${updateError.message}`);
       dismissToast(toastId);
       showSuccess("Đã thêm ảnh vào kịch bản!");
-      fetchCareScripts(selectedConversation.threadId);
     } catch (error: any) {
       dismissToast(toastId);
       showError(error.message);
