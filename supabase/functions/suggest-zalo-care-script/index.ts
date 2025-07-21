@@ -43,7 +43,7 @@ const buildDynamicSystemPrompt = (config, history, context) => {
   };
 
   if (!config.promptTemplate || config.promptTemplate.length === 0) {
-    throw new Error("Prompt template is not configured.");
+    throw new Error("Cấu hình prompt bị thiếu. Vui lòng vào trang 'Train Chatbot Zalo', tab 'Kịch bản chăm sóc', và nhấn 'Lưu thay đổi' để tạo lại cấu hình mặc định.");
   }
 
   let finalPrompt = config.promptTemplate.map(block => {
