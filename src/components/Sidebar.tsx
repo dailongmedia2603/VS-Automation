@@ -47,7 +47,7 @@ const zaloNavItems: NavItem[] = [
 ];
 
 const supportNavItems: NavItem[] = [
-    { name: "Cài đặt API AI", icon: Settings, href: "/settings" },
+    { name: "Cài đặt chung", icon: Settings, href: "/settings" },
     { name: "Tích hợp", icon: Plug, href: "/integrations" },
 ];
 
@@ -255,7 +255,7 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
 
       {/* Support/Settings at the bottom */}
        <div className="mt-auto">
-         <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>Support</p>
+         <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>CÀI ĐẶT CHUNG</p>
          <nav className="flex flex-col space-y-1">
             {supportNavItems.map(renderLink)}
          </nav>
