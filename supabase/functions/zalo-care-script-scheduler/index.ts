@@ -18,6 +18,17 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    // 1. Get Zalo care settings to find the trigger label ID
+    const { data: settings, error: settingsError } = await supabaseAdmin
+      .from('zalo_care_settings')
+      .select('config')
+      .eq('id', 1)
+      .single();
+    
+    if (settingsError) throw settingsError;
+    const triggerLabelId = settings?.config?.trigger_label_id;
+
+    // 2. Find all scheduled scripts that are due
     const { data: scripts, error: scriptsError } = await supabaseAdmin
       .from('zalo_care_scripts')
       .select('*')
@@ -32,15 +43,18 @@ serve(async (req) => {
       });
     }
 
+    // 3. Process each script
     for (const script of scripts) {
       try {
+        // CLAIM: Update status to 'sending'
         const { error: claimError } = await supabaseAdmin
           .from('zalo_care_scripts')
           .update({ status: 'sending' })
           .eq('id', script.id)
           .eq('status', 'scheduled');
-        if (claimError) continue;
+        if (claimError) continue; // Another instance probably claimed it
 
+        // EXECUTE: Send message via n8n proxy
         const { data: contactData } = await supabaseAdmin
           .from('zalo_user')
           .select('displayName, zaloName, avatar')
@@ -62,10 +76,34 @@ serve(async (req) => {
         const { error: proxyError } = await supabaseAdmin.functions.invoke('n8n-zalo-webhook-proxy', { body: payload });
         if (proxyError) throw new Error(`Webhook proxy failed: ${proxyError.message}`);
 
+        // Update status to 'sent'
         await supabaseAdmin
           .from('zalo_care_scripts')
           .update({ status: 'sent' })
           .eq('id', script.id);
+
+        // Re-trigger AI care if the tag is still present
+        if (triggerLabelId) {
+          const { data: labelLink, error: labelLinkError } = await supabaseAdmin
+            .from('zalo_conversation_labels')
+            .select('thread_id')
+            .eq('thread_id', script.thread_id)
+            .eq('label_id', triggerLabelId)
+            .maybeSingle();
+          
+          if (labelLinkError) {
+            console.error(`Error checking for trigger label on thread ${script.thread_id}:`, labelLinkError.message);
+          } else if (labelLink) {
+            // The tag is still there, so trigger the next script
+            console.log(`Script sent for ${script.thread_id}. Re-triggering AI care script creation.`);
+            const { error: triggerError } = await supabaseAdmin.functions.invoke('trigger-zalo-ai-care-script', {
+              body: { threadId: script.thread_id },
+            });
+            if (triggerError) {
+              console.error(`Failed to re-trigger care script for ${script.thread_id}:`, triggerError.message);
+            }
+          }
+        }
 
       } catch (e) {
         console.error(`Failed to process script ${script.id}:`, e.message);
