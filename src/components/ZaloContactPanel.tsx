@@ -20,6 +20,7 @@ import { useAuth } from '@/contexts/AuthContext';
 interface ZaloContactPanelProps { 
   selectedConversation: ZaloConversation | null; 
   onConversationUpdate: (updatedConversation: ZaloConversation) => void;
+  isAiWorking?: boolean;
 }
 
 const getInitials = (name?: string | null) => {
@@ -36,7 +37,7 @@ const statusBadgeColors: Record<CareScriptStatus, string> = {
   failed: 'bg-red-100 text-red-600 hover:bg-red-100' 
 };
 
-export const ZaloContactPanel = ({ selectedConversation, onConversationUpdate }: ZaloContactPanelProps) => {
+export const ZaloContactPanel = ({ selectedConversation, onConversationUpdate, isAiWorking }: ZaloContactPanelProps) => {
   const { user } = useAuth();
   const [notes, setNotes] = useState<ZaloNote[]>([]);
   const [scripts, setScripts] = useState<ZaloCareScript[]>([]);
@@ -348,9 +349,24 @@ export const ZaloContactPanel = ({ selectedConversation, onConversationUpdate }:
               </TooltipProvider>
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-center p-6">
-                <div className="flex items-center justify-center h-16 w-16 bg-slate-200/70 rounded-full mb-4"><Calendar className="h-8 w-8 text-slate-400" /></div>
-                <p className="text-md font-semibold text-slate-800">Chưa có kịch bản chăm sóc</p>
-                <p className="text-sm text-slate-500 mt-1">Tạo kịch bản mới hoặc gắn thẻ AI để tự động tạo.</p>
+                {isAiWorking ? (
+                  <>
+                    <div className="relative mb-4">
+                      <div className="absolute -inset-1.5 bg-blue-200 rounded-full animate-ping opacity-60"></div>
+                      <div className="relative flex items-center justify-center h-16 w-16 bg-blue-100 rounded-full">
+                        <Bot className="h-8 w-8 text-blue-600" />
+                      </div>
+                    </div>
+                    <p className="text-md font-semibold text-slate-800">AI đang phân tích</p>
+                    <p className="text-sm text-slate-500 mt-1 max-w-xs">Hệ thống đang tự động tạo kịch bản chăm sóc...</p>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-center h-16 w-16 bg-slate-200/70 rounded-full mb-4"><Calendar className="h-8 w-8 text-slate-400" /></div>
+                    <p className="text-md font-semibold text-slate-800">Chưa có kịch bản chăm sóc</p>
+                    <p className="text-sm text-slate-500 mt-1">Tạo kịch bản mới hoặc gắn thẻ AI để tự động tạo.</p>
+                  </>
+                )}
               </div>
             )}
           </div>

@@ -62,6 +62,7 @@ const ChatbotZalo = () => {
   const [zaloLabels, setZaloLabels] = useState<ZaloLabel[]>([]);
   const [hasNewLog, setHasNewLog] = useState(false);
   const [triggerLabelId, setTriggerLabelId] = useState<number | null>(null);
+  const [isAiCreatingScript, setIsAiCreatingScript] = useState<Record<string, boolean>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -426,6 +427,15 @@ const ChatbotZalo = () => {
         setConversations(convos => 
           convos.map(c => c.threadId === selectedConversation.threadId ? selectedConversation : c)
         );
+      } else {
+        if (label.id === triggerLabelId) {
+          setIsAiCreatingScript(prev => ({ ...prev, [selectedConversation.threadId]: true }));
+          supabase.functions.invoke('trigger-zalo-ai-care-script', {
+            body: { threadId: selectedConversation.threadId },
+          }).finally(() => {
+            setIsAiCreatingScript(prev => ({ ...prev, [selectedConversation.threadId]: false }));
+          });
+        }
       }
     }
   };
@@ -717,6 +727,7 @@ const ChatbotZalo = () => {
           <ZaloContactPanel 
             selectedConversation={selectedConversation} 
             onConversationUpdate={handleConversationUpdate}
+            isAiWorking={isAiCreatingScript[selectedConversation?.threadId || '']}
           />
         </div>
       </div>
