@@ -12,7 +12,6 @@ import TrainingChatbot from "./pages/TrainingChatbot";
 import Staff from "./pages/Staff";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
-import Integrations from "./pages/Integrations";
 import ZaloSettings from "./pages/ZaloSettings";
 import { AppLayout } from "./components/AppLayout";
 import { ApiSettingsProvider } from "@/contexts/ApiSettingsContext";
@@ -44,7 +43,6 @@ const App = () => (
                     <Route path="/training-chatbot" element={<TrainingChatbot />} />
                     <Route path="/staff" element={<Staff />} />
                     <Route path="/chatbot-zalo" element={<ChatbotZalo />} />
-                    <Route path="/integrations" element={<Integrations />} />
                     <Route path="/zalo-settings" element={<ZaloSettings />} />
                   </Route>
                 </Route>

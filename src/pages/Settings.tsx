@@ -16,20 +16,53 @@ import { useApiSettings } from "@/contexts/ApiSettingsContext";
 import { Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Settings = () => {
-  const { settings, setSettings, isLoading } = useApiSettings();
+  // AI API Settings state
+  const { settings, setSettings, isLoading: isLoadingApi } = useApiSettings();
   const [localSettings, setLocalSettings] = useState(settings);
-  const [isSaving, setIsSaving] = useState(false);
+  const [isSavingApi, setIsSavingApi] = useState(false);
   const [status, setStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
 
+  // Integrations state
+  const [webhookUrl, setWebhookUrl] = useState('');
+  const [isLoadingIntegrations, setIsLoadingIntegrations] = useState(true);
+  const [isSavingIntegrations, setIsSavingIntegrations] = useState(false);
+
+  // Effect for AI API settings
   useEffect(() => {
     setLocalSettings(settings);
   }, [settings]);
 
-  const handleSave = async () => {
-    setIsSaving(true);
+  // Effect for Integrations settings
+  useEffect(() => {
+    const fetchSettings = async () => {
+      setIsLoadingIntegrations(true);
+      try {
+        const { data, error } = await supabase
+          .from('n8n_settings')
+          .select('zalo_webhook_url')
+          .eq('id', 1)
+          .single();
+
+        if (error && error.code !== 'PGRST116') throw error;
+        if (data) {
+          setWebhookUrl(data.zalo_webhook_url || '');
+        }
+      } catch (error: any) {
+        showError("Không thể tải cài đặt n8n: " + error.message);
+      } finally {
+        setIsLoadingIntegrations(false);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  // Save handler for AI API
+  const handleSaveApi = async () => {
+    setIsSavingApi(true);
     try {
       const dataToSave = {
         id: 1,
@@ -44,10 +77,11 @@ const Settings = () => {
     } catch (error: any) {
       showError("Lưu cấu hình thất bại: " + error.message);
     } finally {
-      setIsSaving(false);
+      setIsSavingApi(false);
     }
   };
 
+  // Test connection handler for AI API
   const handleTestConnection = async () => {
     setStatus("testing");
     setError(null);
@@ -87,7 +121,26 @@ const Settings = () => {
     }
   };
 
-  if (isLoading) {
+  // Save handler for Integrations
+  const handleSaveIntegrations = async () => {
+    setIsSavingIntegrations(true);
+    try {
+      const { error } = await supabase
+        .from('n8n_settings')
+        .upsert({ id: 1, zalo_webhook_url: webhookUrl });
+
+      if (error) throw error;
+      showSuccess("Đã lưu URL webhook thành công!");
+    } catch (error: any) {
+      showError("Lưu thất bại: " + error.message);
+    } finally {
+      setIsSavingIntegrations(false);
+    }
+  };
+
+  const pageIsLoading = isLoadingApi || isLoadingIntegrations;
+
+  if (pageIsLoading) {
     return (
       <main className="flex-1 space-y-6 p-6 sm:p-8">
         <Skeleton className="h-8 w-1/3 rounded-lg" />
@@ -114,77 +167,114 @@ const Settings = () => {
 
   return (
     <main className="flex-1 space-y-6 p-6 sm:p-8">
-      <h2 className="text-3xl font-bold tracking-tight">Cài đặt API AI</h2>
-      <Card className="shadow-sm rounded-2xl bg-white">
-        <CardHeader>
-          <CardTitle>Kết nối API</CardTitle>
-          <CardDescription>
-            Quản lý và kiểm tra trạng thái kết nối đến dịch vụ AI của bạn.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="api-url">API Endpoint URL</Label>
-            <Input
-              id="api-url"
-              value={localSettings.apiUrl}
-              onChange={(e) => setLocalSettings({ ...localSettings, apiUrl: e.target.value })}
-              className="bg-slate-100 border-none rounded-lg"
-            />
-          </div>
-           <div className="space-y-2">
-            <Label htmlFor="api-key">API Key</Label>
-            <Input
-              id="api-key"
-              type="password"
-              value={localSettings.apiKey}
-              onChange={(e) => setLocalSettings({ ...localSettings, apiKey: e.target.value })}
-              className="bg-slate-100 border-none rounded-lg"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="embedding-model">Embedding Model Name</Label>
-            <Select
-              value={localSettings.embeddingModelName}
-              onValueChange={(value) => setLocalSettings({ ...localSettings, embeddingModelName: value })}
-            >
-              <SelectTrigger className="bg-slate-100 border-none rounded-lg">
-                <SelectValue placeholder="Chọn model" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="text-embedding-3-small">text-embedding-3-small</SelectItem>
-                <SelectItem value="text-embedding-3-large">text-embedding-3-large</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Quan trọng: Chọn model embedding mà nhà cung cấp API của bạn đã cấp quyền.
-            </p>
-          </div>
-          <Button onClick={handleSave} disabled={isSaving} className="rounded-lg bg-blue-600 hover:bg-blue-700">
-            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isSaving ? "Đang lưu..." : "Lưu thay đổi"}
-          </Button>
-          
-          <div className="border-t pt-6">
-            <div className="flex items-center justify-between">
-                <p className="font-medium">Kiểm tra kết nối</p>
-                {status === "idle" && <Badge variant="outline">Chưa kiểm tra</Badge>}
-                {status === "testing" && <Badge variant="secondary">Đang kiểm tra...</Badge>}
-                {status === "success" && <Badge variant="default" className="bg-green-100 text-green-800">Thành công</Badge>}
-                {status === "error" && <Badge variant="destructive">Thất bại</Badge>}
-            </div>
-            <Button onClick={handleTestConnection} disabled={status === "testing"} className="mt-4 rounded-lg">
-              {status === "testing" ? "Đang kiểm tra..." : "Kiểm tra kết nối"}
-            </Button>
-            {error && (
-              <div className="mt-4 text-sm text-destructive p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-                <p className="font-bold">Chi tiết lỗi:</p>
-                <p className="font-mono break-all">{error}</p>
+      <h2 className="text-3xl font-bold tracking-tight">Cài đặt chung</h2>
+      <Tabs defaultValue="api-ai">
+        <TabsList className="flex justify-start items-center gap-1 p-0 bg-transparent">
+          <TabsTrigger value="api-ai" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Cài đặt API AI</TabsTrigger>
+          <TabsTrigger value="integrations" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Tích hợp</TabsTrigger>
+        </TabsList>
+        <TabsContent value="api-ai" className="mt-4">
+          <Card className="shadow-sm rounded-2xl bg-white">
+            <CardHeader>
+              <CardTitle>Kết nối API</CardTitle>
+              <CardDescription>
+                Quản lý và kiểm tra trạng thái kết nối đến dịch vụ AI của bạn.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="api-url">API Endpoint URL</Label>
+                <Input
+                  id="api-url"
+                  value={localSettings.apiUrl}
+                  onChange={(e) => setLocalSettings({ ...localSettings, apiUrl: e.target.value })}
+                  className="bg-slate-100 border-none rounded-lg"
+                />
               </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+              <div className="space-y-2">
+                <Label htmlFor="api-key">API Key</Label>
+                <Input
+                  id="api-key"
+                  type="password"
+                  value={localSettings.apiKey}
+                  onChange={(e) => setLocalSettings({ ...localSettings, apiKey: e.target.value })}
+                  className="bg-slate-100 border-none rounded-lg"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="embedding-model">Embedding Model Name</Label>
+                <Select
+                  value={localSettings.embeddingModelName}
+                  onValueChange={(value) => setLocalSettings({ ...localSettings, embeddingModelName: value })}
+                >
+                  <SelectTrigger className="bg-slate-100 border-none rounded-lg">
+                    <SelectValue placeholder="Chọn model" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="text-embedding-3-small">text-embedding-3-small</SelectItem>
+                    <SelectItem value="text-embedding-3-large">text-embedding-3-large</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Quan trọng: Chọn model embedding mà nhà cung cấp API của bạn đã cấp quyền.
+                </p>
+              </div>
+              <Button onClick={handleSaveApi} disabled={isSavingApi} className="rounded-lg bg-blue-600 hover:bg-blue-700">
+                {isSavingApi && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isSavingApi ? "Đang lưu..." : "Lưu thay đổi"}
+              </Button>
+              
+              <div className="border-t pt-6">
+                <div className="flex items-center justify-between">
+                    <p className="font-medium">Kiểm tra kết nối</p>
+                    {status === "idle" && <Badge variant="outline">Chưa kiểm tra</Badge>}
+                    {status === "testing" && <Badge variant="secondary">Đang kiểm tra...</Badge>}
+                    {status === "success" && <Badge variant="default" className="bg-green-100 text-green-800">Thành công</Badge>}
+                    {status === "error" && <Badge variant="destructive">Thất bại</Badge>}
+                </div>
+                <Button onClick={handleTestConnection} disabled={status === "testing"} className="mt-4 rounded-lg">
+                  {status === "testing" ? "Đang kiểm tra..." : "Kiểm tra kết nối"}
+                </Button>
+                {error && (
+                  <div className="mt-4 text-sm text-destructive p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                    <p className="font-bold">Chi tiết lỗi:</p>
+                    <p className="font-mono break-all">{error}</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="integrations" className="mt-4">
+          <Card className="shadow-sm rounded-2xl bg-white">
+            <CardHeader>
+              <CardTitle>Tích hợp n8n</CardTitle>
+              <CardDescription>
+                Cấu hình webhook để gửi dữ liệu từ ứng dụng đến n8n khi có sự kiện xảy ra.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="webhook-url">Zalo Webhook URL</Label>
+                <Input
+                  id="webhook-url"
+                  placeholder="Dán URL webhook từ n8n vào đây"
+                  value={webhookUrl}
+                  onChange={(e) => setWebhookUrl(e.target.value)}
+                  className="bg-slate-100 border-none rounded-lg"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Sự kiện gửi tin nhắn Zalo sẽ được gửi đến URL này.
+                </p>
+              </div>
+              <Button onClick={handleSaveIntegrations} disabled={isSavingIntegrations} className="rounded-lg bg-blue-600 hover:bg-blue-700">
+                {isSavingIntegrations && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isSavingIntegrations ? "Đang lưu..." : "Lưu cấu hình"}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </main>
   );
 };

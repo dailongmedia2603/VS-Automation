@@ -48,7 +48,6 @@ const zaloNavItems: NavItem[] = [
 
 const supportNavItems: NavItem[] = [
     { name: "Cài đặt chung", icon: Settings, href: "/settings" },
-    { name: "Tích hợp", icon: Plug, href: "/integrations" },
 ];
 
 interface SidebarProps {
