@@ -15,6 +15,7 @@ import { ZaloContactPanel } from '@/components/ZaloContactPanel';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ZaloConversation, ZaloMessage, ZaloLabel } from '@/types/zalo';
 import { useAuth } from '@/contexts/AuthContext';
+import zaloIcon from '@/assets/images/iconzalo.png';
 
 const getInitials = (name?: string | null) => {
   if (!name) return 'U';
@@ -639,7 +640,7 @@ const ChatbotZalo = () => {
             ) : (
               <div className="flex-1 flex items-center justify-center text-center text-muted-foreground">
                 <div className="flex flex-col items-center gap-4">
-                  <img src="https://stc-zmp3.zadn.vn/zalo-pc/images/logo-zalo.svg" alt="Zalo Logo" className="w-24 h-24" />
+                  <img src={zaloIcon} alt="Zalo Logo" className="w-24 h-24" />
                   <p>Chọn một cuộc trò chuyện Zalo để bắt đầu.</p>
                 </div>
               </div>
