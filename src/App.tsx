@@ -19,6 +19,7 @@ import { ChatwootProvider } from "@/contexts/ChatwootContext";
 import ChatbotZalo from "./pages/ChatbotZalo";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import TrainingDocuments from "./pages/TrainingDocuments";
 
 const queryClient = new QueryClient();
 
@@ -41,6 +42,7 @@ const App = () => (
                     <Route path="/chatbot-settings" element={<ChatwootSettings />} />
                     <Route path="/chatbot-inbox" element={<ChatwootInbox />} />
                     <Route path="/training-chatbot" element={<TrainingChatbot />} />
+                    <Route path="/training-documents" element={<TrainingDocuments />} />
                     <Route path="/staff" element={<Staff />} />
                     <Route path="/chatbot-zalo" element={<ChatbotZalo />} />
                     <Route path="/zalo-settings" element={<ZaloSettings />} />

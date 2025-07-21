@@ -8,7 +8,7 @@ import {
   LayoutDashboard,
   ChevronLeft,
   MessageCircle,
-  Plug,
+  BookCopy,
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -44,6 +44,10 @@ const chatbotNavItems: NavItem[] = [
 const zaloNavItems: NavItem[] = [
     { name: "Chatbot Zalo", icon: MessageCircle, href: "/chatbot-zalo" },
     { name: "Cài đặt Zalo", icon: Settings, href: "/zalo-settings" },
+];
+
+const documentsNavItems: NavItem[] = [
+    { name: "Tài liệu đào tạo", icon: BookCopy, href: "/training-documents" },
 ];
 
 const supportNavItems: NavItem[] = [
@@ -248,6 +252,13 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
             <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>Chatbot Zalo</p>
             <nav className="flex flex-col space-y-1">
                 {zaloNavItems.map(renderLink)}
+            </nav>
+        </div>
+
+        <div>
+            <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>TÀI LIỆU</p>
+            <nav className="flex flex-col space-y-1">
+                {documentsNavItems.map(renderLink)}
             </nav>
         </div>
       </div>
