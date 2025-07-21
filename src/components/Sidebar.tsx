@@ -135,7 +135,7 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
       <Link
         to={item.href}
         className={cn(
-          "flex items-center rounded-lg py-2.5 text-sm font-medium text-gray-500 hover:bg-blue-50 hover:text-blue-600",
+          "flex items-center rounded-lg py-2 text-sm font-medium text-gray-500 hover:bg-blue-50 hover:text-blue-600",
           location.pathname === item.href && "bg-blue-600 text-white hover:bg-blue-600 hover:text-white",
           isCollapsed ? "justify-center px-3" : "px-4"
         )}
@@ -164,8 +164,8 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
   return (
     <div
       className={cn(
-        "h-full flex flex-col bg-white text-zinc-800 space-y-6 border-r border-slate-100 relative transition-all duration-300",
-        isCollapsed ? "p-3" : "p-6",
+        "h-full flex flex-col bg-white text-zinc-800 space-y-4 border-r border-slate-100 relative transition-all duration-300",
+        isCollapsed ? "p-3" : "p-4",
         className
       )}
     >
@@ -229,7 +229,7 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
       </div>
 
       {/* Navigation */}
-      <div className="flex-1 flex flex-col space-y-6 overflow-y-auto">
+      <div className="flex-1 flex flex-col space-y-4 overflow-y-auto">
         <div>
             <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>General</p>
             <nav className="flex flex-col space-y-1">
