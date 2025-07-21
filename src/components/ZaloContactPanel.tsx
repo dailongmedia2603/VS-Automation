@@ -323,8 +323,20 @@ export const ZaloContactPanel = ({ selectedConversation, onConversationUpdate, i
       )}
 
       {activeTab === 'care' && (
-        <div className="flex-1 flex flex-col bg-slate-50 overflow-hidden">
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <div className="flex-1 flex flex-col bg-slate-50 overflow-hidden relative">
+          {isAiWorking && (
+            <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-10 flex flex-col items-center justify-center text-center p-6">
+              <div className="relative mb-4">
+                <div className="absolute -inset-1.5 bg-blue-200 rounded-full animate-ping opacity-60"></div>
+                <div className="relative flex items-center justify-center h-16 w-16 bg-blue-100 rounded-full">
+                  <Bot className="h-8 w-8 text-blue-600" />
+                </div>
+              </div>
+              <p className="text-md font-semibold text-slate-800">AI đang phân tích</p>
+              <p className="text-sm text-slate-500 mt-1 max-w-xs">Hệ thống đang tự động tạo kịch bản chăm sóc...</p>
+            </div>
+          )}
+          <div className={cn("flex-1 overflow-y-auto p-4 space-y-3", isAiWorking && "blur-sm pointer-events-none")}>
             {scripts.length > 0 ? (
               <TooltipProvider>
                 <div className="space-y-3">
@@ -349,28 +361,13 @@ export const ZaloContactPanel = ({ selectedConversation, onConversationUpdate, i
               </TooltipProvider>
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-center p-6">
-                {isAiWorking ? (
-                  <>
-                    <div className="relative mb-4">
-                      <div className="absolute -inset-1.5 bg-blue-200 rounded-full animate-ping opacity-60"></div>
-                      <div className="relative flex items-center justify-center h-16 w-16 bg-blue-100 rounded-full">
-                        <Bot className="h-8 w-8 text-blue-600" />
-                      </div>
-                    </div>
-                    <p className="text-md font-semibold text-slate-800">AI đang phân tích</p>
-                    <p className="text-sm text-slate-500 mt-1 max-w-xs">Hệ thống đang tự động tạo kịch bản chăm sóc...</p>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-center h-16 w-16 bg-slate-200/70 rounded-full mb-4"><Calendar className="h-8 w-8 text-slate-400" /></div>
-                    <p className="text-md font-semibold text-slate-800">Chưa có kịch bản chăm sóc</p>
-                    <p className="text-sm text-slate-500 mt-1">Tạo kịch bản mới hoặc gắn thẻ AI để tự động tạo.</p>
-                  </>
-                )}
+                <div className="flex items-center justify-center h-16 w-16 bg-slate-200/70 rounded-full mb-4"><Calendar className="h-8 w-8 text-slate-400" /></div>
+                <p className="text-md font-semibold text-slate-800">Chưa có kịch bản chăm sóc</p>
+                <p className="text-sm text-slate-500 mt-1">Tạo kịch bản mới hoặc gắn thẻ AI để tự động tạo.</p>
               </div>
             )}
           </div>
-          <div className="p-4 border-t border-slate-100 bg-white flex-shrink-0">
+          <div className={cn("p-4 border-t border-slate-100 bg-white flex-shrink-0", isAiWorking && "blur-sm pointer-events-none")}>
             <Button onClick={openCreateDialog} className="w-full rounded-xl bg-blue-600 hover:bg-blue-700 h-12 text-base font-semibold"><PlusCircle className="mr-2 h-5 w-5" />Tạo kịch bản mới</Button>
           </div>
         </div>
