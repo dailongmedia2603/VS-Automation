@@ -5,16 +5,18 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { format, isSameDay } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import { Search, SendHorizonal, RefreshCw, Loader2, CornerDownLeft, Image as ImageIcon, Paperclip, FileText, X, Check } from 'lucide-react';
+import { Search, SendHorizonal, RefreshCw, Loader2, CornerDownLeft, Image as ImageIcon, Paperclip, FileText, X, Check, Bot } from 'lucide-react';
 import { showError } from '@/utils/toast';
 import { ZaloContactPanel } from '@/components/ZaloContactPanel';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ZaloConversation, ZaloMessage, ZaloLabel } from '@/types/zalo';
 import { useAuth } from '@/contexts/AuthContext';
 import zaloIcon from '@/assets/images/iconzalo.png';
+import { ZaloAiLogViewer } from '@/components/ZaloAiLogViewer';
 
 const getInitials = (name?: string | null) => {
   if (!name) return 'U';
@@ -58,6 +60,7 @@ const ChatbotZalo = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [attachment, setAttachment] = useState<File | null>(null);
   const [zaloLabels, setZaloLabels] = useState<ZaloLabel[]>([]);
+  const [hasNewLog, setHasNewLog] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -191,8 +194,30 @@ const ChatbotZalo = () => {
 
   useEffect(() => {
     if (selectedConversation) {
-      const intervalId = setInterval(fetchMessagesForSelectedConvo, POLLING_INTERVAL);
-      return () => clearInterval(intervalId);
+      setHasNewLog(false);
+
+      const logChannel = supabase
+        .channel(`zalo-ai-logs-for-${selectedConversation.threadId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'zalo_ai_reply_logs',
+            filter: `thread_id=eq.${selectedConversation.threadId}`,
+          },
+          () => {
+            setHasNewLog(true);
+          }
+        )
+        .subscribe();
+
+      const messagesIntervalId = setInterval(fetchMessagesForSelectedConvo, POLLING_INTERVAL);
+
+      return () => {
+        clearInterval(messagesIntervalId);
+        supabase.removeChannel(logChannel);
+      };
     }
   }, [selectedConversation, fetchMessagesForSelectedConvo]);
 
@@ -545,6 +570,17 @@ const ChatbotZalo = () => {
                     <div><h3 className="font-bold">{selectedConversation.name}</h3><p className="text-xs text-muted-foreground">Online</p></div>
                   </div>
                   <div className="flex items-center space-x-2 text-muted-foreground">
+                    <Popover onOpenChange={(open) => { if (open) setHasNewLog(false); }}>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm" className={cn("h-8", hasNewLog && "bg-green-100 text-green-800 animate-glow-green border-green-300")}>
+                          <Bot className="h-4 w-4 mr-2" />
+                          Log AI
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-96 p-0">
+                        <ZaloAiLogViewer threadId={selectedConversation.threadId} />
+                      </PopoverContent>
+                    </Popover>
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => fetchZaloData(true)} disabled={loadingConversations}>
                       <RefreshCw className={cn("h-5 w-5", loadingConversations && "animate-spin")} />
                     </Button>

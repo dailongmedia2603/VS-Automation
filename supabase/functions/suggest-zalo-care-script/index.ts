@@ -54,7 +54,6 @@ const buildDynamicSystemPrompt = (config, history, context) => {
     return `# ${block.title.toUpperCase()}\n${content}`;
   }).join('\n\n');
 
-  // Add a strict instruction for JSON output
   finalPrompt += `\n\n**QUAN TRỌNG:** Chỉ trả lời bằng một đối tượng JSON hợp lệ duy nhất, không có bất kỳ văn bản nào khác. Định dạng phải là: {"content": "nội dung tin nhắn", "scheduled_at": "YYYY-MM-DDTHH:mm:ss.sssZ"}`;
 
   return finalPrompt;
@@ -66,16 +65,30 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
+  const supabaseAdmin = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  );
+
+  let threadId = null;
+  let systemPrompt = null;
+
+  const logToDb = async (status, details) => {
+    if (!threadId) return;
+    await supabaseAdmin.from('zalo_ai_reply_logs').insert({
+      thread_id: threadId,
+      log_type: 'care_script_suggestion',
+      status,
+      details,
+      system_prompt: systemPrompt,
+    });
+  };
+
   try {
-    const { threadId } = await req.json();
+    const body = await req.json();
+    threadId = body.threadId;
     if (!threadId) throw new Error("Yêu cầu thiếu ID cuộc trò chuyện (threadId).");
 
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
-    // 1. Fetch all necessary settings and data in parallel
     const [aiSettingsRes, careScriptSettingsRes, messagesRes, contactRes] = await Promise.all([
       supabaseAdmin.from('ai_settings').select('api_url, api_key').eq('id', 1).single(),
       supabaseAdmin.from('care_script_settings').select('config').eq('id', 1).single(),
@@ -93,12 +106,9 @@ serve(async (req) => {
     const messages = messagesRes.data;
     const contactData = contactRes.data;
 
-    // 2. Process conversation data
     const conversationHistory = messages.map(formatMessage).join('\n');
-    const contactName = contactData?.displayName || contactData?.zaloName || 'Khách hàng';
     const lastUserMessage = messages.filter(m => m.direction === 'in').pop()?.message_content || '';
 
-    // 3. Search for relevant documents
     let context = null;
     if (lastUserMessage) {
         const richQuery = `
@@ -114,10 +124,8 @@ serve(async (req) => {
         else context = searchResults;
     }
 
-    // 4. Build the dynamic system prompt
-    const systemPrompt = buildDynamicSystemPrompt(trainingConfig, conversationHistory, context);
+    systemPrompt = buildDynamicSystemPrompt(trainingConfig, conversationHistory, context);
 
-    // 5. Call the AI proxy
     const { data: proxyResponse, error: proxyError } = await supabaseAdmin.functions.invoke('multi-ai-proxy', {
       body: {
         messages: [{ role: 'system', content: systemPrompt }],
@@ -130,15 +138,17 @@ serve(async (req) => {
     if (proxyError) throw new Error((await proxyError.context.json()).error || proxyError.message);
     if (proxyResponse.error) throw new Error(proxyResponse.error);
 
-    // 6. Parse and return the suggestion
     const aiContent = proxyResponse.choices[0].message.content;
     const jsonString = aiContent.replace(/```json\n|```/g, '').trim();
     const suggestion = JSON.parse(jsonString);
+
+    await logToDb('success', `AI đã gợi ý kịch bản thành công: "${suggestion.content.substring(0, 100)}..."`);
 
     return new Response(JSON.stringify(suggestion), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error) {
     console.error('Lỗi trong function suggest-zalo-care-script:', error.message);
+    await logToDb('error', error.message);
     return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });

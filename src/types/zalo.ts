@@ -64,3 +64,12 @@ export interface ZaloLabel {
   name: string;
   color: string;
 }
+
+export interface ZaloAiLog {
+  id: number;
+  created_at: string;
+  status: 'success' | 'error';
+  details: string;
+  system_prompt: string | null;
+  log_type: 'auto_reply' | 'care_script_suggestion';
+}
