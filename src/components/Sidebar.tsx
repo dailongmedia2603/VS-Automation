@@ -37,13 +37,13 @@ const generalNavItems: NavItem[] = [
 
 const chatbotNavItems: NavItem[] = [
     { name: "Hộp thư Chatbot", icon: MessageSquare, href: "/chatbot-inbox" },
-    { name: "Cài đặt Chatbot", icon: Settings, href: "/chatbot-settings" },
+    { name: "Cấu hình Fanpage", icon: Settings, href: "/chatbot-settings" },
     { name: "Training Chatbot", icon: GraduationCap, href: "/training-chatbot" },
 ]
 
 const zaloNavItems: NavItem[] = [
     { name: "Chatbot Zalo", icon: MessageCircle, href: "/chatbot-zalo" },
-    { name: "Cài đặt Zalo", icon: Settings, href: "/zalo-settings" },
+    { name: "Cấu hình Zalo", icon: Settings, href: "/zalo-settings" },
 ];
 
 const documentsNavItems: NavItem[] = [
