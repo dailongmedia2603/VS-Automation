@@ -9,12 +9,11 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { format, isSameDay } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import { Search, SendHorizonal, RefreshCw, Loader2, Bug, CornerDownLeft, Image as ImageIcon, Paperclip, FileText, X, Check } from 'lucide-react';
+import { Search, SendHorizonal, RefreshCw, Loader2, CornerDownLeft, Image as ImageIcon, Paperclip, FileText, X, Check } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
-import { ZaloDataDebugger } from '@/components/ZaloDataDebugger';
 import { ZaloContactPanel } from '@/components/ZaloContactPanel';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import type { ZaloUser, ZaloConversation, ZaloMessageDb, ZaloMessage, ZaloLabel } from '@/types/zalo';
+import type { ZaloConversation, ZaloMessage, ZaloLabel } from '@/types/zalo';
 import { useAuth } from '@/contexts/AuthContext';
 
 const getInitials = (name?: string | null) => {
@@ -65,8 +64,6 @@ const ChatbotZalo = () => {
   const messageInputRef = useRef<HTMLInputElement>(null);
   const defaultAvatar = 'https://s120-ava-talk.zadn.vn/a/a/c/2/1/120/90898606938dd183dbf5c748e3dae52d.jpg';
   
-  const [isDebugVisible, setIsDebugVisible] = useState(false);
-  const [debugUsersMap, setDebugUsersMap] = useState<Map<string, ZaloUser>>(new Map());
   const POLLING_INTERVAL = 5000;
 
   const scrollToBottom = () => {
@@ -495,10 +492,6 @@ const ChatbotZalo = () => {
       <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" />
       <div className="p-3 border-b flex items-center justify-between">
         <h2 className="text-lg font-bold">Hộp thư Zalo</h2>
-        <Button variant="outline" onClick={() => setIsDebugVisible(!isDebugVisible)}>
-          <Bug className="h-4 w-4 mr-2" />
-          Bật/Tắt Gỡ lỗi
-        </Button>
       </div>
       <div className="flex-1 flex overflow-hidden">
         <aside className="w-80 border-r flex flex-col">
@@ -657,7 +650,6 @@ const ChatbotZalo = () => {
             onConversationUpdate={handleConversationUpdate}
           />
         </div>
-        {isDebugVisible && <div className="p-4 border-t"><ZaloDataDebugger usersMap={debugUsersMap} conversations={conversations} /></div>}
       </div>
     </div>
   );
