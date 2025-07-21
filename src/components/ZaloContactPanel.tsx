@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Phone, Send, Loader2, PlusCircle, Calendar, Clock, Trash2, Pencil, ImagePlus, User as UserIcon, VenetianMask, PhoneCall, Bot } from "lucide-react";
+import { Check, FileText, Phone, Send, Loader2, PlusCircle, Calendar, Clock, Trash2, Pencil, ImagePlus, User as UserIcon, VenetianMask, PhoneCall, Bot } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -19,6 +19,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 interface ZaloContactPanelProps { 
   selectedConversation: ZaloConversation | null; 
+  onConversationUpdate: (updatedConversation: ZaloConversation) => void;
 }
 
 const getInitials = (name?: string | null) => {
@@ -35,7 +36,7 @@ const statusBadgeColors: Record<CareScriptStatus, string> = {
   failed: 'bg-red-100 text-red-600 hover:bg-red-100' 
 };
 
-export const ZaloContactPanel = ({ selectedConversation }: ZaloContactPanelProps) => {
+export const ZaloContactPanel = ({ selectedConversation, onConversationUpdate }: ZaloContactPanelProps) => {
   const { user } = useAuth();
   const [notes, setNotes] = useState<ZaloNote[]>([]);
   const [scripts, setScripts] = useState<ZaloCareScript[]>([]);
@@ -53,6 +54,8 @@ export const ZaloContactPanel = ({ selectedConversation }: ZaloContactPanelProps
   const [scriptForImageUpload, setScriptForImageUpload] = useState<ZaloCareScript | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isSuggestingScript, setIsSuggestingScript] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [displayName, setDisplayName] = useState('');
 
   const fetchNotes = async (threadId: string) => {
     const { data, error } = await supabase.from('zalo_notes').select('*').eq('thread_id', threadId).order('created_at', { ascending: false });
@@ -78,6 +81,8 @@ export const ZaloContactPanel = ({ selectedConversation }: ZaloContactPanelProps
 
   useEffect(() => {
     if (selectedConversation) {
+      setDisplayName(selectedConversation.name);
+      setIsEditingName(false);
       fetchNotes(selectedConversation.threadId);
       fetchCareScripts(selectedConversation.threadId);
       fetchContactDetails(selectedConversation.threadId);
@@ -87,6 +92,36 @@ export const ZaloContactPanel = ({ selectedConversation }: ZaloContactPanelProps
       setContactDetails(null);
     }
   }, [selectedConversation]);
+
+  const handleSaveName = async () => {
+    if (!selectedConversation || !displayName.trim() || displayName.trim() === selectedConversation.name) {
+      setIsEditingName(false);
+      return;
+    }
+
+    const toastId = showLoading("Đang cập nhật tên...");
+    try {
+      const { error } = await supabase
+        .from('zalo_user')
+        .update({ displayName: displayName.trim() })
+        .eq('userId', selectedConversation.threadId);
+
+      if (error) throw error;
+
+      const updatedConversation = {
+        ...selectedConversation,
+        name: displayName.trim(),
+      };
+      onConversationUpdate(updatedConversation);
+
+      dismissToast(toastId);
+      showSuccess("Đã cập nhật tên thành công!");
+      setIsEditingName(false);
+    } catch (err: any) {
+      dismissToast(toastId);
+      showError(`Cập nhật thất bại: ${err.message || 'Lỗi không xác định'}`);
+    }
+  };
 
   const handleSendNote = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -246,8 +281,34 @@ export const ZaloContactPanel = ({ selectedConversation }: ZaloContactPanelProps
         <div className="flex-1 flex flex-col overflow-hidden">
           <div className="p-4 space-y-4 border-b bg-white">
             <div className="flex items-center space-x-3">
-              <Avatar className="h-12 w-12"><AvatarImage src={selectedConversation.avatar} /><AvatarFallback>{getInitials(selectedConversation.name)}</AvatarFallback></Avatar>
-              <h3 className="font-bold text-lg">{selectedConversation.name}</h3>
+              <Avatar className="h-12 w-12"><AvatarImage src={selectedConversation.avatar} /><AvatarFallback>{getInitials(displayName)}</AvatarFallback></Avatar>
+              {isEditingName ? (
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSaveName();
+                      if (e.key === 'Escape') {
+                        setIsEditingName(false);
+                        setDisplayName(selectedConversation?.name || '');
+                      }
+                    }}
+                    className="h-9"
+                    autoFocus
+                  />
+                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={handleSaveName}>
+                    <Check className="h-4 w-4 text-green-600" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center group">
+                  <h3 className="font-bold text-lg cursor-pointer" onClick={() => setIsEditingName(true)}>{displayName}</h3>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100" onClick={() => setIsEditingName(true)}>
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              )}
             </div>
             <div className="space-y-3 text-sm text-muted-foreground">
               <div className="flex items-center"><PhoneCall className="h-4 w-4 mr-3 flex-shrink-0" /><span className={cn(contactDetails?.phoneNumber && "text-green-600 font-medium")}>{contactDetails?.phoneNumber || 'Chưa có'}</span></div>

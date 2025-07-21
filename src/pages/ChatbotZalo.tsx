@@ -324,6 +324,13 @@ const ChatbotZalo = () => {
     }
   };
 
+  const handleConversationUpdate = (updatedConversation: ZaloConversation) => {
+    setSelectedConversation(updatedConversation);
+    setConversations(convos => 
+        convos.map(c => c.threadId === updatedConversation.threadId ? updatedConversation : c)
+    );
+  };
+
   const groupedMessages = useMemo(() => {
     return messages.reduce((acc: ({ type: 'date'; date: string } | { type: 'message'; data: ZaloMessage })[], message, index) => {
       const messageDate = new Date(message.createdAt);
@@ -506,7 +513,10 @@ const ChatbotZalo = () => {
               </div>
             )}
           </section>
-          <ZaloContactPanel selectedConversation={selectedConversation} />
+          <ZaloContactPanel 
+            selectedConversation={selectedConversation} 
+            onConversationUpdate={handleConversationUpdate}
+          />
         </div>
         {isDebugVisible && <div className="p-4 border-t"><ZaloDataDebugger usersMap={debugUsersMap} conversations={conversations} /></div>}
       </div>
