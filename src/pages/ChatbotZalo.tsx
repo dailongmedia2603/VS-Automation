@@ -424,7 +424,11 @@ const ChatbotZalo = () => {
     const hiddenLabelsCount = convo.labels ? convo.labels.length - visibleLabels.length : 0;
 
     return (
-      <div key={convo.threadId} onClick={() => handleSelectConversation(convo)} className={cn("p-2.5 flex space-x-3 cursor-pointer rounded-lg", selectedConversation?.threadId === convo.threadId && "bg-blue-100")}>
+      <div key={convo.threadId} onClick={() => handleSelectConversation(convo)} className={cn(
+        "p-2.5 flex space-x-3 cursor-pointer rounded-lg", 
+        selectedConversation?.threadId === convo.threadId && "bg-blue-100",
+        convo.hasScheduledScript && ! (selectedConversation?.threadId === convo.threadId) && "bg-yellow-50 hover:bg-yellow-100"
+      )}>
         <Avatar className="h-12 w-12">
           <AvatarImage src={convo.avatar || defaultAvatar} />
           <AvatarFallback>{getInitials(convo.name)}</AvatarFallback>

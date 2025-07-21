@@ -16,6 +16,7 @@ export interface ZaloConversation {
   unreadCount: number;
   lastMessageDirection?: 'in' | 'out' | null;
   labels: string[];
+  hasScheduledScript: boolean;
 }
 
 export interface ZaloMessageDb {
