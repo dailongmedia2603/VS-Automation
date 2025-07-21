@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { type User } from '@supabase/supabase-js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -10,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { format, isSameDay } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { Search, SendHorizonal, RefreshCw, Loader2, CornerDownLeft, Image as ImageIcon, Paperclip, FileText, X, Check } from 'lucide-react';
-import { showError, showSuccess } from '@/utils/toast';
+import { showError } from '@/utils/toast';
 import { ZaloContactPanel } from '@/components/ZaloContactPanel';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ZaloConversation, ZaloMessage, ZaloLabel } from '@/types/zalo';
@@ -63,6 +62,8 @@ const ChatbotZalo = () => {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messageInputRef = useRef<HTMLInputElement>(null);
+  const messageContainerRef = useRef<HTMLDivElement>(null);
+  const isUserAtBottom = useRef(true);
   const defaultAvatar = 'https://s120-ava-talk.zadn.vn/a/a/c/2/1/120/90898606938dd183dbf5c748e3dae52d.jpg';
   
   const POLLING_INTERVAL = 5000;
@@ -70,12 +71,6 @@ const ChatbotZalo = () => {
   const scrollToBottom = (behavior: 'smooth' | 'auto' = 'smooth') => {
     messagesEndRef.current?.scrollIntoView({ behavior });
   };
-
-  useEffect(() => {
-    if (selectedConversation) {
-      setTimeout(() => scrollToBottom('auto'), 50);
-    }
-  }, [selectedConversation]);
 
   useEffect(() => {
     if (selectedConversation && messageInputRef.current) {
@@ -228,6 +223,7 @@ const ChatbotZalo = () => {
 
     setLoadingMessages(true);
     setMessages([]);
+    isUserAtBottom.current = true;
     try {
       const { data, error } = await supabase
         .from('zalo_messages')
@@ -282,6 +278,7 @@ const ChatbotZalo = () => {
     
     setNewMessage('');
     setAttachment(null);
+    isUserAtBottom.current = true;
 
     const tempId = Date.now();
     const tempMessage: ZaloMessage = {
@@ -293,7 +290,6 @@ const ChatbotZalo = () => {
         isOutgoing: true,
     };
     setMessages(prev => [...prev, tempMessage]);
-    setTimeout(() => scrollToBottom('smooth'), 0);
 
     try {
         let attachmentUrl: string | null = null;
@@ -417,6 +413,18 @@ const ChatbotZalo = () => {
 
   const unreadConversations = filteredConversations.filter(c => c.unreadCount > 0);
   const readConversations = filteredConversations.filter(c => c.unreadCount === 0);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    const atBottom = scrollHeight - scrollTop - clientHeight < 1;
+    isUserAtBottom.current = atBottom;
+  };
+
+  useEffect(() => {
+    if (isUserAtBottom.current) {
+      scrollToBottom('auto');
+    }
+  }, [messages]);
 
   const renderConversationItem = (convo: ZaloConversation) => {
     const isLastMessageOutgoing = convo.lastMessageDirection === 'out';
@@ -542,7 +550,7 @@ const ChatbotZalo = () => {
                     </Button>
                   </div>
                 </header>
-                <div className="flex-1 overflow-y-auto p-4 md:p-6">
+                <div ref={messageContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 md:p-6">
                   <div className="space-y-4">
                     {loadingMessages ? <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div> : groupedMessages.map((item, index) => {
                       if (item.type === 'date') {
