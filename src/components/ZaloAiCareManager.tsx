@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { showSuccess, showError } from '@/utils/toast';
-import { Bot, Tag, Loader2 } from 'lucide-react';
+import { Tag, Loader2 } from 'lucide-react';
 import type { ZaloLabel } from '@/types/zalo';
 
 export const ZaloAiCareManager = () => {
