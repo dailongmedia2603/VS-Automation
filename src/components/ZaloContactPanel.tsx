@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -63,11 +63,11 @@ export const ZaloContactPanel = ({ selectedConversation, onConversationUpdate, i
     else setNotes(data || []);
   };
 
-  const fetchCareScripts = async (threadId: string) => {
+  const fetchCareScripts = useCallback(async (threadId: string) => {
     const { data, error } = await supabase.from('zalo_care_scripts').select('*').eq('thread_id', threadId).order('created_at', { ascending: false });
     if (error) showError("Không thể tải kịch bản chăm sóc.");
     else setScripts(data || []);
-  };
+  }, []);
 
   const fetchContactDetails = async (threadId: string) => {
     const { data, error } = await supabase.from('zalo_user').select('*').eq('userId', threadId).single();
@@ -86,12 +86,31 @@ export const ZaloContactPanel = ({ selectedConversation, onConversationUpdate, i
       fetchNotes(selectedConversation.threadId);
       fetchCareScripts(selectedConversation.threadId);
       fetchContactDetails(selectedConversation.threadId);
+
+      const channel = supabase.channel(`zalo_care_scripts:${selectedConversation.threadId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'zalo_care_scripts',
+            filter: `thread_id=eq.${selectedConversation.threadId}`,
+          },
+          () => {
+            fetchCareScripts(selectedConversation.threadId);
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     } else {
       setNotes([]);
       setScripts([]);
       setContactDetails(null);
     }
-  }, [selectedConversation]);
+  }, [selectedConversation, fetchCareScripts]);
 
   const handleSaveName = async () => {
     if (!selectedConversation || !displayName.trim() || displayName.trim() === selectedConversation.name) {
