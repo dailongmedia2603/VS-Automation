@@ -20,6 +20,7 @@ import ChatbotZalo from "./pages/ChatbotZalo";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import TrainingDocuments from "./pages/TrainingDocuments";
+import TrainingZaloChatbot from "./pages/TrainingZaloChatbot";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +47,7 @@ const App = () => (
                     <Route path="/staff" element={<Staff />} />
                     <Route path="/chatbot-zalo" element={<ChatbotZalo />} />
                     <Route path="/zalo-settings" element={<ZaloSettings />} />
+                    <Route path="/training-zalo-chatbot" element={<TrainingZaloChatbot />} />
                   </Route>
                 </Route>
                 <Route path="*" element={<NotFound />} />
