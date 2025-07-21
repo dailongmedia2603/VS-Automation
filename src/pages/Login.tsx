@@ -23,7 +23,12 @@ const Login = () => {
         </div>
         <Auth
           supabaseClient={supabase}
-          appearance={{ theme: ThemeSupa }}
+          appearance={{ 
+            theme: ThemeSupa,
+            className: {
+              container: 'login-auth-container'
+            }
+          }}
           providers={[]}
           theme="light"
           localization={{

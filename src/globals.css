@@ -114,3 +114,7 @@
     box-shadow: 0 0 10px rgba(74, 222, 128, 0.8), 0 0 15px rgba(74, 222, 128, 0.6);
   }
 }
+
+.login-auth-container a[href="#auth-sign-up"] {
+  display: none;
+}
