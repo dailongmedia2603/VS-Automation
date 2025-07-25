@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { showSuccess, showError } from '@/utils/toast';
-import hexaLogo from "@/assets/images/logo.png";
+import hexaLogo from "@/assets/images/dailongmedia.png";
 
 const Login = () => {
   const { session } = useAuth();
