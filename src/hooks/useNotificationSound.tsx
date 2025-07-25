@@ -1,12 +1,21 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
+const SOUND_PERMISSION_KEY = 'soundPermissionGranted';
+
 export const useNotificationSound = (soundUrl: string) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [isAllowedToPlay, setIsAllowedToPlay] = useState(false);
+  const [isAllowedToPlay, setIsAllowedToPlay] = useState(() => {
+    try {
+      // Check localStorage for a previously saved permission
+      return localStorage.getItem(SOUND_PERMISSION_KEY) === 'true';
+    } catch (e) {
+      // If localStorage is not available, default to false
+      return false;
+    }
+  });
   const repeatingConversationsRef = useRef<Set<string | number>>(new Set());
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Store isAllowedToPlay in a ref to avoid stale closures in setInterval
   const isAllowedToPlayRef = useRef(isAllowedToPlay);
   useEffect(() => {
     isAllowedToPlayRef.current = isAllowedToPlay;
@@ -24,6 +33,12 @@ export const useNotificationSound = (soundUrl: string) => {
   }, [soundUrl]);
 
   const grantPermission = useCallback(() => {
+    try {
+      // Save the user's choice to localStorage
+      localStorage.setItem(SOUND_PERMISSION_KEY, 'true');
+    } catch (e) {
+      console.error("Could not save sound permission to localStorage", e);
+    }
     setIsAllowedToPlay(true);
     if (audioRef.current) {
       const audio = audioRef.current;
@@ -34,7 +49,6 @@ export const useNotificationSound = (soundUrl: string) => {
     }
   }, []);
 
-  // This function is now stable as it reads the permission status from a ref
   const playSound = useCallback(() => {
     if (audioRef.current && isAllowedToPlayRef.current) {
       audioRef.current.currentTime = 0;
