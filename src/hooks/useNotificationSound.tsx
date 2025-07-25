@@ -18,14 +18,21 @@ export const useNotificationSound = (soundUrl: string) => {
   }, [soundUrl]);
 
   const grantPermission = useCallback(() => {
-    setIsAllowedToPlay(true);
-    // Play a silent sound to "unlock" audio playback on some browsers
     if (audioRef.current) {
       const audio = audioRef.current;
-      audio.muted = true;
+      // Play a short, silent sound to unlock the AudioContext
+      audio.volume = 0;
       audio.play().then(() => {
-        audio.muted = false;
-      }).catch(() => {});
+        // Once playback starts, pause it, reset, and set volume back to normal
+        audio.pause();
+        audio.currentTime = 0;
+        audio.volume = 1;
+        // Now that we know audio can play, set the state
+        setIsAllowedToPlay(true);
+      }).catch(error => {
+        console.error("Audio permission was not granted by the browser:", error);
+        setIsAllowedToPlay(false);
+      });
     }
   }, []);
 
