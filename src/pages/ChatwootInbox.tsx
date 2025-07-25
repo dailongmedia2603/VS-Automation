@@ -18,8 +18,7 @@ import { AiLogViewer } from '@/components/AiLogViewer';
 import { Search, Phone, Paperclip, Image as ImageIcon, SendHorizonal, ThumbsUp, Settings2, CornerDownLeft, Eye, RefreshCw, FileText, X, Filter, Check, PlusCircle, Trash2, Bot, Loader2 } from 'lucide-react';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { Conversation, Message, CareScript, ChatwootLabel } from '@/types/chatwoot';
-import { useNotificationSound } from '@/hooks/useNotificationSound';
-import { SoundPermissionBanner } from '@/components/SoundPermissionBanner';
+import { useNotification } from '@/contexts/NotificationContext';
 
 // Interfaces
 interface Filters {
@@ -39,6 +38,7 @@ const AI_CARE_LABEL = 'AI chăm';
 
 const ChatwootInbox = () => {
   const { settings } = useChatwoot();
+  const { stopRepeatingSound } = useNotification();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
@@ -63,23 +63,7 @@ const ChatwootInbox = () => {
   const selectedConversationIdRef = useRef<number | null>(null);
   const POLLING_INTERVAL = 10000;
   const phoneRegex = /(0[3|5|7|8|9][0-9]{8})\b/;
-  const { playNotificationSound, stopRepeatingSound, isAllowedToPlay, grantPermission } = useNotificationSound('/sounds/notificationnew.mp3');
-  const prevConversationsRef = useRef<Map<number, Conversation>>(new Map());
-
-  useEffect(() => {
-    const prevConversations = prevConversationsRef.current;
-    const newConversationsMap = new Map(conversations.map(c => [c.id, c]));
-
-    conversations.forEach(newConvo => {
-      const oldConvo = prevConversations.get(newConvo.id);
-      if (newConvo.unread_count > (oldConvo?.unread_count || 0)) {
-        playNotificationSound(newConvo.id);
-      }
-    });
-
-    prevConversationsRef.current = newConversationsMap;
-  }, [conversations, playNotificationSound]);
-
+  
   useEffect(() => {
     selectedConversationIdRef.current = selectedConversation?.id ?? null;
   }, [selectedConversation]);
@@ -131,9 +115,7 @@ const ChatwootInbox = () => {
   const syncMessagesToDB = async (msgs: Message[], convoId: number) => {
     if (msgs.length === 0) return;
     
-    // Lọc để chỉ bao gồm các tin nhắn công khai thực tế (loại 0: đến, loại 1: đi và không riêng tư)
     const actualMessages = msgs.filter(m => (m.message_type === 0 || m.message_type === 1) && !m.private);
-
     if (actualMessages.length === 0) return;
 
     const messagesToUpsert = actualMessages.map(m => ({ id: m.id, conversation_id: convoId, content: m.content, message_type: m.message_type, is_private: m.private, sender_name: m.sender?.name, sender_thumbnail: m.sender?.thumbnail, created_at_chatwoot: new Date(m.created_at * 1000).toISOString(), }));
@@ -377,7 +359,6 @@ const ChatwootInbox = () => {
         setMessages(prev => [...prev, responseData]);
         await syncMessagesToDB([responseData], selectedConversation.id);
 
-        // Cập nhật danh sách cuộc trò chuyện ngay lập tức
         setConversations(prevConvos => {
             const convoToUpdate = prevConvos.find(c => c.id === selectedConversation.id);
             if (!convoToUpdate) return prevConvos;
@@ -576,7 +557,6 @@ const ChatwootInbox = () => {
 
   return (
     <div className="flex h-full bg-white border-t">
-      {!isAllowedToPlay && <SoundPermissionBanner onGrantPermission={grantPermission} />}
       <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" />
       <aside className="w-80 border-r flex flex-col">
         <div className="p-3 border-b">

@@ -21,6 +21,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import TrainingDocuments from "./pages/TrainingDocuments";
 import TrainingZaloChatbot from "./pages/TrainingZaloChatbot";
+import { NotificationProvider } from "./contexts/NotificationContext";
 
 const queryClient = new QueryClient();
 
@@ -36,19 +37,21 @@ const App = () => (
               <Routes>
                 <Route path="/login" element={<Login />} />
                 <Route element={<ProtectedRoute />}>
-                  <Route element={<AppLayout />}>
-                    <Route path="/" element={<Dashboard />} />
-                    <Route path="/projects" element={<Projects />} />
-                    <Route path="/settings" element={<Settings />} />
-                    <Route path="/chatbot-settings" element={<ChatwootSettings />} />
-                    <Route path="/chatbot-inbox" element={<ChatwootInbox />} />
-                    <Route path="/training-chatbot" element={<TrainingChatbot />} />
-                    <Route path="/training-documents" element={<TrainingDocuments />} />
-                    <Route path="/staff" element={<Staff />} />
-                    <Route path="/chatbot-zalo" element={<ChatbotZalo />} />
-                    <Route path="/zalo-settings" element={<ZaloSettings />} />
-                    <Route path="/training-zalo-chatbot" element={<TrainingZaloChatbot />} />
-                  </Route>
+                  <NotificationProvider>
+                    <Route element={<AppLayout />}>
+                      <Route path="/" element={<Dashboard />} />
+                      <Route path="/projects" element={<Projects />} />
+                      <Route path="/settings" element={<Settings />} />
+                      <Route path="/chatbot-settings" element={<ChatwootSettings />} />
+                      <Route path="/chatbot-inbox" element={<ChatwootInbox />} />
+                      <Route path="/training-chatbot" element={<TrainingChatbot />} />
+                      <Route path="/training-documents" element={<TrainingDocuments />} />
+                      <Route path="/staff" element={<Staff />} />
+                      <Route path="/chatbot-zalo" element={<ChatbotZalo />} />
+                      <Route path="/zalo-settings" element={<ZaloSettings />} />
+                      <Route path="/training-zalo-chatbot" element={<TrainingZaloChatbot />} />
+                    </Route>
+                  </NotificationProvider>
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>

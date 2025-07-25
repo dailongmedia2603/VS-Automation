@@ -17,8 +17,7 @@ import type { ZaloConversation, ZaloMessage, ZaloLabel } from '@/types/zalo';
 import { useAuth } from '@/contexts/AuthContext';
 import zaloIcon from '@/assets/images/iconzalo.png';
 import { ZaloAiLogViewer } from '@/components/ZaloAiLogViewer';
-import { useNotificationSound } from '@/hooks/useNotificationSound';
-import { SoundPermissionBanner } from '@/components/SoundPermissionBanner';
+import { useNotification } from '@/contexts/NotificationContext';
 
 const getInitials = (name?: string | null) => {
   if (!name) return 'U';
@@ -52,6 +51,7 @@ const getFileNameFromUrl = (url: string): string => {
 
 const ChatbotZalo = () => {
   const { user } = useAuth();
+  const { stopRepeatingSound } = useNotification();
   const [conversations, setConversations] = useState<ZaloConversation[]>([]);
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [selectedConversation, setSelectedConversation] = useState<ZaloConversation | null>(null);
@@ -72,24 +72,8 @@ const ChatbotZalo = () => {
   const messageContainerRef = useRef<HTMLDivElement>(null);
   const isUserAtBottom = useRef(true);
   const defaultAvatar = 'https://s120-ava-talk.zadn.vn/a/a/c/2/1/120/90898606938dd183dbf5c748e3dae52d.jpg';
-  const { playNotificationSound, stopRepeatingSound, isAllowedToPlay, grantPermission } = useNotificationSound('/sounds/notificationnew.mp3');
-  const prevConversationsRef = useRef<Map<string, ZaloConversation>>(new Map());
   
   const POLLING_INTERVAL = 5000;
-
-  useEffect(() => {
-    const prevConversations = prevConversationsRef.current;
-    const newConversationsMap = new Map(conversations.map(c => [c.threadId, c]));
-
-    conversations.forEach(newConvo => {
-      const oldConvo = prevConversations.get(newConvo.threadId);
-      if (newConvo.unreadCount > (oldConvo?.unreadCount || 0)) {
-        playNotificationSound(newConvo.threadId);
-      }
-    });
-
-    prevConversationsRef.current = newConversationsMap;
-  }, [conversations, playNotificationSound]);
 
   const scrollToBottom = (behavior: 'smooth' | 'auto' = 'smooth') => {
     messagesEndRef.current?.scrollIntoView({ behavior });
@@ -575,7 +559,6 @@ const ChatbotZalo = () => {
 
   return (
     <div className="flex flex-col h-full bg-white">
-      {!isAllowedToPlay && <SoundPermissionBanner onGrantPermission={grantPermission} />}
       <input type="file" ref={imageInputRef} onChange={handleFileSelect} className="hidden" accept="image/*" />
       <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" />
       <div className="p-3 border-b flex items-center justify-between">
