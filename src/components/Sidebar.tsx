@@ -8,6 +8,9 @@ import {
   ChevronLeft,
   BookCopy,
   LogOut,
+  Sparkles,
+  CheckCircle,
+  Wrench,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link, useLocation } from "react-router-dom";
@@ -36,6 +39,18 @@ const generalNavItems: NavItem[] = [
 const documentsNavItems: NavItem[] = [
     { name: "Tài liệu đào tạo", icon: BookCopy, href: "/training-documents" },
     { name: "Training Chatbot", icon: GraduationCap, href: "/training-chatbot" },
+];
+
+const contentNavItems: NavItem[] = [
+    { name: "Content AI", icon: Sparkles, href: "/content-ai" },
+];
+
+const seederNavItems: NavItem[] = [
+    { name: "Check Seeding", icon: CheckCircle, href: "/check-seeding" },
+];
+
+const toolsNavItems: NavItem[] = [
+    { name: "Công cụ", icon: Wrench, href: "/tools" },
 ];
 
 const supportNavItems: NavItem[] = [
@@ -235,6 +250,27 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
             <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>TÀI LIỆU & HUẤN LUYỆN</p>
             <nav className="flex flex-col space-y-1">
                 {documentsNavItems.map(renderLink)}
+            </nav>
+        </div>
+
+        <div>
+            <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>Content</p>
+            <nav className="flex flex-col space-y-1">
+                {contentNavItems.map(renderLink)}
+            </nav>
+        </div>
+
+        <div>
+            <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>Seeder</p>
+            <nav className="flex flex-col space-y-1">
+                {seederNavItems.map(renderLink)}
+            </nav>
+        </div>
+
+        <div>
+            <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>Công cụ</p>
+            <nav className="flex flex-col space-y-1">
+                {toolsNavItems.map(renderLink)}
             </nav>
         </div>
       </div>

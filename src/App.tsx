@@ -15,6 +15,9 @@ import { ApiSettingsProvider } from "@/contexts/ApiSettingsContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import TrainingDocuments from "./pages/TrainingDocuments";
+import ContentAi from "./pages/ContentAi";
+import CheckSeeding from "./pages/CheckSeeding";
+import Tools from "./pages/Tools";
 
 const queryClient = new QueryClient();
 
@@ -36,6 +39,9 @@ const App = () => (
                   <Route path="/training-chatbot" element={<TrainingChatbot />} />
                   <Route path="/training-documents" element={<TrainingDocuments />} />
                   <Route path="/staff" element={<Staff />} />
+                  <Route path="/content-ai" element={<ContentAi />} />
+                  <Route path="/check-seeding" element={<CheckSeeding />} />
+                  <Route path="/tools" element={<Tools />} />
                 </Route>
               </Route>
               <Route path="*" element={<NotFound />} />
