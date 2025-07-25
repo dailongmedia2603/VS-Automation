@@ -19,7 +19,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "./ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import dailongLogo from "@/assets/images/dailong-logo.png";
+import hexaLogo from "@/assets/images/logo.png";
 import { useAuth } from "@/contexts/AuthContext";
 import { showSuccess, showError } from "@/utils/toast";
 
@@ -189,13 +189,13 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
       </Button>
 
       {/* Logo */}
-      <div className={cn("flex items-center", isCollapsed ? "justify-center h-10" : "h-10")}>
+      <div className={cn("flex items-center", isCollapsed ? "justify-center h-10" : "")}>
         {isCollapsed ? (
           <div className="bg-blue-600 rounded-lg p-2 flex items-center justify-center">
             <Briefcase className="h-5 w-5 text-white" />
           </div>
         ) : (
-          <img src={dailongLogo} alt="Dai Long Media Agency Logo" className="h-full w-auto object-contain" />
+          <img src={hexaLogo} alt="HEXA Logo" className="w-4/5 h-auto mx-auto" />
         )}
       </div>
 
