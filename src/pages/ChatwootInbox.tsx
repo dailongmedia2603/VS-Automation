@@ -38,7 +38,7 @@ const AI_CARE_LABEL = 'AI chăm';
 
 const ChatwootInbox = () => {
   const { settings } = useChatwoot();
-  const { stopRepeatingSound } = useNotification();
+  const { stopRepeatingSound, decrementChatwootUnread } = useNotification();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
@@ -292,7 +292,12 @@ const ChatwootInbox = () => {
 
   const handleSelectConversation = async (conversation: Conversation) => {
     stopRepeatingSound(conversation.id);
-    setSelectedConversation(conversation);
+    if (conversation.unread_count > 0) {
+      decrementChatwootUnread();
+    }
+    setSelectedConversation({ ...conversation, unread_count: 0 });
+    setConversations(convos => convos.map(c => c.id === conversation.id ? { ...c, unread_count: 0 } : c));
+    
     setLoadingMessages(true);
     setMessages([]);
     try {
@@ -304,16 +309,14 @@ const ChatwootInbox = () => {
       await syncMessagesToDB(fetchedMessages, conversation.id);
     } catch (err: any) { console.error('Đã xảy ra lỗi khi tải tin nhắn.');
     } finally { setLoadingMessages(false); }
-    if (conversation.unread_count > 0) {
-      setConversations(convos => convos.map(c => c.id === conversation.id ? { ...c, unread_count: 0 } : c));
-      supabase.functions.invoke('chatwoot-proxy', {
-        body: {
-          action: 'mark_as_read',
-          settings,
-          conversationId: conversation.id,
-        },
-      }).catch((err: any) => console.error("Lỗi ngầm khi đánh dấu đã đọc:", err.message));
-    }
+    
+    supabase.functions.invoke('chatwoot-proxy', {
+      body: {
+        action: 'mark_as_read',
+        settings,
+        conversationId: conversation.id,
+      },
+    }).catch((err: any) => console.error("Lỗi ngầm khi đánh dấu đã đọc:", err.message));
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {

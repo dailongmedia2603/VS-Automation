@@ -51,7 +51,7 @@ const getFileNameFromUrl = (url: string): string => {
 
 const ChatbotZalo = () => {
   const { user } = useAuth();
-  const { stopRepeatingSound } = useNotification();
+  const { stopRepeatingSound, decrementZaloUnread } = useNotification();
   const [conversations, setConversations] = useState<ZaloConversation[]>([]);
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [selectedConversation, setSelectedConversation] = useState<ZaloConversation | null>(null);
@@ -236,6 +236,10 @@ const ChatbotZalo = () => {
 
   const handleSelectConversation = async (conversation: ZaloConversation) => {
     stopRepeatingSound(conversation.threadId);
+    if (conversation.unreadCount > 0) {
+      decrementZaloUnread();
+    }
+
     if (user && conversation.unreadCount > 0) {
       const { error } = await supabase
         .from('zalo_conversation_seen_status')

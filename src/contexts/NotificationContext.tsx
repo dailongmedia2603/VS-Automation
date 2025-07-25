@@ -11,6 +11,8 @@ interface NotificationContextType {
   stopRepeatingSound: (conversationId: string | number) => void;
   chatwootUnreadCount: number;
   zaloUnreadCount: number;
+  decrementChatwootUnread: () => void;
+  decrementZaloUnread: () => void;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -106,7 +108,15 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
     return () => clearInterval(intervalId);
   }, [pollChatwoot, pollZalo]);
 
-  const value = { stopRepeatingSound, chatwootUnreadCount, zaloUnreadCount };
+  const decrementChatwootUnread = () => {
+    setChatwootUnreadCount(prev => Math.max(0, prev - 1));
+  };
+
+  const decrementZaloUnread = () => {
+    setZaloUnreadCount(prev => Math.max(0, prev - 1));
+  };
+
+  const value = { stopRepeatingSound, chatwootUnreadCount, zaloUnreadCount, decrementChatwootUnread, decrementZaloUnread };
 
   return (
     <NotificationContext.Provider value={value}>
