@@ -1,4 +1,4 @@
-import React, { createContext, useContext, ReactNode, useEffect, useRef, useCallback, useState } from 'react';
+import { createContext, useContext, ReactNode, useEffect, useRef, useCallback, useState } from 'react';
 import { useNotificationSound } from '@/hooks/useNotificationSound';
 import { SoundPermissionBanner } from '@/components/SoundPermissionBanner';
 import { useChatwoot } from './ChatwootContext';
