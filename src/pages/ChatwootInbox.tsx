@@ -18,6 +18,7 @@ import { AiLogViewer } from '@/components/AiLogViewer';
 import { Search, Phone, Paperclip, Image as ImageIcon, SendHorizonal, ThumbsUp, Settings2, CornerDownLeft, Eye, RefreshCw, FileText, X, Filter, Check, PlusCircle, Trash2, Bot, Loader2 } from 'lucide-react';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { Conversation, Message, CareScript, ChatwootLabel } from '@/types/chatwoot';
+import { useNotificationSound } from '@/hooks/useNotificationSound';
 
 // Interfaces
 interface Filters {
@@ -61,6 +62,22 @@ const ChatwootInbox = () => {
   const selectedConversationIdRef = useRef<number | null>(null);
   const POLLING_INTERVAL = 10000;
   const phoneRegex = /(0[3|5|7|8|9][0-9]{8})\b/;
+  const { playNotificationSound, stopRepeatingSound } = useNotificationSound('/sounds/notification.mp3');
+  const prevConversationsRef = useRef<Map<number, Conversation>>(new Map());
+
+  useEffect(() => {
+    const prevConversations = prevConversationsRef.current;
+    const newConversationsMap = new Map(conversations.map(c => [c.id, c]));
+
+    conversations.forEach(newConvo => {
+      const oldConvo = prevConversations.get(newConvo.id);
+      if (newConvo.unread_count > (oldConvo?.unread_count || 0)) {
+        playNotificationSound(newConvo.id);
+      }
+    });
+
+    prevConversationsRef.current = newConversationsMap;
+  }, [conversations, playNotificationSound]);
 
   useEffect(() => {
     selectedConversationIdRef.current = selectedConversation?.id ?? null;
@@ -291,6 +308,7 @@ const ChatwootInbox = () => {
   }, [messages, selectedConversation, settings]);
 
   const handleSelectConversation = async (conversation: Conversation) => {
+    stopRepeatingSound(conversation.id);
     setSelectedConversation(conversation);
     setLoadingMessages(true);
     setMessages([]);
