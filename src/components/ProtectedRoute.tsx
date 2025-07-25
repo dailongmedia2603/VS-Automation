@@ -1,7 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate, Outlet } from 'react-router-dom';
 import { Skeleton } from './ui/skeleton';
-import { NotificationProvider } from '@/contexts/NotificationContext';
 
 export const ProtectedRoute = () => {
   const { user, isLoading } = useAuth();
@@ -23,8 +22,6 @@ export const ProtectedRoute = () => {
   }
 
   return (
-    <NotificationProvider>
-      <Outlet />
-    </NotificationProvider>
+    <Outlet />
   );
 };

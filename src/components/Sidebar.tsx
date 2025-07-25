@@ -3,11 +3,9 @@ import {
   BarChart3,
   Users,
   Settings,
-  MessageSquare,
   GraduationCap,
   LayoutDashboard,
   ChevronLeft,
-  MessageCircle,
   BookCopy,
   LogOut,
 } from "lucide-react";
@@ -21,7 +19,6 @@ import { supabase } from "@/integrations/supabase/client";
 import hexaLogo from "@/assets/images/logo.png";
 import { useAuth } from "@/contexts/AuthContext";
 import { showSuccess, showError } from "@/utils/toast";
-import { useNotification } from "@/contexts/NotificationContext";
 
 interface NavItem {
   name: string;
@@ -36,20 +33,9 @@ const generalNavItems: NavItem[] = [
   { name: "Nhân sự", icon: Users, href: "/staff" },
 ];
 
-const chatbotNavItems: NavItem[] = [
-    { name: "Hộp thư Chatbot", icon: MessageSquare, href: "/chatbot-inbox" },
-    { name: "Cấu hình Fanpage", icon: Settings, href: "/chatbot-settings" },
-    { name: "Training Chatbot", icon: GraduationCap, href: "/training-chatbot" },
-]
-
-const zaloNavItems: NavItem[] = [
-    { name: "Chatbot Zalo", icon: MessageCircle, href: "/chatbot-zalo" },
-    { name: "Cấu hình Zalo", icon: Settings, href: "/zalo-settings" },
-    { name: "Train Chatbot Zalo", icon: GraduationCap, href: "/training-zalo-chatbot" },
-];
-
 const documentsNavItems: NavItem[] = [
     { name: "Tài liệu đào tạo", icon: BookCopy, href: "/training-documents" },
+    { name: "Training Chatbot", icon: GraduationCap, href: "/training-chatbot" },
 ];
 
 const supportNavItems: NavItem[] = [
@@ -71,7 +57,6 @@ interface StaffProfile {
 export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps) {
   const location = useLocation();
   const { user } = useAuth();
-  const { chatwootUnreadCount, zaloUnreadCount } = useNotification();
   const [profile, setProfile] = useState<StaffProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
 
@@ -138,34 +123,19 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
   };
 
   const renderLink = (item: NavItem) => {
-    let unreadCount = 0;
-    if (item.href === '/chatbot-inbox') {
-      unreadCount = chatwootUnreadCount;
-    } else if (item.href === '/chatbot-zalo') {
-      unreadCount = zaloUnreadCount;
-    }
-
     const linkContent = (
       <Link
         to={item.href}
         className={cn(
           "flex items-center rounded-lg py-2 text-sm font-medium text-gray-500 hover:bg-blue-50 hover:text-blue-600",
           location.pathname === item.href && "bg-blue-600 text-white hover:bg-blue-600 hover:text-white",
-          isCollapsed ? "justify-center px-3 relative" : "px-4 justify-between"
+          isCollapsed ? "justify-center px-3 relative" : "px-4"
         )}
       >
         <div className="flex items-center">
           <item.icon className={cn("h-5 w-5 transition-all", !isCollapsed && "mr-3")} />
           <span className={cn("transition-all", isCollapsed && "sr-only")}>{item.name}</span>
         </div>
-        {!isCollapsed && unreadCount > 0 && (
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </span>
-        )}
-        {isCollapsed && unreadCount > 0 && (
-          <span className="absolute top-1.5 right-1.5 h-2.5 w-2.5 rounded-full bg-red-500 border-2 border-white"></span>
-        )}
       </Link>
     );
 
@@ -262,21 +232,7 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
         </div>
         
         <div>
-            <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>CHATBOT FANPAGE</p>
-            <nav className="flex flex-col space-y-1">
-                {chatbotNavItems.map(renderLink)}
-            </nav>
-        </div>
-
-        <div>
-            <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>Chatbot Zalo</p>
-            <nav className="flex flex-col space-y-1">
-                {zaloNavItems.map(renderLink)}
-            </nav>
-        </div>
-
-        <div>
-            <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>TÀI LIỆU</p>
+            <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>TÀI LIỆU & HUẤN LUYỆN</p>
             <nav className="flex flex-col space-y-1">
                 {documentsNavItems.map(renderLink)}
             </nav>
