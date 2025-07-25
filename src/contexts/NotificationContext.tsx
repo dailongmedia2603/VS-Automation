@@ -1,4 +1,4 @@
-import React, { createContext, useContext, ReactNode, useEffect, useRef, useCallback } from 'react';
+import React, { createContext, useContext, ReactNode, useEffect, useRef, useCallback, useState } from 'react';
 import { useNotificationSound } from '@/hooks/useNotificationSound';
 import { SoundPermissionBanner } from '@/components/SoundPermissionBanner';
 import { useChatwoot } from './ChatwootContext';
@@ -9,6 +9,8 @@ import type { ZaloConversation } from '@/types/zalo';
 
 interface NotificationContextType {
   stopRepeatingSound: (conversationId: string | number) => void;
+  chatwootUnreadCount: number;
+  zaloUnreadCount: number;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -17,13 +19,14 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
   const { playNotificationSound, stopRepeatingSound, isAllowedToPlay, grantPermission } = useNotificationSound('/sounds/notificationnew.mp3');
   const { settings: chatwootSettings } = useChatwoot();
   const { user } = useAuth();
+  const [chatwootUnreadCount, setChatwootUnreadCount] = useState(0);
+  const [zaloUnreadCount, setZaloUnreadCount] = useState(0);
 
   const prevChatwootConversationsRef = useRef<Map<number, Conversation>>(new Map());
   const prevZaloConversationsRef = useRef<Map<string, ZaloConversation>>(new Map());
 
   const POLLING_INTERVAL = 15000; // Check every 15 seconds
 
-  // Polling for Chatwoot
   const pollChatwoot = useCallback(async () => {
     if (!chatwootSettings.accountId || !chatwootSettings.apiToken) return;
 
@@ -33,6 +36,9 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
       });
       const conversationsFromServer: Conversation[] = chatwootData?.data?.payload || [];
       
+      const totalUnread = conversationsFromServer.reduce((acc, convo) => acc + convo.unread_count, 0);
+      setChatwootUnreadCount(totalUnread);
+
       const prevConversations = prevChatwootConversationsRef.current;
       const newConversationsMap = new Map(conversationsFromServer.map(c => [c.id, c]));
 
@@ -49,7 +55,6 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [chatwootSettings, playNotificationSound]);
 
-  // Polling for Zalo
   const pollZalo = useCallback(async () => {
     if (!user) return;
     try {
@@ -72,6 +77,9 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
         const isUnread = convo.lastMessageDirection !== 'out' && lastMessageTimestamp > lastSeenTimestamp;
         return { ...convo, unreadCount: isUnread ? 1 : 0 };
       });
+
+      const totalUnread = finalConversations.reduce((acc, convo) => acc + convo.unreadCount, 0);
+      setZaloUnreadCount(totalUnread);
 
       const prevConversations = prevZaloConversationsRef.current;
       const newConversationsMap = new Map(finalConversations.map(c => [c.threadId, c]));
@@ -98,8 +106,10 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
     return () => clearInterval(intervalId);
   }, [pollChatwoot, pollZalo]);
 
+  const value = { stopRepeatingSound, chatwootUnreadCount, zaloUnreadCount };
+
   return (
-    <NotificationContext.Provider value={{ stopRepeatingSound }}>
+    <NotificationContext.Provider value={value}>
       {!isAllowedToPlay && <SoundPermissionBanner onGrantPermission={grantPermission} />}
       {children}
     </NotificationContext.Provider>
