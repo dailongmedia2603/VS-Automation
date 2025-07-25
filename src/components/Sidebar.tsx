@@ -33,7 +33,6 @@ const generalNavItems: NavItem[] = [
   { name: "Dashboard", icon: LayoutDashboard, href: "/" },
   { name: "Dự án", icon: Briefcase, href: "/projects" },
   { name: "Báo cáo", icon: BarChart3, href: "/reports" },
-  { name: "Nhân sự", icon: Users, href: "/staff" },
 ];
 
 const documentsNavItems: NavItem[] = [
@@ -54,6 +53,7 @@ const toolsNavItems: NavItem[] = [
 ];
 
 const supportNavItems: NavItem[] = [
+    { name: "Nhân sự", icon: Users, href: "/staff" },
     { name: "Cài đặt chung", icon: Settings, href: "/settings" },
 ];
 
