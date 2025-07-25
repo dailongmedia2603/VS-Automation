@@ -7,29 +7,27 @@ export const useNotificationSound = (soundUrl: string) => {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // Initialize the Audio object
     audioRef.current = new Audio(soundUrl);
     audioRef.current.loop = false;
 
-    // Browsers require user interaction to play audio.
-    const grantPermission = () => {
-      setIsAllowedToPlay(true);
-      // Clean up the event listener once permission is granted.
-      document.removeEventListener('click', grantPermission);
-      document.removeEventListener('keydown', grantPermission);
-    };
-
-    document.addEventListener('click', grantPermission);
-    document.addEventListener('keydown', grantPermission);
-
     return () => {
-      document.removeEventListener('click', grantPermission);
-      document.removeEventListener('keydown', grantPermission);
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
     };
   }, [soundUrl]);
+
+  const grantPermission = useCallback(() => {
+    setIsAllowedToPlay(true);
+    // Play a silent sound to "unlock" audio playback on some browsers
+    if (audioRef.current) {
+      const audio = audioRef.current;
+      audio.muted = true;
+      audio.play().then(() => {
+        audio.muted = false;
+      }).catch(() => {});
+    }
+  }, []);
 
   const playSound = useCallback(() => {
     if (audioRef.current && isAllowedToPlay) {
@@ -66,5 +64,5 @@ export const useNotificationSound = (soundUrl: string) => {
     repeatingConversationsRef.current.delete(conversationId);
   }, []);
 
-  return { playNotificationSound, stopRepeatingSound };
+  return { playNotificationSound, stopRepeatingSound, isAllowedToPlay, grantPermission };
 };

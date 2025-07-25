@@ -19,6 +19,7 @@ import { Search, Phone, Paperclip, Image as ImageIcon, SendHorizonal, ThumbsUp, 
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { Conversation, Message, CareScript, ChatwootLabel } from '@/types/chatwoot';
 import { useNotificationSound } from '@/hooks/useNotificationSound';
+import { SoundPermissionBanner } from '@/components/SoundPermissionBanner';
 
 // Interfaces
 interface Filters {
@@ -62,7 +63,7 @@ const ChatwootInbox = () => {
   const selectedConversationIdRef = useRef<number | null>(null);
   const POLLING_INTERVAL = 10000;
   const phoneRegex = /(0[3|5|7|8|9][0-9]{8})\b/;
-  const { playNotificationSound, stopRepeatingSound } = useNotificationSound('/sounds/notification.mp3');
+  const { playNotificationSound, stopRepeatingSound, isAllowedToPlay, grantPermission } = useNotificationSound('/sounds/notificationnew.mp3');
   const prevConversationsRef = useRef<Map<number, Conversation>>(new Map());
 
   useEffect(() => {
@@ -575,6 +576,7 @@ const ChatwootInbox = () => {
 
   return (
     <div className="flex h-full bg-white border-t">
+      {!isAllowedToPlay && <SoundPermissionBanner onGrantPermission={grantPermission} />}
       <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" />
       <aside className="w-80 border-r flex flex-col">
         <div className="p-3 border-b">

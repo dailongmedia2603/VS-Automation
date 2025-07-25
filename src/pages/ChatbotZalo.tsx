@@ -18,6 +18,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import zaloIcon from '@/assets/images/iconzalo.png';
 import { ZaloAiLogViewer } from '@/components/ZaloAiLogViewer';
 import { useNotificationSound } from '@/hooks/useNotificationSound';
+import { SoundPermissionBanner } from '@/components/SoundPermissionBanner';
 
 const getInitials = (name?: string | null) => {
   if (!name) return 'U';
@@ -71,7 +72,7 @@ const ChatbotZalo = () => {
   const messageContainerRef = useRef<HTMLDivElement>(null);
   const isUserAtBottom = useRef(true);
   const defaultAvatar = 'https://s120-ava-talk.zadn.vn/a/a/c/2/1/120/90898606938dd183dbf5c748e3dae52d.jpg';
-  const { playNotificationSound, stopRepeatingSound } = useNotificationSound('/sounds/notification.mp3');
+  const { playNotificationSound, stopRepeatingSound, isAllowedToPlay, grantPermission } = useNotificationSound('/sounds/notificationnew.mp3');
   const prevConversationsRef = useRef<Map<string, ZaloConversation>>(new Map());
   
   const POLLING_INTERVAL = 5000;
@@ -574,6 +575,7 @@ const ChatbotZalo = () => {
 
   return (
     <div className="flex flex-col h-full bg-white">
+      {!isAllowedToPlay && <SoundPermissionBanner onGrantPermission={grantPermission} />}
       <input type="file" ref={imageInputRef} onChange={handleFileSelect} className="hidden" accept="image/*" />
       <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" />
       <div className="p-3 border-b flex items-center justify-between">
