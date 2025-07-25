@@ -6,6 +6,12 @@ export const useNotificationSound = (soundUrl: string) => {
   const repeatingConversationsRef = useRef<Set<string | number>>(new Set());
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Store isAllowedToPlay in a ref to avoid stale closures in setInterval
+  const isAllowedToPlayRef = useRef(isAllowedToPlay);
+  useEffect(() => {
+    isAllowedToPlayRef.current = isAllowedToPlay;
+  }, [isAllowedToPlay]);
+
   useEffect(() => {
     audioRef.current = new Audio(soundUrl);
     audioRef.current.loop = false;
@@ -19,7 +25,6 @@ export const useNotificationSound = (soundUrl: string) => {
 
   const grantPermission = useCallback(() => {
     setIsAllowedToPlay(true);
-    // Play a silent sound to "unlock" audio playback on some browsers
     if (audioRef.current) {
       const audio = audioRef.current;
       audio.muted = true;
@@ -29,14 +34,15 @@ export const useNotificationSound = (soundUrl: string) => {
     }
   }, []);
 
+  // This function is now stable as it reads the permission status from a ref
   const playSound = useCallback(() => {
-    if (audioRef.current && isAllowedToPlay) {
+    if (audioRef.current && isAllowedToPlayRef.current) {
       audioRef.current.currentTime = 0;
       audioRef.current.play().catch(error => {
         console.warn("Audio play failed:", error);
       });
     }
-  }, [isAllowedToPlay]);
+  }, []);
 
   const startRepeatingSound = useCallback((conversationId: string | number) => {
     repeatingConversationsRef.current.add(conversationId);
