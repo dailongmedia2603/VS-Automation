@@ -14,7 +14,7 @@ serve(async (req) => {
   try {
     const { apiUrl, accessToken } = await req.json();
     if (!accessToken) {
-      throw new Error("Access Token is required.");
+      throw new Error("Vui lòng cung cấp Access Token.");
     }
 
     const finalApiUrl = apiUrl || 'https://graph.facebook.com/v20.0';
@@ -24,7 +24,19 @@ serve(async (req) => {
     const data = await response.json();
 
     if (!response.ok) {
-      const errorMessage = data?.error?.message || `Request failed with status ${response.status}`;
+      // Provide a more helpful error message for common issues.
+      let errorMessage = `Yêu cầu thất bại với mã trạng thái ${response.status}.`;
+      const fbError = data?.error?.message;
+
+      if (response.status === 400 || response.status === 401) {
+        errorMessage = `Xác thực thất bại. Vui lòng kiểm tra lại Access Token của bạn.`;
+        if (fbError) {
+          errorMessage += ` (Lỗi từ Facebook: ${fbError})`;
+        }
+      } else if (fbError) {
+        errorMessage = fbError;
+      }
+      
       throw new Error(errorMessage);
     }
 
@@ -35,7 +47,6 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error testing Facebook API connection:', error.message);
-    // Return 200 OK but with an error payload so the client can parse it.
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
