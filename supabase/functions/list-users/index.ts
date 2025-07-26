@@ -24,15 +24,15 @@ serve(async (req) => {
     const { data: staffData, error: staffError } = await supabaseAdmin.from('staff').select('*');
     if (staffError) throw staffError;
 
-    const staffMap = new Map(staffData.map(s => [s.id, s]));
+    const staffMap = new Map(staffData ? staffData.map(s => [s.id, s]) : []);
 
     const combinedUsers = users.map(user => {
       const staffInfo = staffMap.get(user.id) || {};
       return {
         id: user.id,
         email: user.email,
-        name: user.user_metadata.full_name || user.email,
-        avatar_url: user.user_metadata.avatar_url,
+        name: user.user_metadata?.full_name || user.email,
+        avatar_url: user.user_metadata?.avatar_url,
         role: staffInfo.role || 'Chưa có chức vụ',
         status: staffInfo.status || 'active',
       };
