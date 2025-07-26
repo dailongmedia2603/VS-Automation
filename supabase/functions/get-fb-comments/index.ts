@@ -23,7 +23,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Fetch Facebook API settings from the database
     const { data: fbSettings, error: settingsError } = await supabaseAdmin
       .from('apifb_settings')
       .select('api_url, api_key')
@@ -36,21 +35,23 @@ serve(async (req) => {
 
     const { api_url: apiUrl, api_key: accessToken } = fbSettings;
     const finalApiUrl = apiUrl || 'http://api.akng.io.vn/graph';
-
-    // Updated URL structure to match user's requirement
     const fbApiEndpoint = `${finalApiUrl}/${postId}/comments?access_token=${accessToken}`;
 
     const response = await fetch(fbApiEndpoint);
-    const data = await response.json();
+    const rawResponse = await response.text();
+    const data = JSON.parse(rawResponse);
 
     if (!response.ok) {
       const errorMessage = data?.error?.message || `Yêu cầu API thất bại với mã trạng thái ${response.status}.`;
       throw new Error(errorMessage);
     }
 
-    // Ensure we always return an object with a 'data' property that is an array
     const responseData = {
-        data: Array.isArray(data.data) ? data.data : []
+        data: Array.isArray(data.data) ? data.data : [],
+        log: {
+            requestUrl: fbApiEndpoint,
+            rawResponse: rawResponse,
+        }
     };
 
     return new Response(JSON.stringify(responseData), {
