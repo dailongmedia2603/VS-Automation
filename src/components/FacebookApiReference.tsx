@@ -1,17 +1,24 @@
 import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Code, Search } from 'lucide-react';
+import { Code, Search, Link as LinkIcon } from 'lucide-react';
 import { ScrollArea } from "@/components/ui/scroll-area";
-import endpointsRaw from '@/assets/data/endpoints.txt?raw';
+import apiData from '@/assets/data/facebook_graph_endpoints.json';
 
 interface FacebookApiReferenceProps {
   baseUrl: string;
 }
 
 interface Endpoint {
-  endpoint: string;
+  path: string;
   description: string;
+  doc_url?: string;
+}
+
+const generateDescription = (nodeName: string, edgeName: string, notes?: string): string => {
+    const formattedEdge = edgeName.replace(/_/g, ' ');
+    const description = `Lấy ${formattedEdge} cho một ${nodeName}.`;
+    return notes ? `${description} ${notes}` : description;
 }
 
 export const FacebookApiReference: React.FC<FacebookApiReferenceProps> = ({ baseUrl }) => {
@@ -19,17 +26,44 @@ export const FacebookApiReference: React.FC<FacebookApiReferenceProps> = ({ base
   const finalBaseUrl = baseUrl || 'https://graph.facebook.com/v20.0';
 
   const allEndpoints = useMemo(() => {
-    if (!endpointsRaw) return [];
-    return endpointsRaw
-      .split('\n')
-      .map(line => {
-        const parts = line.split(' - ');
-        if (parts.length < 2) return null;
-        const endpoint = parts[0].trim();
-        const description = parts.slice(1).join(' - ').trim();
-        return { endpoint, description };
-      })
-      .filter((item): item is Endpoint => item !== null && !!item.endpoint && !!item.description);
+    const endpoints: Endpoint[] = [];
+    const apiEndpoints = (apiData as any).default || apiData;
+
+    if (!apiEndpoints || !apiEndpoints.endpoints) return [];
+
+    apiEndpoints.endpoints.forEach((node: any) => {
+      if (node.get) {
+        node.get.forEach((path: string) => {
+          endpoints.push({
+            path: path,
+            description: `Lấy một đối tượng ${node.node}.`,
+            doc_url: node.doc_url
+          });
+        });
+      }
+      if (node.edges) {
+        node.edges.forEach((edge: any) => {
+          const edgeName = edge.path.split('/').pop() || 'items';
+          endpoints.push({
+            path: edge.path,
+            description: generateDescription(node.node, edgeName, edge.notes),
+            doc_url: edge.doc_url
+          });
+        });
+      }
+    });
+    
+    if (apiEndpoints.special && apiEndpoints.special.alias) {
+        apiEndpoints.special.alias.forEach((alias: any) => {
+            endpoints.push({
+                path: alias.path,
+                description: alias.notes || `Một endpoint đại diện.`,
+                doc_url: alias.doc_url
+            });
+        });
+    }
+
+    return endpoints;
   }, []);
 
   const filteredEndpoints = useMemo(() => {
@@ -38,7 +72,7 @@ export const FacebookApiReference: React.FC<FacebookApiReferenceProps> = ({ base
     }
     return allEndpoints.filter(
       (ep: Endpoint) =>
-        ep.endpoint.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        ep.path.toLowerCase().includes(searchQuery.toLowerCase()) ||
         ep.description.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [searchQuery, allEndpoints]);
@@ -66,11 +100,18 @@ export const FacebookApiReference: React.FC<FacebookApiReferenceProps> = ({ base
             {filteredEndpoints.length > 0 ? (
               filteredEndpoints.map((ex, index) => (
                 <div key={index} className="p-4 border rounded-lg bg-slate-50/50">
-                  <p className="text-sm text-slate-700 font-medium">{ex.description}</p>
+                  <div className="flex justify-between items-start">
+                    <p className="text-sm text-slate-700 font-medium flex-1 pr-4">{ex.description}</p>
+                    {ex.doc_url && (
+                        <a href={ex.doc_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 flex-shrink-0" title="Xem tài liệu">
+                            <LinkIcon className="h-4 w-4" />
+                        </a>
+                    )}
+                  </div>
                   <div className="mt-2 p-3 bg-slate-900 rounded-md text-white font-mono text-xs flex items-center gap-2">
                     <Code className="h-4 w-4 flex-shrink-0" />
                     <span className="break-all">
-                      <span className="font-bold text-green-400">GET</span> {finalBaseUrl}{ex.endpoint}
+                      <span className="font-bold text-green-400">GET</span> {finalBaseUrl}{ex.path}
                     </span>
                   </div>
                 </div>
