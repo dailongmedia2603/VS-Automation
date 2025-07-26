@@ -2,13 +2,13 @@ import { ToolCard } from "@/components/ToolCard";
 import { MessageSquareQuote } from "lucide-react";
 
 const tools = [
-  // {
-  //   title: "Check Key Word Comment",
-  //   description: "Quét và lọc các bình luận chứa từ khóa trên các bài đăng Facebook.",
-  //   icon: MessageSquareQuote,
-  //   href: "/tools/check-keyword-comment",
-  //   color: "bg-blue-100 text-blue-600",
-  // },
+  {
+    title: "Check Key Word Comment",
+    description: "Quét và lọc các bình luận chứa từ khóa trên các bài đăng Facebook.",
+    icon: MessageSquareQuote,
+    href: "/tools/check-keyword-comment",
+    color: "bg-blue-100 text-blue-600",
+  },
 ];
 
 const Tools = () => {
