@@ -156,13 +156,12 @@ const Settings = () => {
     try {
       const { error } = await supabase
         .from('apifb_settings')
-        .update({ api_url: fbApiUrl, api_key: fbAccessToken })
-        .eq('id', 1);
+        .upsert({ id: 1, api_url: fbApiUrl, api_key: fbAccessToken });
 
       if (error) throw error;
       showSuccess("Đã lưu cấu hình API Facebook!");
     } catch (error: any) {
-      const errorMessage = error?.message || 'Lỗi không xác định. Vui lòng kiểm tra lại quyền truy cập (RLS policies) cho bảng "apifb_settings".';
+      const errorMessage = error?.message || 'Lỗi không xác định. Vui lòng kiểm tra lại cấu hình bảng "apifb_settings" trên Supabase.';
       showError("Lưu thất bại: " + errorMessage);
     } finally {
       setIsSavingFb(false);
