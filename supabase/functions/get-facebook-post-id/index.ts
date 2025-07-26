@@ -29,12 +29,13 @@ serve(async (req) => {
 
     const html = await response.text();
 
-    // A more robust regex to find the post ID in various formats within the HTML content or URL
-    const regex = /"post_id":"(\d+)"|"story_fbid":"(\d+)"|"top_level_post_id":"(\d+)"|story_fbid=(\d+)|(?:posts|videos|photos)\/(\d+)/;
+    // This is a more robust regex that looks for various patterns Facebook uses to store post IDs.
+    // It checks for "post_id", "top_level_post_id", "story_fbid", and common URL patterns.
+    const regex = /"post_id":"(\d+)"|"top_level_post_id":"(\d+)"|"story_fbid":"(\d+)"|story_fbid=(\d+)|(?:posts|videos|photos|reels|watch)\/(\d+)/;
     const match = html.match(regex);
 
     if (match) {
-      // The post ID will be in one of the capturing groups, filtering out undefined values
+      // The post ID will be in one of the capturing groups. We find the first one that is not undefined.
       const postId = match.slice(1).find(id => id !== undefined);
       if (postId) {
         return new Response(JSON.stringify({ postId }), {
