@@ -137,10 +137,9 @@ const Settings = () => {
       const { error } = await supabase.from('api_fb').upsert(dataToSave);
       if (error) throw error;
       showSuccess("Đã lưu cấu hình API Facebook!");
-    } catch (err: any)
-     {
+    } catch (err: any) {
       console.error("Facebook settings save failed:", err);
-      const errorMessage = err.message || (typeof err === 'object' ? JSON.stringify(err) : String(err));
+      const errorMessage = err.details || err.message || (typeof err === 'object' ? JSON.stringify(err) : 'Lỗi không xác định.');
       showError("Lưu thất bại: " + errorMessage);
     } finally {
       setIsSavingFb(false);
