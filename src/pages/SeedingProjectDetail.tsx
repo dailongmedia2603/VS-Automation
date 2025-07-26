@@ -7,7 +7,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, MessageSquare, FileCheck2, ChevronRight, ArrowLeft } from 'lucide-react';
+import { PlusCircle, MessageSquare, FileCheck2, ChevronRight, ArrowLeft, Edit, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type Project = {
@@ -62,6 +62,34 @@ const SeedingProjectDetail = () => {
     fetchProjectDetails();
   }, [projectId]);
 
+  const PostList = ({ posts, selectedPost, onSelectPost }: { posts: Post[], selectedPost: Post | null, onSelectPost: (post: Post) => void }) => (
+    <div className="flex flex-col gap-1 pl-2">
+      {posts.map((post, index) => (
+        <div
+          key={post.id}
+          onClick={() => onSelectPost(post)}
+          className={cn(
+            "group w-full text-left p-2 rounded-md text-sm flex items-center justify-between cursor-pointer",
+            selectedPost?.id === post.id ? "bg-blue-100 text-blue-700 font-semibold" : "hover:bg-slate-100"
+          )}
+        >
+          <span>Post {index + 1}</span>
+          <div className="flex items-center">
+            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); alert(`Sửa Post ${post.id}`); }}>
+                <Edit className="h-3 w-3" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); alert(`Xóa Post ${post.id}`); }}>
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
+            <ChevronRight className={cn("h-4 w-4 text-slate-400 transition-transform", selectedPost?.id === post.id && "translate-x-1 text-blue-700")} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
   if (isLoading) {
     return (
       <main className="flex-1 p-6 sm:p-8 bg-slate-50">
@@ -114,21 +142,7 @@ const SeedingProjectDetail = () => {
                   </div>
                 </AccordionTrigger>
                 <AccordionContent>
-                  <div className="flex flex-col gap-1 pl-2">
-                    {posts.map((post, index) => (
-                      <button
-                        key={post.id}
-                        onClick={() => setSelectedPost(post)}
-                        className={cn(
-                          "w-full text-left p-2 rounded-md text-sm flex items-center justify-between",
-                          selectedPost?.id === post.id ? "bg-blue-100 text-blue-700 font-semibold" : "hover:bg-slate-100"
-                        )}
-                      >
-                        Post {index + 1}
-                        <ChevronRight className={cn("h-4 w-4 text-slate-400 transition-transform", selectedPost?.id === post.id && "translate-x-1 text-blue-700")} />
-                      </button>
-                    ))}
-                  </div>
+                  <PostList posts={posts} selectedPost={selectedPost} onSelectPost={setSelectedPost} />
                 </AccordionContent>
               </AccordionItem>
               <AccordionItem value="approve-post">
@@ -139,7 +153,7 @@ const SeedingProjectDetail = () => {
                   </div>
                 </AccordionTrigger>
                 <AccordionContent>
-                   <div className="pl-2 text-sm text-slate-500">Chức năng đang được phát triển.</div>
+                   <PostList posts={posts} selectedPost={selectedPost} onSelectPost={setSelectedPost} />
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
