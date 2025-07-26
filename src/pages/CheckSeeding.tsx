@@ -16,6 +16,7 @@ import { format } from 'date-fns';
 import { SeedingStatCard } from '@/components/SeedingStatCard';
 import { Link } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Label } from '@/components/ui/label';
 
 type ProjectStatus = 'checking' | 'completed' | 'archived';
 type Project = {
@@ -245,17 +246,24 @@ const CheckSeeding = () => {
       )}
 
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Thêm dự án mới</DialogTitle>
+            <DialogTitle className="text-xl font-bold">Thêm dự án mới</DialogTitle>
             <DialogDescription>Nhập tên cho dự án seeding của bạn.</DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <Input placeholder="VD: Chiến dịch seeding tháng 9" value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} />
+            <Label htmlFor="project-name" className="sr-only">Tên dự án</Label>
+            <Input 
+              id="project-name"
+              placeholder="VD: Chiến dịch seeding tháng 9" 
+              value={newProjectName} 
+              onChange={(e) => setNewProjectName(e.target.value)}
+              className="h-11 bg-slate-100/70 border-slate-200"
+            />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Hủy</Button>
-            <Button onClick={handleAddProject} disabled={isSaving}>
+            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} className="rounded-lg">Hủy</Button>
+            <Button onClick={handleAddProject} disabled={isSaving} className="rounded-lg bg-blue-600 hover:bg-blue-700">
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Lưu
             </Button>
