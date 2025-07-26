@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { showError } from '@/utils/toast';
+import { showError, showSuccess } from '@/utils/toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, Download, MoreHorizontal, Link as LinkIcon, MessageCircle, Code } from 'lucide-react';
+import { Search, Download, MoreHorizontal, Link as LinkIcon, MessageCircle, Code, PlayCircle, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type Post = {
@@ -27,6 +27,23 @@ type Comment = {
   comment_link: string | null;
 };
 
+interface FbComment {
+  message: string;
+  from: {
+    id: string;
+    name: string;
+    link: string;
+  };
+  permalink_url: string;
+  id: string;
+}
+
+interface CheckResult {
+  found: number;
+  notFound: number;
+  total: number;
+}
+
 interface CommentCheckDetailProps {
   post: Post;
 }
@@ -36,35 +53,97 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'visible' | 'not_visible'>('all');
+  const [isChecking, setIsChecking] = useState(false);
+  const [checkResult, setCheckResult] = useState<CheckResult | null>(null);
+
+  const fetchComments = async () => {
+    setIsLoading(true);
+    const { data, error } = await supabase
+      .from('seeding_comments')
+      .select('*')
+      .eq('post_id', post.id)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      showError("Không thể tải danh sách comment: " + error.message);
+    } else {
+      setComments(data || []);
+    }
+    setIsLoading(false);
+  };
 
   useEffect(() => {
-    const fetchComments = async () => {
-      setIsLoading(true);
-      const { data, error } = await supabase
-        .from('seeding_comments')
-        .select('*')
-        .eq('post_id', post.id)
-        .order('created_at', { ascending: true });
-
-      if (error) {
-        showError("Không thể tải danh sách comment: " + error.message);
-      } else {
-        setComments(data || []);
-      }
-      setIsLoading(false);
-    };
-
     fetchComments();
+    setCheckResult(null); // Reset check result when post changes
   }, [post.id]);
+
+  const handleRunCheck = async () => {
+    if (!post.links) {
+      showError("Bài viết này thiếu ID để có thể kiểm tra.");
+      return;
+    }
+    setIsChecking(true);
+    setCheckResult(null);
+
+    try {
+      const { data: fbData, error: functionError } = await supabase.functions.invoke('get-fb-comments', {
+        body: { postId: post.links }
+      });
+
+      if (functionError) throw functionError;
+      if (fbData.error) throw new Error(fbData.error);
+
+      const actualComments: FbComment[] = fbData.data || [];
+      
+      const updates = [];
+      let foundCount = 0;
+
+      for (const expectedComment of comments) {
+        const foundFbComment = actualComments.find(actual => actual.message.trim() === expectedComment.content.trim());
+        
+        if (foundFbComment) {
+          foundCount++;
+          updates.push({
+            id: expectedComment.id,
+            status: 'visible' as const,
+            account_name: foundFbComment.from.name,
+            comment_link: foundFbComment.permalink_url,
+          });
+        } else {
+          if (expectedComment.status === 'visible') {
+            updates.push({
+              id: expectedComment.id,
+              status: 'not_visible' as const,
+              account_name: null,
+              comment_link: null,
+            });
+          }
+        }
+      }
+
+      if (updates.length > 0) {
+        const { error: updateError } = await supabase.from('seeding_comments').upsert(updates);
+        if (updateError) throw updateError;
+      }
+
+      const total = comments.length;
+      setCheckResult({ found: foundCount, notFound: total - foundCount, total });
+      showSuccess(`Kiểm tra hoàn tất! Tìm thấy ${foundCount}/${total} bình luận.`);
+      
+      fetchComments();
+
+    } catch (error: any) {
+      const errorMessage = error.context?.json ? (await error.context.json()).error : error.message;
+      showError(`Kiểm tra thất bại: ${errorMessage}`);
+    } finally {
+      setIsChecking(false);
+    }
+  };
 
   const filteredComments = useMemo(() => {
     return comments.filter(comment => {
-      if (statusFilter !== 'all' && comment.status !== statusFilter) {
-        return false;
-      }
-      if (searchTerm && !comment.content.toLowerCase().includes(searchTerm.toLowerCase())) {
-        return false;
-      }
+      if (statusFilter !== 'all' && comment.status !== statusFilter) return false;
+      if (searchTerm && !comment.content.toLowerCase().includes(searchTerm.toLowerCase())) return false;
       return true;
     });
   }, [comments, searchTerm, statusFilter]);
@@ -89,6 +168,38 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
         )}
       </CardHeader>
       <CardContent className="flex-1 flex flex-col">
+        <Card className="mb-4 bg-slate-50 border-slate-200">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-slate-800">Kiểm tra bình luận tự động</h3>
+              <p className="text-sm text-slate-500">Quét bài viết và cập nhật trạng thái các bình luận trong danh sách.</p>
+            </div>
+            <div className="flex items-center gap-4">
+              {checkResult && (
+                <div className="flex items-center gap-4 text-sm">
+                  <div className="flex items-center gap-2 text-green-600">
+                    <CheckCircle2 className="h-5 w-5" />
+                    <div>
+                      <p className="font-bold">{checkResult.found}</p>
+                      <p className="text-xs text-slate-500">Đã hiện</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-amber-600">
+                    <XCircle className="h-5 w-5" />
+                    <div>
+                      <p className="font-bold">{checkResult.notFound}</p>
+                      <p className="text-xs text-slate-500">Chưa hiện</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <Button onClick={handleRunCheck} disabled={isChecking} className="bg-blue-600 hover:bg-blue-700 rounded-lg">
+                {isChecking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
+                {isChecking ? 'Đang chạy...' : 'Chạy Check'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
         <div className="flex items-center justify-between gap-4 mb-4">
           <div className="relative flex-grow max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
