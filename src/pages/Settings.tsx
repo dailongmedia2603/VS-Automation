@@ -51,7 +51,7 @@ const Settings = () => {
       try {
         const [n8nRes, fbRes] = await Promise.all([
           supabase.from('n8n_settings').select('zalo_webhook_url').eq('id', 1).single(),
-          supabase.from('facebook_settings').select('api_url, access_token').eq('id', 1).single()
+          supabase.from('api_fb').select('url, access_token').eq('id', 1).single()
         ]);
 
         if (n8nRes.error && n8nRes.error.code !== 'PGRST116') throw n8nRes.error;
@@ -59,7 +59,7 @@ const Settings = () => {
 
         if (fbRes.error && fbRes.error.code !== 'PGRST116') throw fbRes.error;
         if (fbRes.data) {
-          setFbApiUrl(fbRes.data.api_url || '');
+          setFbApiUrl(fbRes.data.url || '');
           setFbAccessToken(fbRes.data.access_token || '');
         }
       } catch (error: any) {
@@ -133,28 +133,9 @@ const Settings = () => {
   const handleSaveFacebook = async () => {
     setIsSavingFb(true);
     try {
-      const { data, error: selectError } = await supabase
-        .from('facebook_settings')
-        .select('id')
-        .eq('id', 1)
-        .maybeSingle();
-
-      if (selectError) throw selectError;
-
-      const dataToSave = { api_url: fbApiUrl, access_token: fbAccessToken };
-
-      if (data) {
-        const { error: updateError } = await supabase
-          .from('facebook_settings')
-          .update(dataToSave)
-          .eq('id', 1);
-        if (updateError) throw updateError;
-      } else {
-        const { error: insertError } = await supabase
-          .from('facebook_settings')
-          .insert({ id: 1, ...dataToSave });
-        if (insertError) throw insertError;
-      }
+      const dataToSave = { id: 1, url: fbApiUrl, access_token: fbAccessToken };
+      const { error } = await supabase.from('api_fb').upsert(dataToSave);
+      if (error) throw error;
       showSuccess("Đã lưu cấu hình API Facebook!");
     } catch (err: any)
      {
