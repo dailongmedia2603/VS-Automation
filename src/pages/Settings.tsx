@@ -37,6 +37,8 @@ const Settings = () => {
   const [fbAccessToken, setFbAccessToken] = useState('');
   const [isLoadingFb, setIsLoadingFb] = useState(true);
   const [isSavingFb, setIsSavingFb] = useState(false);
+  const [fbApiStatus, setFbApiStatus] = useState<'idle' | 'testing' | 'success' | 'error'>("idle");
+  const [fbApiError, setFbApiError] = useState<string | null>(null);
 
   // Effect for AI API settings
   useEffect(() => {
@@ -175,6 +177,27 @@ const Settings = () => {
       showError("Lưu thất bại: " + errorMessage);
     } finally {
       setIsSavingFb(false);
+    }
+  };
+
+  const handleTestFbConnection = async () => {
+    setFbApiStatus("testing");
+    setFbApiError(null);
+    try {
+        const { data, error } = await supabase.functions.invoke('test-fb-api', {
+            body: { apiUrl: fbApiUrl, accessToken: fbAccessToken }
+        });
+
+        if (error) throw error;
+        if (data.error) throw new Error(data.error);
+
+        setFbApiStatus("success");
+        showSuccess(`Kết nối thành công! Xin chào, ${data.data.name}.`);
+    } catch (err: any) {
+        setFbApiStatus("error");
+        const errorMessage = err.message || "Đã xảy ra lỗi không xác định.";
+        setFbApiError(errorMessage);
+        showError(`Kiểm tra thất bại: ${errorMessage}`);
     }
   };
 
@@ -350,6 +373,24 @@ const Settings = () => {
                 {isSavingFb && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {isSavingFb ? "Đang lưu..." : "Lưu cấu hình"}
               </Button>
+              <div className="border-t pt-6 mt-2">
+                <div className="flex items-center justify-between">
+                    <p className="font-medium">Kiểm tra kết nối</p>
+                    {fbApiStatus === "idle" && <Badge variant="outline">Chưa kiểm tra</Badge>}
+                    {fbApiStatus === "testing" && <Badge variant="secondary">Đang kiểm tra...</Badge>}
+                    {fbApiStatus === "success" && <Badge variant="default" className="bg-green-100 text-green-800">Thành công</Badge>}
+                    {fbApiStatus === "error" && <Badge variant="destructive">Thất bại</Badge>}
+                </div>
+                <Button onClick={handleTestFbConnection} disabled={fbApiStatus === "testing"} className="mt-4 rounded-lg">
+                  {fbApiStatus === "testing" ? "Đang kiểm tra..." : "Kiểm tra kết nối"}
+                </Button>
+                {fbApiError && (
+                  <div className="mt-4 text-sm text-destructive p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                    <p className="font-bold">Chi tiết lỗi:</p>
+                    <p className="font-mono break-all">{fbApiError}</p>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
           <FacebookApiReference baseUrl={fbApiUrl} accessToken={fbAccessToken} />
