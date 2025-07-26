@@ -48,7 +48,12 @@ serve(async (req) => {
       throw new Error(errorMessage);
     }
 
-    return new Response(JSON.stringify(data), {
+    // Ensure we always return an object with a 'data' property that is an array
+    const responseData = {
+        data: Array.isArray(data.data) ? data.data : []
+    };
+
+    return new Response(JSON.stringify(responseData), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
