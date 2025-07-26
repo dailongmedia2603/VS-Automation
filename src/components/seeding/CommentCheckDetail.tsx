@@ -69,14 +69,16 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
     });
   }, [comments, searchTerm, statusFilter]);
 
+  const postUrl = post.links ? (post.links.startsWith('http') ? post.links : `https://www.facebook.com/${post.links}`) : '#';
+
   return (
     <Card className="w-full h-full shadow-none border-none flex flex-col">
       <CardHeader>
         <CardTitle className="text-2xl font-bold text-slate-800">{post.name}</CardTitle>
         {post.links && (
-          <div className="flex items-center gap-2 text-sm text-slate-500 pt-2">
+          <div className="flex items-center gap-2 text-sm text-slate-500 pt-1">
             <LinkIcon className="h-4 w-4" />
-            <a href={post.links} target="_blank" rel="noopener noreferrer" className="hover:underline break-all hover:text-blue-600">
+            <a href={postUrl} target="_blank" rel="noopener noreferrer" className="hover:underline hover:text-blue-600">
               {post.links}
             </a>
           </div>
