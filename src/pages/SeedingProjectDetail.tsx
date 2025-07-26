@@ -236,16 +236,43 @@ const SeedingProjectDetail = () => {
       </ResizablePanelGroup>
 
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent><DialogHeader><DialogTitle>Thêm Post Mới</DialogTitle></DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4"><Label htmlFor="name" className="text-right">Tên Post</Label><Input id="name" value={newPostName} onChange={(e) => setNewPostName(e.target.value)} className="col-span-3" /></div>
-            <div className="grid grid-cols-4 items-center gap-4"><Label htmlFor="type" className="text-right">Loại</Label>
-              <Select value={newPostType} onValueChange={(v) => setNewPostType(v as any)}><SelectTrigger className="col-span-3"><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="comment_check">Check Comment</SelectItem><SelectItem value="post_approval">Check duyệt post</SelectItem></SelectContent>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Thêm Post Mới</DialogTitle>
+            <DialogDescription>
+              Điền thông tin chi tiết cho bài đăng mới của bạn.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-6 py-4">
+            <div className="grid grid-cols-3 items-center gap-4">
+              <Label htmlFor="name" className="text-left">Tên Post</Label>
+              <Input 
+                id="name" 
+                value={newPostName} 
+                onChange={(e) => setNewPostName(e.target.value)} 
+                className="col-span-2 h-10 bg-slate-100/70 border-slate-200" 
+              />
+            </div>
+            <div className="grid grid-cols-3 items-center gap-4">
+              <Label htmlFor="type" className="text-left">Loại</Label>
+              <Select value={newPostType} onValueChange={(v) => setNewPostType(v as any)}>
+                <SelectTrigger className="col-span-2 h-10 bg-slate-100/70 border-slate-200">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="comment_check">Check Comment</SelectItem>
+                  <SelectItem value="post_approval">Check duyệt post</SelectItem>
+                </SelectContent>
               </Select>
             </div>
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Hủy</Button><Button onClick={handleAddPost} disabled={isSaving}>{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Lưu</Button></DialogFooter>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} className="rounded-lg">Hủy</Button>
+            <Button onClick={handleAddPost} disabled={isSaving} className="rounded-lg bg-blue-600 hover:bg-blue-700">
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Lưu
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
