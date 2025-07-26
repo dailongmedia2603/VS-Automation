@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Code, Search } from 'lucide-react';
 import { ScrollArea } from "@/components/ui/scroll-area";
-import endpointsRaw from '@/assets/data/endpoints.txt';
+import endpointsRaw from '@/assets/data/endpoints.txt?raw';
 
 interface FacebookApiReferenceProps {
   baseUrl: string;
