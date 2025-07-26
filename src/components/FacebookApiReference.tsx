@@ -24,7 +24,7 @@ const generateDescription = (nodeName: string, edgeName: string, notes?: string)
 
 export const FacebookApiReference: React.FC<FacebookApiReferenceProps> = ({ baseUrl, accessToken }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const finalBaseUrl = baseUrl || 'https://graph.facebook.com/v20.0';
+  const finalBaseUrl = baseUrl || 'http://api.akng.io.vn/graph';
 
   const allEndpoints = useMemo(() => {
     const endpoints: Endpoint[] = [];

@@ -184,8 +184,9 @@ const Settings = () => {
     setFbApiStatus("testing");
     setFbApiError(null);
     try {
+        const urlToTest = fbApiUrl.trim() || 'http://api.akng.io.vn/graph';
         const { data, error } = await supabase.functions.invoke('test-fb-api', {
-            body: { apiUrl: fbApiUrl, accessToken: fbAccessToken }
+            body: { apiUrl: urlToTest, accessToken: fbAccessToken }
         });
 
         if (error) throw error;
@@ -351,12 +352,12 @@ const Settings = () => {
                 <Label htmlFor="fb-api-url">URL API Get</Label>
                 <Input
                   id="fb-api-url"
-                  placeholder="https://graph.facebook.com/v20.0"
+                  placeholder="http://api.akng.io.vn/graph"
                   value={fbApiUrl}
                   onChange={(e) => setFbApiUrl(e.target.value)}
                   className="bg-slate-100 border-none rounded-lg"
                 />
-                <p className="text-xs text-muted-foreground">Nếu bỏ trống, sẽ sử dụng mặc định: https://graph.facebook.com/v20.0</p>
+                <p className="text-xs text-muted-foreground">Nếu bỏ trống, sẽ sử dụng mặc định: http://api.akng.io.vn/graph</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="fb-access-token">Access Token</Label>
@@ -393,7 +394,7 @@ const Settings = () => {
               </div>
             </CardContent>
           </Card>
-          <FacebookApiReference baseUrl={fbApiUrl} accessToken={fbAccessToken} />
+          <FacebookApiReference baseUrl={fbApiUrl || 'http://api.akng.io.vn/graph'} accessToken={fbAccessToken} />
         </TabsContent>
       </Tabs>
     </main>
