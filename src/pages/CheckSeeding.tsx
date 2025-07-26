@@ -285,6 +285,7 @@ const CheckSeeding = () => {
                       <TableCell className="text-center">{project.completed_posts}</TableCell>
                       <TableCell>
                         <Badge className={cn(
+                          'pointer-events-none',
                           project.status === 'completed' && 'bg-green-100 text-green-800 border-green-200',
                           project.status === 'checking' && 'bg-amber-100 text-amber-800 border-amber-200',
                           project.status === 'archived' && 'bg-slate-100 text-slate-800 border-slate-200'
