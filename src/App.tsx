@@ -18,7 +18,7 @@ import TrainingDocuments from "./pages/TrainingDocuments";
 import ContentAi from "./pages/ContentAi";
 import CheckSeeding from "./pages/CheckSeeding";
 import Tools from "./pages/Tools";
-import CheckKeywordComment from "./pages/tools/check-keyword-comment";
+import CheckKeywordComment from "@/pages/tools/check-keyword-comment";
 
 const queryClient = new QueryClient();
 

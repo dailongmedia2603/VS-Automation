@@ -32,11 +32,6 @@ const Tools = () => {
             color={tool.color}
           />
         ))}
-        {tools.length === 0 && (
-          <div className="col-span-full text-center py-16 text-muted-foreground">
-            <p>Hiện chưa có công cụ nào.</p>
-          </div>
-        )}
       </div>
     </main>
   );
