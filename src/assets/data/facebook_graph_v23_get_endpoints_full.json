@@ -1,0 +1,566 @@
+{
+  "api_version": "v23.0",
+  "product": "Facebook Graph API",
+  "generated_at": "2025-07-26T06:24:13.717785Z",
+  "scope": "Facebook Graph API only (excludes Marketing API & Instagram Graph API)",
+  "completeness": "Best-effort comprehensive list of GET URL templates compiled from Graph API Reference v23.0; for guaranteed completeness, run the included scraper script.",
+  "endpoints": [
+    {
+      "node": "user",
+      "doc_url": "https://developers.facebook.com/docs/graph-api/reference/user/",
+      "get": [
+        "/v23.0/{user-id}"
+      ],
+      "edges": [
+        {
+          "path": "/v23.0/{user-id}/feed",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/user/feed/"
+        },
+        {
+          "path": "/v23.0/{user-id}/albums",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/user/albums/"
+        },
+        {
+          "path": "/v23.0/{user-id}/picture",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/user/picture/"
+        },
+        {
+          "path": "/v23.0/{user-id}/live_videos",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/user/live_videos/"
+        },
+        {
+          "path": "/v23.0/{user-id}/events",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/user/events/"
+        },
+        {
+          "path": "/v23.0/{user-id}/likes",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/user/likes/"
+        },
+        {
+          "path": "/v23.0/{user-id}/tagged",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/user/tagged/"
+        },
+        {
+          "path": "/v23.0/{user-id}/videos",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/user/videos/"
+        }
+      ]
+    },
+    {
+      "node": "page",
+      "doc_url": "https://developers.facebook.com/docs/graph-api/reference/page/",
+      "get": [
+        "/v23.0/{page-id}"
+      ],
+      "edges": [
+        {
+          "path": "/v23.0/{page-id}/feed",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/page/feed/"
+        },
+        {
+          "path": "/v23.0/{page-id}/posts",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/page-post/"
+        },
+        {
+          "path": "/v23.0/{page-id}/published_posts",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/page/published_posts/"
+        },
+        {
+          "path": "/v23.0/{page-id}/visitor_posts",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/page/visitor_posts/"
+        },
+        {
+          "path": "/v23.0/{page-id}/photos",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/page/photos/"
+        },
+        {
+          "path": "/v23.0/{page-id}/videos",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/page/videos/"
+        },
+        {
+          "path": "/v23.0/{page-id}/events",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/page/events/"
+        },
+        {
+          "path": "/v23.0/{page-id}/leadgen_forms",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/page/leadgen_forms/"
+        },
+        {
+          "path": "/v23.0/{page-id}/conversations",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/page/conversations/"
+        },
+        {
+          "path": "/v23.0/{page-id}/messages",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/page/messages/"
+        },
+        {
+          "path": "/v23.0/{page-id}/insights",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/page/insights/"
+        },
+        {
+          "path": "/v23.0/{page-id}/subscribed_apps",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/page/subscribed_apps/"
+        },
+        {
+          "path": "/v23.0/{page-id}/live_videos",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/page/live_videos/"
+        },
+        {
+          "path": "/v23.0/{page-id}/blocked",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/page/blocked/"
+        },
+        {
+          "path": "/v23.0/{page-id}/roles",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/page/roles/"
+        },
+        {
+          "path": "/v23.0/{page-id}/admins",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/page/admins/"
+        },
+        {
+          "path": "/v23.0/{page-id}/agencies",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/page/agencies/"
+        },
+        {
+          "path": "/v23.0/{page-id}/tabs",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/page/tabs/"
+        },
+        {
+          "path": "/v23.0/{page-id}/settings",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/page-settings/"
+        },
+        {
+          "path": "/v23.0/{page-id}/messaging_feature_review",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/page/messaging_feature_review/"
+        },
+        {
+          "path": "/v23.0/{page-id}/secondary_receivers",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/page/secondary_receivers/"
+        },
+        {
+          "path": "/v23.0/{page-id}/pass_thread_control",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/page/pass_thread_control/"
+        },
+        {
+          "path": "/v23.0/{page-id}/take_thread_control",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/page/take_thread_control/"
+        },
+        {
+          "path": "/v23.0/{page-id}/request_thread_control",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/page/request_thread_control/"
+        },
+        {
+          "path": "/v23.0/{page-id}/ratings",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/page/ratings/",
+          "notes": "May be deprecated/limited; check docs."
+        },
+        {
+          "path": "/v23.0/{page-id}/tagged",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/page/tagged/"
+        }
+      ]
+    },
+    {
+      "node": "page-post",
+      "doc_url": "https://developers.facebook.com/docs/graph-api/reference/page-post/",
+      "get": [
+        "/v23.0/{page-post-id}"
+      ],
+      "edges": [
+        {
+          "path": "/v23.0/{page-post-id}/comments",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/post/comments/"
+        },
+        {
+          "path": "/v23.0/{page-post-id}/sharedposts",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/page-post/sharedposts/"
+        },
+        {
+          "path": "/v23.0/{page-post-id}/insights",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/page-post/insights/"
+        }
+      ]
+    },
+    {
+      "node": "post",
+      "doc_url": "https://developers.facebook.com/docs/graph-api/reference/post/",
+      "get": [
+        "/v23.0/{post-id}"
+      ],
+      "edges": [
+        {
+          "path": "/v23.0/{post-id}/comments",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/post/comments/"
+        },
+        {
+          "path": "/v23.0/{post-id}/attachments",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/post/attachments/"
+        },
+        {
+          "path": "/v23.0/{post-id}/sharedposts",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/post/sharedposts/"
+        },
+        {
+          "path": "/v23.0/{post-id}/reactions",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/post/reactions/"
+        },
+        {
+          "path": "/v23.0/{post-id}/insights",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/post/insights/"
+        },
+        {
+          "path": "/v23.0/{post-id}/to",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/post/to/"
+        },
+        {
+          "path": "/v23.0/{post-id}/sponsor_tags",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/post/sponsor_tags/"
+        }
+      ]
+    },
+    {
+      "node": "comment",
+      "doc_url": "https://developers.facebook.com/docs/graph-api/reference/comment/",
+      "get": [
+        "/v23.0/{comment-id}"
+      ],
+      "edges": [
+        {
+          "path": "/v23.0/{comment-id}/comments",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/comment/"
+        },
+        {
+          "path": "/v23.0/{comment-id}/reactions",
+          "notes": "Reactions on the comment; see object /reactions edge."
+        }
+      ]
+    },
+    {
+      "node": "album",
+      "doc_url": "https://developers.facebook.com/docs/graph-api/reference/album/",
+      "get": [
+        "/v23.0/{album-id}"
+      ],
+      "edges": [
+        {
+          "path": "/v23.0/{album-id}/photos",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/album/photos/"
+        },
+        {
+          "path": "/v23.0/{album-id}/comments",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/album/comments/"
+        },
+        {
+          "path": "/v23.0/{album-id}/likes",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/album/likes/"
+        },
+        {
+          "path": "/v23.0/{album-id}/picture",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/album/picture/"
+        }
+      ]
+    },
+    {
+      "node": "photo",
+      "doc_url": "https://developers.facebook.com/docs/graph-api/reference/photo/",
+      "get": [
+        "/v23.0/{photo-id}"
+      ],
+      "edges": [
+        {
+          "path": "/v23.0/{photo-id}/picture",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/photo/picture/"
+        },
+        {
+          "path": "/v23.0/{photo-id}/comments",
+          "notes": "Comments on the photo."
+        },
+        {
+          "path": "/v23.0/{photo-id}/reactions",
+          "notes": "Reactions on the photo."
+        },
+        {
+          "path": "/v23.0/{photo-id}/insights",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/photo/insights/"
+        },
+        {
+          "path": "/v23.0/{photo-id}/sponsor_tags",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/photo/sponsor_tags/"
+        }
+      ]
+    },
+    {
+      "node": "video",
+      "doc_url": "https://developers.facebook.com/docs/graph-api/reference/video/",
+      "get": [
+        "/v23.0/{video-id}"
+      ],
+      "edges": [
+        {
+          "path": "/v23.0/{video-id}/comments",
+          "notes": "Comments on the video."
+        },
+        {
+          "path": "/v23.0/{video-id}/reactions",
+          "notes": "Reactions on the video."
+        },
+        {
+          "path": "/v23.0/{video-id}/status",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/video-status/"
+        },
+        {
+          "path": "/v23.0/{video-id}/polls",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/video-poll/"
+        },
+        {
+          "path": "/v23.0/{video-id}/poll_settings",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/video/poll_settings/"
+        },
+        {
+          "path": "/v23.0/{video-id}/crosspost_shared_pages",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/video/crosspost_shared_pages/"
+        }
+      ]
+    },
+    {
+      "node": "video-list",
+      "doc_url": "https://developers.facebook.com/docs/graph-api/reference/video-list/",
+      "get": [
+        "/v23.0/{video-list-id}"
+      ],
+      "edges": []
+    },
+    {
+      "node": "group",
+      "doc_url": "https://developers.facebook.com/docs/graph-api/reference/group/",
+      "get": [
+        "/v23.0/{group-id}"
+      ],
+      "edges": [
+        {
+          "path": "/v23.0/{group-id}/feed",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/group/feed/"
+        },
+        {
+          "path": "/v23.0/{group-id}/files",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/group-file/"
+        },
+        {
+          "path": "/v23.0/{group-id}/events",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/group/events/"
+        },
+        {
+          "path": "/v23.0/{group-id}/members",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/group/members/",
+          "notes": "Availability restricted."
+        }
+      ]
+    },
+    {
+      "node": "event",
+      "doc_url": "https://developers.facebook.com/docs/graph-api/reference/event/",
+      "get": [
+        "/v23.0/{event-id}"
+      ],
+      "edges": [
+        {
+          "path": "/v23.0/{event-id}/attending",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/event/attending/"
+        },
+        {
+          "path": "/v23.0/{event-id}/declined",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/event/declined/"
+        },
+        {
+          "path": "/v23.0/{event-id}/interested",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/event/interested/"
+        },
+        {
+          "path": "/v23.0/{event-id}/maybe",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/event/maybe/"
+        },
+        {
+          "path": "/v23.0/{event-id}/invited",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/event/invited/"
+        },
+        {
+          "path": "/v23.0/{event-id}/photos",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/event/photos/"
+        },
+        {
+          "path": "/v23.0/{event-id}/live_videos",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/event/live_videos/"
+        },
+        {
+          "path": "/v23.0/{event-id}/picture",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/event/picture/"
+        },
+        {
+          "path": "/v23.0/{event-id}/roles",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/event/roles/"
+        }
+      ]
+    },
+    {
+      "node": "live-video",
+      "doc_url": "https://developers.facebook.com/docs/graph-api/reference/live-video/",
+      "get": [
+        "/v23.0/{live-video-id}"
+      ],
+      "edges": [
+        {
+          "path": "/v23.0/{live-video-id}/comments",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/live-video/comments/"
+        },
+        {
+          "path": "/v23.0/{live-video-id}/reactions",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/live-video/reactions/"
+        },
+        {
+          "path": "/v23.0/{live-video-id}/blocked_users",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/live-video/blocked_users/"
+        },
+        {
+          "path": "/v23.0/{live-video-id}/errors",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/live-video/errors/"
+        },
+        {
+          "path": "/v23.0/{live-video-id}/input_stream",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/live-video-input-stream/"
+        },
+        {
+          "path": "/v23.0/{live-video-id}/crosspost_shared_pages",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/live-video/crosspost_shared_pages/"
+        }
+      ]
+    },
+    {
+      "node": "place",
+      "doc_url": "https://developers.facebook.com/docs/graph-api/reference/place/",
+      "get": [
+        "/v23.0/{place-id}"
+      ],
+      "edges": []
+    },
+    {
+      "node": "place-topic",
+      "doc_url": "https://developers.facebook.com/docs/graph-api/reference/place-topic/",
+      "get": [
+        "/v23.0/{place-topic-id}"
+      ],
+      "edges": []
+    },
+    {
+      "node": "location",
+      "doc_url": "https://developers.facebook.com/docs/graph-api/reference/location/",
+      "get": [
+        "/v23.0/{location-id}"
+      ],
+      "edges": []
+    },
+    {
+      "node": "link",
+      "doc_url": "https://developers.facebook.com/docs/graph-api/reference/link/",
+      "get": [
+        "/v23.0/{link-id}"
+      ],
+      "edges": []
+    },
+    {
+      "node": "url",
+      "doc_url": "https://developers.facebook.com/docs/graph-api/reference/url/",
+      "get": [
+        "/v23.0/{url-id}"
+      ],
+      "edges": []
+    },
+    {
+      "node": "domain",
+      "doc_url": "https://developers.facebook.com/docs/graph-api/reference/domain/",
+      "get": [
+        "/v23.0/{domain-id}"
+      ],
+      "edges": []
+    },
+    {
+      "node": "application",
+      "doc_url": "https://developers.facebook.com/docs/graph-api/reference/application/",
+      "get": [
+        "/v23.0/{app-id}"
+      ],
+      "edges": [
+        {
+          "path": "/v23.0/{app-id}/accounts",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/application/accounts/"
+        },
+        {
+          "path": "/v23.0/{app-id}/activities",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/application/activities/"
+        },
+        {
+          "path": "/v23.0/{app-id}/purchases",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/application/purchases/"
+        },
+        {
+          "path": "/v23.0/{app-id}/subscriptions",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/application/subscriptions/"
+        },
+        {
+          "path": "/v23.0/{app-id}/roles",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/application/roles/"
+        },
+        {
+          "path": "/v23.0/{app-id}/objects",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/application/objects/"
+        }
+      ]
+    },
+    {
+      "node": "ads-archive",
+      "doc_url": "https://developers.facebook.com/docs/graph-api/reference/ads_archive/",
+      "get": [
+        "/v23.0/ads_archive"
+      ],
+      "edges": []
+    },
+    {
+      "node": "leadgen-form",
+      "doc_url": "https://developers.facebook.com/docs/graph-api/reference/leadgen-form/",
+      "get": [
+        "/v23.0/{leadgen-form-id}"
+      ],
+      "edges": [
+        {
+          "path": "/v23.0/{leadgen-form-id}/leads",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/leadgen-form/leads/"
+        },
+        {
+          "path": "/v23.0/{leadgen-form-id}/test_leads",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/leadgen-form/test_leads/"
+        }
+      ]
+    },
+    {
+      "node": "page-leadgen",
+      "doc_url": "https://developers.facebook.com/docs/graph-api/reference/page/leadgen_forms/",
+      "get": [
+        "/v23.0/{page-id}/leadgen_forms"
+      ],
+      "edges": [
+        {
+          "path": "/v23.0/{page-id}/leadgen_forms",
+          "doc_url": "https://developers.facebook.com/docs/graph-api/reference/page/leadgen_forms/",
+          "notes": "Edge returns leadgen forms; use {form-id}/leads to read leads."
+        }
+      ]
+    }
+  ],
+  "special": {
+    "alias": [
+      {
+        "path": "/v23.0/me",
+        "notes": "Alias to the user or page associated with the access token."
+      }
+    ]
+  }
+}
