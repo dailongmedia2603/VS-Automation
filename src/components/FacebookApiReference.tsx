@@ -108,10 +108,10 @@ export const FacebookApiReference: React.FC<FacebookApiReferenceProps> = ({ base
                         </a>
                     )}
                   </div>
-                  <div className="mt-2 p-3 bg-slate-900 rounded-md text-white font-mono text-xs flex items-center gap-2">
+                  <div className="mt-2 p-3 bg-blue-50 rounded-md text-slate-900 font-mono text-xs flex items-center gap-2">
                     <Code className="h-4 w-4 flex-shrink-0" />
                     <span className="break-all">
-                      <span className="font-bold text-green-400">GET</span> {finalBaseUrl}{ex.path}
+                      <span className="font-bold text-green-600">GET</span> {finalBaseUrl}{ex.path}
                     </span>
                   </div>
                 </div>
