@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Code, Search } from 'lucide-react';
 import { ScrollArea } from "@/components/ui/scroll-area";
-import * as endpointsInfo from '@/assets/data/facebook_graph_v23_get_endpoints_full.json';
+import endpointsRaw from '@/assets/data/endpoints.txt';
 
 interface FacebookApiReferenceProps {
   baseUrl: string;
@@ -18,13 +18,21 @@ export const FacebookApiReference: React.FC<FacebookApiReferenceProps> = ({ base
   const [searchQuery, setSearchQuery] = useState('');
   const finalBaseUrl = baseUrl || 'https://graph.facebook.com/v20.0';
 
-  // The imported JSON might be a module with a 'default' key holding the array.
-  const allEndpoints: Endpoint[] = (endpointsInfo as any).default || endpointsInfo || [];
+  const allEndpoints = useMemo(() => {
+    if (!endpointsRaw) return [];
+    return endpointsRaw
+      .split('\n')
+      .map(line => {
+        const parts = line.split(' - ');
+        if (parts.length < 2) return null;
+        const endpoint = parts[0].trim();
+        const description = parts.slice(1).join(' - ').trim();
+        return { endpoint, description };
+      })
+      .filter((item): item is Endpoint => item !== null && !!item.endpoint && !!item.description);
+  }, []);
 
   const filteredEndpoints = useMemo(() => {
-    if (!allEndpoints || !Array.isArray(allEndpoints)) {
-      return [];
-    }
     if (!searchQuery) {
       return allEndpoints;
     }
