@@ -19,6 +19,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { Link } from 'react-router-dom';
 
 type ProjectStatus = 'checking' | 'completed' | 'archived';
 type Project = {
@@ -278,7 +279,11 @@ const CheckSeeding = () => {
                   paginatedProjects.map((project) => (
                     <TableRow key={project.id}>
                       <TableCell><Checkbox checked={selectedIds.includes(project.id)} onCheckedChange={(checked) => handleSelectRow(project.id, !!checked)} /></TableCell>
-                      <TableCell className="font-medium">{project.name}</TableCell>
+                      <TableCell className="font-medium">
+                        <Link to={`/check-seeding/${project.id}`} className="hover:underline text-slate-800">
+                          {project.name}
+                        </Link>
+                      </TableCell>
                       <TableCell>{format(new Date(project.created_at), 'dd/MM/yyyy')}</TableCell>
                       <TableCell className="text-center">{project.total_posts}</TableCell>
                       <TableCell className="text-center">{project.checking_posts}</TableCell>
