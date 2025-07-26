@@ -1,46 +1,54 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Link, Navigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { showSuccess, showError } from '@/utils/toast';
 import hexaLogo from "@/assets/images/dailongmedia.png";
 
-const Login = () => {
-  const { session } = useAuth();
+const Register = () => {
+  const navigate = useNavigate();
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
-        showError("Vui lòng nhập email và mật khẩu.");
+    if (!name || !email || !password) {
+        showError("Vui lòng nhập đầy đủ họ tên, email và mật khẩu.");
+        return;
+    }
+    if (password.length < 8) {
+        showError("Mật khẩu phải có ít nhất 8 ký tự.");
         return;
     }
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      const { error } = await supabase.functions.invoke('create-user', {
+        body: {
+          email,
+          password,
+          name,
+        },
       });
-      if (error) throw error;
-      showSuccess('Đăng nhập thành công!');
+
+      if (error) {
+        const errorContext = await error.context.json();
+        throw new Error(errorContext.error || error.message);
+      }
+      
+      showSuccess('Đăng ký thành công! Vui lòng đăng nhập.');
+      navigate('/login');
     } catch (error: any) {
-      showError(error.error_description || error.message || "Đã xảy ra lỗi đăng nhập.");
+      showError(error.message || "Đã xảy ra lỗi đăng ký.");
     } finally {
       setIsLoading(false);
     }
   };
-
-  if (session) {
-    return <Navigate to="/" replace />;
-  }
 
   return (
     <div className="min-h-screen w-full bg-blue-600 lg:grid lg:grid-cols-2">
@@ -48,15 +56,28 @@ const Login = () => {
         <div className="w-full max-w-md space-y-8">
           <div>
             <h2 className="mt-8 text-3xl font-bold tracking-tight text-gray-900">
-              Đăng nhập
+              Đăng ký tài khoản
             </h2>
             <p className="mt-2 text-sm text-gray-500">
-              Nhập Email và mật khẩu để đăng nhập
+              Tạo tài khoản mới để bắt đầu
             </p>
           </div>
 
           <div className="space-y-6">
-            <form className="space-y-5" onSubmit={handleLogin}>
+            <form className="space-y-5" onSubmit={handleRegister}>
+              <div>
+                <Label htmlFor="name" className="font-semibold">Họ và tên*</Label>
+                <Input
+                  id="name"
+                  name="name"
+                  type="text"
+                  autoComplete="name"
+                  required
+                  className="mt-2 h-12"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </div>
               <div>
                 <Label htmlFor="email" className="font-semibold">Email*</Label>
                 <Input
@@ -78,7 +99,7 @@ const Login = () => {
                     id="password"
                     name="password"
                     type={showPassword ? 'text' : 'password'}
-                    autoComplete="current-password"
+                    autoComplete="new-password"
                     required
                     placeholder="Tối thiểu 8 ký tự"
                     className="h-12 pr-10"
@@ -95,33 +116,18 @@ const Login = () => {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <Checkbox id="remember-me" name="remember-me" />
-                  <Label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
-                    Giữ trạng thái đăng nhập
-                  </Label>
-                </div>
-
-                <div className="text-sm">
-                  <Link to="#" className="font-medium text-blue-600 hover:text-blue-500">
-                    Quên mật khẩu?
-                  </Link>
-                </div>
-              </div>
-
               <div>
                 <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 h-12 text-base font-semibold" disabled={isLoading}>
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Đăng nhập
+                  Đăng ký
                 </Button>
               </div>
             </form>
             
             <p className="text-center text-sm text-gray-600">
-              Chưa có tài khoản?{' '}
-              <Link to="/register" className="font-medium text-blue-600 hover:text-blue-500">
-                Đăng ký tài khoản
+              Đã có tài khoản?{' '}
+              <Link to="/login" className="font-medium text-blue-600 hover:text-blue-500">
+                Đăng nhập ngay
               </Link>
             </p>
           </div>
@@ -149,4 +155,4 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default Register;

@@ -10,6 +10,7 @@ import TrainingChatbot from "./pages/TrainingChatbot";
 import Staff from "./pages/Staff";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
+import Register from "./pages/Register";
 import { AppLayout } from "./components/AppLayout";
 import { ApiSettingsProvider } from "@/contexts/ApiSettingsContext";
 import { AuthProvider } from "./contexts/AuthContext";
@@ -32,6 +33,7 @@ const App = () => (
             <Sonner />
             <Routes>
               <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
               <Route element={<ProtectedRoute />}>
                 <Route element={<AppLayout />}>
                   <Route path="/" element={<Dashboard />} />
