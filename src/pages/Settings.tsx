@@ -156,12 +156,13 @@ const Settings = () => {
     try {
       const { error } = await supabase
         .from('apifb_settings')
-        .upsert({ id: 1, api_url: fbApiUrl, api_key: fbAccessToken });
+        .update({ api_url: fbApiUrl, api_key: fbAccessToken })
+        .eq('id', 1);
 
       if (error) throw error;
       showSuccess("Đã lưu cấu hình API Facebook!");
     } catch (error: any) {
-      const errorMessage = error?.message || 'Lỗi không xác định. Hãy đảm bảo bảng "apifb_settings" có cột "id" là khóa chính (Primary Key).';
+      const errorMessage = error?.message || 'Lỗi không xác định. Vui lòng kiểm tra lại quyền truy cập (RLS policies) cho bảng "apifb_settings".';
       showError("Lưu thất bại: " + errorMessage);
     } finally {
       setIsSavingFb(false);
