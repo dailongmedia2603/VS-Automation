@@ -161,7 +161,8 @@ const Settings = () => {
       if (error) throw error;
       showSuccess("Đã lưu cấu hình API Facebook!");
     } catch (error: any) {
-      showError("Lưu thất bại: " + error.message);
+      const errorMessage = error?.message || 'Lỗi không xác định. Hãy đảm bảo bảng "apifb_settings" có cột "id" là khóa chính (Primary Key).';
+      showError("Lưu thất bại: " + errorMessage);
     } finally {
       setIsSavingFb(false);
     }
