@@ -32,6 +32,7 @@ serve(async (req) => {
       .single()
 
     if (settingsError || !aiSettings || !aiSettings.api_key || !aiSettings.api_url) {
+      console.error("AI settings error:", settingsError);
       throw new Error('Vui lòng cấu hình API trong trang Cài đặt API AI.')
     }
     console.log("AI settings loaded successfully.");
@@ -46,8 +47,10 @@ serve(async (req) => {
         }
     });
 
-    console.log("Received response from proxy.");
-    if (proxyError) throw new Error(`Lỗi gọi AI Proxy: ${(await proxyError.context.json()).error || proxyError.message}`);
+    if (proxyError) {
+        const errorBody = await proxyError.context.json();
+        throw new Error(`Lỗi gọi AI Proxy: ${errorBody.error || proxyError.message}`);
+    }
     if (proxyResponse.error) throw new Error(`Lỗi từ AI Proxy: ${proxyResponse.error}`);
     if (!proxyResponse.data || !proxyResponse.data[0] || !proxyResponse.data[0].embedding) {
         console.error("Invalid response from proxy:", proxyResponse);
@@ -61,7 +64,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error) {
-    console.error("Error in embed-document:", error.message);
+    console.error("--- embed-document function error:", error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
