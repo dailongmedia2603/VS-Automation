@@ -29,12 +29,12 @@ type Comment = {
 
 interface FbComment {
   message: string;
-  from: {
+  from?: {
     id: string;
     name: string;
-    link: string;
+    link?: string;
   };
-  permalink_url: string;
+  permalink_url?: string;
   id: string;
 }
 
@@ -99,15 +99,15 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
       let foundCount = 0;
 
       for (const expectedComment of comments) {
-        const foundFbComment = actualComments.find(actual => actual.message.trim() === expectedComment.content.trim());
+        const foundFbComment = actualComments.find(actual => actual.message && actual.message.trim() === expectedComment.content.trim());
         
         if (foundFbComment) {
           foundCount++;
           updates.push({
             id: expectedComment.id,
             status: 'visible' as const,
-            account_name: foundFbComment.from.name,
-            comment_link: foundFbComment.permalink_url,
+            account_name: foundFbComment.from?.name || 'Không rõ',
+            comment_link: foundFbComment.permalink_url || null,
           });
         } else {
           if (expectedComment.status === 'visible') {

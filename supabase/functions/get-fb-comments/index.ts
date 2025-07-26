@@ -37,8 +37,8 @@ serve(async (req) => {
     const { api_url: apiUrl, api_key: accessToken } = fbSettings;
     const finalApiUrl = apiUrl || 'http://api.akng.io.vn/graph';
 
-    const fields = 'message,from{id,name,link},permalink_url';
-    const fbApiEndpoint = `${finalApiUrl}/${postId}/comments?fields=${fields}&access_token=${accessToken}`;
+    // Updated URL structure to match user's requirement
+    const fbApiEndpoint = `${finalApiUrl}/${postId}/comments?access_token=${accessToken}`;
 
     const response = await fetch(fbApiEndpoint);
     const data = await response.json();
