@@ -199,7 +199,7 @@ const SeedingProjectDetail = () => {
       </div>
 
       <ResizablePanelGroup direction="horizontal" className="flex-1 rounded-2xl border bg-white shadow-sm overflow-hidden">
-        <ResizablePanel defaultSize={30} minSize={20} maxSize={40}>
+        <ResizablePanel defaultSize={20} minSize={20} maxSize={40}>
           <div className="flex flex-col h-full p-4">
             <Accordion type="multiple" defaultValue={['check-comment', 'approve-post']} className="w-full">
               <AccordionItem value="check-comment">
@@ -218,7 +218,7 @@ const SeedingProjectDetail = () => {
           </div>
         </ResizablePanel>
         <ResizableHandle withHandle />
-        <ResizablePanel defaultSize={70}>
+        <ResizablePanel defaultSize={80}>
           <div className="flex h-full items-center justify-center p-6">
             {selectedPost ? (
               <Card className="w-full h-full shadow-none border-none">
