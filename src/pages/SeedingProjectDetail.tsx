@@ -6,7 +6,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, MessageSquare, FileCheck2, ChevronRight, ArrowLeft, Edit, Trash2, Loader2, Check, Wand2 } from 'lucide-react';
+import { PlusCircle, MessageSquare, FileCheck2, ChevronRight, ArrowLeft, Edit, Trash2, Loader2, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -58,7 +58,6 @@ const SeedingProjectDetail = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newPostData, setNewPostData] = useState(initialNewPostState);
   const [isSaving, setIsSaving] = useState(false);
-  const [isFetchingPostId, setIsFetchingPostId] = useState(false);
 
   const fetchProjectData = async () => {
     if (!projectId) return;
@@ -173,38 +172,6 @@ const SeedingProjectDetail = () => {
       showError("Thêm post thất bại: " + error.message);
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const handleGetPostId = async () => {
-    if (!newPostData.links) {
-      showError("Vui lòng nhập link bài viết.");
-      return;
-    }
-    setIsFetchingPostId(true);
-    const toastId = showLoading("Đang lấy ID bài viết...");
-    try {
-      const { data, error } = await supabase.functions.invoke('get-facebook-post-id', {
-        body: { url: newPostData.links },
-      });
-
-      if (error) {
-        const errorBody = await error.context?.json();
-        if (errorBody?.error) {
-          throw new Error(errorBody.error);
-        }
-        throw error;
-      }
-      
-      if (data.error) throw new Error(data.error);
-
-      dismissToast(toastId);
-      showSuccess(`Lấy ID thành công: ${data.postId}`);
-    } catch (error: any) {
-      dismissToast(toastId);
-      showError(error.message);
-    } finally {
-      setIsFetchingPostId(false);
     }
   };
 
@@ -343,12 +310,7 @@ const SeedingProjectDetail = () => {
               <div className="space-y-4 p-4 border rounded-lg bg-slate-50">
                 <div className="space-y-2">
                   <Label htmlFor="post-link">Link bài viết</Label>
-                  <div className="flex items-center gap-2">
-                    <Input id="post-link" value={newPostData.links} onChange={(e) => setNewPostData(d => ({...d, links: e.target.value}))} />
-                    <Button size="icon" variant="outline" onClick={handleGetPostId} disabled={isFetchingPostId}>
-                      {isFetchingPostId ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
-                    </Button>
-                  </div>
+                  <Input id="post-link" value={newPostData.links} onChange={(e) => setNewPostData(d => ({...d, links: e.target.value}))} />
                 </div>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
