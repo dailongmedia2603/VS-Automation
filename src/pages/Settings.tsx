@@ -352,7 +352,7 @@ const Settings = () => {
               </Button>
             </CardContent>
           </Card>
-          <FacebookApiReference baseUrl={fbApiUrl} />
+          <FacebookApiReference baseUrl={fbApiUrl} accessToken={fbAccessToken} />
         </TabsContent>
       </Tabs>
     </main>

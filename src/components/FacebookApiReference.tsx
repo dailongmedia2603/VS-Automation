@@ -7,6 +7,7 @@ import apiData from '@/assets/data/facebook_graph_endpoints.json';
 
 interface FacebookApiReferenceProps {
   baseUrl: string;
+  accessToken: string;
 }
 
 interface Endpoint {
@@ -21,7 +22,7 @@ const generateDescription = (nodeName: string, edgeName: string, notes?: string)
     return notes ? `${description} ${notes}` : description;
 }
 
-export const FacebookApiReference: React.FC<FacebookApiReferenceProps> = ({ baseUrl }) => {
+export const FacebookApiReference: React.FC<FacebookApiReferenceProps> = ({ baseUrl, accessToken }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const finalBaseUrl = baseUrl || 'https://graph.facebook.com/v20.0';
 
@@ -111,7 +112,7 @@ export const FacebookApiReference: React.FC<FacebookApiReferenceProps> = ({ base
                   <div className="mt-2 p-3 bg-blue-50 rounded-md text-slate-900 font-mono text-xs flex items-center gap-2">
                     <Code className="h-4 w-4 flex-shrink-0" />
                     <span className="break-all">
-                      <span className="font-bold text-green-600">GET</span> {finalBaseUrl}{ex.path}
+                      <span className="font-bold text-green-600">GET</span> {finalBaseUrl}{ex.path}{accessToken && `?access_token=${accessToken}`}
                     </span>
                   </div>
                 </div>
