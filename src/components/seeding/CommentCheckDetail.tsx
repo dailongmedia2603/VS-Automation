@@ -338,7 +338,7 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
             <div>
               <h3 className="font-semibold mb-2">Kết quả thô trả về:</h3>
               <ScrollArea className="h-64 w-full bg-slate-100 rounded-md border p-4">
-                <pre className="text-xs"><code>{JSON.stringify(JSON.parse(logData?.rawResponse || '{}'), null, 2)}</code></pre>
+                <pre className="text-xs whitespace-pre-wrap break-all"><code>{JSON.stringify(JSON.parse(logData?.rawResponse || '{}'), null, 2)}</code></pre>
               </ScrollArea>
             </div>
           </div>
