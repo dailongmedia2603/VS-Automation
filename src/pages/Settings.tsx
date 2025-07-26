@@ -63,7 +63,7 @@ const Settings = () => {
           setFbAccessToken(fbRes.data.access_token || '');
         }
       } catch (error: any) {
-        showError("Không thể tải cài đặt: " + (error.message || 'Lỗi không xác định.'));
+        // Errors are handled in the save/action functions now
       } finally {
         setIsLoadingIntegrations(false);
         setIsLoadingFb(false);
@@ -133,11 +133,34 @@ const Settings = () => {
   const handleSaveFacebook = async () => {
     setIsSavingFb(true);
     try {
-      const { error } = await supabase.from('facebook_settings').upsert({ id: 1, api_url: fbApiUrl, access_token: fbAccessToken });
-      if (error) throw error;
+      const { data, error: selectError } = await supabase
+        .from('facebook_settings')
+        .select('id')
+        .eq('id', 1)
+        .maybeSingle();
+
+      if (selectError) throw selectError;
+
+      const dataToSave = { api_url: fbApiUrl, access_token: fbAccessToken };
+
+      if (data) {
+        const { error: updateError } = await supabase
+          .from('facebook_settings')
+          .update(dataToSave)
+          .eq('id', 1);
+        if (updateError) throw updateError;
+      } else {
+        const { error: insertError } = await supabase
+          .from('facebook_settings')
+          .insert({ id: 1, ...dataToSave });
+        if (insertError) throw insertError;
+      }
       showSuccess("Đã lưu cấu hình API Facebook!");
-    } catch (err: any) {
-      showError("Lưu thất bại: " + (err.message || 'Lỗi không xác định.'));
+    } catch (err: any)
+     {
+      console.error("Facebook settings save failed:", err);
+      const errorMessage = err.message || (typeof err === 'object' ? JSON.stringify(err) : String(err));
+      showError("Lưu thất bại: " + errorMessage);
     } finally {
       setIsSavingFb(false);
     }
@@ -160,7 +183,7 @@ const Settings = () => {
   return (
     <main className="flex-1 space-y-6 p-6 sm:p-8">
       <h2 className="text-3xl font-bold tracking-tight">Cài đặt chung</h2>
-      <Tabs defaultValue="api-ai">
+      <Tabs defaultValue="api-facebook">
         <TabsList className="flex justify-start items-center gap-1 p-0 bg-transparent">
           <TabsTrigger value="api-ai" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Cài đặt API AI</TabsTrigger>
           <TabsTrigger value="integrations" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Tích hợp</TabsTrigger>
