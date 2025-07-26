@@ -2,20 +2,23 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, Search, Archive, Trash2, FolderClock, CheckCircle, ListTodo, ChevronDown, Loader2, ArchiveRestore } from 'lucide-react';
+import { PlusCircle, Search, Archive, Trash2, FolderClock, CheckCircle, ListTodo, ChevronDown, Loader2, ArchiveRestore, MoreHorizontal, Edit } from 'lucide-react';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { format } from 'date-fns';
 import { SeedingStatCard } from '@/components/SeedingStatCard';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 type ProjectStatus = 'checking' | 'completed' | 'archived';
 type Project = {
@@ -35,9 +38,14 @@ const CheckSeeding = () => {
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | 'all'>('all');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [newProjectName, setNewProjectName] = useState('');
+  
+  const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [projectName, setProjectName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+  const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
 
   const fetchProjects = async () => {
     setIsLoading(true);
@@ -58,16 +66,13 @@ const CheckSeeding = () => {
   const filteredProjects = useMemo(() => {
     return projects.filter(p => {
       const isArchivedView = statusFilter === 'archived';
-      
       if (isArchivedView) {
         if (p.status !== 'archived') return false;
       } else {
         if (p.status === 'archived') return false;
         if (statusFilter !== 'all' && p.status !== statusFilter) return false;
       }
-      
       if (searchTerm && !p.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-      
       return true;
     });
   }, [projects, statusFilter, searchTerm]);
@@ -119,40 +124,73 @@ const CheckSeeding = () => {
         successMessage = 'Đã xóa thành công!';
         query = supabase.from('seeding_projects').delete().in('id', selectedIds);
         break;
-      default:
-        return;
+      default: return;
     }
 
     const toastId = showLoading(toastMessage);
     const { error } = await query;
     dismissToast(toastId);
 
-    if (error) {
-      showError(`Thao tác thất bại: ${error.message}`);
-    } else {
-      showSuccess(successMessage);
-    }
+    if (error) showError(`Thao tác thất bại: ${error.message}`);
+    else showSuccess(successMessage);
     
     setSelectedIds([]);
     fetchProjects();
   };
 
-  const handleAddProject = async () => {
-    if (!newProjectName.trim()) {
+  const handleOpenAddDialog = () => {
+    setEditingProject(null);
+    setProjectName('');
+    setIsAddEditDialogOpen(true);
+  };
+
+  const handleOpenEditDialog = (project: Project) => {
+    setEditingProject(project);
+    setProjectName(project.name);
+    setIsAddEditDialogOpen(true);
+  };
+
+  const handleSaveProject = async () => {
+    if (!projectName.trim()) {
       showError("Tên dự án không được để trống.");
       return;
     }
     setIsSaving(true);
-    const { error } = await supabase.from('seeding_projects').insert({ name: newProjectName });
-    if (error) {
-      showError("Thêm dự án thất bại: " + error.message);
+    let error;
+    if (editingProject) {
+      ({ error } = await supabase.from('seeding_projects').update({ name: projectName }).eq('id', editingProject.id));
     } else {
-      showSuccess("Đã thêm dự án thành công!");
-      setIsAddDialogOpen(false);
-      setNewProjectName('');
+      ({ error } = await supabase.from('seeding_projects').insert({ name: projectName }));
+    }
+
+    if (error) {
+      showError("Lưu dự án thất bại: " + error.message);
+    } else {
+      showSuccess(`Đã ${editingProject ? 'cập nhật' : 'thêm'} dự án thành công!`);
+      setIsAddEditDialogOpen(false);
       fetchProjects();
     }
     setIsSaving(false);
+  };
+
+  const handleDeleteProject = (project: Project) => {
+    setProjectToDelete(project);
+    setIsDeleteAlertOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!projectToDelete) return;
+    const toastId = showLoading("Đang xóa...");
+    const { error } = await supabase.from('seeding_projects').delete().eq('id', projectToDelete.id);
+    dismissToast(toastId);
+    if (error) {
+      showError("Xóa thất bại: " + error.message);
+    } else {
+      showSuccess("Đã xóa dự án thành công!");
+      fetchProjects();
+    }
+    setIsDeleteAlertOpen(false);
+    setProjectToDelete(null);
   };
 
   return (
@@ -192,14 +230,16 @@ const CheckSeeding = () => {
                 </DropdownMenu>
               )}
               <Tabs value={statusFilter} onValueChange={(value) => setStatusFilter(value as any)}>
-                <TabsList>
-                  <TabsTrigger value="all">Tất cả</TabsTrigger>
-                  <TabsTrigger value="completed">Hoàn thành</TabsTrigger>
-                  <TabsTrigger value="checking">Đang check</TabsTrigger>
-                  <TabsTrigger value="archived">Lưu trữ</TabsTrigger>
+                <TabsList className="p-1 h-auto bg-slate-100 rounded-lg">
+                  <TabsTrigger value="all" className="px-3 py-1.5 text-sm data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700 rounded-md">Tất cả</TabsTrigger>
+                  <TabsTrigger value="completed" className="px-3 py-1.5 text-sm data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700 rounded-md">Hoàn thành</TabsTrigger>
+                  <TabsTrigger value="checking" className="px-3 py-1.5 text-sm data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700 rounded-md">Đang check</TabsTrigger>
                 </TabsList>
               </Tabs>
-              <Button onClick={() => setIsAddDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700">
+              <Button variant="outline" onClick={() => setStatusFilter('archived')} className={cn(statusFilter === 'archived' && 'bg-blue-100 text-blue-700')}>
+                <Archive className="mr-2 h-4 w-4" />Lưu trữ
+              </Button>
+              <Button onClick={handleOpenAddDialog} className="bg-blue-600 hover:bg-blue-700">
                 <PlusCircle className="mr-2 h-4 w-4" />Thêm dự án
               </Button>
             </div>
@@ -216,6 +256,8 @@ const CheckSeeding = () => {
                   <TableHead className="text-center">Tổng Post</TableHead>
                   <TableHead className="text-center">Đang check</TableHead>
                   <TableHead className="text-center">Hoàn thành</TableHead>
+                  <TableHead>Trạng thái</TableHead>
+                  <TableHead className="text-right">Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -228,6 +270,8 @@ const CheckSeeding = () => {
                       <TableCell><Skeleton className="h-5 w-12 mx-auto" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-12 mx-auto" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-12 mx-auto" /></TableCell>
+                      <TableCell><Skeleton className="h-6 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                     </TableRow>
                   ))
                 ) : paginatedProjects.length > 0 ? (
@@ -239,10 +283,30 @@ const CheckSeeding = () => {
                       <TableCell className="text-center">{project.total_posts}</TableCell>
                       <TableCell className="text-center">{project.checking_posts}</TableCell>
                       <TableCell className="text-center">{project.completed_posts}</TableCell>
+                      <TableCell>
+                        <Badge className={cn(
+                          project.status === 'completed' && 'bg-green-100 text-green-800 border-green-200',
+                          project.status === 'checking' && 'bg-amber-100 text-amber-800 border-amber-200',
+                          project.status === 'archived' && 'bg-slate-100 text-slate-800 border-slate-200'
+                        )}>
+                          {project.status === 'completed' ? 'Hoàn thành' : project.status === 'checking' ? 'Đang check' : 'Lưu trữ'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleOpenEditDialog(project)}><Edit className="mr-2 h-4 w-4" />Sửa</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDeleteProject(project)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
                     </TableRow>
                   ))
                 ) : (
-                  <TableRow><TableCell colSpan={6} className="text-center h-24">Không có dự án nào.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={8} className="text-center h-24">Không có dự án nào.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
@@ -276,31 +340,38 @@ const CheckSeeding = () => {
         </div>
       )}
 
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+      <Dialog open={isAddEditDialogOpen} onOpenChange={setIsAddEditDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold">Thêm dự án mới</DialogTitle>
-            <DialogDescription>Nhập tên cho dự án seeding của bạn.</DialogDescription>
+            <DialogTitle className="text-xl font-bold">{editingProject ? 'Sửa dự án' : 'Thêm dự án mới'}</DialogTitle>
+            <DialogDescription>{editingProject ? 'Chỉnh sửa tên cho dự án của bạn.' : 'Nhập tên cho dự án seeding của bạn.'}</DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <Label htmlFor="project-name" className="sr-only">Tên dự án</Label>
-            <Input 
-              id="project-name"
-              placeholder="VD: Chiến dịch seeding tháng 9" 
-              value={newProjectName} 
-              onChange={(e) => setNewProjectName(e.target.value)}
-              className="h-11 bg-slate-100/70 border-slate-200"
-            />
+            <Input id="project-name" placeholder="VD: Chiến dịch seeding tháng 9" value={projectName} onChange={(e) => setProjectName(e.target.value)} className="h-11 bg-slate-100/70 border-slate-200" />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} className="rounded-lg">Hủy</Button>
-            <Button onClick={handleAddProject} disabled={isSaving} className="rounded-lg bg-blue-600 hover:bg-blue-700">
+            <Button variant="outline" onClick={() => setIsAddEditDialogOpen(false)} className="rounded-lg">Hủy</Button>
+            <Button onClick={handleSaveProject} disabled={isSaving} className="rounded-lg bg-blue-600 hover:bg-blue-700">
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Lưu
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Bạn có chắc chắn muốn xóa?</AlertDialogTitle>
+            <AlertDialogDescription>Hành động này không thể hoàn tác. Dự án "{projectToDelete?.name}" sẽ bị xóa vĩnh viễn.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setProjectToDelete(null)}>Hủy</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">Xóa</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   );
 };
