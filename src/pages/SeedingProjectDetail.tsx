@@ -188,13 +188,18 @@ const SeedingProjectDetail = () => {
         body: { url: newPostData.links },
       });
 
-      if (error) throw error;
+      if (error) {
+        const errorBody = await error.context?.json();
+        if (errorBody?.error) {
+          throw new Error(errorBody.error);
+        }
+        throw error;
+      }
+      
       if (data.error) throw new Error(data.error);
 
       dismissToast(toastId);
       showSuccess(`Lấy ID thành công: ${data.postId}`);
-      // Optionally, you can update the link to be just the ID
-      // setNewPostData(d => ({ ...d, links: data.postId }));
     } catch (error: any) {
       dismissToast(toastId);
       showError(error.message);
