@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, Download, MoreHorizontal, Link as LinkIcon } from 'lucide-react';
+import { Search, Download, MoreHorizontal, Link as LinkIcon, MessageCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type Post = {
@@ -72,11 +72,11 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
   return (
     <Card className="w-full h-full shadow-none border-none flex flex-col">
       <CardHeader>
-        <CardTitle className="text-2xl">{post.name}</CardTitle>
+        <CardTitle className="text-2xl font-bold text-slate-800">{post.name}</CardTitle>
         {post.links && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2">
+          <div className="flex items-center gap-2 text-sm text-slate-500 pt-2">
             <LinkIcon className="h-4 w-4" />
-            <a href={post.links} target="_blank" rel="noopener noreferrer" className="hover:underline break-all">
+            <a href={post.links} target="_blank" rel="noopener noreferrer" className="hover:underline break-all hover:text-blue-600">
               {post.links}
             </a>
           </div>
@@ -86,11 +86,11 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
         <div className="flex items-center justify-between gap-4 mb-4">
           <div className="relative flex-grow max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Tìm kiếm comment..." className="pl-9" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+            <Input placeholder="Tìm kiếm comment..." className="pl-9 rounded-lg bg-slate-100 border-none" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
           </div>
           <div className="flex items-center gap-2">
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[180px] rounded-lg">
                 <SelectValue placeholder="Lọc trạng thái" />
               </SelectTrigger>
               <SelectContent>
@@ -99,7 +99,7 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
                 <SelectItem value="not_visible">Chưa hiện</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline">
+            <Button variant="outline" className="rounded-lg">
               <Download className="mr-2 h-4 w-4" />
               Xuất Excel
             </Button>
@@ -107,7 +107,7 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
         </div>
         <div className="border rounded-lg overflow-auto flex-1">
           <Table>
-            <TableHeader>
+            <TableHeader className="bg-slate-50">
               <TableRow>
                 <TableHead className="w-[50px]">STT</TableHead>
                 <TableHead>Content comment</TableHead>
@@ -122,34 +122,35 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
                   <TableRow key={i}>
                     <TableCell><Skeleton className="h-5 w-5" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-full" /></TableCell>
-                    <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+                    <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                    <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto rounded-md" /></TableCell>
                   </TableRow>
                 ))
               ) : filteredComments.length > 0 ? (
                 filteredComments.map((comment, index) => (
-                  <TableRow key={comment.id}>
-                    <TableCell>{index + 1}</TableCell>
-                    <TableCell className="max-w-xs break-words">{comment.content}</TableCell>
+                  <TableRow key={comment.id} className="hover:bg-slate-50">
+                    <TableCell className="font-medium text-slate-500">{index + 1}</TableCell>
+                    <TableCell className="max-w-xs break-words text-slate-700">{comment.content}</TableCell>
                     <TableCell>
                       <Badge className={cn(
-                        comment.status === 'visible' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
+                        'pointer-events-none',
+                        comment.status === 'visible' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-amber-100 text-amber-800 border-amber-200'
                       )}>
                         {comment.status === 'visible' ? 'Đã hiện' : 'Chưa hiện'}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <div className="text-xs">
+                      <div className="text-xs text-slate-500">
                         <p><strong>Account:</strong> {comment.account_name || 'N/A'}</p>
-                        <p className="flex items-center gap-1">
+                        <div className="flex items-center gap-1.5">
                           <strong>Link:</strong> 
                           {comment.comment_link ? (
-                            <a href={comment.comment_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                              <LinkIcon className="h-3 w-3" />
+                            <a href={comment.comment_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700" title={comment.comment_link}>
+                              <LinkIcon className="h-3.5 w-3.5" />
                             </a>
                           ) : 'N/A'}
-                        </p>
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
@@ -166,7 +167,15 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
                   </TableRow>
                 ))
               ) : (
-                <TableRow><TableCell colSpan={5} className="text-center h-24">Không có comment nào.</TableCell></TableRow>
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center h-48 text-slate-500">
+                    <div className="flex flex-col items-center gap-2">
+                      <MessageCircle className="h-10 w-10 text-slate-400" />
+                      <span className="font-medium">Không có comment nào</span>
+                      <span className="text-xs">Hãy thử thêm comment mới hoặc thay đổi bộ lọc.</span>
+                    </div>
+                  </TableCell>
+                </TableRow>
               )}
             </TableBody>
           </Table>
