@@ -63,7 +63,7 @@ const Settings = () => {
           setFbAccessToken(fbRes.data.access_token || '');
         }
       } catch (error: any) {
-        showError("Không thể tải cài đặt: " + error.message);
+        showError("Không thể tải cài đặt: " + (error.message || 'Lỗi không xác định.'));
       } finally {
         setIsLoadingIntegrations(false);
         setIsLoadingFb(false);
@@ -86,8 +86,8 @@ const Settings = () => {
       if (error) throw error;
       setSettings(localSettings);
       showSuccess("Cấu hình API AI đã được lưu!");
-    } catch (error: any) {
-      showError("Lưu cấu hình thất bại: " + error.message);
+    } catch (err: any) {
+      showError("Lưu cấu hình thất bại: " + (err.message || 'Lỗi không xác định.'));
     } finally {
       setIsSavingApi(false);
     }
@@ -122,8 +122,8 @@ const Settings = () => {
       const { error } = await supabase.from('n8n_settings').upsert({ id: 1, zalo_webhook_url: webhookUrl });
       if (error) throw error;
       showSuccess("Đã lưu URL webhook thành công!");
-    } catch (error: any) {
-      showError("Lưu thất bại: " + error.message);
+    } catch (err: any) {
+      showError("Lưu thất bại: " + (err.message || 'Lỗi không xác định.'));
     } finally {
       setIsSavingIntegrations(false);
     }
@@ -136,8 +136,8 @@ const Settings = () => {
       const { error } = await supabase.from('facebook_settings').upsert({ id: 1, api_url: fbApiUrl, access_token: fbAccessToken });
       if (error) throw error;
       showSuccess("Đã lưu cấu hình API Facebook!");
-    } catch (error: any) {
-      showError("Lưu thất bại: " + error.message);
+    } catch (err: any) {
+      showError("Lưu thất bại: " + (err.message || 'Lỗi không xác định.'));
     } finally {
       setIsSavingFb(false);
     }
