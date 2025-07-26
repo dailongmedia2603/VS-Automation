@@ -51,7 +51,7 @@ const Settings = () => {
       try {
         const [n8nRes, fbRes] = await Promise.all([
           supabase.from('n8n_settings').select('zalo_webhook_url').eq('id', 1).single(),
-          supabase.from('facebook_api_settings').select('url, access_token').eq('id', 1).single()
+          supabase.from('apifb_settings').select('api_url, api_key').eq('id', 1).single()
         ]);
 
         if (n8nRes.error && n8nRes.error.code !== 'PGRST116') throw n8nRes.error;
@@ -59,8 +59,8 @@ const Settings = () => {
 
         if (fbRes.error && fbRes.error.code !== 'PGRST116') throw fbRes.error;
         if (fbRes.data) {
-          setFbApiUrl(fbRes.data.url || '');
-          setFbAccessToken(fbRes.data.access_token || '');
+          setFbApiUrl(fbRes.data.api_url || '');
+          setFbAccessToken(fbRes.data.api_key || '');
         }
       } catch (error: any) {
         showError("Không thể tải cài đặt: " + error.message);
@@ -155,8 +155,8 @@ const Settings = () => {
     setIsSavingFb(true);
     try {
       const { error } = await supabase
-        .from('facebook_api_settings')
-        .upsert({ id: 1, url: fbApiUrl, access_token: fbAccessToken });
+        .from('apifb_settings')
+        .upsert({ id: 1, api_url: fbApiUrl, api_key: fbAccessToken });
 
       if (error) throw error;
       showSuccess("Đã lưu cấu hình API Facebook!");
