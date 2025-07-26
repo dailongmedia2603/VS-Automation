@@ -5,7 +5,6 @@ import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PlusCircle, MessageSquare, FileCheck2, ChevronRight, ArrowLeft, Edit, Trash2, Loader2, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -16,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { CommentCheckDetail } from '@/components/seeding/CommentCheckDetail';
 
 type Project = {
   id: number;
@@ -25,6 +25,7 @@ type Project = {
 type Post = {
   id: number;
   name: string;
+  links: string | null;
   content: string | null;
   status: 'checking' | 'completed';
   type: 'comment_check' | 'post_approval';
@@ -123,35 +124,55 @@ const SeedingProjectDetail = () => {
       return;
     }
     setIsSaving(true);
+    const toastId = showLoading("Đang tạo post...");
 
-    const dataToInsert: any = {
-      project_id: projectId,
-      name: newPostData.name,
-      type: newPostData.type,
-      is_active: newPostData.is_active,
-      status: 'checking',
-    };
+    try {
+      const postToInsert = {
+        project_id: projectId,
+        name: newPostData.name,
+        type: newPostData.type,
+        is_active: newPostData.is_active,
+        links: newPostData.links,
+        content: newPostData.type === 'post_approval' ? newPostData.content : null,
+        check_frequency: newPostData.type === 'post_approval' ? newPostData.check_frequency : null,
+      };
 
-    if (newPostData.type === 'comment_check') {
-      dataToInsert.links = newPostData.links;
-      dataToInsert.comments = newPostData.comments;
-    } else { // post_approval
-      dataToInsert.links = newPostData.links;
-      dataToInsert.content = newPostData.content;
-      dataToInsert.check_frequency = newPostData.check_frequency;
-    }
+      const { data: newPost, error: postError } = await supabase
+        .from('seeding_posts')
+        .insert(postToInsert)
+        .select()
+        .single();
 
-    const { error } = await supabase.from('seeding_posts').insert(dataToInsert);
-    
-    if (error) {
-      showError("Thêm post thất bại: " + error.message);
-    } else {
+      if (postError) throw postError;
+
+      if (newPostData.type === 'comment_check' && newPostData.comments.trim()) {
+        const commentsToInsert = newPostData.comments
+          .split('\n')
+          .filter(line => line.trim() !== '')
+          .map(content => ({
+            post_id: newPost.id,
+            content: content.trim(),
+          }));
+        
+        if (commentsToInsert.length > 0) {
+          const { error: commentsError } = await supabase
+            .from('seeding_comments')
+            .insert(commentsToInsert);
+          if (commentsError) throw commentsError;
+        }
+      }
+      
+      dismissToast(toastId);
       showSuccess("Đã thêm post thành công!");
       setIsAddDialogOpen(false);
       setNewPostData(initialNewPostState);
       fetchProjectData();
+    } catch (error: any) {
+      dismissToast(toastId);
+      showError("Thêm post thất bại: " + error.message);
+    } finally {
+      setIsSaving(false);
     }
-    setIsSaving(false);
   };
 
   const commentCount = newPostData.comments.split('\n').filter(line => line.trim() !== '').length;
@@ -248,10 +269,11 @@ const SeedingProjectDetail = () => {
         <ResizablePanel defaultSize={80}>
           <div className="flex h-full items-center justify-center p-6">
             {selectedPost ? (
-              <Card className="w-full h-full shadow-none border-none">
-                <CardHeader><CardTitle>{selectedPost.name}</CardTitle></CardHeader>
-                <CardContent><p className="text-sm text-slate-700 whitespace-pre-wrap">{selectedPost.content || "Chưa có nội dung."}</p></CardContent>
-              </Card>
+              selectedPost.type === 'comment_check' ? (
+                <CommentCheckDetail post={selectedPost} />
+              ) : (
+                <div>Chức năng Check duyệt post đang được phát triển.</div>
+              )
             ) : (
               <div className="text-center text-slate-500">
                 <p className="font-semibold text-lg">Chọn một mục để xem chi tiết</p>
