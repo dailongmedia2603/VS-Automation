@@ -54,16 +54,20 @@ const Settings = () => {
           supabase.from('api_fb').select('url, access_token').eq('id', 1).single()
         ]);
 
-        if (n8nRes.error && n8nRes.error.code !== 'PGRST116') throw n8nRes.error;
-        if (n8nRes.data) setWebhookUrl(n8nRes.data.zalo_webhook_url || '');
+        if (n8nRes.error && n8nRes.error.code !== 'PGRST116') {
+          showError(`Lỗi tải cài đặt n8n: ${n8nRes.error.message}`);
+        } else if (n8nRes.data) {
+          setWebhookUrl(n8nRes.data.zalo_webhook_url || '');
+        }
 
-        if (fbRes.error && fbRes.error.code !== 'PGRST116') throw fbRes.error;
-        if (fbRes.data) {
+        if (fbRes.error && fbRes.error.code !== 'PGRST116') {
+          showError(`Lỗi tải cài đặt Facebook: ${fbRes.error.message}`);
+        } else if (fbRes.data) {
           setFbApiUrl(fbRes.data.url || '');
           setFbAccessToken(fbRes.data.access_token || '');
         }
       } catch (error: any) {
-        // Errors are handled in the save/action functions now
+        showError("Đã xảy ra lỗi không mong muốn khi tải cài đặt: " + error.message);
       } finally {
         setIsLoadingIntegrations(false);
         setIsLoadingFb(false);
@@ -191,7 +195,7 @@ const Settings = () => {
           <Card className="shadow-sm rounded-2xl bg-white">
             <CardHeader><CardTitle>Cấu hình API Facebook Graph</CardTitle><CardDescription>Nhập thông tin để kết nối với dịch vụ API của bạn.</CardDescription></CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2"><Label htmlFor="fb-api-url">URL Dịch vụ API</Label><Input id="fb-api-url" placeholder="https://your-proxy-service.com/v20.0" value={fbApiUrl} onChange={(e) => setFbApiUrl(e.target.value)} className="bg-slate-100 border-none rounded-lg" /><p className="text-xs text-muted-foreground">Nếu bỏ trống, sẽ sử dụng mặc định: https://graph.facebook.com/v20.0</p></div>
+              <div className="space-y-2"><Label htmlFor="fb-api-url">URL Dịch vụ API</Label><Input id="fb-api-url" placeholder="https://graph.facebook.com/v20.0" value={fbApiUrl} onChange={(e) => setFbApiUrl(e.target.value)} className="bg-slate-100 border-none rounded-lg" /><p className="text-xs text-muted-foreground">Nếu bỏ trống, sẽ sử dụng mặc định: https://graph.facebook.com/v20.0</p></div>
               <div className="space-y-2"><Label htmlFor="fb-access-token">Access Token</Label><Input id="fb-access-token" type="password" placeholder="EAA..." value={fbAccessToken} onChange={(e) => setFbAccessToken(e.target.value)} className="bg-slate-100 border-none rounded-lg" /></div>
               <Button onClick={handleSaveFacebook} disabled={isSavingFb} className="rounded-lg bg-blue-600 hover:bg-blue-700">{isSavingFb && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{isSavingFb ? "Đang lưu..." : "Lưu cấu hình Facebook"}</Button>
             </CardContent>
