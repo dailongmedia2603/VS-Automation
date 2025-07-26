@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Code, Search } from 'lucide-react';
 import { ScrollArea } from "@/components/ui/scroll-area";
-import endpointsData from '@/assets/data/facebook_graph_v23_get_endpoints_full.json';
+import * as endpointsInfo from '@/assets/data/facebook_graph_v23_get_endpoints_full.json';
 
 interface FacebookApiReferenceProps {
   baseUrl: string;
@@ -18,16 +18,22 @@ export const FacebookApiReference: React.FC<FacebookApiReferenceProps> = ({ base
   const [searchQuery, setSearchQuery] = useState('');
   const finalBaseUrl = baseUrl || 'https://graph.facebook.com/v20.0';
 
+  // The imported JSON might be a module with a 'default' key holding the array.
+  const allEndpoints: Endpoint[] = (endpointsInfo as any).default || endpointsInfo || [];
+
   const filteredEndpoints = useMemo(() => {
-    if (!searchQuery) {
-      return endpointsData;
+    if (!allEndpoints || !Array.isArray(allEndpoints)) {
+      return [];
     }
-    return (endpointsData as Endpoint[]).filter(
+    if (!searchQuery) {
+      return allEndpoints;
+    }
+    return allEndpoints.filter(
       (ep: Endpoint) =>
         ep.endpoint.toLowerCase().includes(searchQuery.toLowerCase()) ||
         ep.description.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [searchQuery]);
+  }, [searchQuery, allEndpoints]);
 
   return (
     <Card className="mt-6 shadow-sm rounded-2xl bg-white">
@@ -41,7 +47,7 @@ export const FacebookApiReference: React.FC<FacebookApiReferenceProps> = ({ base
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder={`Tìm kiếm trong ${endpointsData.length} endpoints...`}
+            placeholder={`Tìm kiếm trong ${allEndpoints.length} endpoints...`}
             className="pl-9 bg-slate-100 border-none rounded-lg"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
