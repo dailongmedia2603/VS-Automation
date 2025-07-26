@@ -1,14 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { showError } from '@/utils/toast';
+import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, MessageSquare, FileCheck2, ChevronRight, ArrowLeft, Edit, Trash2 } from 'lucide-react';
+import { PlusCircle, MessageSquare, FileCheck2, ChevronRight, ArrowLeft, Edit, Trash2, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
 type Project = {
   id: number;
@@ -28,6 +32,31 @@ const SeedingProjectDetail = () => {
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingPost, setEditingPost] = useState<Post | null>(null);
+  const [postContent, setPostContent] = useState('');
+  
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [postToDelete, setPostToDelete] = useState<Post | null>(null);
+  
+  const [isSaving, setIsSaving] = useState(false);
+
+  const fetchPosts = async () => {
+    if (!projectId) return;
+    try {
+      const { data: postsData, error: postsError } = await supabase
+        .from('seeding_posts')
+        .select('id, content, status')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: true });
+
+      if (postsError) throw postsError;
+      setPosts(postsData || []);
+    } catch (error: any) {
+      showError("Không thể tải danh sách post: " + error.message);
+    }
+  };
+
   useEffect(() => {
     if (!projectId) return;
 
@@ -42,15 +71,7 @@ const SeedingProjectDetail = () => {
 
         if (projectError) throw projectError;
         setProject(projectData);
-
-        const { data: postsData, error: postsError } = await supabase
-          .from('seeding_posts')
-          .select('id, content, status')
-          .eq('project_id', projectId)
-          .order('created_at', { ascending: true });
-
-        if (postsError) throw postsError;
-        setPosts(postsData || []);
+        await fetchPosts();
 
       } catch (error: any) {
         showError("Không thể tải chi tiết dự án: " + error.message);
@@ -61,6 +82,61 @@ const SeedingProjectDetail = () => {
 
     fetchProjectDetails();
   }, [projectId]);
+
+  const handleOpenEditDialog = (post: Post) => {
+    setEditingPost(post);
+    setPostContent(post.content || '');
+    setIsEditDialogOpen(true);
+  };
+
+  const handleOpenDeleteDialog = (post: Post) => {
+    setPostToDelete(post);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleSavePost = async () => {
+    if (!editingPost) return;
+    setIsSaving(true);
+    const { error } = await supabase
+      .from('seeding_posts')
+      .update({ content: postContent })
+      .eq('id', editingPost.id);
+    
+    if (error) {
+      showError("Cập nhật post thất bại: " + error.message);
+    } else {
+      showSuccess("Đã cập nhật post thành công!");
+      setIsEditDialogOpen(false);
+      setEditingPost(null);
+      if (selectedPost?.id === editingPost.id) {
+        setSelectedPost(prev => prev ? { ...prev, content: postContent } : null);
+      }
+      fetchPosts();
+    }
+    setIsSaving(false);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!postToDelete) return;
+    const toastId = showLoading("Đang xóa post...");
+    const { error } = await supabase
+      .from('seeding_posts')
+      .delete()
+      .eq('id', postToDelete.id);
+    
+    dismissToast(toastId);
+    if (error) {
+      showError("Xóa post thất bại: " + error.message);
+    } else {
+      showSuccess("Đã xóa post thành công!");
+      setIsDeleteDialogOpen(false);
+      if (selectedPost?.id === postToDelete.id) {
+        setSelectedPost(null);
+      }
+      setPostToDelete(null);
+      fetchPosts();
+    }
+  };
 
   const PostList = ({ posts, selectedPost, onSelectPost }: { posts: Post[], selectedPost: Post | null, onSelectPost: (post: Post) => void }) => (
     <div className="flex flex-col gap-1 pl-2">
@@ -76,10 +152,10 @@ const SeedingProjectDetail = () => {
           <span>Post {index + 1}</span>
           <div className="flex items-center">
             <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); alert(`Sửa Post ${post.id}`); }}>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); handleOpenEditDialog(post); }}>
                 <Edit className="h-3 w-3" />
               </Button>
-              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); alert(`Xóa Post ${post.id}`); }}>
+              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleOpenDeleteDialog(post); }}>
                 <Trash2 className="h-3 w-3" />
               </Button>
             </div>
@@ -182,6 +258,44 @@ const SeedingProjectDetail = () => {
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>
+
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Sửa nội dung Post</DialogTitle>
+            <DialogDescription>Chỉnh sửa nội dung cho bài đăng của bạn.</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="post-content" className="sr-only">Nội dung Post</Label>
+            <Textarea 
+              id="post-content"
+              value={postContent}
+              onChange={(e) => setPostContent(e.target.value)}
+              className="min-h-[150px]"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Hủy</Button>
+            <Button onClick={handleSavePost} disabled={isSaving}>
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Lưu thay đổi
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Bạn có chắc chắn muốn xóa?</AlertDialogTitle>
+            <AlertDialogDescription>Hành động này không thể hoàn tác. Post này sẽ bị xóa vĩnh viễn.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPostToDelete(null)}>Hủy</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDelete} className="bg-red-600 hover:bg-red-700">Xóa</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   );
 };
