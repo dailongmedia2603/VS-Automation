@@ -37,8 +37,18 @@ const Register = () => {
       });
 
       if (error) {
-        const errorContext = await error.context.json();
-        throw new Error(errorContext.error || error.message);
+        let errorMessage = error.message;
+        if (error.context && typeof error.context.json === 'function') {
+          try {
+            const errorBody = await error.context.json();
+            if (errorBody.error) {
+              errorMessage = errorBody.error;
+            }
+          } catch (e) {
+            // Bỏ qua lỗi phân tích JSON
+          }
+        }
+        throw new Error(errorMessage);
       }
       
       showSuccess('Đăng ký thành công! Vui lòng đăng nhập.');

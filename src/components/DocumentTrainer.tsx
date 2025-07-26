@@ -247,8 +247,18 @@ export const DocumentTrainer = () => {
       const { data: embeddingData, error: functionError } = await supabase.functions.invoke('embed-document', { body: { textToEmbed } });
 
       if (functionError) {
-        const errorData = await functionError.context.json();
-        throw new Error(errorData.error || functionError.message);
+        let errorMessage = functionError.message;
+        if (functionError.context && typeof functionError.context.json === 'function') {
+          try {
+            const errorBody = await functionError.context.json();
+            if (errorBody.error) {
+              errorMessage = errorBody.error;
+            }
+          } catch (e) {
+            // Bỏ qua lỗi phân tích JSON
+          }
+        }
+        throw new Error(errorMessage);
       }
       if (embeddingData.error) throw new Error(embeddingData.error);
       if (!embeddingData.embedding) throw new Error("Không nhận được vector embedding từ server.");

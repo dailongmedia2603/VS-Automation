@@ -111,8 +111,18 @@ const Settings = () => {
       );
 
       if (functionError) {
-        const errorData = await functionError.context.json();
-        throw new Error(errorData.error || functionError.message);
+        let errorMessage = functionError.message;
+        if (functionError.context && typeof functionError.context.json === 'function') {
+          try {
+            const errorBody = await functionError.context.json();
+            if (errorBody.error) {
+              errorMessage = errorBody.error;
+            }
+          } catch (e) {
+            // Bỏ qua lỗi phân tích JSON
+          }
+        }
+        throw new Error(errorMessage);
       }
       
       if (data && data.error) {
