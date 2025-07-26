@@ -309,7 +309,7 @@ const SeedingProjectDetail = () => {
             {newPostData.type === 'comment_check' && (
               <div className="space-y-4 p-4 border rounded-lg bg-slate-50">
                 <div className="space-y-2">
-                  <Label htmlFor="post-link">Link bài viết</Label>
+                  <Label htmlFor="post-link">ID bài viết</Label>
                   <Input id="post-link" value={newPostData.links} onChange={(e) => setNewPostData(d => ({...d, links: e.target.value}))} />
                 </div>
                 <div className="space-y-2">
@@ -325,8 +325,8 @@ const SeedingProjectDetail = () => {
             {newPostData.type === 'post_approval' && (
               <div className="space-y-4 p-4 border rounded-lg bg-slate-50">
                 <div className="space-y-2">
-                  <Label htmlFor="group-links">Link group</Label>
-                  <Textarea id="group-links" placeholder="Mỗi link một hàng" value={newPostData.links} onChange={(e) => setNewPostData(d => ({...d, links: e.target.value}))} />
+                  <Label htmlFor="group-links">ID Group</Label>
+                  <Textarea id="group-links" placeholder="Mỗi ID một hàng" value={newPostData.links} onChange={(e) => setNewPostData(d => ({...d, links: e.target.value}))} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="post-content">Nội dung bài viết</Label>
