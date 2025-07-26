@@ -17,6 +17,7 @@ import { Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { FacebookApiReference } from "@/components/FacebookApiReference";
 
 const Settings = () => {
   // AI API Settings state
@@ -31,30 +32,41 @@ const Settings = () => {
   const [isLoadingIntegrations, setIsLoadingIntegrations] = useState(true);
   const [isSavingIntegrations, setIsSavingIntegrations] = useState(false);
 
+  // Facebook API Settings state
+  const [fbApiUrl, setFbApiUrl] = useState('');
+  const [fbAccessToken, setFbAccessToken] = useState('');
+  const [isLoadingFb, setIsLoadingFb] = useState(true);
+  const [isSavingFb, setIsSavingFb] = useState(false);
+
   // Effect for AI API settings
   useEffect(() => {
     setLocalSettings(settings);
   }, [settings]);
 
-  // Effect for Integrations settings
+  // Effect for Integrations and Facebook settings
   useEffect(() => {
     const fetchSettings = async () => {
       setIsLoadingIntegrations(true);
+      setIsLoadingFb(true);
       try {
-        const { data, error } = await supabase
-          .from('n8n_settings')
-          .select('zalo_webhook_url')
-          .eq('id', 1)
-          .single();
+        const [n8nRes, fbRes] = await Promise.all([
+          supabase.from('n8n_settings').select('zalo_webhook_url').eq('id', 1).single(),
+          supabase.from('facebook_api_settings').select('url, access_token').eq('id', 1).single()
+        ]);
 
-        if (error && error.code !== 'PGRST116') throw error;
-        if (data) {
-          setWebhookUrl(data.zalo_webhook_url || '');
+        if (n8nRes.error && n8nRes.error.code !== 'PGRST116') throw n8nRes.error;
+        if (n8nRes.data) setWebhookUrl(n8nRes.data.zalo_webhook_url || '');
+
+        if (fbRes.error && fbRes.error.code !== 'PGRST116') throw fbRes.error;
+        if (fbRes.data) {
+          setFbApiUrl(fbRes.data.url || '');
+          setFbAccessToken(fbRes.data.access_token || '');
         }
       } catch (error: any) {
-        showError("Không thể tải cài đặt n8n: " + error.message);
+        showError("Không thể tải cài đặt: " + error.message);
       } finally {
         setIsLoadingIntegrations(false);
+        setIsLoadingFb(false);
       }
     };
     fetchSettings();
@@ -138,7 +150,24 @@ const Settings = () => {
     }
   };
 
-  const pageIsLoading = isLoadingApi || isLoadingIntegrations;
+  // Save handler for Facebook API
+  const handleSaveFacebook = async () => {
+    setIsSavingFb(true);
+    try {
+      const { error } = await supabase
+        .from('facebook_api_settings')
+        .upsert({ id: 1, url: fbApiUrl, access_token: fbAccessToken });
+
+      if (error) throw error;
+      showSuccess("Đã lưu cấu hình API Facebook!");
+    } catch (error: any) {
+      showError("Lưu thất bại: " + error.message);
+    } finally {
+      setIsSavingFb(false);
+    }
+  };
+
+  const pageIsLoading = isLoadingApi || isLoadingIntegrations || isLoadingFb;
 
   if (pageIsLoading) {
     return (
@@ -172,6 +201,7 @@ const Settings = () => {
         <TabsList className="flex justify-start items-center gap-1 p-0 bg-transparent">
           <TabsTrigger value="api-ai" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Cài đặt API AI</TabsTrigger>
           <TabsTrigger value="integrations" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Tích hợp</TabsTrigger>
+          <TabsTrigger value="api-facebook" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">API Facebook Graph</TabsTrigger>
         </TabsList>
         <TabsContent value="api-ai" className="mt-4">
           <Card className="shadow-sm rounded-2xl bg-white">
@@ -273,6 +303,45 @@ const Settings = () => {
               </Button>
             </CardContent>
           </Card>
+        </TabsContent>
+        <TabsContent value="api-facebook" className="mt-4">
+          <Card className="shadow-sm rounded-2xl bg-white">
+            <CardHeader>
+              <CardTitle>Cấu hình API Facebook Graph</CardTitle>
+              <CardDescription>
+                Nhập thông tin để kết nối với dịch vụ API của bạn.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="fb-api-url">URL API Get</Label>
+                <Input
+                  id="fb-api-url"
+                  placeholder="https://graph.facebook.com/v20.0"
+                  value={fbApiUrl}
+                  onChange={(e) => setFbApiUrl(e.target.value)}
+                  className="bg-slate-100 border-none rounded-lg"
+                />
+                <p className="text-xs text-muted-foreground">Nếu bỏ trống, sẽ sử dụng mặc định: https://graph.facebook.com/v20.0</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="fb-access-token">Access Token</Label>
+                <Input
+                  id="fb-access-token"
+                  type="password"
+                  placeholder="EAA..."
+                  value={fbAccessToken}
+                  onChange={(e) => setFbAccessToken(e.target.value)}
+                  className="bg-slate-100 border-none rounded-lg"
+                />
+              </div>
+              <Button onClick={handleSaveFacebook} disabled={isSavingFb} className="rounded-lg bg-blue-600 hover:bg-blue-700">
+                {isSavingFb && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isSavingFb ? "Đang lưu..." : "Lưu cấu hình"}
+              </Button>
+            </CardContent>
+          </Card>
+          <FacebookApiReference baseUrl={fbApiUrl} />
         </TabsContent>
       </Tabs>
     </main>
