@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, Download, MoreHorizontal, Link as LinkIcon, MessageCircle } from 'lucide-react';
+import { Search, Download, MoreHorizontal, Link as LinkIcon, MessageCircle, Code } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type Post = {
@@ -74,14 +74,18 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
   return (
     <Card className="w-full h-full shadow-none border-none flex flex-col">
       <CardHeader>
-        <CardTitle className="text-2xl font-bold text-slate-800">{post.name}</CardTitle>
-        {post.links && (
-          <div className="flex items-center gap-2 text-sm text-slate-500 pt-1">
-            <LinkIcon className="h-4 w-4" />
-            <a href={postUrl} target="_blank" rel="noopener noreferrer" className="hover:underline hover:text-blue-600">
-              {post.links}
+        <div className="flex justify-between items-center">
+            <h2 className="text-lg font-semibold text-slate-800">{post.name}</h2>
+            <a href={postUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800" title="Mở bài viết gốc">
+                <LinkIcon className="h-4 w-4" />
             </a>
-          </div>
+        </div>
+        {post.links && (
+            <div className="mt-2 p-3 bg-blue-50 rounded-md text-slate-900 font-mono text-xs flex items-center gap-2">
+                <Code className="h-4 w-4 flex-shrink-0 text-slate-600" />
+                <span className="font-bold text-green-600">ID</span>
+                <span className="text-slate-700 break-all">{post.links}</span>
+            </div>
         )}
       </CardHeader>
       <CardContent className="flex-1 flex flex-col">
