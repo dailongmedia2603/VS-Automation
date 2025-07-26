@@ -14,6 +14,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 
 type Project = {
   id: number;
@@ -26,6 +28,16 @@ type Post = {
   content: string | null;
   status: 'checking' | 'completed';
   type: 'comment_check' | 'post_approval';
+};
+
+const initialNewPostState = {
+  name: '',
+  type: 'comment_check' as 'comment_check' | 'post_approval',
+  links: '',
+  comments: '',
+  content: '',
+  check_frequency: 'daily_1',
+  is_active: true,
 };
 
 const SeedingProjectDetail = () => {
@@ -43,8 +55,7 @@ const SeedingProjectDetail = () => {
   const [postToDelete, setPostToDelete] = useState<Post | null>(null);
   
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [newPostName, setNewPostName] = useState('');
-  const [newPostType, setNewPostType] = useState<'comment_check' | 'post_approval'>('comment_check');
+  const [newPostData, setNewPostData] = useState(initialNewPostState);
   const [isSaving, setIsSaving] = useState(false);
 
   const fetchProjectData = async () => {
@@ -107,27 +118,43 @@ const SeedingProjectDetail = () => {
   };
 
   const handleAddPost = async () => {
-    if (!newPostName.trim() || !projectId) {
+    if (!newPostData.name.trim() || !projectId) {
       showError("Tên post không được để trống.");
       return;
     }
     setIsSaving(true);
-    const { error } = await supabase.from('seeding_posts').insert({
+
+    const dataToInsert: any = {
       project_id: projectId,
-      name: newPostName,
-      type: newPostType,
-      content: `Đây là nội dung mặc định cho "${newPostName}".`
-    });
+      name: newPostData.name,
+      type: newPostData.type,
+      is_active: newPostData.is_active,
+      status: 'checking',
+    };
+
+    if (newPostData.type === 'comment_check') {
+      dataToInsert.links = newPostData.links;
+      dataToInsert.comments = newPostData.comments;
+    } else { // post_approval
+      dataToInsert.links = newPostData.links;
+      dataToInsert.content = newPostData.content;
+      dataToInsert.check_frequency = newPostData.check_frequency;
+    }
+
+    const { error } = await supabase.from('seeding_posts').insert(dataToInsert);
+    
     if (error) {
       showError("Thêm post thất bại: " + error.message);
     } else {
       showSuccess("Đã thêm post thành công!");
       setIsAddDialogOpen(false);
-      setNewPostName('');
+      setNewPostData(initialNewPostState);
       fetchProjectData();
     }
     setIsSaving(false);
   };
+
+  const commentCount = newPostData.comments.split('\n').filter(line => line.trim() !== '').length;
 
   const PostList = ({ posts, onSelectPost }: { posts: Post[], onSelectPost: (post: Post) => void }) => {
     const inputRef = useRef<HTMLInputElement>(null);
@@ -193,7 +220,7 @@ const SeedingProjectDetail = () => {
           <Link to="/check-seeding"><Button variant="outline" size="icon"><ArrowLeft className="h-4 w-4" /></Button></Link>
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">{project.name}</h1>
         </div>
-        <Button onClick={() => setIsAddDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700">
+        <Button onClick={() => { setNewPostData(initialNewPostState); setIsAddDialogOpen(true); }} className="bg-blue-600 hover:bg-blue-700">
           <PlusCircle className="mr-2 h-4 w-4" />Thêm Post
         </Button>
       </div>
@@ -236,34 +263,70 @@ const SeedingProjectDetail = () => {
       </ResizablePanelGroup>
 
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold">Thêm Post Mới</DialogTitle>
-            <DialogDescription>
-              Điền thông tin chi tiết cho bài đăng mới của bạn.
-            </DialogDescription>
+            <DialogDescription>Điền thông tin chi tiết cho bài đăng mới của bạn.</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-6 py-4">
-            <div className="grid grid-cols-3 items-center gap-4">
-              <Label htmlFor="name" className="text-left">Tên Post</Label>
-              <Input 
-                id="name" 
-                value={newPostName} 
-                onChange={(e) => setNewPostName(e.target.value)} 
-                className="col-span-2 h-10 bg-slate-100/70 border-slate-200" 
-              />
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="post-name">Tên Post</Label>
+              <Input id="post-name" value={newPostData.name} onChange={(e) => setNewPostData(d => ({...d, name: e.target.value}))} />
             </div>
-            <div className="grid grid-cols-3 items-center gap-4">
-              <Label htmlFor="type" className="text-left">Loại</Label>
-              <Select value={newPostType} onValueChange={(v) => setNewPostType(v as any)}>
-                <SelectTrigger className="col-span-2 h-10 bg-slate-100/70 border-slate-200">
-                  <SelectValue />
-                </SelectTrigger>
+            <div className="space-y-2">
+              <Label htmlFor="post-type">Loại</Label>
+              <Select value={newPostData.type} onValueChange={(v) => setNewPostData(d => ({...d, type: v as any}))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="comment_check">Check Comment</SelectItem>
                   <SelectItem value="post_approval">Check duyệt post</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            {newPostData.type === 'comment_check' && (
+              <div className="space-y-4 p-4 border rounded-lg bg-slate-50">
+                <div className="space-y-2">
+                  <Label htmlFor="post-link">Link bài viết</Label>
+                  <Input id="post-link" value={newPostData.links} onChange={(e) => setNewPostData(d => ({...d, links: e.target.value}))} />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <Label htmlFor="post-comments">Danh sách comment</Label>
+                    <span className="text-xs font-medium text-slate-500">Số lượng: {commentCount}</span>
+                  </div>
+                  <Textarea id="post-comments" value={newPostData.comments} onChange={(e) => setNewPostData(d => ({...d, comments: e.target.value}))} className="min-h-[120px]" />
+                </div>
+              </div>
+            )}
+
+            {newPostData.type === 'post_approval' && (
+              <div className="space-y-4 p-4 border rounded-lg bg-slate-50">
+                <div className="space-y-2">
+                  <Label htmlFor="group-links">Link group</Label>
+                  <Textarea id="group-links" placeholder="Mỗi link một hàng" value={newPostData.links} onChange={(e) => setNewPostData(d => ({...d, links: e.target.value}))} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="post-content">Nội dung bài viết</Label>
+                  <Textarea id="post-content" value={newPostData.content} onChange={(e) => setNewPostData(d => ({...d, content: e.target.value}))} className="min-h-[120px]" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="check-frequency">Tần suất check</Label>
+                  <Select value={newPostData.check_frequency} onValueChange={(v) => setNewPostData(d => ({...d, check_frequency: v}))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="daily_1">1 lần / ngày</SelectItem>
+                      <SelectItem value="daily_2">2 lần / ngày</SelectItem>
+                      <SelectItem value="daily_3">3 lần / ngày</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+            
+            <div className="flex items-center justify-between pt-2">
+              <Label htmlFor="is-active" className="font-medium">Kích hoạt</Label>
+              <Switch id="is-active" checked={newPostData.is_active} onCheckedChange={(c) => setNewPostData(d => ({...d, is_active: c}))} />
             </div>
           </div>
           <DialogFooter>
