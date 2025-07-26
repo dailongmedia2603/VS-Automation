@@ -10,11 +10,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, Search, Archive, Trash2, FolderClock, CheckCircle, ListTodo, ChevronDown, Loader2 } from 'lucide-react';
+import { PlusCircle, Search, Archive, Trash2, FolderClock, CheckCircle, ListTodo, ChevronDown, Loader2, ArchiveRestore } from 'lucide-react';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { format } from 'date-fns';
 import { SeedingStatCard } from '@/components/SeedingStatCard';
-import { Link } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 
@@ -57,13 +56,20 @@ const CheckSeeding = () => {
   }, []);
 
   const filteredProjects = useMemo(() => {
-    return projects
-      .filter(p => p.status !== 'archived')
-      .filter(p => {
+    return projects.filter(p => {
+      const isArchivedView = statusFilter === 'archived';
+      
+      if (isArchivedView) {
+        if (p.status !== 'archived') return false;
+      } else {
+        if (p.status === 'archived') return false;
         if (statusFilter !== 'all' && p.status !== statusFilter) return false;
-        if (searchTerm && !p.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-        return true;
-      });
+      }
+      
+      if (searchTerm && !p.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+      
+      return true;
+    });
   }, [projects, statusFilter, searchTerm]);
 
   const paginatedProjects = useMemo(() => {
@@ -92,18 +98,41 @@ const CheckSeeding = () => {
     setSelectedIds(prev => checked ? [...prev, id] : prev.filter(i => i !== id));
   };
 
-  const handleBulkAction = async (action: 'archive' | 'delete') => {
-    const toastId = showLoading(`Đang ${action === 'archive' ? 'lưu trữ' : 'xóa'}...`);
-    if (action === 'delete') {
-      const { error } = await supabase.from('seeding_projects').delete().in('id', selectedIds);
-      if (error) showError("Xóa thất bại: " + error.message);
-      else showSuccess("Đã xóa thành công!");
-    } else {
-      const { error } = await supabase.from('seeding_projects').update({ status: 'archived' }).in('id', selectedIds);
-      if (error) showError("Lưu trữ thất bại: " + error.message);
-      else showSuccess("Đã lưu trữ thành công!");
+  const handleBulkAction = async (action: 'archive' | 'delete' | 'restore') => {
+    let toastMessage = '';
+    let query;
+    let successMessage = '';
+
+    switch (action) {
+      case 'archive':
+        toastMessage = 'Đang lưu trữ...';
+        successMessage = 'Đã lưu trữ thành công!';
+        query = supabase.from('seeding_projects').update({ status: 'archived' }).in('id', selectedIds);
+        break;
+      case 'restore':
+        toastMessage = 'Đang khôi phục...';
+        successMessage = 'Đã khôi phục thành công!';
+        query = supabase.from('seeding_projects').update({ status: 'checking' }).in('id', selectedIds);
+        break;
+      case 'delete':
+        toastMessage = 'Đang xóa vĩnh viễn...';
+        successMessage = 'Đã xóa thành công!';
+        query = supabase.from('seeding_projects').delete().in('id', selectedIds);
+        break;
+      default:
+        return;
     }
+
+    const toastId = showLoading(toastMessage);
+    const { error } = await query;
     dismissToast(toastId);
+
+    if (error) {
+      showError(`Thao tác thất bại: ${error.message}`);
+    } else {
+      showSuccess(successMessage);
+    }
+    
     setSelectedIds([]);
     fetchProjects();
   };
@@ -147,17 +176,18 @@ const CheckSeeding = () => {
               <Input placeholder="Tìm kiếm dự án..." className="pl-9" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
             </div>
             <div className="flex items-center gap-2">
-              <Link to="/check-seeding/archived">
-                <Button variant="outline"><Archive className="mr-2 h-4 w-4" />Lưu trữ</Button>
-              </Link>
               {selectedIds.length > 0 && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline">Thao tác <ChevronDown className="ml-2 h-4 w-4" /></Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
-                    <DropdownMenuItem onClick={() => handleBulkAction('archive')}><Archive className="mr-2 h-4 w-4" />Lưu trữ</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleBulkAction('delete')} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem>
+                    {statusFilter === 'archived' ? (
+                      <DropdownMenuItem onClick={() => handleBulkAction('restore')}><ArchiveRestore className="mr-2 h-4 w-4" />Khôi phục</DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem onClick={() => handleBulkAction('archive')}><Archive className="mr-2 h-4 w-4" />Lưu trữ</DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem onClick={() => handleBulkAction('delete')} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa vĩnh viễn</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
@@ -166,6 +196,7 @@ const CheckSeeding = () => {
                   <TabsTrigger value="all">Tất cả</TabsTrigger>
                   <TabsTrigger value="completed">Hoàn thành</TabsTrigger>
                   <TabsTrigger value="checking">Đang check</TabsTrigger>
+                  <TabsTrigger value="archived">Lưu trữ</TabsTrigger>
                 </TabsList>
               </Tabs>
               <Button onClick={() => setIsAddDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700">
@@ -179,7 +210,7 @@ const CheckSeeding = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-12"><Checkbox checked={selectedIds.length > 0 && selectedIds.length === paginatedProjects.length} onCheckedChange={handleSelectAll} /></TableHead>
+                  <TableHead className="w-12"><Checkbox checked={selectedIds.length > 0 && selectedIds.length === paginatedProjects.length && paginatedProjects.length > 0} onCheckedChange={handleSelectAll} /></TableHead>
                   <TableHead>Dự án</TableHead>
                   <TableHead>Ngày tạo</TableHead>
                   <TableHead className="text-center">Tổng Post</TableHead>

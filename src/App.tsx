@@ -18,7 +18,6 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import TrainingDocuments from "./pages/TrainingDocuments";
 import ContentAi from "./pages/ContentAi";
 import CheckSeeding from "./pages/CheckSeeding";
-import ArchivedSeedingProjects from "./pages/ArchivedSeedingProjects";
 import Tools from "./pages/Tools";
 import CheckKeywordComment from "@/pages/tools/check-keyword-comment";
 
@@ -45,7 +44,6 @@ const App = () => (
                   <Route path="/staff" element={<Staff />} />
                   <Route path="/content-ai" element={<ContentAi />} />
                   <Route path="/check-seeding" element={<CheckSeeding />} />
-                  <Route path="/check-seeding/archived" element={<ArchivedSeedingProjects />} />
                   <Route path="/tools" element={<Tools />} />
                   <Route path="/tools/check-keyword-comment" element={<CheckKeywordComment />} />
                 </Route>
