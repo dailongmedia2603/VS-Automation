@@ -22,6 +22,9 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
+  let firstRequestUrl = null;
+  let firstRawResponse = null;
+
   try {
     const { postId } = await req.json();
     if (!postId) throw new Error("Post ID is required.");
@@ -35,7 +38,6 @@ serve(async (req) => {
     if (postError) throw new Error(`Failed to fetch post content: ${postError.message}`);
     if (!post.content) throw new Error("Post has no content to check.");
 
-    // Fetch url_templates and api_key from settings
     const { data: fbSettings, error: settingsError } = await supabaseAdmin.from('apifb_settings').select('url_templates, api_key').eq('id', 1).single();
     if (settingsError || !fbSettings) {
       throw new Error("Facebook API settings are not configured.");
@@ -56,22 +58,30 @@ serve(async (req) => {
     for (const group of groups) {
       const groupId = group.group_id;
       
-      // Construct the URL from the template
       let feedUrl = postApprovalTemplate.replace(/{group-id}/g, groupId);
 
-      // Ensure access token is present if not already in the template
       if (!feedUrl.includes('access_token=') && accessToken) {
         const separator = feedUrl.includes('?') ? '&' : '?';
         feedUrl += `${separator}access_token=${accessToken}`;
       }
       
+      if (!firstRequestUrl) {
+        firstRequestUrl = feedUrl;
+      }
+
       try {
         const response = await fetch(feedUrl);
-        const feedData = await response.json();
+        const responseText = await response.text();
+        
+        if (!firstRawResponse) {
+            firstRawResponse = responseText;
+        }
+
+        const feedData = JSON.parse(responseText);
 
         if (!response.ok) {
             console.warn(`API error for group ${groupId}: ${feedData?.error?.message || 'Unknown error'}`);
-            continue; // Skip to next group on API error
+            continue;
         }
 
         if (feedData.data) {
@@ -84,7 +94,6 @@ serve(async (req) => {
               checked_at: new Date().toISOString()
             }).eq('id', group.id);
           } else {
-            // If not found, just update the checked_at timestamp and ensure status is correct
             await supabaseAdmin.from('seeding_groups').update({
               checked_at: new Date().toISOString(),
               status: 'not_found'
@@ -110,12 +119,18 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       approved: currentApprovedCount,
       pending: total - currentApprovedCount,
-      total: total
+      total: total,
+      requestUrl: firstRequestUrl,
+      rawResponse: firstRawResponse
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error) {
     console.error('Error in check-post-approval function:', error.message);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      requestUrl: firstRequestUrl,
+      rawResponse: firstRawResponse
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     });

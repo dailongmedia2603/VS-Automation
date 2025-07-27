@@ -113,19 +113,30 @@ export const PostApprovalDetail = ({
       });
 
       if (error || data.error) {
-        throw new Error(error?.message || data?.error);
+        const errorMessage = error?.message || data?.error;
+        setLog({ 
+            step: 'Kiểm tra thất bại', 
+            errorMessage: errorMessage,
+            requestUrl: data?.requestUrl,
+            rawResponse: data?.rawResponse
+        });
+        throw new Error(errorMessage);
       }
 
       dismissToast(toastId);
       setCheckResult(data);
-      setLog({ step: 'Kiểm tra hoàn tất', errorMessage: 'Không có lỗi' });
+      setLog({ 
+          step: 'Kiểm tra hoàn tất', 
+          errorMessage: 'Không có lỗi',
+          requestUrl: data.requestUrl,
+          rawResponse: data.rawResponse
+      });
       showSuccess(`Kiểm tra hoàn tất! Duyệt thành công ${data.approved}/${data.total} group.`);
       onCheckComplete();
       fetchGroups();
 
     } catch (err: any) {
-      dismissToast(toastId);
-      setLog({ step: 'Kiểm tra thất bại', errorMessage: err.message });
+      if (toastId) dismissToast(toastId);
       showError(`Kiểm tra thất bại: ${err.message}`);
     } finally {
       setIsChecking(false);
