@@ -150,7 +150,7 @@ const Register = () => {
         <div className="text-center z-10 flex flex-col items-center">
             <img src={hexaLogo} alt="DAILONG MEDIA Logo" className="w-[28rem] h-auto mb-8" style={{ filter: 'brightness(0) invert(1)' }} />
             <div className="border border-white/20 rounded-2xl p-8 backdrop-blur-sm bg-white/10 max-w-md">
-                <p className="text-4xl font-bold mt-2 leading-tight">Hệ thống Automation AI hỗ trợ triển khai dự án</p>
+                <p className="text-2xl font-semibold mt-2 leading-tight">Hệ thống Automation AI hỗ trợ triển khai dự án</p>
             </div>
         </div>
         <div className="absolute bottom-8 left-0 right-0 flex justify-center space-x-8 text-sm text-blue-200">
