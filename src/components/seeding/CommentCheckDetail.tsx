@@ -47,24 +47,41 @@ interface CommentCheckDetailProps {
   post: Post;
 }
 
-const ErrorLogDialog = ({ isOpen, onOpenChange, log }: { isOpen: boolean, onOpenChange: (open: boolean) => void, log: ErrorLog | null }) => {
+const LogDialog = ({ isOpen, onOpenChange, log, isError }: { isOpen: boolean, onOpenChange: (open: boolean) => void, log: ErrorLog | null, isError: boolean }) => {
     if (!log) return null;
+    
+    let formattedResponse = log.rawResponse;
+    try {
+        if (log.rawResponse) {
+            formattedResponse = JSON.stringify(JSON.parse(log.rawResponse), null, 2);
+        }
+    } catch (e) {
+        // Keep rawResponse as is if it's not valid JSON
+    }
+
     return (
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Chi tiết lỗi - {log.step}</DialogTitle>
+            <DialogTitle className={cn(isError && "text-destructive")}>
+              {isError ? `Chi tiết lỗi - ${log.step}` : "Nhật ký API"}
+            </DialogTitle>
             <DialogDescription>
-              Đã xảy ra lỗi trong quá trình kiểm tra. Dưới đây là thông tin chi tiết để gỡ lỗi.
+              {isError 
+                ? "Đã xảy ra lỗi trong quá trình kiểm tra. Dưới đây là thông tin chi tiết để gỡ lỗi."
+                : "Chi tiết về yêu cầu đã gửi và phản hồi nhận được từ API."
+              }
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-4">
-            <div>
-              <h3 className="font-semibold mb-2">Thông báo lỗi:</h3>
-              <div className="p-3 bg-destructive/10 text-destructive rounded-md text-sm font-mono break-all">
-                {log.errorMessage}
-              </div>
-            </div>
+            {isError && (
+                <div>
+                    <h3 className="font-semibold mb-2 text-destructive">Thông báo lỗi:</h3>
+                    <div className="p-3 bg-destructive/10 text-destructive rounded-md text-sm font-mono break-all">
+                        {log.errorMessage}
+                    </div>
+                </div>
+            )}
             {log.requestUrl && (
               <div>
                 <h3 className="font-semibold mb-2">URL đã gửi đi:</h3>
@@ -77,7 +94,7 @@ const ErrorLogDialog = ({ isOpen, onOpenChange, log }: { isOpen: boolean, onOpen
               <div>
                 <h3 className="font-semibold mb-2">Kết quả thô trả về:</h3>
                 <ScrollArea className="h-48 w-full bg-slate-100 rounded-md border p-4">
-                  <pre className="text-xs whitespace-pre-wrap break-all"><code>{log.rawResponse}</code></pre>
+                  <pre className="text-xs whitespace-pre-wrap break-all"><code>{formattedResponse}</code></pre>
                 </ScrollArea>
               </div>
             )}
@@ -97,8 +114,8 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
   const [statusFilter, setStatusFilter] = useState<'all' | 'visible' | 'not_visible'>('all');
   const [isChecking, setIsChecking] = useState(false);
   const [checkResult, setCheckResult] = useState<CheckResult | null>(null);
-  const [errorLog, setErrorLog] = useState<ErrorLog | null>(null);
-  const [isErrorLogOpen, setIsErrorLogOpen] = useState(false);
+  const [log, setLog] = useState<ErrorLog | null>(null);
+  const [isLogOpen, setIsLogOpen] = useState(false);
 
   const fetchComments = async () => {
     setIsLoading(true);
@@ -119,7 +136,7 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
   useEffect(() => {
     fetchComments();
     setCheckResult(null);
-    setErrorLog(null);
+    setLog(null);
   }, [post.id]);
 
   const handleRunCheck = async () => {
@@ -129,7 +146,7 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
     }
     setIsChecking(true);
     setCheckResult(null);
-    setErrorLog(null);
+    setLog(null);
     let toastId;
 
     try {
@@ -139,9 +156,17 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
         body: { fbPostId: post.links }
       });
       if (fetchError || fetchData.error) {
-        throw { step: 'Lấy dữ liệu', error: fetchError || fetchData };
+        throw { step: 'Lấy dữ liệu', error: fetchError || fetchData, logData: fetchData };
       }
       
+      // Always set log data after step 1 to allow inspection
+      setLog({
+          step: 'Lấy dữ liệu thành công',
+          errorMessage: 'Không có lỗi',
+          requestUrl: fetchData.requestUrl,
+          rawResponse: fetchData.rawResponse
+      });
+
       // Step 2: Process and store data
       dismissToast(toastId);
       toastId = showLoading("Bước 2/3: Đang xử lý và lưu trữ dữ liệu...");
@@ -149,7 +174,7 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
         body: { rawResponse: fetchData.rawResponse, internalPostId: post.id }
       });
       if (processError || processData.error) {
-        throw { step: 'Xử lý dữ liệu', error: processError || processData, log: fetchData };
+        throw { step: 'Xử lý dữ liệu', error: processError || processData, logData: fetchData };
       }
 
       // Step 3: Compare and update
@@ -159,7 +184,7 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
         body: { postId: post.id }
       });
       if (compareError || compareResult.error) {
-        throw { step: 'So sánh dữ liệu', error: compareError || compareResult };
+        throw { step: 'So sánh dữ liệu', error: compareError || compareResult, logData: fetchData };
       }
 
       dismissToast(toastId);
@@ -170,11 +195,11 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
     } catch (e: any) {
       if (toastId) dismissToast(toastId);
       const errorMessage = e.error?.message || 'Đã xảy ra lỗi không xác định.';
-      setErrorLog({
+      setLog({
           step: e.step || 'Không xác định',
           errorMessage: errorMessage,
-          requestUrl: e.log?.requestUrl || e.error?.requestUrl,
-          rawResponse: e.log?.rawResponse,
+          requestUrl: e.logData?.requestUrl,
+          rawResponse: e.logData?.rawResponse,
       });
       showError(`Kiểm tra thất bại ở bước: ${e.step}.`);
     } finally {
@@ -236,10 +261,14 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
                     </div>
                   </div>
                 )}
-                {errorLog && (
-                    <Button variant="destructive" size="sm" onClick={() => setIsErrorLogOpen(true)}>
+                {log && (
+                    <Button 
+                        variant={log.errorMessage !== 'Không có lỗi' ? 'destructive' : 'outline'} 
+                        size="sm" 
+                        onClick={() => setIsLogOpen(true)}
+                    >
                         <FileText className="mr-2 h-4 w-4" />
-                        Xem Log Lỗi
+                        {log.errorMessage !== 'Không có lỗi' ? 'Xem Log Lỗi' : 'Xem Log API'}
                     </Button>
                 )}
                 <Button onClick={handleRunCheck} disabled={isChecking} className="bg-blue-600 hover:bg-blue-700 rounded-lg">
@@ -357,7 +386,7 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
           </div>
         </CardContent>
       </Card>
-      <ErrorLogDialog isOpen={isErrorLogOpen} onOpenChange={setIsErrorLogOpen} log={errorLog} />
+      <LogDialog isOpen={isLogOpen} onOpenChange={setIsLogOpen} log={log} isError={log?.errorMessage !== 'Không có lỗi'} />
     </>
   );
 };
