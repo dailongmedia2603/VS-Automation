@@ -112,8 +112,16 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
       const updates = [];
       let foundCount = 0;
 
-      // Normalization function for more robust matching
-      const normalizeString = (str: string) => str.trim().toLowerCase();
+      // **NEW, SMARTER NORMALIZATION FUNCTION**
+      // Normalizes Unicode, trims whitespace, converts to lowercase, and standardizes internal whitespace.
+      const normalizeString = (str: string) => {
+        if (!str) return '';
+        return str
+          .normalize('NFC')
+          .trim()
+          .toLowerCase()
+          .replace(/\s+/g, ' ');
+      };
 
       for (const expectedComment of comments) {
         const normalizedExpectedContent = normalizeString(expectedComment.content);
