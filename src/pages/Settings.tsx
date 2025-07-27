@@ -33,7 +33,7 @@ const Settings = () => {
   const [isSavingIntegrations, setIsSavingIntegrations] = useState(false);
 
   // Facebook API Settings state
-  const [fbApiUrl, setFbApiUrl] = useState('');
+  const [urlTemplates, setUrlTemplates] = useState({ comment_check: '' });
   const [fbAccessToken, setFbAccessToken] = useState('');
   const [isLoadingFb, setIsLoadingFb] = useState(true);
   const [isSavingFb, setIsSavingFb] = useState(false);
@@ -53,7 +53,7 @@ const Settings = () => {
       try {
         const [n8nRes, fbRes] = await Promise.all([
           supabase.from('n8n_settings').select('zalo_webhook_url').eq('id', 1).single(),
-          supabase.from('apifb_settings').select('api_url, api_key').eq('id', 1).single()
+          supabase.from('apifb_settings').select('url_templates, api_key').eq('id', 1).single()
         ]);
 
         if (n8nRes.error && n8nRes.error.code !== 'PGRST116') throw n8nRes.error;
@@ -61,7 +61,7 @@ const Settings = () => {
 
         if (fbRes.error && fbRes.error.code !== 'PGRST116') throw fbRes.error;
         if (fbRes.data) {
-          setFbApiUrl(fbRes.data.api_url || '');
+          setUrlTemplates(fbRes.data.url_templates || { comment_check: '' });
           setFbAccessToken(fbRes.data.api_key || '');
         }
       } catch (error: any) {
@@ -168,7 +168,7 @@ const Settings = () => {
     try {
       const { error } = await supabase
         .from('apifb_settings')
-        .upsert({ id: 1, api_url: fbApiUrl, api_key: fbAccessToken });
+        .upsert({ id: 1, url_templates: urlTemplates, api_key: fbAccessToken });
 
       if (error) throw error;
       showSuccess("Đã lưu cấu hình API Facebook!");
@@ -184,7 +184,7 @@ const Settings = () => {
     setFbApiStatus("testing");
     setFbApiError(null);
     try {
-        const urlToTest = fbApiUrl.trim() || 'http://api.akng.io.vn/graph';
+        const urlToTest = (urlTemplates.comment_check || 'http://api.akng.io.vn/graph/me').replace(/{postId}/g, 'me');
         const { data, error } = await supabase.functions.invoke('test-fb-api', {
             body: { apiUrl: urlToTest, accessToken: fbAccessToken }
         });
@@ -349,17 +349,6 @@ const Settings = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="fb-api-url">URL API Get</Label>
-                <Input
-                  id="fb-api-url"
-                  placeholder="http://api.akng.io.vn/graph"
-                  value={fbApiUrl}
-                  onChange={(e) => setFbApiUrl(e.target.value)}
-                  className="bg-slate-100 border-none rounded-lg"
-                />
-                <p className="text-xs text-muted-foreground">Nếu bỏ trống, sẽ sử dụng mặc định: http://api.akng.io.vn/graph</p>
-              </div>
-              <div className="space-y-2">
                 <Label htmlFor="fb-access-token">Access Token</Label>
                 <Input
                   id="fb-access-token"
@@ -369,6 +358,24 @@ const Settings = () => {
                   onChange={(e) => setFbAccessToken(e.target.value)}
                   className="bg-slate-100 border-none rounded-lg"
                 />
+              </div>
+              <div className="border-t pt-4 mt-4">
+                <h3 className="text-md font-semibold">Cấu hình URL theo tính năng</h3>
+                <p className="text-sm text-muted-foreground mb-4">Định nghĩa các mẫu URL cho từng tính năng cụ thể.</p>
+                <div className="space-y-4 p-4 border rounded-lg bg-slate-50/50">
+                    <div className="space-y-2">
+                        <Label htmlFor="url-comment-check">Check Comment URL</Label>
+                        <Input
+                            id="url-comment-check"
+                            placeholder="http://api.example.com/graph/{postId}/comments"
+                            value={urlTemplates.comment_check}
+                            onChange={(e) => setUrlTemplates(prev => ({ ...prev, comment_check: e.target.value }))}
+                            className="bg-white"
+                        />
+                        <p className="text-xs text-muted-foreground">Sử dụng <code>{`{postId}`}</code> để đại diện cho ID bài viết. Access token sẽ được tự động thêm vào.</p>
+                    </div>
+                    {/* Add other feature URL templates here in the future */}
+                </div>
               </div>
               <Button onClick={handleSaveFacebook} disabled={isSavingFb} className="rounded-lg bg-blue-600 hover:bg-blue-700">
                 {isSavingFb && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -382,7 +389,7 @@ const Settings = () => {
                     {fbApiStatus === "success" && <Badge variant="default" className="bg-green-100 text-green-800">Thành công</Badge>}
                     {fbApiStatus === "error" && <Badge variant="destructive">Thất bại</Badge>}
                 </div>
-                <Button onClick={handleTestFbConnection} disabled={fbApiStatus === "testing"} className="mt-4 rounded-lg">
+                <Button onClick={handleTestFbConnection} disabled={fbApiStatus === "testing" || !urlTemplates.comment_check} className="mt-4 rounded-lg">
                   {fbApiStatus === "testing" ? "Đang kiểm tra..." : "Kiểm tra kết nối"}
                 </Button>
                 {fbApiError && (
@@ -394,7 +401,7 @@ const Settings = () => {
               </div>
             </CardContent>
           </Card>
-          <FacebookApiReference baseUrl={fbApiUrl || 'http://api.akng.io.vn/graph'} accessToken={fbAccessToken} />
+          <FacebookApiReference baseUrl={urlTemplates.comment_check.split('/{postId}')[0]} accessToken={fbAccessToken} />
         </TabsContent>
       </Tabs>
     </main>

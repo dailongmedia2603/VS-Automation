@@ -25,7 +25,7 @@ serve(async (req) => {
 
     const { data: fbSettings, error: settingsError } = await supabaseAdmin
       .from('apifb_settings')
-      .select('api_url, api_key')
+      .select('url_templates, api_key')
       .eq('id', 1)
       .single();
 
@@ -33,16 +33,22 @@ serve(async (req) => {
       throw new Error("Không thể tải cấu hình API Facebook. Vui lòng kiểm tra trang Cài đặt.");
     }
 
-    const { api_url: apiUrl, api_key: accessToken } = fbSettings;
-    const finalApiUrl = apiUrl || 'http://api.akng.io.vn/graph';
+    const { url_templates: urlTemplates, api_key: accessToken } = fbSettings;
+    const commentCheckTemplate = urlTemplates?.comment_check;
+
+    if (!commentCheckTemplate) {
+        throw new Error("Chưa cấu hình URL cho tính năng Check Comment. Vui lòng vào trang Cài đặt.");
+    }
+
+    // Replace placeholder and construct the final URL
+    const finalUrl = commentCheckTemplate.replace(/{postId}/g, postId);
     const fields = 'message,from{id,name},permalink_url,created_time';
-    const initialEndpoint = `${finalApiUrl}/${postId}/comments?fields=${fields}&access_token=${accessToken}`;
+    const initialEndpoint = `${finalUrl}?fields=${fields}&access_token=${accessToken}`;
 
     let allComments = [];
     let nextUrl = initialEndpoint;
     let firstResponseForLog = null;
 
-    // Loop to handle pagination
     while (nextUrl) {
       const response = await fetch(nextUrl);
       const rawResponse = await response.text();
@@ -61,7 +67,6 @@ serve(async (req) => {
         allComments.push(...data.data);
       }
 
-      // Check for the next page link
       nextUrl = data.paging?.next || null;
     }
 
@@ -69,7 +74,7 @@ serve(async (req) => {
         data: allComments,
         log: {
             requestUrl: initialEndpoint,
-            rawResponse: firstResponseForLog, // Log the first response for debugging
+            rawResponse: firstResponseForLog,
         }
     };
 
