@@ -17,16 +17,17 @@ serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
 
-  const { fbPostId, internalPostId } = await req.json();
-  if (!fbPostId || !internalPostId) {
-    return new Response(JSON.stringify({ error: "Cả ID bài viết Facebook và ID nội bộ đều là bắt buộc." }), {
+  const { fbPostId } = await req.json();
+  if (!fbPostId) {
+    return new Response(JSON.stringify({ error: "ID bài viết Facebook là bắt buộc." }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
     });
   }
 
+  let requestUrl = '';
+
   try {
-    // Step 1: Fetch API settings from Supabase
     const { data: fbSettings, error: settingsError } = await supabaseAdmin
       .from('apifb_settings')
       .select('url_templates, api_key')
@@ -34,108 +35,46 @@ serve(async (req) => {
       .single();
 
     if (settingsError || !fbSettings) {
-      throw new Error("Không thể tải cấu hình API Facebook. Vui lòng kiểm tra trang Cài đặt.");
+      throw new Error("Không thể tải cấu hình API Facebook.");
     }
 
     const { url_templates: urlTemplates, api_key: dbAccessToken } = fbSettings;
     const commentCheckTemplate = urlTemplates?.comment_check;
 
     if (!commentCheckTemplate) {
-        throw new Error("Chưa cấu hình URL cho tính năng Check Comment. Vui lòng vào trang Cài đặt.");
+        throw new Error("Chưa cấu hình URL cho tính năng Check Comment.");
     }
 
-    // Step 2: Fetch all comments from Facebook API with pagination
     const url = new URL(commentCheckTemplate.replace(/{postId}/g, fbPostId));
     const simplifiedFields = 'message,from,permalink_url,created_time,comments';
     url.searchParams.set('fields', simplifiedFields);
     if (!url.searchParams.has('access_token') && dbAccessToken) {
         url.searchParams.set('access_token', dbAccessToken);
     }
-    const initialEndpoint = url.toString();
+    requestUrl = url.toString();
 
-    const allComments = [];
-    let nextUrl = initialEndpoint;
-    let safetyCounter = 0;
-    const MAX_PAGES = 20;
+    const response = await fetch(requestUrl);
+    const responseText = await response.text();
 
-    while (nextUrl && safetyCounter < MAX_PAGES) {
-      safetyCounter++;
-      const response = await fetch(nextUrl);
-      const data = await response.json();
-      
-      if (!response.ok || data.error) {
-        const errorMessage = data?.error?.message || `Yêu cầu API thất bại với mã trạng thái ${response.status}.`;
-        throw new Error(errorMessage);
-      }
-      
-      // Handle both `{"data": [...]}` and `[...]` structures
-      const commentsList = Array.isArray(data) ? data : (data.data && Array.isArray(data.data) ? data.data : []);
-
-      if (commentsList.length > 0) {
-        for (const comment of commentsList) {
-          allComments.push(comment);
-          // Also handle nested replies if they exist
-          if (comment.comments && Array.isArray(comment.comments.data)) {
-            allComments.push(...comment.comments.data);
-          }
+    if (!response.ok) {
+        let errorData;
+        try {
+            errorData = JSON.parse(responseText);
+        } catch(e) {
+            errorData = { error: { message: responseText }};
         }
-      }
-      
-      nextUrl = (data.paging && data.paging.next) ? data.paging.next : null;
+        const errorMessage = errorData?.error?.message || `Yêu cầu API thất bại với mã trạng thái ${response.status}.`;
+        throw new Error(errorMessage);
     }
 
-    // Step 3: Clear old data for this post from actual_comments table
-    const { error: deleteError } = await supabaseAdmin
-      .from('actual_comments')
-      .delete()
-      .eq('post_id', internalPostId);
-
-    if (deleteError) {
-      throw new Error(`Không thể dọn dẹp dữ liệu cũ: ${deleteError.message}`);
-    }
-
-    // Step 4: Insert new data into actual_comments table
-    if (allComments.length > 0) {
-      const commentsToInsert = allComments.map(comment => ({
-        post_id: internalPostId,
-        message: comment.message,
-        account_name: comment.from?.name,
-        account_id: comment.from?.id,
-        comment_link: comment.permalink_url,
-        created_time: comment.created_time,
-      }));
-
-      const { error: insertError } = await supabaseAdmin
-        .from('actual_comments')
-        .insert(commentsToInsert);
-
-      if (insertError) {
-        throw new Error(`Không thể lưu dữ liệu mới: ${insertError.message}`);
-      }
-    }
-
-    // Step 5: Log the successful operation
-    await supabaseAdmin.from('seeding_api_logs').insert({
-        post_id: internalPostId,
-        raw_response: JSON.stringify({ count: allComments.length, message: "Data fetched and stored successfully." }),
-        status: 'success'
-    });
-
-    return new Response(JSON.stringify({ success: true, message: `Đã lấy và lưu trữ ${allComments.length} bình luận.` }), {
+    return new Response(JSON.stringify({ rawResponse: responseText, requestUrl }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
 
   } catch (error) {
-    await supabaseAdmin.from('seeding_api_logs').insert({
-        post_id: internalPostId,
-        raw_response: JSON.stringify({ error: error.message }),
-        status: 'error',
-        error_message: error.message
-    });
-
     console.error('Error in get-fb-comments function:', error.message);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: error.message, requestUrl }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     });
