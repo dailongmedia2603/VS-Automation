@@ -7,7 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Helper to parse frequency string like "1_hour" into milliseconds
 const parseFrequency = (freq) => {
   if (!freq) return null;
   const [value, unit] = freq.split('_');
@@ -33,13 +32,12 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // 1. Get all active post_approval posts that need checking
     const { data: posts, error: fetchError } = await supabaseAdmin
       .from('seeding_posts')
       .select('id, links, check_frequency, last_checked_at')
       .eq('is_active', true)
       .eq('status', 'checking')
-      .eq('type', 'post_approval'); // Filter specifically for post_approval
+      .eq('type', 'post_approval');
 
     if (fetchError) throw new Error(`Failed to fetch posts: ${fetchError.message}`);
 
@@ -48,11 +46,10 @@ serve(async (req) => {
 
     for (const post of posts) {
       const interval = parseFrequency(post.check_frequency);
-      if (!interval) continue; // Skip if frequency is invalid
+      if (!interval) continue;
 
       const lastChecked = post.last_checked_at ? new Date(post.last_checked_at) : null;
 
-      // Check if it's time to run
       if (!lastChecked || (now.getTime() - lastChecked.getTime()) >= interval) {
         postsToCheck.push(post);
       }
@@ -65,17 +62,23 @@ serve(async (req) => {
       });
     }
 
-    // 2. Trigger checks for due posts in parallel
     const checkPromises = postsToCheck.map(async (post) => {
       try {
         console.log(`Checking post approval for post ID: ${post.id}`);
         
-        // Update last_checked_at immediately to prevent race conditions
-        await supabaseAdmin.from('seeding_posts').update({ last_checked_at: now.toISOString() }).eq('id', post.id);
+        // 1. Lấy thời gian kiểm tra cuối cùng, nếu không có thì lấy 5 ngày trước làm mặc định
+        const sinceDate = post.last_checked_at ? new Date(post.last_checked_at) : new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
+        const untilDate = now;
 
-        // Invoke the checking process (chain of functions)
+        // 2. Tạo chuỗi thời gian động
+        const timeCheckString = `&since=${sinceDate.toISOString()}&until=${untilDate.toISOString()}`;
+        
+        // 3. Cập nhật last_checked_at ngay lập tức
+        await supabaseAdmin.from('seeding_posts').update({ last_checked_at: untilDate.toISOString() }).eq('id', post.id);
+
+        // 4. Gọi các function tiếp theo với chuỗi thời gian động
         const { data: fetchData, error: fetchError } = await supabaseAdmin.functions.invoke('get-fb-duyetpost', {
-          body: { postId: post.id }
+          body: { postId: post.id, timeCheckString }
         });
         if (fetchError || (fetchData && fetchData.error)) throw new Error(fetchError?.message || fetchData?.error);
 
