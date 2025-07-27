@@ -6,7 +6,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, MessageSquare, FileCheck2, ChevronRight, ArrowLeft, Edit, Trash2, Loader2, Check, CheckCircle } from 'lucide-react';
+import { PlusCircle, MessageSquare, FileCheck2, ChevronRight, ArrowLeft, Edit, Trash2, Loader2, Check, CheckCircle, UploadCloud } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { CommentCheckDetail } from '@/components/seeding/CommentCheckDetail';
+import { ImportPostsDialog } from '@/components/seeding/ImportPostsDialog';
 
 type Project = {
   id: number;
@@ -60,6 +61,8 @@ const SeedingProjectDetail = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newPostData, setNewPostData] = useState(initialNewPostState);
   const [isSaving, setIsSaving] = useState(false);
+
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
 
   // State for auto-check settings
   const [autoCheckActive, setAutoCheckActive] = useState(false);
@@ -290,9 +293,15 @@ const SeedingProjectDetail = () => {
           <Link to="/check-seeding"><Button variant="outline" size="icon"><ArrowLeft className="h-4 w-4" /></Button></Link>
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">{project.name}</h1>
         </div>
-        <Button onClick={() => { setNewPostData(initialNewPostState); setIsAddDialogOpen(true); }} className="bg-blue-600 hover:bg-blue-700">
-          <PlusCircle className="mr-2 h-4 w-4" />Thêm Post
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}>
+            <UploadCloud className="mr-2 h-4 w-4" />
+            Import
+          </Button>
+          <Button onClick={() => { setNewPostData(initialNewPostState); setIsAddDialogOpen(true); }} className="bg-blue-600 hover:bg-blue-700">
+            <PlusCircle className="mr-2 h-4 w-4" />Thêm Post
+          </Button>
+        </div>
       </div>
 
       <ResizablePanelGroup direction="horizontal" className="flex-1 rounded-2xl border bg-white shadow-sm overflow-hidden">
@@ -348,6 +357,16 @@ const SeedingProjectDetail = () => {
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>
+
+      <ImportPostsDialog 
+        isOpen={isImportDialogOpen} 
+        onOpenChange={setIsImportDialogOpen}
+        projectId={projectId}
+        onSuccess={() => {
+          setIsImportDialogOpen(false);
+          fetchProjectData();
+        }}
+      />
 
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent className="sm:max-w-lg">
