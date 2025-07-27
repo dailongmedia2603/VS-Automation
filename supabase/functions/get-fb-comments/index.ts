@@ -71,15 +71,23 @@ serve(async (req) => {
       allRawResponses.push(data);
 
       if (Array.isArray(data.data)) {
-        allComments.push(...data.data);
+        // Iterate through top-level comments
+        for (const comment of data.data) {
+          // Add the top-level comment itself
+          allComments.push(comment);
+          
+          // Check for and add replies
+          if (comment.comments && Array.isArray(comment.comments.data)) {
+            allComments.push(...comment.comments.data);
+            // Note: This doesn't handle pagination within replies yet, but it's a critical first step.
+          }
+        }
       }
 
       // **SAFE PAGINATION LOGIC**
-      // Explicitly check for the 'next' property in the 'paging' object
       if (data.paging && data.paging.next) {
         nextUrl = data.paging.next;
       } else {
-        // If 'paging' or 'next' does not exist, explicitly end the loop
         nextUrl = null; 
       }
     }

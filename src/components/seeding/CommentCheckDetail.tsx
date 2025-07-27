@@ -112,8 +112,14 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
       const updates = [];
       let foundCount = 0;
 
+      // Normalization function for more robust matching
+      const normalizeString = (str: string) => str.trim().toLowerCase();
+
       for (const expectedComment of comments) {
-        const foundFbComment = actualComments.find(actual => actual.message && actual.message.trim() === expectedComment.content.trim());
+        const normalizedExpectedContent = normalizeString(expectedComment.content);
+        const foundFbComment = actualComments.find(actual => 
+          actual.message && normalizeString(actual.message) === normalizedExpectedContent
+        );
         
         if (foundFbComment) {
           foundCount++;
