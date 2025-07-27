@@ -19,7 +19,7 @@ interface ImportPostsDialogProps {
 type ParsedRow = {
   post_name: string;
   post_type: 'comment_check' | 'post_approval';
-  post_links: string;
+  id_list: string;
   post_content?: string;
   comment_content?: string;
 };
@@ -46,21 +46,14 @@ export const ImportPostsDialog = ({ isOpen, onOpenChange, projectId, onSuccess }
       {
         post_name: 'Bài Viết Mẫu 1 (Check Comment)',
         post_type: 'comment_check',
-        post_links: '123456789012345',
+        id_list: '123456789012345 (ID bài viết)',
         post_content: '',
-        comment_content: 'Comment mẫu 1 cho bài viết 1',
-      },
-      {
-        post_name: 'Bài Viết Mẫu 1 (Check Comment)',
-        post_type: 'comment_check',
-        post_links: '123456789012345',
-        post_content: '',
-        comment_content: 'Comment mẫu 2 cho bài viết 1',
+        comment_content: 'Comment mẫu 1 cho bài viết 1\nComment mẫu 2 cho bài viết 1',
       },
       {
         post_name: 'Bài Viết Mẫu 2 (Check Duyệt Post)',
         post_type: 'post_approval',
-        post_links: 'group_id_1,group_id_2',
+        id_list: 'group_id_1\ngroup_id_2 (mỗi ID group 1 dòng)',
         post_content: 'Đây là nội dung của bài viết cần duyệt.',
         comment_content: '',
       },
@@ -91,10 +84,10 @@ export const ImportPostsDialog = ({ isOpen, onOpenChange, projectId, onSuccess }
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
         
-        const requiredFields = ['post_name', 'post_type', 'post_links'];
+        const requiredFields = ['post_name', 'post_type', 'id_list'];
         const firstRow = jsonData[0] || {};
         if (!requiredFields.every(field => field in firstRow)) {
-          throw new Error("File Excel thiếu các cột bắt buộc: post_name, post_type, post_links.");
+          throw new Error("File Excel thiếu các cột bắt buộc: post_name, post_type, id_list.");
         }
 
         setParsedData(jsonData as ParsedRow[]);
@@ -121,13 +114,13 @@ export const ImportPostsDialog = ({ isOpen, onOpenChange, projectId, onSuccess }
         acc[postName] = {
           name: postName,
           type: row.post_type,
-          links: row.post_links,
+          links: row.id_list,
           content: row.post_content,
           comments: [],
         };
       }
       if (row.comment_content?.trim()) {
-        acc[postName].comments.push(row.comment_content.trim());
+        acc[postName].comments.push(...row.comment_content.trim().split('\n'));
       }
       return acc;
     }, {} as Record<string, { name: string; type: string; links: string; content?: string; comments: string[] }>);
@@ -155,13 +148,29 @@ export const ImportPostsDialog = ({ isOpen, onOpenChange, projectId, onSuccess }
           .single();
         if (postError) throw postError;
 
-        if (newPost && postData.comments.length > 0) {
-          const commentsToInsert = postData.comments.map(commentContent => ({
-            post_id: newPost.id,
-            content: commentContent,
-          }));
-          const { error: commentsError } = await supabase.from('seeding_comments').insert(commentsToInsert);
-          if (commentsError) throw commentsError;
+        if (newPost) {
+          // Handle comments for 'comment_check'
+          if (postData.type === 'comment_check' && postData.comments.length > 0) {
+            const commentsToInsert = postData.comments.map(commentContent => ({
+              post_id: newPost.id,
+              content: commentContent.trim(),
+            }));
+            const { error: commentsError } = await supabase.from('seeding_comments').insert(commentsToInsert);
+            if (commentsError) throw commentsError;
+          }
+
+          // Handle group IDs for 'post_approval'
+          if (postData.type === 'post_approval' && postData.links) {
+            const groupIds = postData.links.toString().split('\n').map(id => id.trim()).filter(id => id);
+            if (groupIds.length > 0) {
+              const groupsToInsert = groupIds.map(groupId => ({
+                post_id: newPost.id,
+                group_id: groupId,
+              }));
+              const { error: groupsError } = await supabase.from('seeding_groups').insert(groupsToInsert);
+              if (groupsError) throw groupsError;
+            }
+          }
         }
         successCount++;
       } catch (error: any) {
