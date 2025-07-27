@@ -17,9 +17,15 @@ serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
 
-  const { postId } = await req.json();
-  if (!postId) {
-    return new Response(JSON.stringify({ error: "ID bài viết là bắt buộc." }), {
+  const { fbPostId, internalPostId } = await req.json();
+  if (!fbPostId) {
+    return new Response(JSON.stringify({ error: "ID bài viết Facebook là bắt buộc." }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 400,
+    });
+  }
+  if (!internalPostId) {
+    return new Response(JSON.stringify({ error: "ID bài viết nội bộ là bắt buộc." }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
     });
@@ -43,7 +49,7 @@ serve(async (req) => {
         throw new Error("Chưa cấu hình URL cho tính năng Check Comment. Vui lòng vào trang Cài đặt.");
     }
 
-    let initialEndpoint = commentCheckTemplate.replace(/{postId}/g, postId);
+    let initialEndpoint = commentCheckTemplate.replace(/{postId}/g, fbPostId);
     if (!initialEndpoint.includes('access_token=') && dbAccessToken) {
         initialEndpoint += (initialEndpoint.includes('?') ? '&' : '?') + `access_token=${dbAccessToken}`;
     }
@@ -77,12 +83,11 @@ serve(async (req) => {
 
     const responseData = {
         data: allComments,
-        log: { requestUrl: initialEndpoint }
+        log: { requestUrl: initialEndpoint, rawResponse: JSON.stringify(allComments, null, 2) }
     };
     
-    // Log the successful response to the new table
     await supabaseAdmin.from('seeding_api_logs').insert({
-        post_id: postId,
+        post_id: internalPostId,
         raw_response: JSON.stringify(allComments, null, 2),
         status: 'success'
     });
@@ -93,9 +98,8 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    // Log the error to the new table
     await supabaseAdmin.from('seeding_api_logs').insert({
-        post_id: postId,
+        post_id: internalPostId,
         raw_response: JSON.stringify({ error: error.message }),
         status: 'error',
         error_message: error.message

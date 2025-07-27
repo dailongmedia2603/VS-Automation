@@ -99,7 +99,10 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
 
     try {
       const { data: fbData, error: functionError } = await supabase.functions.invoke('get-fb-comments', {
-        body: { postId: post.links }
+        body: { 
+          fbPostId: post.links,
+          internalPostId: post.id 
+        }
       });
 
       if (functionError) throw functionError;
@@ -112,21 +115,17 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
       const updates = [];
       let foundCount = 0;
 
-      // **ULTRA-ROBUST NORMALIZATION FUNCTION**
-      // Normalizes Unicode, converts to lowercase, and removes ALL punctuation and whitespace
-      // to create a "fingerprint" of the text for comparison.
       const normalizeString = (str: string) => {
         if (!str) return '';
         return str
           .normalize('NFC')
           .toLowerCase()
-          .replace(/[\s\p{P}]/gu, ''); // Removes whitespace and all Unicode punctuation
+          .replace(/[\s\p{P}]/gu, '');
       };
 
       for (const expectedComment of comments) {
         const normalizedExpectedContent = normalizeString(expectedComment.content);
         
-        // Find using "includes" on the hyper-normalized strings
         const foundFbComment = actualComments.find(actual => 
           actual.message && normalizeString(actual.message).includes(normalizedExpectedContent)
         );
