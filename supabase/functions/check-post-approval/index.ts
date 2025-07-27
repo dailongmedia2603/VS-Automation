@@ -35,12 +35,19 @@ serve(async (req) => {
     if (postError) throw new Error(`Failed to fetch post content: ${postError.message}`);
     if (!post.content) throw new Error("Post has no content to check.");
 
-    const { data: fbSettings, error: settingsError } = await supabaseAdmin.from('apifb_settings').select('api_url, api_key').eq('id', 1).single();
-    if (settingsError || !fbSettings || !fbSettings.api_url || !fbSettings.api_key) {
+    // Fetch url_templates and api_key from settings
+    const { data: fbSettings, error: settingsError } = await supabaseAdmin.from('apifb_settings').select('url_templates, api_key').eq('id', 1).single();
+    if (settingsError || !fbSettings) {
       throw new Error("Facebook API settings are not configured.");
     }
 
-    const { api_url: apiUrl, api_key: accessToken } = fbSettings;
+    const { url_templates: urlTemplates, api_key: accessToken } = fbSettings;
+    const postApprovalTemplate = urlTemplates?.post_approval;
+
+    if (!postApprovalTemplate) {
+        throw new Error("Chưa cấu hình URL cho tính năng Check Duyệt Post trong Cài đặt.");
+    }
+
     const normalizedPostContent = normalizeString(post.content);
 
     const { data: groups, error: groupsError } = await supabaseAdmin.from('seeding_groups').select('id, group_id').eq('post_id', postId);
@@ -48,7 +55,15 @@ serve(async (req) => {
 
     for (const group of groups) {
       const groupId = group.group_id;
-      const feedUrl = `${apiUrl}/${groupId}/feed?fields=message,permalink_url&limit=100&access_token=${accessToken}`;
+      
+      // Construct the URL from the template
+      let feedUrl = postApprovalTemplate.replace(/{group-id}/g, groupId);
+
+      // Ensure access token is present if not already in the template
+      if (!feedUrl.includes('access_token=') && accessToken) {
+        const separator = feedUrl.includes('?') ? '&' : '?';
+        feedUrl += `${separator}access_token=${accessToken}`;
+      }
       
       try {
         const response = await fetch(feedUrl);
@@ -69,8 +84,10 @@ serve(async (req) => {
               checked_at: new Date().toISOString()
             }).eq('id', group.id);
           } else {
+            // If not found, just update the checked_at timestamp and ensure status is correct
             await supabaseAdmin.from('seeding_groups').update({
-              checked_at: new Date().toISOString()
+              checked_at: new Date().toISOString(),
+              status: 'not_found'
             }).eq('id', group.id);
           }
         }
