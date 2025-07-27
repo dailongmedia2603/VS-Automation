@@ -32,18 +32,20 @@ serve(async (req) => {
 
   try {
     // Step 1: Fetch expected comments (from seeding_comments)
-    const { data: expectedComments, error: expectedError } = await supabaseAdmin
+    const { data: expectedCommentsData, error: expectedError } = await supabaseAdmin
       .from('seeding_comments')
       .select('*')
       .eq('post_id', postId);
     if (expectedError) throw new Error(`Lỗi lấy comment dự kiến: ${expectedError.message}`);
+    const expectedComments = expectedCommentsData || []; // Handle null case
 
     // Step 2: Fetch actual comments (from actual_comments)
-    const { data: actualComments, error: actualError } = await supabaseAdmin
+    const { data: actualCommentsData, error: actualError } = await supabaseAdmin
       .from('actual_comments')
       .select('*')
       .eq('post_id', postId);
     if (actualError) throw new Error(`Lỗi lấy comment thực tế: ${actualError.message}`);
+    const actualComments = actualCommentsData || []; // Handle null case
 
     // Step 3: Perform comparison
     const updates = [];
