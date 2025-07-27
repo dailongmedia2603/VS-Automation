@@ -41,8 +41,8 @@ serve(async (req) => {
     if (!post.content) throw new Error("Bài viết không có nội dung để so sánh.");
     const normalizedPostContent = normalizeString(post.content);
 
-    // 2. Get all groups for this post
-    const { data: groups, error: groupsError } = await supabaseAdmin.from('seeding_groups').select('id, group_id').eq('post_id', postId);
+    // 2. Get all groups for this post, including their current status
+    const { data: groups, error: groupsError } = await supabaseAdmin.from('seeding_groups').select('id, group_id, status').eq('post_id', postId);
     if (groupsError) throw new Error(`Lỗi lấy danh sách group: ${groupsError.message}`);
 
     // 3. Get all actual posts from the new table
@@ -61,10 +61,13 @@ serve(async (req) => {
           checked_at: new Date().toISOString()
         }).eq('id', group.id);
       } else {
-        await supabaseAdmin.from('seeding_groups').update({
-          status: 'not_found',
-          checked_at: new Date().toISOString()
-        }).eq('id', group.id);
+        // Only update to 'not_found' if it's not already 'approved'
+        if (group.status !== 'approved') {
+          await supabaseAdmin.from('seeding_groups').update({
+            status: 'not_found',
+            checked_at: new Date().toISOString()
+          }).eq('id', group.id);
+        }
       }
     }
 
