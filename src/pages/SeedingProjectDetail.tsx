@@ -312,9 +312,12 @@ const SeedingProjectDetail = () => {
         </ResizablePanel>
         <ResizableHandle withHandle />
         <ResizablePanel defaultSize={75}>
-          <div className="flex h-full items-center justify-center p-6">
+          <div className={cn(
+            "h-full p-6",
+            selectedPost ? "overflow-y-auto" : "flex items-center justify-center"
+          )}>
             {selectedPost ? (
-              <div className="w-full h-full flex flex-col gap-6">
+              <div className="w-full flex flex-col gap-6">
                 {selectedPost.type === 'comment_check' ? (
                   <CommentCheckDetail
                     post={selectedPost}
