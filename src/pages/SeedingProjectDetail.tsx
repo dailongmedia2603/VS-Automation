@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { CommentCheckDetail } from '@/components/seeding/CommentCheckDetail';
+import { PostApprovalDetail } from '@/components/seeding/PostApprovalDetail';
 import { ImportPostsDialog } from '@/components/seeding/ImportPostsDialog';
 
 type Project = {
@@ -179,7 +180,7 @@ const SeedingProjectDetail = () => {
         type: newPostData.type,
         is_active: newPostData.is_active,
         links: newPostData.links,
-        content: newPostData.type === 'post_approval' ? newPostData.content : null,
+        content: newPostData.content,
         check_frequency: `${newPostData.check_frequency.split('_')[0]}_${newPostData.check_frequency.split('_')[1] || 'hour'}`,
       };
 
@@ -205,6 +206,24 @@ const SeedingProjectDetail = () => {
             .from('seeding_comments')
             .insert(commentsToInsert);
           if (commentsError) throw commentsError;
+        }
+      }
+
+      if (newPostData.type === 'post_approval' && newPostData.links.trim()) {
+        const groupsToInsert = newPostData.links
+          .split('\n')
+          .map(line => line.trim())
+          .filter(line => line !== '')
+          .map(groupId => ({
+            post_id: newPost.id,
+            group_id: groupId,
+          }));
+        
+        if (groupsToInsert.length > 0) {
+          const { error: groupsError } = await supabase
+            .from('seeding_groups')
+            .insert(groupsToInsert);
+          if (groupsError) throw groupsError;
         }
       }
       
@@ -345,8 +364,21 @@ const SeedingProjectDetail = () => {
                     onSaveSettings={handleSaveAutoCheckSettings}
                     onCheckComplete={fetchProjectData}
                   />
+                ) : selectedPost.type === 'post_approval' ? (
+                  <PostApprovalDetail
+                    project={project}
+                    post={selectedPost}
+                    autoCheckActive={autoCheckActive}
+                    onAutoCheckChange={setAutoCheckActive}
+                    frequencyValue={frequencyValue}
+                    onFrequencyValueChange={setFrequencyValue}
+                    frequencyUnit={frequencyUnit}
+                    onFrequencyUnitChange={setFrequencyUnit}
+                    onSaveSettings={handleSaveAutoCheckSettings}
+                    onCheckComplete={fetchProjectData}
+                  />
                 ) : (
-                  <div className="flex-1">Chức năng Check duyệt post đang được phát triển.</div>
+                  <div className="flex-1">Loại post không được hỗ trợ.</div>
                 )}
               </div>
             ) : (
@@ -410,29 +442,18 @@ const SeedingProjectDetail = () => {
             {newPostData.type === 'post_approval' && (
               <div className="space-y-4 p-4 border rounded-lg bg-slate-50">
                 <div className="space-y-2">
-                  <Label htmlFor="group-links">ID Group</Label>
-                  <Textarea id="group-links" placeholder="Mỗi ID một hàng" value={newPostData.links} onChange={(e) => setNewPostData(d => ({...d, links: e.target.value}))} />
+                  <Label htmlFor="group-links">ID Group (mỗi ID một dòng)</Label>
+                  <Textarea id="group-links" placeholder="12345..." value={newPostData.links} onChange={(e) => setNewPostData(d => ({...d, links: e.target.value}))} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="post-content">Nội dung bài viết</Label>
                   <Textarea id="post-content" value={newPostData.content} onChange={(e) => setNewPostData(d => ({...d, content: e.target.value}))} className="min-h-[120px]" />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="check-frequency">Tần suất check</Label>
-                  <Select value={newPostData.check_frequency} onValueChange={(v) => setNewPostData(d => ({...d, check_frequency: v}))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1_hour">1 giờ / lần</SelectItem>
-                      <SelectItem value="2_hour">2 giờ / lần</SelectItem>
-                      <SelectItem value="1_day">1 ngày / lần</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
               </div>
             )}
             
             <div className="flex items-center justify-between pt-2">
-              <Label htmlFor="is-active" className="font-medium">Kích hoạt</Label>
+              <Label htmlFor="is-active" className="font-medium">Kích hoạt tự động check</Label>
               <Switch id="is-active" checked={newPostData.is_active} onCheckedChange={(c) => setNewPostData(d => ({...d, is_active: c}))} />
             </div>
           </div>
