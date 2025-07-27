@@ -505,59 +505,63 @@ export const CommentCheckDetail = ({
                     </TableRow>
                   ))
                 ) : filteredComments.length > 0 ? (
-                  filteredComments.map((comment, index) => (
-                    <TableRow key={comment.id} className="hover:bg-slate-50">
-                      <TableCell className="font-medium text-slate-500">{index + 1}</TableCell>
-                      <TableCell className="max-w-xs break-words text-slate-700">{comment.content}</TableCell>
-                      <TableCell>
-                        <Badge className={cn(
-                          'pointer-events-none',
-                          comment.status === 'visible' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-amber-100 text-amber-800 border-amber-200'
-                        )}>
-                          {comment.status === 'visible' ? 'Đã hiện' : 'Chưa hiện'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-xs text-slate-500">
-                          <div className="flex items-center gap-1.5">
-                            <strong>Account:</strong>
-                            {comment.account_id && comment.account_name ? (
-                              <a href={`https://www.facebook.com/${comment.account_id}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium">
-                                {comment.account_name}
-                              </a>
-                            ) : (
-                              <span>{comment.account_name || 'N/A'}</span>
-                            )}
+                  filteredComments.map((comment, index) => {
+                    const hasDisappeared = comment.status === 'not_visible' && !!comment.account_name;
+                    return (
+                      <TableRow key={comment.id} className={cn('hover:bg-slate-50', hasDisappeared && 'bg-red-50 hover:bg-red-100')}>
+                        <TableCell className="font-medium text-slate-500">{index + 1}</TableCell>
+                        <TableCell className="max-w-xs break-words text-slate-700">{comment.content}</TableCell>
+                        <TableCell>
+                          <Badge className={cn(
+                            'pointer-events-none',
+                            comment.status === 'visible' ? 'bg-green-100 text-green-800 border-green-200' : 
+                            hasDisappeared ? 'bg-red-200 text-red-800 border-red-300' : 'bg-amber-100 text-amber-800 border-amber-200'
+                          )}>
+                            {comment.status === 'visible' ? 'Đã hiện' : 'Chưa hiện'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-xs text-slate-500">
+                            <div className="flex items-center gap-1.5">
+                              <strong>Account:</strong>
+                              {comment.account_id && comment.account_name ? (
+                                <a href={`https://www.facebook.com/${comment.account_id}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium">
+                                  {comment.account_name}
+                                </a>
+                              ) : (
+                                <span>{comment.account_name || 'N/A'}</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <strong>Link:</strong> 
+                              {comment.comment_link ? (
+                                <a href={comment.comment_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700" title={comment.comment_link}>
+                                  <LinkIcon className="h-3.5 w-3.5" />
+                                </a>
+                              ) : 'N/A'}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1.5">
-                            <strong>Link:</strong> 
-                            {comment.comment_link ? (
-                              <a href={comment.comment_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700" title={comment.comment_link}>
-                                <LinkIcon className="h-3.5 w-3.5" />
-                              </a>
-                            ) : 'N/A'}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleOpenEditDialog(comment)}>
-                              <Edit className="mr-2 h-4 w-4" />
-                              Sửa
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleOpenDeleteAlert(comment)} className="text-destructive">
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Xóa
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleOpenEditDialog(comment)}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Sửa
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleOpenDeleteAlert(comment)} className="text-destructive">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Xóa
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
                 ) : (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center h-48 text-slate-500">

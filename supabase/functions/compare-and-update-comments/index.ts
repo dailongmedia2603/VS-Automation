@@ -74,14 +74,12 @@ serve(async (req) => {
           commented_at: foundFbComment.created_time,
         });
       } else {
+        // If comment was previously visible but now is not, only update status
+        // This preserves old data (account_name, etc.) for the UI to detect a "disappeared" comment
         if (expectedComment.status === 'visible') {
           updates.push({
             id: expectedComment.id,
             status: 'not_visible',
-            account_name: null,
-            comment_link: null,
-            account_id: null,
-            commented_at: null,
           });
         }
       }
