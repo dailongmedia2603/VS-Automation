@@ -131,7 +131,6 @@ export const CommentCheckDetail = ({ post, onPostUpdate }: CommentCheckDetailPro
     }
     setIsChecking(true);
     setCheckResult(null);
-    setLogData(null);
 
     try {
       const { data: fbData, error: functionError } = await supabase.functions.invoke('get-fb-comments', {
