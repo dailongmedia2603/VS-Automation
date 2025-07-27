@@ -25,18 +25,25 @@ serve(async (req) => {
 
     const { data: fbSettings, error: settingsError } = await supabaseAdmin
       .from('apifb_settings')
-      .select('api_url, api_key')
+      .select('url_templates, api_key')
       .eq('id', 1)
       .single();
 
-    if (settingsError || !fbSettings || !fbSettings.api_key) {
+    if (settingsError || !fbSettings || !fbSettings.api_key || !fbSettings.url_templates) {
       throw new Error("Không thể tải cấu hình API Facebook. Vui lòng kiểm tra trang Cài đặt.");
     }
 
-    const { api_url: apiUrl, api_key: accessToken } = fbSettings;
-    const finalApiUrl = apiUrl || 'http://api.akng.io.vn/graph';
-    const fields = 'message,from{id,name},permalink_url,created_time';
-    const initialEndpoint = `${finalApiUrl}/${postId}/comments?fields=${fields}&access_token=${accessToken}`;
+    const { url_templates: urlTemplates, api_key: accessToken } = fbSettings;
+    
+    const urlTemplate = urlTemplates.get_comments;
+    if (!urlTemplate) {
+        throw new Error("Chưa cấu hình URL cho tính năng 'Lấy bình luận' trong Cài đặt.");
+    }
+
+    // Replace placeholder and append access token
+    const baseUrl = urlTemplate.replace('{postId}', postId);
+    const separator = baseUrl.includes('?') ? '&' : '?';
+    const initialEndpoint = `${baseUrl}${separator}access_token=${accessToken}`;
 
     let allComments = [];
     let nextUrl = initialEndpoint;
