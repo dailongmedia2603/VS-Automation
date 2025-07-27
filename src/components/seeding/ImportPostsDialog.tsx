@@ -242,7 +242,7 @@ export const ImportPostsDialog = ({ isOpen, onOpenChange, projectId, onSuccess }
           <Button 
             onClick={handleImport} 
             disabled={isParsing || parsedData.length === 0 || isImporting}
-            className="bg-slate-900 hover:bg-slate-800"
+            className="bg-blue-600 hover:bg-blue-700"
           >
             {isImporting ? 'Đang xử lý...' : 'Bắt đầu Import'}
           </Button>
