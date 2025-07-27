@@ -9,16 +9,21 @@ import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, Download, MoreHorizontal, Link as LinkIcon, MessageCircle, Code, PlayCircle, CheckCircle2, XCircle, Loader2, FileText } from 'lucide-react';
+import { Search, Download, MoreHorizontal, Link as LinkIcon, MessageCircle, Code, PlayCircle, CheckCircle2, XCircle, Loader2, FileText, Save } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 
 type Post = {
   id: number;
   name: string;
   links: string | null;
   type: 'comment_check' | 'post_approval';
+  is_active: boolean;
+  check_frequency: string | null;
+  status: 'checking' | 'completed';
 };
 
 type Comment = {
@@ -53,9 +58,10 @@ interface LogData {
 
 interface CommentCheckDetailProps {
   post: Post;
+  onPostUpdate: () => void;
 }
 
-export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
+export const CommentCheckDetail = ({ post, onPostUpdate }: CommentCheckDetailProps) => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -64,6 +70,11 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
   const [checkResult, setCheckResult] = useState<CheckResult | null>(null);
   const [logData, setLogData] = useState<LogData | null>(null);
   const [isLogDialogOpen, setIsLogDialogOpen] = useState(false);
+
+  const [isActive, setIsActive] = useState(post.is_active);
+  const [checkInterval, setCheckInterval] = useState('1');
+  const [checkUnit, setCheckUnit] = useState('hours');
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
 
   const fetchComments = async () => {
     setIsLoading(true);
@@ -85,7 +96,33 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
     fetchComments();
     setCheckResult(null);
     setLogData(null);
-  }, [post.id]);
+    setIsActive(post.is_active);
+    if (post.check_frequency) {
+      const [interval, unit] = post.check_frequency.split('_');
+      setCheckInterval(interval || '1');
+      setCheckUnit(unit || 'hours');
+    } else {
+      setCheckInterval('1');
+      setCheckUnit('hours');
+    }
+  }, [post]);
+
+  const handleSettingsSave = async () => {
+    setIsSavingSettings(true);
+    const frequency = `${checkInterval}_${checkUnit}`;
+    const { error } = await supabase
+        .from('seeding_posts')
+        .update({ is_active: isActive, check_frequency: frequency })
+        .eq('id', post.id);
+    
+    if (error) {
+        showError("Lưu cài đặt thất bại: " + error.message);
+    } else {
+        showSuccess("Đã lưu cài đặt!");
+        onPostUpdate();
+    }
+    setIsSavingSettings(false);
+  };
 
   const handleRunCheck = async () => {
     if (!post.links) {
@@ -143,6 +180,12 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
       setCheckResult({ found: foundCount, notFound: total - foundCount, total });
       showSuccess(`Kiểm tra hoàn tất! Tìm thấy ${foundCount}/${total} bình luận.`);
       
+      const allVisible = foundCount === total && total > 0;
+      if (allVisible) {
+        await supabase.from('seeding_posts').update({ status: 'completed', is_active: false }).eq('id', post.id);
+      }
+      
+      onPostUpdate();
       fetchComments();
 
     } catch (error: any) {
@@ -183,40 +226,49 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
         </CardHeader>
         <CardContent className="flex-1 flex flex-col">
           <Card className="mb-4 bg-slate-50 border-slate-200">
-            <CardContent className="p-4 flex items-center justify-between">
-              <div>
-                <h3 className="font-semibold text-slate-800">Kiểm tra bình luận tự động</h3>
-                <p className="text-sm text-slate-500">Quét bài viết và cập nhật trạng thái các bình luận trong danh sách.</p>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-slate-800">Kiểm tra bình luận tự động</h3>
+                  <p className="text-sm text-slate-500">Quét bài viết và cập nhật trạng thái các bình luận trong danh sách.</p>
+                </div>
+                <div className="flex items-center gap-4">
+                  {checkResult && (
+                    <div className="flex items-center gap-4 text-sm">
+                      <div className="flex items-center gap-2 text-green-600"><CheckCircle2 className="h-5 w-5" /><div><p className="font-bold">{checkResult.found}</p><p className="text-xs text-slate-500">Đã hiện</p></div></div>
+                      <div className="flex items-center gap-2 text-amber-600"><XCircle className="h-5 w-5" /><div><p className="font-bold">{checkResult.notFound}</p><p className="text-xs text-slate-500">Chưa hiện</p></div></div>
+                    </div>
+                  )}
+                  {logData && (<Button variant="outline" size="sm" onClick={() => setIsLogDialogOpen(true)}><FileText className="mr-2 h-4 w-4" />Xem Log</Button>)}
+                  <Button onClick={handleRunCheck} disabled={isChecking} className="bg-blue-600 hover:bg-blue-700 rounded-lg">
+                    {isChecking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
+                    {isChecking ? 'Đang chạy...' : 'Chạy Check'}
+                  </Button>
+                </div>
               </div>
-              <div className="flex items-center gap-4">
-                {checkResult && (
-                  <div className="flex items-center gap-4 text-sm">
-                    <div className="flex items-center gap-2 text-green-600">
-                      <CheckCircle2 className="h-5 w-5" />
-                      <div>
-                        <p className="font-bold">{checkResult.found}</p>
-                        <p className="text-xs text-slate-500">Đã hiện</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 text-amber-600">
-                      <XCircle className="h-5 w-5" />
-                      <div>
-                        <p className="font-bold">{checkResult.notFound}</p>
-                        <p className="text-xs text-slate-500">Chưa hiện</p>
-                      </div>
-                    </div>
+              <div className="mt-4 pt-4 border-t border-slate-200 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="check-interval" className="text-sm font-medium">Quét lại sau mỗi</Label>
+                    <Input id="check-interval" type="number" value={checkInterval} onChange={(e) => setCheckInterval(e.target.value)} className="w-20 h-9" />
+                    <Select value={checkUnit} onValueChange={(v) => setCheckUnit(v)}>
+                      <SelectTrigger className="w-[100px] h-9"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="minutes">Phút</SelectItem>
+                        <SelectItem value="hours">Giờ</SelectItem>
+                        <SelectItem value="days">Ngày</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                )}
-                {logData && (
-                    <Button variant="outline" size="sm" onClick={() => setIsLogDialogOpen(true)}>
-                        <FileText className="mr-2 h-4 w-4" />
-                        Xem Log
-                    </Button>
-                )}
-                <Button onClick={handleRunCheck} disabled={isChecking} className="bg-blue-600 hover:bg-blue-700 rounded-lg">
-                  {isChecking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
-                  {isChecking ? 'Đang chạy...' : 'Chạy Check'}
-                </Button>
+                  <Button size="sm" onClick={handleSettingsSave} disabled={isSavingSettings}>
+                    {isSavingSettings ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                    Lưu
+                  </Button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="is-active" className="font-medium">{isActive ? 'Đang kích hoạt' : 'Đã tắt'}</Label>
+                  <Switch id="is-active" checked={isActive} onCheckedChange={setIsActive} />
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -227,19 +279,14 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
             </div>
             <div className="flex items-center gap-2">
               <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
-                <SelectTrigger className="w-[180px] rounded-lg">
-                  <SelectValue placeholder="Lọc trạng thái" />
-                </SelectTrigger>
+                <SelectTrigger className="w-[180px] rounded-lg"><SelectValue placeholder="Lọc trạng thái" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tất cả trạng thái</SelectItem>
                   <SelectItem value="visible">Đã hiện</SelectItem>
                   <SelectItem value="not_visible">Chưa hiện</SelectItem>
                 </SelectContent>
               </Select>
-              <Button variant="outline" className="rounded-lg">
-                <Download className="mr-2 h-4 w-4" />
-                Xuất Excel
-              </Button>
+              <Button variant="outline" className="rounded-lg"><Download className="mr-2 h-4 w-4" />Xuất Excel</Button>
             </div>
           </div>
           <div className="border rounded-lg overflow-auto flex-1">
@@ -255,64 +302,19 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  [...Array(5)].map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell><Skeleton className="h-5 w-5" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-full" /></TableCell>
-                      <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                      <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto rounded-md" /></TableCell>
-                    </TableRow>
-                  ))
+                  [...Array(5)].map((_, i) => (<TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell></TableRow>))
                 ) : filteredComments.length > 0 ? (
                   filteredComments.map((comment, index) => (
                     <TableRow key={comment.id} className="hover:bg-slate-50">
                       <TableCell className="font-medium text-slate-500">{index + 1}</TableCell>
                       <TableCell className="max-w-xs break-words text-slate-700">{comment.content}</TableCell>
-                      <TableCell>
-                        <Badge className={cn(
-                          'pointer-events-none',
-                          comment.status === 'visible' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-amber-100 text-amber-800 border-amber-200'
-                        )}>
-                          {comment.status === 'visible' ? 'Đã hiện' : 'Chưa hiện'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-xs text-slate-500">
-                          <p><strong>Account:</strong> {comment.account_name || 'N/A'}</p>
-                          <div className="flex items-center gap-1.5">
-                            <strong>Link:</strong> 
-                            {comment.comment_link ? (
-                              <a href={comment.comment_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700" title={comment.comment_link}>
-                                <LinkIcon className="h-3.5 w-3.5" />
-                              </a>
-                            ) : 'N/A'}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>Sửa</DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive">Xóa</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
+                      <TableCell><Badge className={cn('pointer-events-none', comment.status === 'visible' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-amber-100 text-amber-800 border-amber-200')}>{comment.status === 'visible' ? 'Đã hiện' : 'Chưa hiện'}</Badge></TableCell>
+                      <TableCell><div className="text-xs text-slate-500"><p><strong>Account:</strong> {comment.account_name || 'N/A'}</p><div className="flex items-center gap-1.5"><strong>Link:</strong> {comment.comment_link ? (<a href={comment.comment_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700" title={comment.comment_link}><LinkIcon className="h-3.5 w-3.5" /></a>) : 'N/A'}</div></div></TableCell>
+                      <TableCell className="text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem>Sửa</DropdownMenuItem><DropdownMenuItem className="text-destructive">Xóa</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell>
                     </TableRow>
                   ))
                 ) : (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center h-48 text-slate-500">
-                      <div className="flex flex-col items-center gap-2">
-                        <MessageCircle className="h-10 w-10 text-slate-400" />
-                        <span className="font-medium">Không có comment nào</span>
-                        <span className="text-xs">Hãy thử thêm comment mới hoặc thay đổi bộ lọc.</span>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                  <TableRow><TableCell colSpan={5} className="text-center h-48 text-slate-500"><div className="flex flex-col items-center gap-2"><MessageCircle className="h-10 w-10 text-slate-400" /><span className="font-medium">Không có comment nào</span><span className="text-xs">Hãy thử thêm comment mới hoặc thay đổi bộ lọc.</span></div></TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
@@ -321,31 +323,7 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
       </Card>
 
       <Dialog open={isLogDialogOpen} onOpenChange={setIsLogDialogOpen}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Nhật ký kiểm tra</DialogTitle>
-            <DialogDescription>
-              Chi tiết về yêu cầu đã gửi và phản hồi nhận được từ API.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <h3 className="font-semibold mb-2">URL đã gửi đi:</h3>
-              <div className="p-3 bg-slate-100 rounded-md text-slate-900 font-mono text-xs break-all">
-                {logData?.requestUrl}
-              </div>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-2">Kết quả thô trả về:</h3>
-              <ScrollArea className="h-64 w-full bg-slate-100 rounded-md border p-4">
-                <pre className="text-xs whitespace-pre-wrap break-all"><code>{JSON.stringify(JSON.parse(logData?.rawResponse || '{}'), null, 2)}</code></pre>
-              </ScrollArea>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button onClick={() => setIsLogDialogOpen(false)}>Đóng</Button>
-          </DialogFooter>
-        </DialogContent>
+        <DialogContent className="sm:max-w-2xl"><DialogHeader><DialogTitle>Nhật ký kiểm tra</DialogTitle><DialogDescription>Chi tiết về yêu cầu đã gửi và phản hồi nhận được từ API.</DialogDescription></DialogHeader><div className="space-y-4 py-4"><div><h3 className="font-semibold mb-2">URL đã gửi đi:</h3><div className="p-3 bg-slate-100 rounded-md text-slate-900 font-mono text-xs break-all">{logData?.requestUrl}</div></div><div><h3 className="font-semibold mb-2">Kết quả thô trả về:</h3><ScrollArea className="h-64 w-full bg-slate-100 rounded-md border p-4"><pre className="text-xs whitespace-pre-wrap break-all"><code>{JSON.stringify(JSON.parse(logData?.rawResponse || '{}'), null, 2)}</code></pre></ScrollArea></div></div><DialogFooter><Button onClick={() => setIsLogDialogOpen(false)}>Đóng</Button></DialogFooter></DialogContent>
       </Dialog>
     </>
   );
