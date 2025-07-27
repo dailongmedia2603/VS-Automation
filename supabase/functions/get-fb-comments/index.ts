@@ -50,18 +50,21 @@ serve(async (req) => {
         }
     }
 
-    let allComments = [];
-    let allRawResponses = [];
+    const allComments = [];
+    const allRawResponses = [];
     let nextUrl = initialEndpoint;
+    let safetyCounter = 0;
+    const MAX_PAGES = 20; // Safety limit to prevent infinite loops
 
-    // Loop to handle pagination
-    while (nextUrl) {
+    while (nextUrl && safetyCounter < MAX_PAGES) {
+      safetyCounter++;
+      
       const response = await fetch(nextUrl);
       const rawResponse = await response.text();
       const data = JSON.parse(rawResponse);
 
       if (!response.ok) {
-        const errorMessage = data?.error?.message || `Yêu cầu API thất bại với mã trạng thái ${response.status}.`;
+        const errorMessage = data?.error?.message || `Yêu cầu API thất bại ở trang ${safetyCounter} với mã trạng thái ${response.status}.`;
         throw new Error(errorMessage);
       }
       
@@ -71,15 +74,19 @@ serve(async (req) => {
         allComments.push(...data.data);
       }
 
-      // Check for the next page link and update the URL for the next loop iteration
-      nextUrl = data.paging?.next || null;
+      // Explicitly check for the 'next' property in the 'paging' object
+      if (data.paging && data.paging.next) {
+        nextUrl = data.paging.next;
+      } else {
+        nextUrl = null; // End the loop if 'next' is not present
+      }
     }
 
     const responseData = {
         data: allComments,
         log: {
             requestUrl: initialEndpoint,
-            rawResponse: JSON.stringify(allRawResponses, null, 2), // Log all responses
+            rawResponse: JSON.stringify(allRawResponses, null, 2),
         }
     };
 
