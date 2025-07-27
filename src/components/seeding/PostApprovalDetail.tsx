@@ -365,10 +365,10 @@ export const PostApprovalDetail = ({
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="end">
-                        <div className="p-2 border-b flex flex-col items-start">
-                          <Button variant="link" className="h-auto p-1" onClick={() => { setDateRange({ from: new Date(), to: new Date() }); setDatePickerOpen(false); }}>Hôm nay</Button>
-                          <Button variant="link" className="h-auto p-1" onClick={() => { setDateRange({ from: subDays(new Date(), 2), to: new Date() }); setDatePickerOpen(false); }}>3 ngày qua</Button>
-                          <Button variant="link" className="h-auto p-1" onClick={() => { setDateRange({ from: subDays(new Date(), 4), to: new Date() }); setDatePickerOpen(false); }}>5 ngày qua</Button>
+                        <div className="p-3 flex flex-col items-start space-y-1">
+                          <Button variant="ghost" className="w-full justify-start font-normal h-auto p-2 text-sm" onClick={() => { setDateRange({ from: new Date(), to: new Date() }); setDatePickerOpen(false); }}>Hôm nay</Button>
+                          <Button variant="ghost" className="w-full justify-start font-normal h-auto p-2 text-sm" onClick={() => { setDateRange({ from: subDays(new Date(), 2), to: new Date() }); setDatePickerOpen(false); }}>3 ngày qua</Button>
+                          <Button variant="ghost" className="w-full justify-start font-normal h-auto p-2 text-sm" onClick={() => { setDateRange({ from: subDays(new Date(), 4), to: new Date() }); setDatePickerOpen(false); }}>5 ngày qua</Button>
                         </div>
                         <Calendar
                           initialFocus
