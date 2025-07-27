@@ -204,6 +204,14 @@ export const CommentCheckDetail = ({ post, onPostUpdate }: CommentCheckDetailPro
     }
   };
 
+  const handleViewLog = () => {
+    if (logData) {
+      setIsLogDialogOpen(true);
+    } else {
+      showError("Chưa có log để xem. Vui lòng chạy check trước.");
+    }
+  };
+
   const filteredComments = useMemo(() => {
     return comments.filter(comment => {
       if (statusFilter !== 'all' && comment.status !== statusFilter) return false;
@@ -247,7 +255,7 @@ export const CommentCheckDetail = ({ post, onPostUpdate }: CommentCheckDetailPro
                       <div className="flex items-center gap-2 text-amber-600"><XCircle className="h-5 w-5" /><div><p className="font-bold">{checkResult.notFound}</p><p className="text-xs text-slate-500">Chưa hiện</p></div></div>
                     </div>
                   )}
-                  {logData && (<Button variant="outline" size="sm" onClick={() => setIsLogDialogOpen(true)}><FileText className="mr-2 h-4 w-4" />Xem Log</Button>)}
+                  <Button variant="outline" size="sm" onClick={handleViewLog}><FileText className="mr-2 h-4 w-4" />Xem Log</Button>
                   <Button onClick={handleRunCheck} disabled={isChecking} className="bg-blue-600 hover:bg-blue-700 rounded-lg">
                     {isChecking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
                     {isChecking ? 'Đang chạy...' : 'Chạy Check'}
