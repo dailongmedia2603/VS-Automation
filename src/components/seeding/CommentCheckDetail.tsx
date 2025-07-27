@@ -9,13 +9,14 @@ import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, Download, MoreHorizontal, Link as LinkIcon, MessageCircle, Code, PlayCircle, CheckCircle2, XCircle, Loader2, FileText, Settings } from 'lucide-react';
+import { Search, Download, MoreHorizontal, Link as LinkIcon, MessageCircle, Code, PlayCircle, CheckCircle2, XCircle, Loader2, FileText, Settings, PlusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 
 type Post = {
   id: number;
@@ -135,6 +136,10 @@ export const CommentCheckDetail = ({
   const [checkResult, setCheckResult] = useState<CheckResult | null>(null);
   const [log, setLog] = useState<ErrorLog | null>(null);
   const [isLogOpen, setIsLogOpen] = useState(false);
+  
+  const [isAddCommentDialogOpen, setIsAddCommentDialogOpen] = useState(false);
+  const [newCommentsText, setNewCommentsText] = useState('');
+  const [isSavingComments, setIsSavingComments] = useState(false);
 
   const fetchComments = async () => {
     setIsLoading(true);
@@ -223,6 +228,41 @@ export const CommentCheckDetail = ({
     } finally {
       setIsChecking(false);
     }
+  };
+
+  const handleSaveNewComments = async () => {
+    if (!newCommentsText.trim()) {
+        showError("Vui lòng nhập ít nhất một comment.");
+        return;
+    }
+    setIsSavingComments(true);
+
+    const commentsToInsert = newCommentsText
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line !== '')
+        .map(content => ({
+            post_id: post.id,
+            content: content,
+        }));
+
+    if (commentsToInsert.length === 0) {
+        showError("Không có comment hợp lệ để thêm.");
+        setIsSavingComments(false);
+        return;
+    }
+
+    const { error } = await supabase.from('seeding_comments').insert(commentsToInsert);
+
+    if (error) {
+        showError("Thêm comment thất bại: " + error.message);
+    } else {
+        showSuccess(`Đã thêm thành công ${commentsToInsert.length} comment!`);
+        setIsAddCommentDialogOpen(false);
+        setNewCommentsText('');
+        fetchComments(); // Refresh the list
+    }
+    setIsSavingComments(false);
   };
 
   const filteredComments = useMemo(() => {
@@ -349,6 +389,10 @@ export const CommentCheckDetail = ({
                 <Download className="mr-2 h-4 w-4" />
                 Xuất Excel
               </Button>
+              <Button onClick={() => setIsAddCommentDialogOpen(true)} className="rounded-lg">
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Thêm comment
+              </Button>
             </div>
           </div>
           <div className="border rounded-lg overflow-auto flex-1">
@@ -438,6 +482,31 @@ export const CommentCheckDetail = ({
         </CardContent>
       </Card>
       <LogDialog isOpen={isLogOpen} onOpenChange={setIsLogOpen} log={log} isError={log?.errorMessage !== 'Không có lỗi'} />
+      <Dialog open={isAddCommentDialogOpen} onOpenChange={setIsAddCommentDialogOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Thêm comment mới</DialogTitle>
+                <DialogDescription>
+                    Nhập danh sách các comment, mỗi comment trên một dòng.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+                <Textarea
+                    placeholder="Comment 1..."
+                    value={newCommentsText}
+                    onChange={(e) => setNewCommentsText(e.target.value)}
+                    className="min-h-[200px]"
+                />
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsAddCommentDialogOpen(false)}>Hủy</Button>
+                <Button onClick={handleSaveNewComments} disabled={isSavingComments}>
+                    {isSavingComments && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Lưu
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };
