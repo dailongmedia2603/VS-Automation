@@ -57,6 +57,7 @@ interface CommentCheckDetailProps {
   frequencyUnit: string;
   onFrequencyUnitChange: (unit: string) => void;
   onSaveSettings: () => void;
+  onCheckComplete: () => void;
 }
 
 const LogDialog = ({ isOpen, onOpenChange, log, isError }: { isOpen: boolean, onOpenChange: (open: boolean) => void, log: ErrorLog | null, isError: boolean }) => {
@@ -127,7 +128,8 @@ export const CommentCheckDetail = ({
   onFrequencyValueChange,
   frequencyUnit,
   onFrequencyUnitChange,
-  onSaveSettings
+  onSaveSettings,
+  onCheckComplete
 }: CommentCheckDetailProps) => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -221,7 +223,7 @@ export const CommentCheckDetail = ({
       dismissToast(toastId);
       setCheckResult(compareResult);
       showSuccess(`Kiểm tra hoàn tất! Tìm thấy ${compareResult.found}/${compareResult.total} bình luận.`);
-      fetchComments();
+      onCheckComplete(); // Notify parent to refetch all data
 
     } catch (e: any) {
       if (toastId) dismissToast(toastId);

@@ -235,9 +235,12 @@ const SeedingProjectDetail = () => {
             key={post.id}
             onClick={() => editingPostId !== post.id && onSelectPost(post)}
             className={cn(
-              "group w-full text-left p-2 rounded-md text-sm flex items-center justify-between cursor-pointer hover:bg-slate-100",
-              post.status === 'completed' && "bg-green-50 text-green-800 hover:bg-green-100",
-              selectedPost?.id === post.id && editingPostId !== post.id && "bg-blue-100 text-blue-700 font-semibold hover:bg-blue-100"
+              "group w-full text-left p-2 rounded-md text-sm flex items-center justify-between cursor-pointer",
+              post.status === 'completed' 
+                ? "bg-green-50 text-green-800 hover:bg-green-100" 
+                : selectedPost?.id === post.id && editingPostId !== post.id 
+                  ? "bg-blue-100 text-blue-700 font-semibold hover:bg-blue-100" 
+                  : "hover:bg-slate-100"
             )}
           >
             {editingPostId === post.id ? (
@@ -329,6 +332,7 @@ const SeedingProjectDetail = () => {
                     frequencyUnit={frequencyUnit}
                     onFrequencyUnitChange={setFrequencyUnit}
                     onSaveSettings={handleSaveAutoCheckSettings}
+                    onCheckComplete={fetchProjectData}
                   />
                 ) : (
                   <div className="flex-1">Chức năng Check duyệt post đang được phát triển.</div>
