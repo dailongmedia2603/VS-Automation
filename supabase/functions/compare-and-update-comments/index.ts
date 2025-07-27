@@ -105,6 +105,18 @@ serve(async (req) => {
     const total = expectedComments.length;
     const result = { found: foundCount, notFound: total - foundCount, total };
 
+    // Step 5: Update post status if all comments are found
+    if (result.notFound === 0 && total > 0) {
+      const { error: postUpdateError } = await supabaseAdmin
+        .from('seeding_posts')
+        .update({ status: 'completed', is_active: false })
+        .eq('id', postId);
+
+      if (postUpdateError) {
+        console.error(`Failed to update post status for postId ${postId}:`, postUpdateError.message);
+      }
+    }
+
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
