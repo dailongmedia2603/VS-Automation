@@ -108,7 +108,7 @@ export const CommentCheckDetail = ({ post, onPostUpdate }: CommentCheckDetailPro
       setCheckInterval('1');
       setCheckUnit('hours');
     }
-  }, [post.is_active, post.check_frequency]);
+  }, [post]);
 
   const handleSettingsSave = async () => {
     setIsSavingSettings(true);
@@ -147,9 +147,6 @@ export const CommentCheckDetail = ({ post, onPostUpdate }: CommentCheckDetailPro
 
       const actualComments: FbComment[] = fbData.data || [];
       
-      const updates = [];
-      let foundCount = 0;
-
       const { data: currentComments, error: dbCommentsError } = await supabase
         .from('seeding_comments')
         .select('id, content, status')
@@ -157,17 +154,22 @@ export const CommentCheckDetail = ({ post, onPostUpdate }: CommentCheckDetailPro
       
       if (dbCommentsError) throw dbCommentsError;
 
+      const updates = [];
+      let foundCount = 0;
+
       for (const expectedComment of currentComments) {
         const foundFbComment = actualComments.find(actual => actual.message && actual.message.trim() === expectedComment.content.trim());
         
         if (foundFbComment) {
           foundCount++;
-          updates.push({
-            id: expectedComment.id,
-            status: 'visible' as const,
-            account_name: foundFbComment.from?.name || 'Không rõ',
-            comment_link: foundFbComment.permalink_url || null,
-          });
+          if (expectedComment.status !== 'visible') {
+            updates.push({
+              id: expectedComment.id,
+              status: 'visible' as const,
+              account_name: foundFbComment.from?.name || 'Không rõ',
+              comment_link: foundFbComment.permalink_url || null,
+            });
+          }
         } else {
           if (expectedComment.status === 'visible') {
             updates.push({

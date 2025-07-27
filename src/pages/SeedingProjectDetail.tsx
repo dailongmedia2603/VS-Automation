@@ -31,6 +31,7 @@ type Post = {
   type: 'comment_check' | 'post_approval';
   is_active: boolean;
   check_frequency: string | null;
+  seeding_comments: { status: string }[];
 };
 
 const initialNewPostState = {
@@ -71,14 +72,13 @@ const SeedingProjectDetail = () => {
       setProject(projectData);
 
       const { data: postsData, error: postsError } = await supabase
-        .from('seeding_posts').select('*').eq('project_id', projectId).order('created_at', { ascending: true });
+        .from('seeding_posts').select('*, seeding_comments(status)').eq('project_id', projectId).order('created_at', { ascending: true });
       if (postsError) throw postsError;
       
-      const allPosts = postsData || [];
+      const allPosts = (postsData as Post[]) || [];
       setCommentCheckPosts(allPosts.filter(p => p.type === 'comment_check'));
       setPostApprovalPosts(allPosts.filter(p => p.type === 'post_approval'));
 
-      // Reselect post if it was updated
       if (selectedPost) {
         const updatedSelectedPost = allPosts.find(p => p.id === selectedPost.id);
         if (updatedSelectedPost) {
@@ -196,6 +196,11 @@ const SeedingProjectDetail = () => {
       }
     }, [editingPostId]);
 
+    const isPostDone = (post: Post) => {
+      if (!post.seeding_comments || post.seeding_comments.length === 0) return false;
+      return post.seeding_comments.every(c => c.status === 'visible');
+    };
+
     return (
       <div className="flex flex-col gap-1 pl-2">
         {posts.map((post) => (
@@ -222,7 +227,7 @@ const SeedingProjectDetail = () => {
             ) : (
               <>
                 <span className="flex items-center gap-2">
-                  {post.status === 'completed' && <CheckCircle className="h-4 w-4 text-green-500" />}
+                  {isPostDone(post) && <CheckCircle className="h-4 w-4 text-green-500" />}
                   {post.name}
                 </span>
                 <div className="flex items-center">
