@@ -9,9 +9,10 @@ import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, Download, MoreHorizontal, Link as LinkIcon, MessageCircle, Code, PlayCircle, CheckCircle2, XCircle, Loader2, FileText, Settings, PlusCircle } from 'lucide-react';
+import { Search, Download, MoreHorizontal, Link as LinkIcon, MessageCircle, Code, PlayCircle, CheckCircle2, XCircle, Loader2, FileText, Settings, PlusCircle, Edit, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Label } from '@/components/ui/label';
@@ -141,6 +142,13 @@ export const CommentCheckDetail = ({
   const [newCommentsText, setNewCommentsText] = useState('');
   const [isSavingComments, setIsSavingComments] = useState(false);
 
+  const [isEditCommentDialogOpen, setIsEditCommentDialogOpen] = useState(false);
+  const [editingComment, setEditingComment] = useState<Comment | null>(null);
+  const [editedContent, setEditedContent] = useState('');
+
+  const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
+  const [commentToDelete, setCommentToDelete] = useState<Comment | null>(null);
+
   const fetchComments = async () => {
     setIsLoading(true);
     const { data, error } = await supabase
@@ -263,6 +271,56 @@ export const CommentCheckDetail = ({
         fetchComments(); // Refresh the list
     }
     setIsSavingComments(false);
+  };
+
+  const handleOpenEditDialog = (comment: Comment) => {
+    setEditingComment(comment);
+    setEditedContent(comment.content);
+    setIsEditCommentDialogOpen(true);
+  };
+
+  const handleUpdateComment = async () => {
+      if (!editingComment || !editedContent.trim()) {
+          showError("Nội dung comment không được để trống.");
+          return;
+      }
+      const toastId = showLoading("Đang cập nhật...");
+      const { error } = await supabase
+          .from('seeding_comments')
+          .update({ content: editedContent.trim() })
+          .eq('id', editingComment.id);
+      
+      dismissToast(toastId);
+      if (error) {
+          showError("Cập nhật thất bại: " + error.message);
+      } else {
+          showSuccess("Đã cập nhật comment!");
+          setIsEditCommentDialogOpen(false);
+          fetchComments();
+      }
+  };
+
+  const handleOpenDeleteAlert = (comment: Comment) => {
+      setCommentToDelete(comment);
+      setIsDeleteAlertOpen(true);
+  };
+
+  const handleDeleteComment = async () => {
+      if (!commentToDelete) return;
+      const toastId = showLoading("Đang xóa...");
+      const { error } = await supabase
+          .from('seeding_comments')
+          .delete()
+          .eq('id', commentToDelete.id);
+
+      dismissToast(toastId);
+      if (error) {
+          showError("Xóa thất bại: " + error.message);
+      } else {
+          showSuccess("Đã xóa comment!");
+          setIsDeleteAlertOpen(false);
+          fetchComments();
+      }
   };
 
   const filteredComments = useMemo(() => {
@@ -458,8 +516,14 @@ export const CommentCheckDetail = ({
                             <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>Sửa</DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive">Xóa</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleOpenEditDialog(comment)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Sửa
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleOpenDeleteAlert(comment)} className="text-destructive">
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Xóa
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -507,6 +571,38 @@ export const CommentCheckDetail = ({
             </DialogFooter>
         </DialogContent>
       </Dialog>
+      <Dialog open={isEditCommentDialogOpen} onOpenChange={setIsEditCommentDialogOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Sửa comment</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+                <Textarea
+                    value={editedContent}
+                    onChange={(e) => setEditedContent(e.target.value)}
+                    className="min-h-[100px]"
+                />
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsEditCommentDialogOpen(false)}>Hủy</Button>
+                <Button onClick={handleUpdateComment}>Lưu thay đổi</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Bạn có chắc chắn muốn xóa?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Hành động này không thể hoàn tác. Comment sẽ bị xóa vĩnh viễn.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setCommentToDelete(null)}>Hủy</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteComment} className="bg-red-600 hover:bg-red-700">Xóa</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };
