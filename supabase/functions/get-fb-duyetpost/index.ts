@@ -56,9 +56,19 @@ serve(async (req) => {
         }
         
         const feedData = JSON.parse(responseText);
-        if (feedData.data && Array.isArray(feedData.data)) {
-            // Add groupId to each post for later processing
-            const postsWithGroupId = feedData.data.map(p => ({ ...p, group_id: groupId }));
+        let postsArray = [];
+
+        // Handle nested structure from proxy: {"data": {"data": [...]}}
+        if (feedData.data && feedData.data.data && Array.isArray(feedData.data.data)) {
+            postsArray = feedData.data.data;
+        } 
+        // Handle standard Facebook structure: {"data": [...]}
+        else if (feedData.data && Array.isArray(feedData.data)) {
+            postsArray = feedData.data;
+        }
+
+        if (postsArray.length > 0) {
+            const postsWithGroupId = postsArray.map(p => ({ ...p, group_id: groupId }));
             allPosts.push(...postsWithGroupId);
         }
       } catch (fetchErr) {
