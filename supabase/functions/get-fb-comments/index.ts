@@ -49,21 +49,16 @@ serve(async (req) => {
         throw new Error("Chưa cấu hình URL cho tính năng Check Comment. Vui lòng vào trang Cài đặt.");
     }
 
-    // Build the URL programmatically to ensure correctness
     const url = new URL(commentCheckTemplate.replace(/{postId}/g, fbPostId));
-    
-    // **STRATEGIC FIX:** Simplify the 'fields' parameter to ensure a response.
-    // This requests only top-level comments but is more compatible.
     const simplifiedFields = 'message,from,permalink_url,created_time,comments';
     url.searchParams.set('fields', simplifiedFields);
-
     if (!url.searchParams.has('access_token') && dbAccessToken) {
         url.searchParams.set('access_token', dbAccessToken);
     }
-
     const initialEndpoint = url.toString();
 
     const allComments = [];
+    const allRawResponses = []; // Store raw responses from each page
     let nextUrl = initialEndpoint;
     let safetyCounter = 0;
     const MAX_PAGES = 20;
@@ -71,7 +66,10 @@ serve(async (req) => {
     while (nextUrl && safetyCounter < MAX_PAGES) {
       safetyCounter++;
       const response = await fetch(nextUrl);
-      const data = await response.json();
+      const rawResponseText = await response.text(); // Get raw text first
+      const data = JSON.parse(rawResponseText); // Then parse
+      
+      allRawResponses.push(data); // Store the parsed object from this page
 
       if (!response.ok) {
         const errorMessage = data?.error?.message || `Yêu cầu API thất bại ở trang ${safetyCounter} với mã trạng thái ${response.status}.`;
@@ -81,26 +79,28 @@ serve(async (req) => {
       if (Array.isArray(data.data)) {
         for (const comment of data.data) {
           allComments.push(comment);
-          // Also add replies if they exist in the simplified response
           if (comment.comments && Array.isArray(comment.comments.data)) {
             allComments.push(...comment.comments.data);
           }
         }
       }
-
       nextUrl = (data.paging && data.paging.next) ? data.paging.next : null;
     }
 
-    const responseData = {
-        data: allComments,
-        log: { requestUrl: initialEndpoint, rawResponse: JSON.stringify(allComments, null, 2) }
-    };
-    
+    const finalRawResponseString = JSON.stringify(allRawResponses, null, 2);
+
+    // Log the raw, unprocessed response first
     await supabaseAdmin.from('seeding_api_logs').insert({
         post_id: internalPostId,
-        raw_response: JSON.stringify(allComments, null, 2),
+        raw_response: finalRawResponseString,
         status: 'success'
     });
+
+    // Then, prepare the data to be sent back to the client
+    const responseData = {
+        data: allComments,
+        log: { requestUrl: initialEndpoint, rawResponse: finalRawResponseString }
+    };
 
     return new Response(JSON.stringify(responseData), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
