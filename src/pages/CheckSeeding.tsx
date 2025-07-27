@@ -69,11 +69,14 @@ const CheckSeeding = () => {
   const filteredProjects = useMemo(() => {
     return projects.filter(p => {
       const isArchivedView = statusFilter === 'archived';
+      const isCompleted = p.total_posts > 0 && p.total_posts === p.completed_posts;
+
       if (isArchivedView) {
         if (p.status !== 'archived') return false;
       } else {
         if (p.status === 'archived') return false;
-        if (statusFilter !== 'all' && p.status !== statusFilter) return false;
+        if (statusFilter === 'completed' && !isCompleted) return false;
+        if (statusFilter === 'checking' && isCompleted) return false;
       }
       if (searchTerm && !p.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
       return true;
@@ -91,10 +94,13 @@ const CheckSeeding = () => {
 
   const stats = useMemo(() => {
     const activeProjects = projects.filter(p => p.status !== 'archived');
+    const completedCount = activeProjects.filter(p => p.total_posts > 0 && p.total_posts === p.completed_posts).length;
+    const checkingCount = activeProjects.length - completedCount;
+    
     return {
       total: activeProjects.length,
-      completed: activeProjects.filter(p => p.status === 'completed').length,
-      checking: activeProjects.filter(p => p.status === 'checking').length,
+      completed: completedCount,
+      checking: checkingCount,
     };
   }, [projects]);
 
@@ -282,43 +288,55 @@ const CheckSeeding = () => {
                     </TableRow>
                   ))
                 ) : paginatedProjects.length > 0 ? (
-                  paginatedProjects.map((project) => (
-                    <TableRow key={project.id}>
-                      <TableCell><Checkbox checked={selectedIds.includes(project.id)} onCheckedChange={(checked) => handleSelectRow(project.id, !!checked)} /></TableCell>
-                      <TableCell className="font-medium">
-                        <Link to={`/check-seeding/${project.id}`} className="hover:underline text-slate-800">
-                          {project.name}
-                        </Link>
-                      </TableCell>
-                      <TableCell>{format(new Date(project.created_at), 'dd/MM/yyyy')}</TableCell>
-                      <TableCell className="text-center">{project.total_posts}</TableCell>
-                      <TableCell className="text-center">{project.comment_check_count}</TableCell>
-                      <TableCell className="text-center">{project.post_approval_count}</TableCell>
-                      <TableCell className="text-center">{project.checking_posts}</TableCell>
-                      <TableCell className="text-center">{project.completed_posts}</TableCell>
-                      <TableCell>
-                        <Badge className={cn(
-                          'pointer-events-none',
-                          project.status === 'completed' && 'bg-green-100 text-green-800 border-green-200',
-                          project.status === 'checking' && 'bg-amber-100 text-amber-800 border-amber-200',
-                          project.status === 'archived' && 'bg-slate-100 text-slate-800 border-slate-200'
-                        )}>
-                          {project.status === 'completed' ? 'Hoàn thành' : project.status === 'checking' ? 'Đang check' : 'Lưu trữ'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleOpenEditDialog(project)}><Edit className="mr-2 h-4 w-4" />Sửa</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDeleteProject(project)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  paginatedProjects.map((project) => {
+                    const isCompleted = project.total_posts > 0 && project.total_posts === project.completed_posts;
+                    return (
+                      <TableRow key={project.id}>
+                        <TableCell><Checkbox checked={selectedIds.includes(project.id)} onCheckedChange={(checked) => handleSelectRow(project.id, !!checked)} /></TableCell>
+                        <TableCell className="font-medium">
+                          <Link to={`/check-seeding/${project.id}`} className="hover:underline text-slate-800">
+                            {project.name}
+                          </Link>
+                        </TableCell>
+                        <TableCell>{format(new Date(project.created_at), 'dd/MM/yyyy')}</TableCell>
+                        <TableCell className="text-center">{project.total_posts}</TableCell>
+                        <TableCell className="text-center">{project.comment_check_count}</TableCell>
+                        <TableCell className="text-center">{project.post_approval_count}</TableCell>
+                        <TableCell className="text-center">{project.checking_posts}</TableCell>
+                        <TableCell className="text-center">{project.completed_posts}</TableCell>
+                        <TableCell>
+                          {(() => {
+                            if (project.status === 'archived') {
+                              return (
+                                <Badge className="bg-slate-100 text-slate-800 border-slate-200 pointer-events-none">
+                                  Lưu trữ
+                                </Badge>
+                              );
+                            }
+                            return (
+                              <Badge className={cn(
+                                'pointer-events-none',
+                                isCompleted ? 'bg-green-100 text-green-800 border-green-200' : 'bg-amber-100 text-amber-800 border-amber-200'
+                              )}>
+                                {isCompleted ? 'Hoàn thành' : 'Đang check'}
+                              </Badge>
+                            );
+                          })()}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleOpenEditDialog(project)}><Edit className="mr-2 h-4 w-4" />Sửa</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleDeleteProject(project)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
                 ) : (
                   <TableRow><TableCell colSpan={10} className="text-center h-24">Không có dự án nào.</TableCell></TableRow>
                 )}
