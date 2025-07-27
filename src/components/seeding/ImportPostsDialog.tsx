@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { UploadCloud, FileDown, CheckCircle, XCircle, FileSpreadsheet } from 'lucide-react';
-import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
+import { showSuccess, showError } from '@/utils/toast';
 import * as XLSX from 'xlsx';
 
 interface ImportPostsDialogProps {
@@ -184,49 +184,51 @@ export const ImportPostsDialog = ({ isOpen, onOpenChange, projectId, onSuccess }
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!isImporting) { onOpenChange(open); resetState(); } }}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-lg p-0">
+        <DialogHeader className="p-6 pb-4">
           <DialogTitle className="text-xl font-bold">Import hàng loạt</DialogTitle>
           <DialogDescription>Tải lên file Excel để thêm nhiều bài viết và bình luận cùng lúc.</DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 py-4">
-          <div className="p-4 border rounded-lg bg-slate-50">
-            <h4 className="font-semibold text-sm mb-2">Bước 1: Tải file mẫu</h4>
-            <p className="text-xs text-slate-500 mb-3">Sử dụng file mẫu để đảm bảo dữ liệu của bạn được định dạng chính xác.</p>
-            <Button variant="outline" size="sm" onClick={handleDownloadTemplate}>
+        <div className="px-6 py-4 space-y-4 bg-slate-50">
+          <div className="p-4 rounded-lg bg-white border">
+            <h4 className="font-semibold text-slate-800">Bước 1: Tải file mẫu</h4>
+            <p className="text-sm text-slate-500 mt-1 mb-3">Sử dụng file mẫu để đảm bảo dữ liệu của bạn được định dạng chính xác.</p>
+            <Button variant="outline" onClick={handleDownloadTemplate}>
               <FileDown className="mr-2 h-4 w-4" />
               Tải file mẫu
             </Button>
           </div>
-          <div className="p-4 border rounded-lg bg-slate-50">
-            <h4 className="font-semibold text-sm mb-2">Bước 2: Tải lên file của bạn</h4>
-            <Label htmlFor="file-upload" className="relative flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-white hover:bg-slate-50">
-              <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                <UploadCloud className="w-8 h-8 mb-2 text-slate-500" />
-                <p className="mb-1 text-sm text-slate-500"><span className="font-semibold">Nhấn để tải lên</span> hoặc kéo thả</p>
+
+          <div className="p-4 rounded-lg bg-white border">
+            <h4 className="font-semibold text-slate-800">Bước 2: Tải lên file của bạn</h4>
+            <Label htmlFor="file-upload" className="relative flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-white hover:bg-slate-50 mt-3">
+              <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center">
+                <UploadCloud className="w-8 h-8 mb-2 text-slate-400" />
+                <p className="mb-1 text-sm text-slate-600">Nhấn để tải lên hoặc kéo thả</p>
                 <p className="text-xs text-slate-500">XLSX, XLS, hoặc CSV</p>
               </div>
               <Input id="file-upload" type="file" className="sr-only" onChange={handleFileChange} accept=".xlsx, .xls, .csv" />
             </Label>
             {file && (
-              <div className="mt-4 flex items-center justify-between p-2 bg-white rounded-md border">
+              <div className="mt-3 flex items-center justify-between p-2 bg-slate-100 rounded-md border">
                 <div className="flex items-center gap-2 text-sm">
                   <FileSpreadsheet className="h-5 w-5 text-green-600" />
-                  <span className="font-medium">{file.name}</span>
+                  <span className="font-medium text-slate-700">{file.name}</span>
                 </div>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setFile(null); setParsedData([]); }}>
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500 hover:text-slate-800" onClick={() => { setFile(null); setParsedData([]); }}>
                   <XCircle className="h-4 w-4" />
                 </Button>
               </div>
             )}
           </div>
+
           {parsedData.length > 0 && !isImporting && (
-            <div className="text-center text-sm text-slate-600">
+            <div className="text-center text-sm text-slate-600 pt-2">
               <p>Đã tìm thấy <span className="font-bold">{Object.keys(parsedData.reduce((acc, row) => ({...acc, [row.post_name]: true}), {})).length}</span> bài viết và <span className="font-bold">{parsedData.filter(r => r.comment_content).length}</span> bình luận.</p>
             </div>
           )}
           {isImporting && (
-            <div>
+            <div className="pt-2">
               <Progress value={importProgress} className="w-full" />
               <div className="mt-2 flex justify-between text-sm">
                 <div className="flex items-center gap-1 text-green-600"><CheckCircle className="h-4 w-4" /><span>Thành công: {importResult?.success || 0}</span></div>
@@ -235,9 +237,13 @@ export const ImportPostsDialog = ({ isOpen, onOpenChange, projectId, onSuccess }
             </div>
           )}
         </div>
-        <DialogFooter>
+        <DialogFooter className="p-6 bg-white border-t">
           <Button variant="outline" onClick={() => { onOpenChange(false); resetState(); }}>Hủy</Button>
-          <Button onClick={handleImport} disabled={isParsing || parsedData.length === 0 || isImporting}>
+          <Button 
+            onClick={handleImport} 
+            disabled={isParsing || parsedData.length === 0 || isImporting}
+            className="bg-slate-900 hover:bg-slate-800"
+          >
             {isImporting ? 'Đang xử lý...' : 'Bắt đầu Import'}
           </Button>
         </DialogFooter>
