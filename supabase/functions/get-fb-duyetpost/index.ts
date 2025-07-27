@@ -16,7 +16,7 @@ serve(async (req) => {
   let firstRawResponse = null;
 
   try {
-    const { postId } = await req.json();
+    const { postId, timeCheckString } = await req.json();
     if (!postId) throw new Error("Post ID is required.");
 
     const supabaseAdmin = createClient(
@@ -37,7 +37,10 @@ serve(async (req) => {
 
     for (const group of groups) {
       const groupId = group.group_id;
-      let feedUrl = postApprovalTemplate.replace(/{group-id}/g, groupId);
+      let feedUrl = postApprovalTemplate
+        .replace(/{group-id}/g, groupId)
+        .replace(/{time_check}/g, timeCheckString || '');
+
       if (!feedUrl.includes('access_token=') && accessToken) {
         const separator = feedUrl.includes('?') ? '&' : '?';
         feedUrl += `${separator}access_token=${accessToken}`;

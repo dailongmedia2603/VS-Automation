@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, Download, MoreHorizontal, Link as LinkIcon, Code, PlayCircle, CheckCircle2, XCircle, Loader2, FileText, Settings, PlusCircle, Edit, Trash2, Users, Save } from 'lucide-react';
+import { Search, Download, MoreHorizontal, Link as LinkIcon, Code, PlayCircle, CheckCircle2, XCircle, Loader2, FileText, Settings, PlusCircle, Edit, Trash2, Users, Save, Calendar as CalendarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -19,6 +19,10 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import * as XLSX from 'xlsx';
 import { LogDialog, type ErrorLog } from '@/components/seeding/LogDialog';
+import { DateRange } from "react-day-picker"
+import { format as formatDateFns, startOfDay, endOfDay, subDays } from "date-fns"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
 
 type Project = {
   id: number;
@@ -92,6 +96,9 @@ export const PostApprovalDetail = ({
   const [groupToDelete, setGroupToDelete] = useState<Group | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+
   useEffect(() => {
     setPostContent(post.content || '');
   }, [post.content]);
@@ -193,17 +200,27 @@ export const PostApprovalDetail = ({
     }
   };
 
+  const generateTimeCheckString = (range: DateRange | undefined): string => {
+    if (!range?.from) {
+        return '';
+    }
+    const since = startOfDay(range.from).toISOString();
+    const until = endOfDay(range.to || range.from).toISOString();
+    return `&since=${since}&until=${until}`;
+  };
+
   const handleRunCheck = async () => {
     setIsChecking(true);
     setCheckResult(null);
     setLog(null);
     let toastId;
     let logData: Partial<ErrorLog> = {};
+    const timeCheckString = generateTimeCheckString(dateRange);
 
     try {
       toastId = showLoading("Bước 1/3: Đang lấy dữ liệu thô từ API...");
       const { data: fetchData, error: fetchError } = await supabase.functions.invoke('get-fb-duyetpost', {
-        body: { postId: post.id }
+        body: { postId: post.id, timeCheckString }
       });
       logData = { requestUrl: fetchData?.requestUrl, rawResponse: fetchData?.rawResponse };
       if (fetchError || fetchData.error) throw { step: 'Lấy dữ liệu', error: fetchError || fetchData };
@@ -323,7 +340,48 @@ export const PostApprovalDetail = ({
                     </div>
                   )}
                   {log && (<Button variant={log.errorMessage !== 'Không có lỗi' ? 'destructive' : 'outline'} size="sm" onClick={() => setIsLogOpen(true)}><FileText className="mr-2 h-4 w-4" />{log.errorMessage !== 'Không có lỗi' ? 'Xem Log Lỗi' : 'Xem Log'}</Button>)}
-                  <Button onClick={handleRunCheck} disabled={isChecking} className="bg-blue-600 hover:bg-blue-700 rounded-lg">{isChecking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}{isChecking ? 'Đang chạy...' : 'Chạy Check'}</Button>
+                  <div className="flex items-center gap-2">
+                    <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "w-[240px] justify-start text-left font-normal",
+                            !dateRange && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {dateRange?.from ? (
+                            dateRange.to ? (
+                              <>
+                                {formatDateFns(dateRange.from, "dd/MM/y")} - {formatDateFns(dateRange.to, "dd/MM/y")}
+                              </>
+                            ) : (
+                              formatDateFns(dateRange.from, "dd/MM/y")
+                            )
+                          ) : (
+                            <span>Chọn ngày check</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="end">
+                        <div className="p-2 border-b flex flex-col items-start">
+                          <Button variant="link" className="h-auto p-1" onClick={() => { setDateRange({ from: new Date(), to: new Date() }); setDatePickerOpen(false); }}>Hôm nay</Button>
+                          <Button variant="link" className="h-auto p-1" onClick={() => { setDateRange({ from: subDays(new Date(), 2), to: new Date() }); setDatePickerOpen(false); }}>3 ngày qua</Button>
+                          <Button variant="link" className="h-auto p-1" onClick={() => { setDateRange({ from: subDays(new Date(), 4), to: new Date() }); setDatePickerOpen(false); }}>5 ngày qua</Button>
+                        </div>
+                        <Calendar
+                          initialFocus
+                          mode="range"
+                          defaultMonth={dateRange?.from}
+                          selected={dateRange}
+                          onSelect={setDateRange}
+                          numberOfMonths={1}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <Button onClick={handleRunCheck} disabled={isChecking} className="bg-blue-600 hover:bg-blue-700 rounded-lg">{isChecking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}{isChecking ? 'Đang chạy...' : 'Chạy Check'}</Button>
+                  </div>
                 </div>
               </div>
             </CardContent>
