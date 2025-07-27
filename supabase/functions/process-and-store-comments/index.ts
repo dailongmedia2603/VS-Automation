@@ -27,31 +27,18 @@ serve(async (req) => {
 
   try {
     const data = JSON.parse(rawResponse);
-    const allComments = [];
-    let nextUrl = null;
+    let allComments = [];
 
-    // Handle paginated data from Facebook Graph API format
-    if (data.data && Array.isArray(data.data)) {
-        for (const comment of data.data) {
-            allComments.push(comment);
-            if (comment.comments && Array.isArray(comment.comments.data)) {
-                allComments.push(...comment.comments.data);
-            }
-        }
-        nextUrl = (data.paging && data.paging.next) ? data.paging.next : null;
-    } 
-    // Handle flat array format from custom APIs
-    else if (Array.isArray(data)) {
-        allComments.push(...data);
-    }
-
-    // If there's a next page, fetch it (simple one-level pagination for now)
-    if (nextUrl) {
-        const response = await fetch(nextUrl);
-        const nextData = await response.json();
-        if (nextData.data && Array.isArray(nextData.data)) {
-            allComments.push(...nextData.data);
-        }
+    // NEW: Intelligent logic to find the comments array
+    if (data && data.data && Array.isArray(data.data.data)) {
+        // Handles the {"data": {"data": [...]}} structure from your API
+        allComments = data.data.data;
+    } else if (data && Array.isArray(data.data)) {
+        // Handles the standard Facebook {"data": [...]} structure
+        allComments = data.data;
+    } else if (Array.isArray(data)) {
+        // Handles a flat array [...] structure
+        allComments = data;
     }
 
     // Clear old data
