@@ -40,10 +40,8 @@ serve(async (req) => {
         throw new Error("Chưa cấu hình URL cho tính năng Check Comment. Vui lòng vào trang Cài đặt.");
     }
 
-    // Use the template directly from settings
     let initialEndpoint = commentCheckTemplate.replace(/{postId}/g, postId);
 
-    // Append the access token from DB only if it's not already in the template
     if (!initialEndpoint.includes('access_token=') && dbAccessToken) {
         if (initialEndpoint.includes('?')) {
             initialEndpoint += `&access_token=${dbAccessToken}`;
@@ -56,6 +54,7 @@ serve(async (req) => {
     let nextUrl = initialEndpoint;
     let firstResponseForLog = null;
 
+    // Loop to handle pagination
     while (nextUrl) {
       const response = await fetch(nextUrl);
       const rawResponse = await response.text();
@@ -74,6 +73,7 @@ serve(async (req) => {
         allComments.push(...data.data);
       }
 
+      // Check for the next page link and update the URL for the next loop iteration
       nextUrl = data.paging?.next || null;
     }
 
@@ -81,7 +81,7 @@ serve(async (req) => {
         data: allComments,
         log: {
             requestUrl: initialEndpoint,
-            rawResponse: firstResponseForLog,
+            rawResponse: firstResponseForLog, // Log the first response for debugging
         }
     };
 
