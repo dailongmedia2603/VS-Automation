@@ -394,7 +394,7 @@ const SeedingProjectDetail = () => {
       <ImportPostsDialog 
         isOpen={isImportDialogOpen} 
         onOpenChange={setIsImportDialogOpen}
-        projectId={projectId}
+        projectId={projectId!}
         onSuccess={() => {
           setIsImportDialogOpen(false);
           fetchProjectData();

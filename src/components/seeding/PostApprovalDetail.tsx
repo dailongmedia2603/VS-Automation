@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, Download, MoreHorizontal, Link as LinkIcon, Code, PlayCircle, CheckCircle2, XCircle, Loader2, FileText, Settings, PlusCircle, Edit, Trash2, Users, Save, Calendar as CalendarIcon } from 'lucide-react';
+import { Search, Download, MoreHorizontal, Link as LinkIcon, PlayCircle, CheckCircle2, XCircle, Loader2, FileText, Settings, PlusCircle, Edit, Trash2, Users, Save, Calendar as CalendarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -48,6 +48,14 @@ interface CheckResult {
   pending: number;
   total: number;
 }
+
+type ExportDataRow = {
+  post_content: string;
+  group_id: string;
+  approved_post_link: string | null;
+  account_name: string | null;
+  account_id: string | null;
+};
 
 interface PostApprovalDetailProps {
   project: Project;
@@ -274,7 +282,7 @@ export const PostApprovalDetail = ({
         return;
       }
 
-      const dataToExport = data.map(row => ({
+      const dataToExport = data.map((row: ExportDataRow) => ({
         'Nội dung bài viết': row.post_content,
         'ID group': row.group_id,
         'Link bài viết': row.approved_post_link,
