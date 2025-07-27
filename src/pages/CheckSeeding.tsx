@@ -30,6 +30,8 @@ type Project = {
   total_posts: number;
   checking_posts: number;
   completed_posts: number;
+  comment_check_count: number;
+  post_approval_count: number;
 };
 
 const CheckSeeding = () => {
@@ -55,7 +57,7 @@ const CheckSeeding = () => {
       showError("Không thể tải dự án: " + error.message);
       setProjects([]);
     } else {
-      setProjects(data || []);
+      setProjects(data as Project[] || []);
     }
     setIsLoading(false);
   };
@@ -255,6 +257,8 @@ const CheckSeeding = () => {
                   <TableHead>Dự án</TableHead>
                   <TableHead>Ngày tạo</TableHead>
                   <TableHead className="text-center">Tổng Post</TableHead>
+                  <TableHead className="text-center">Check Comment</TableHead>
+                  <TableHead className="text-center">Check Post</TableHead>
                   <TableHead className="text-center">Đang check</TableHead>
                   <TableHead className="text-center">Hoàn thành</TableHead>
                   <TableHead>Trạng thái</TableHead>
@@ -268,6 +272,8 @@ const CheckSeeding = () => {
                       <TableCell><Skeleton className="h-5 w-5" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-48" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-12 mx-auto" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-12 mx-auto" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-12 mx-auto" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-12 mx-auto" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-12 mx-auto" /></TableCell>
@@ -286,6 +292,8 @@ const CheckSeeding = () => {
                       </TableCell>
                       <TableCell>{format(new Date(project.created_at), 'dd/MM/yyyy')}</TableCell>
                       <TableCell className="text-center">{project.total_posts}</TableCell>
+                      <TableCell className="text-center">{project.comment_check_count}</TableCell>
+                      <TableCell className="text-center">{project.post_approval_count}</TableCell>
                       <TableCell className="text-center">{project.checking_posts}</TableCell>
                       <TableCell className="text-center">{project.completed_posts}</TableCell>
                       <TableCell>
@@ -312,7 +320,7 @@ const CheckSeeding = () => {
                     </TableRow>
                   ))
                 ) : (
-                  <TableRow><TableCell colSpan={8} className="text-center h-24">Không có dự án nào.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={10} className="text-center h-24">Không có dự án nào.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
