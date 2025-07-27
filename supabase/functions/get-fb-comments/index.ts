@@ -7,31 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Recursive function to fetch all pages
-async function fetchAllPages(url, accumulatedComments = [], accumulatedResponses = []) {
-    if (!url) {
-        return { comments: accumulatedComments, responses: accumulatedResponses };
-    }
-
-    const response = await fetch(url);
-    const rawResponse = await response.text();
-    const data = JSON.parse(rawResponse);
-
-    if (!response.ok) {
-        const errorMessage = data?.error?.message || `Yêu cầu API thất bại với mã trạng thái ${response.status}.`;
-        throw new Error(errorMessage);
-    }
-
-    const newComments = accumulatedComments.concat(data.data || []);
-    const newResponses = accumulatedResponses.concat(data);
-    
-    const nextUrl = data.paging?.next || null;
-
-    // If there is a next page, call the function again with the new URL
-    return await fetchAllPages(nextUrl, newComments, newResponses);
-}
-
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -75,13 +50,36 @@ serve(async (req) => {
         }
     }
 
-    const { comments, responses } = await fetchAllPages(initialEndpoint);
+    let allComments = [];
+    let allRawResponses = [];
+    let nextUrl = initialEndpoint;
+
+    // Loop to handle pagination
+    while (nextUrl) {
+      const response = await fetch(nextUrl);
+      const rawResponse = await response.text();
+      const data = JSON.parse(rawResponse);
+
+      if (!response.ok) {
+        const errorMessage = data?.error?.message || `Yêu cầu API thất bại với mã trạng thái ${response.status}.`;
+        throw new Error(errorMessage);
+      }
+      
+      allRawResponses.push(data);
+
+      if (Array.isArray(data.data)) {
+        allComments.push(...data.data);
+      }
+
+      // Check for the next page link and update the URL for the next loop iteration
+      nextUrl = data.paging?.next || null;
+    }
 
     const responseData = {
-        data: comments,
+        data: allComments,
         log: {
             requestUrl: initialEndpoint,
-            rawResponse: JSON.stringify(responses, null, 2), // Log all responses
+            rawResponse: JSON.stringify(allRawResponses, null, 2), // Log all responses
         }
     };
 
