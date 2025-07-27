@@ -6,7 +6,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, MessageSquare, FileCheck2, ChevronRight, ArrowLeft, Edit, Trash2, Loader2, Check } from 'lucide-react';
+import { PlusCircle, MessageSquare, FileCheck2, ChevronRight, ArrowLeft, Edit, Trash2, Loader2, Check, CheckCircle, Settings, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { CommentCheckDetail } from '@/components/seeding/CommentCheckDetail';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 type Project = {
   id: number;
@@ -29,6 +30,8 @@ type Post = {
   content: string | null;
   status: 'checking' | 'completed';
   type: 'comment_check' | 'post_approval';
+  is_active: boolean;
+  check_frequency: string | null;
 };
 
 const initialNewPostState = {
@@ -37,7 +40,7 @@ const initialNewPostState = {
   links: '',
   comments: '',
   content: '',
-  check_frequency: 'daily_1',
+  check_frequency: '1_hour',
   is_active: true,
 };
 
@@ -59,6 +62,38 @@ const SeedingProjectDetail = () => {
   const [newPostData, setNewPostData] = useState(initialNewPostState);
   const [isSaving, setIsSaving] = useState(false);
 
+  // State for auto-check settings
+  const [autoCheckActive, setAutoCheckActive] = useState(false);
+  const [frequencyValue, setFrequencyValue] = useState('1');
+  const [frequencyUnit, setFrequencyUnit] = useState('hour');
+
+  useEffect(() => {
+    if (selectedPost) {
+      setAutoCheckActive(selectedPost.is_active);
+      const [value, unit] = selectedPost.check_frequency?.split('_') || ['1', 'hour'];
+      setFrequencyValue(value);
+      setFrequencyUnit(unit);
+    }
+  }, [selectedPost]);
+
+  const handleSaveAutoCheckSettings = async () => {
+    if (!selectedPost) return;
+    const check_frequency = `${frequencyValue}_${frequencyUnit}`;
+    const toastId = showLoading("Đang lưu cài đặt...");
+    const { error } = await supabase
+      .from('seeding_posts')
+      .update({ is_active: autoCheckActive, check_frequency })
+      .eq('id', selectedPost.id);
+    
+    dismissToast(toastId);
+    if (error) {
+      showError("Lưu cài đặt thất bại: " + error.message);
+    } else {
+      showSuccess("Đã lưu cài đặt tự động!");
+      fetchProjectData(); // Refresh data
+    }
+  };
+
   const fetchProjectData = async () => {
     if (!projectId) return;
     setIsLoading(true);
@@ -75,6 +110,14 @@ const SeedingProjectDetail = () => {
       const allPosts = postsData || [];
       setCommentCheckPosts(allPosts.filter(p => p.type === 'comment_check'));
       setPostApprovalPosts(allPosts.filter(p => p.type === 'post_approval'));
+
+      // Update selected post with new data if it exists
+      if (selectedPost) {
+        const updatedSelectedPost = allPosts.find(p => p.id === selectedPost.id);
+        if (updatedSelectedPost) {
+          setSelectedPost(updatedSelectedPost);
+        }
+      }
 
     } catch (error: any) {
       showError("Không thể tải chi tiết dự án: " + error.message);
@@ -134,7 +177,7 @@ const SeedingProjectDetail = () => {
         is_active: newPostData.is_active,
         links: newPostData.links,
         content: newPostData.type === 'post_approval' ? newPostData.content : null,
-        check_frequency: newPostData.type === 'post_approval' ? newPostData.check_frequency : null,
+        check_frequency: `${newPostData.check_frequency.split('_')[0]}_${newPostData.check_frequency.split('_')[1] || 'hour'}`,
       };
 
       const { data: newPost, error: postError } = await supabase
@@ -211,7 +254,10 @@ const SeedingProjectDetail = () => {
               </div>
             ) : (
               <>
-                <span>{post.name}</span>
+                <span className="flex items-center gap-2">
+                  {post.status === 'completed' && <CheckCircle className="h-4 w-4 text-green-500" />}
+                  {post.name}
+                </span>
                 <div className="flex items-center">
                   <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setEditingPostId(post.id); setEditingName(post.name); }}>
@@ -247,7 +293,7 @@ const SeedingProjectDetail = () => {
       </div>
 
       <ResizablePanelGroup direction="horizontal" className="flex-1 rounded-2xl border bg-white shadow-sm overflow-hidden">
-        <ResizablePanel defaultSize={20} minSize={20} maxSize={40}>
+        <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
           <div className="flex flex-col h-full p-4">
             <Accordion type="multiple" defaultValue={['check-comment', 'approve-post']} className="w-full">
               <AccordionItem value="check-comment">
@@ -266,14 +312,42 @@ const SeedingProjectDetail = () => {
           </div>
         </ResizablePanel>
         <ResizableHandle withHandle />
-        <ResizablePanel defaultSize={80}>
+        <ResizablePanel defaultSize={75}>
           <div className="flex h-full items-center justify-center p-6">
             {selectedPost ? (
-              selectedPost.type === 'comment_check' ? (
-                <CommentCheckDetail post={selectedPost} />
-              ) : (
-                <div>Chức năng Check duyệt post đang được phát triển.</div>
-              )
+              <div className="w-full h-full flex flex-col gap-6">
+                {selectedPost.type === 'comment_check' ? (
+                  <CommentCheckDetail post={selectedPost} />
+                ) : (
+                  <div className="flex-1">Chức năng Check duyệt post đang được phát triển.</div>
+                )}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><Settings className="h-5 w-5 text-slate-600" />Cài đặt tự động</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50">
+                      <Label htmlFor="auto-check-switch" className="font-medium text-slate-700">Tự động chạy check</Label>
+                      <Switch id="auto-check-switch" checked={autoCheckActive} onCheckedChange={setAutoCheckActive} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Tần suất quét lại</Label>
+                      <div className="flex items-center gap-2">
+                        <Input type="number" value={frequencyValue} onChange={(e) => setFrequencyValue(e.target.value)} className="w-24" />
+                        <Select value={frequencyUnit} onValueChange={setFrequencyUnit}>
+                          <SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="minute">Phút</SelectItem>
+                            <SelectItem value="hour">Giờ</SelectItem>
+                            <SelectItem value="day">Ngày</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <Button onClick={handleSaveAutoCheckSettings}>Lưu cài đặt</Button>
+                  </CardContent>
+                </Card>
+              </div>
             ) : (
               <div className="text-center text-slate-500">
                 <p className="font-semibold text-lg">Chọn một mục để xem chi tiết</p>
@@ -337,9 +411,9 @@ const SeedingProjectDetail = () => {
                   <Select value={newPostData.check_frequency} onValueChange={(v) => setNewPostData(d => ({...d, check_frequency: v}))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="daily_1">1 lần / ngày</SelectItem>
-                      <SelectItem value="daily_2">2 lần / ngày</SelectItem>
-                      <SelectItem value="daily_3">3 lần / ngày</SelectItem>
+                      <SelectItem value="1_hour">1 giờ / lần</SelectItem>
+                      <SelectItem value="2_hour">2 giờ / lần</SelectItem>
+                      <SelectItem value="1_day">1 ngày / lần</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
