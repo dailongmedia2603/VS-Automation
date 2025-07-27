@@ -12,17 +12,20 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
+  const supabaseAdmin = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  );
+
+  const { postId } = await req.json();
+  if (!postId) {
+    return new Response(JSON.stringify({ error: "ID bài viết là bắt buộc." }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 400,
+    });
+  }
+
   try {
-    const { postId } = await req.json();
-    if (!postId) {
-      throw new Error("ID bài viết là bắt buộc.");
-    }
-
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
     const { data: fbSettings, error: settingsError } = await supabaseAdmin
       .from('apifb_settings')
       .select('url_templates, api_key')
@@ -41,64 +44,48 @@ serve(async (req) => {
     }
 
     let initialEndpoint = commentCheckTemplate.replace(/{postId}/g, postId);
-
     if (!initialEndpoint.includes('access_token=') && dbAccessToken) {
-        if (initialEndpoint.includes('?')) {
-            initialEndpoint += `&access_token=${dbAccessToken}`;
-        } else {
-            initialEndpoint += `?access_token=${dbAccessToken}`;
-        }
+        initialEndpoint += (initialEndpoint.includes('?') ? '&' : '?') + `access_token=${dbAccessToken}`;
     }
 
     const allComments = [];
-    const allRawResponses = [];
     let nextUrl = initialEndpoint;
     let safetyCounter = 0;
-    const MAX_PAGES = 20; // Safety limit to prevent infinite loops
+    const MAX_PAGES = 20;
 
     while (nextUrl && safetyCounter < MAX_PAGES) {
       safetyCounter++;
-      
       const response = await fetch(nextUrl);
-      const rawResponse = await response.text();
-      const data = JSON.parse(rawResponse);
+      const data = await response.json();
 
       if (!response.ok) {
         const errorMessage = data?.error?.message || `Yêu cầu API thất bại ở trang ${safetyCounter} với mã trạng thái ${response.status}.`;
         throw new Error(errorMessage);
       }
       
-      allRawResponses.push(data);
-
       if (Array.isArray(data.data)) {
-        // Iterate through top-level comments
         for (const comment of data.data) {
-          // Add the top-level comment itself
           allComments.push(comment);
-          
-          // Check for and add replies
           if (comment.comments && Array.isArray(comment.comments.data)) {
             allComments.push(...comment.comments.data);
-            // Note: This doesn't handle pagination within replies yet, but it's a critical first step.
           }
         }
       }
 
-      // **SAFE PAGINATION LOGIC**
-      if (data.paging && data.paging.next) {
-        nextUrl = data.paging.next;
-      } else {
-        nextUrl = null; 
-      }
+      nextUrl = (data.paging && data.paging.next) ? data.paging.next : null;
     }
 
     const responseData = {
         data: allComments,
-        log: {
-            requestUrl: initialEndpoint,
-            rawResponse: JSON.stringify(allRawResponses, null, 2),
-        }
+        log: { requestUrl: initialEndpoint }
     };
+    
+    // Log the successful response to the new table
+    await supabaseAdmin.from('seeding_api_logs').insert({
+        post_id: postId,
+        raw_response: JSON.stringify(allComments, null, 2),
+        status: 'success'
+    });
 
     return new Response(JSON.stringify(responseData), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -106,6 +93,14 @@ serve(async (req) => {
     });
 
   } catch (error) {
+    // Log the error to the new table
+    await supabaseAdmin.from('seeding_api_logs').insert({
+        post_id: postId,
+        raw_response: JSON.stringify({ error: error.message }),
+        status: 'error',
+        error_message: error.message
+    });
+
     console.error('Error fetching Facebook comments:', error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
