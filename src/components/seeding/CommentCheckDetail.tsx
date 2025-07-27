@@ -112,15 +112,21 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
       const updates = [];
       let foundCount = 0;
 
+      // **ULTRA-ROBUST NORMALIZATION FUNCTION**
+      // Normalizes Unicode, converts to lowercase, and removes ALL punctuation and whitespace
+      // to create a "fingerprint" of the text for comparison.
       const normalizeString = (str: string) => {
         if (!str) return '';
-        return str.normalize('NFC').trim().toLowerCase();
+        return str
+          .normalize('NFC')
+          .toLowerCase()
+          .replace(/[\s\p{P}]/gu, ''); // Removes whitespace and all Unicode punctuation
       };
 
       for (const expectedComment of comments) {
         const normalizedExpectedContent = normalizeString(expectedComment.content);
         
-        // Find using "includes" for Ctrl+F-like behavior
+        // Find using "includes" on the hyper-normalized strings
         const foundFbComment = actualComments.find(actual => 
           actual.message && normalizeString(actual.message).includes(normalizedExpectedContent)
         );
