@@ -76,26 +76,29 @@ export const CommentCheckDetail = ({ post, onPostUpdate }: CommentCheckDetailPro
   const [checkUnit, setCheckUnit] = useState('hours');
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
-  const fetchComments = async () => {
-    setIsLoading(true);
-    const { data, error } = await supabase
-      .from('seeding_comments')
-      .select('*')
-      .eq('post_id', post.id)
-      .order('created_at', { ascending: true });
-
-    if (error) {
-      showError("Không thể tải danh sách comment: " + error.message);
-    } else {
-      setComments(data || []);
-    }
-    setIsLoading(false);
-  };
-
   useEffect(() => {
+    const fetchComments = async () => {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from('seeding_comments')
+        .select('*')
+        .eq('post_id', post.id)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        showError("Không thể tải danh sách comment: " + error.message);
+      } else {
+        setComments(data || []);
+      }
+      setIsLoading(false);
+    };
+
     fetchComments();
     setCheckResult(null);
     setLogData(null);
+  }, [post.id]);
+
+  useEffect(() => {
     setIsActive(post.is_active);
     if (post.check_frequency) {
       const [interval, unit] = post.check_frequency.split('_');
@@ -105,7 +108,7 @@ export const CommentCheckDetail = ({ post, onPostUpdate }: CommentCheckDetailPro
       setCheckInterval('1');
       setCheckUnit('hours');
     }
-  }, [post]);
+  }, [post.is_active, post.check_frequency]);
 
   const handleSettingsSave = async () => {
     setIsSavingSettings(true);
@@ -147,7 +150,14 @@ export const CommentCheckDetail = ({ post, onPostUpdate }: CommentCheckDetailPro
       const updates = [];
       let foundCount = 0;
 
-      for (const expectedComment of comments) {
+      const { data: currentComments, error: dbCommentsError } = await supabase
+        .from('seeding_comments')
+        .select('id, content, status')
+        .eq('post_id', post.id);
+      
+      if (dbCommentsError) throw dbCommentsError;
+
+      for (const expectedComment of currentComments) {
         const foundFbComment = actualComments.find(actual => actual.message && actual.message.trim() === expectedComment.content.trim());
         
         if (foundFbComment) {
@@ -175,7 +185,7 @@ export const CommentCheckDetail = ({ post, onPostUpdate }: CommentCheckDetailPro
         if (updateError) throw updateError;
       }
 
-      const total = comments.length;
+      const total = currentComments.length;
       setCheckResult({ found: foundCount, notFound: total - foundCount, total });
       showSuccess(`Kiểm tra hoàn tất! Tìm thấy ${foundCount}/${total} bình luận.`);
       
@@ -185,7 +195,6 @@ export const CommentCheckDetail = ({ post, onPostUpdate }: CommentCheckDetailPro
       }
       
       onPostUpdate();
-      fetchComments();
 
     } catch (error: any) {
       const errorMessage = error.context?.json ? (await error.context.json()).error : error.message;
