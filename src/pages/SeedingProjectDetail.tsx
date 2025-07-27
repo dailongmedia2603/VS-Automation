@@ -98,9 +98,9 @@ const SeedingProjectDetail = () => {
     }
   };
 
-  const fetchProjectData = async () => {
+  const fetchProjectData = async (isInitialLoad = false) => {
     if (!projectId) return;
-    setIsLoading(true);
+    if (isInitialLoad) setIsLoading(true);
     try {
       const { data: projectData, error: projectError } = await supabase
         .from('seeding_projects').select('id, name').eq('id', projectId).single();
@@ -126,12 +126,12 @@ const SeedingProjectDetail = () => {
     } catch (error: any) {
       showError("Không thể tải chi tiết dự án: " + error.message);
     } finally {
-      setIsLoading(false);
+      if (isInitialLoad) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchProjectData();
+    fetchProjectData(true);
   }, [projectId]);
 
   const handleSaveName = async () => {
@@ -362,7 +362,7 @@ const SeedingProjectDetail = () => {
                     frequencyUnit={frequencyUnit}
                     onFrequencyUnitChange={setFrequencyUnit}
                     onSaveSettings={handleSaveAutoCheckSettings}
-                    onCheckComplete={fetchProjectData}
+                    onCheckComplete={() => fetchProjectData()}
                   />
                 ) : selectedPost.type === 'post_approval' ? (
                   <PostApprovalDetail
@@ -375,7 +375,7 @@ const SeedingProjectDetail = () => {
                     frequencyUnit={frequencyUnit}
                     onFrequencyUnitChange={setFrequencyUnit}
                     onSaveSettings={handleSaveAutoCheckSettings}
-                    onCheckComplete={fetchProjectData}
+                    onCheckComplete={() => fetchProjectData()}
                   />
                 ) : (
                   <div className="flex-1">Loại post không được hỗ trợ.</div>
