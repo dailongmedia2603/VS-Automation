@@ -90,6 +90,7 @@ export const PostApprovalDetail = ({
   const [editedGroupId, setEditedGroupId] = useState('');
 
   const [groupToDelete, setGroupToDelete] = useState<Group | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
   
   useEffect(() => {
     setPostContent(post.content || '');
@@ -242,6 +243,42 @@ export const PostApprovalDetail = ({
     }
   };
 
+  const handleExportExcel = async () => {
+    setIsExporting(true);
+    const toastId = showLoading("Đang chuẩn bị dữ liệu xuất...");
+    try {
+      const { data, error } = await supabase.rpc('get_post_approval_export_data', {
+        p_post_id: post.id
+      });
+
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        showError("Không có dữ liệu để xuất.");
+        return;
+      }
+
+      const dataToExport = data.map(row => ({
+        'Nội dung bài viết': row.post_content,
+        'ID group': row.group_id,
+        'Link bài viết': row.approved_post_link,
+        'Account name': row.account_name,
+        'Account ID': row.account_id
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "ExportData");
+      XLSX.writeFile(workbook, `export_${project.name}_${post.name}.xlsx`);
+      showSuccess("Đã xuất file Excel thành công!");
+
+    } catch (error: any) {
+      showError("Xuất Excel thất bại: " + error.message);
+    } finally {
+      dismissToast(toastId);
+      setIsExporting(false);
+    }
+  };
+
   const filteredGroups = useMemo(() => {
     return groups.filter(group => {
       if (statusFilter !== 'all' && group.status !== statusFilter) return false;
@@ -298,6 +335,10 @@ export const PostApprovalDetail = ({
             <div className="relative flex-grow max-w-xs"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Tìm kiếm group ID..." className="pl-9 rounded-lg bg-slate-100 border-none" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
             <div className="flex items-center gap-2">
               <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}><SelectTrigger className="w-[180px] rounded-lg"><SelectValue placeholder="Lọc trạng thái" /></SelectTrigger><SelectContent><SelectItem value="all">Tất cả trạng thái</SelectItem><SelectItem value="approved">Đã duyệt</SelectItem><SelectItem value="not_found">Chưa duyệt</SelectItem></SelectContent></Select>
+              <Button onClick={handleExportExcel} variant="outline" className="rounded-lg" disabled={isExporting}>
+                {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                Xuất Excel
+              </Button>
               <Button onClick={() => setIsAddGroupDialogOpen(true)} className="rounded-lg"><PlusCircle className="mr-2 h-4 w-4" />Thêm Group</Button>
             </div>
           </div>
