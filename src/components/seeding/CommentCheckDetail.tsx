@@ -87,32 +87,27 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
     setLogData(null);
 
     try {
-      // Step 1: Trigger the Edge Function to fetch data and populate the log table.
-      const { error: functionError } = await supabase.functions.invoke('get-fb-comments', {
+      // Step 1: Trigger the Edge Function and get the clean data directly.
+      const { data: responseData, error: functionError } = await supabase.functions.invoke('get-fb-comments', {
         body: { 
           fbPostId: post.links,
           internalPostId: post.id 
         }
       });
-      if (functionError) throw functionError;
 
-      // Step 2: Fetch the newly created log from the database. This is our source of truth.
-      const { data: latestLog, error: logError } = await supabase
-        .from('seeding_api_logs')
-        .select('raw_response')
-        .eq('post_id', post.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-      
-      if (logError || !latestLog || !latestLog.raw_response) {
-        throw new Error("Không tìm thấy log API sau khi chạy. Vui lòng thử lại.");
+      if (functionError) {
+        const errorMessage = functionError.context?.json ? (await functionError.context.json()).error : functionError.message;
+        throw new Error(errorMessage);
       }
       
-      const rawResponseText = latestLog.raw_response;
-      const actualComments = JSON.parse(rawResponseText);
+      if (!responseData || !responseData.data) {
+        throw new Error("Phản hồi từ server không hợp lệ hoặc không có dữ liệu.");
+      }
 
-      // Step 3: Perform comparison against the logged data.
+      const actualComments = responseData.data; // This is the clean, flat array of comments
+      setLogData(responseData.log); // Set log data for the viewer
+
+      // Step 2: Perform comparison.
       const updates = [];
       let foundCount = 0;
 
@@ -167,8 +162,7 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
       fetchComments();
 
     } catch (error: any) {
-      const errorMessage = error.context?.json ? (await error.context.json()).error : error.message;
-      showError(`Kiểm tra thất bại: ${errorMessage}`);
+      showError(`Kiểm tra thất bại: ${error.message}`);
     } finally {
       setIsChecking(false);
     }
