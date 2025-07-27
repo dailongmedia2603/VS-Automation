@@ -49,10 +49,19 @@ serve(async (req) => {
         throw new Error("Chưa cấu hình URL cho tính năng Check Comment. Vui lòng vào trang Cài đặt.");
     }
 
-    let initialEndpoint = commentCheckTemplate.replace(/{postId}/g, fbPostId);
-    if (!initialEndpoint.includes('access_token=') && dbAccessToken) {
-        initialEndpoint += (initialEndpoint.includes('?') ? '&' : '?') + `access_token=${dbAccessToken}`;
+    // Build the URL programmatically to ensure correctness
+    const url = new URL(commentCheckTemplate.replace(/{postId}/g, fbPostId));
+    
+    // **STRATEGIC FIX:** Simplify the 'fields' parameter to ensure a response.
+    // This requests only top-level comments but is more compatible.
+    const simplifiedFields = 'message,from,permalink_url,created_time,comments';
+    url.searchParams.set('fields', simplifiedFields);
+
+    if (!url.searchParams.has('access_token') && dbAccessToken) {
+        url.searchParams.set('access_token', dbAccessToken);
     }
+
+    const initialEndpoint = url.toString();
 
     const allComments = [];
     let nextUrl = initialEndpoint;
@@ -72,6 +81,7 @@ serve(async (req) => {
       if (Array.isArray(data.data)) {
         for (const comment of data.data) {
           allComments.push(comment);
+          // Also add replies if they exist in the simplified response
           if (comment.comments && Array.isArray(comment.comments.data)) {
             allComments.push(...comment.comments.data);
           }
