@@ -13,7 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useState, useEffect } from "react";
 import { showSuccess, showError } from "@/utils/toast";
 import { useApiSettings } from "@/contexts/ApiSettingsContext";
-import { Loader2 } from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -33,12 +33,17 @@ const Settings = () => {
   const [isSavingIntegrations, setIsSavingIntegrations] = useState(false);
 
   // Facebook API Settings state
-  const [urlTemplates, setUrlTemplates] = useState({ comment_check: '' });
+  const [fbApiUrl, setFbApiUrl] = useState('');
+  const [urlTemplates, setUrlTemplates] = useState<{ [key: string]: string }>({ comment_check: '' });
   const [fbAccessToken, setFbAccessToken] = useState('');
   const [isLoadingFb, setIsLoadingFb] = useState(true);
   const [isSavingFb, setIsSavingFb] = useState(false);
   const [fbApiStatus, setFbApiStatus] = useState<'idle' | 'testing' | 'success' | 'error'>("idle");
   const [fbApiError, setFbApiError] = useState<string | null>(null);
+
+  // State for the new feature URL form
+  const [newFeature, setNewFeature] = useState('comment_check');
+  const [newUrl, setNewUrl] = useState('');
 
   // Effect for AI API settings
   useEffect(() => {
@@ -53,7 +58,7 @@ const Settings = () => {
       try {
         const [n8nRes, fbRes] = await Promise.all([
           supabase.from('n8n_settings').select('zalo_webhook_url').eq('id', 1).single(),
-          supabase.from('apifb_settings').select('url_templates, api_key').eq('id', 1).single()
+          supabase.from('apifb_settings').select('api_url, url_templates, api_key').eq('id', 1).single()
         ]);
 
         if (n8nRes.error && n8nRes.error.code !== 'PGRST116') throw n8nRes.error;
@@ -61,6 +66,7 @@ const Settings = () => {
 
         if (fbRes.error && fbRes.error.code !== 'PGRST116') throw fbRes.error;
         if (fbRes.data) {
+          setFbApiUrl(fbRes.data.api_url || '');
           setUrlTemplates(fbRes.data.url_templates || { comment_check: '' });
           setFbAccessToken(fbRes.data.api_key || '');
         }
@@ -73,6 +79,24 @@ const Settings = () => {
     };
     fetchSettings();
   }, []);
+
+  const handleAddOrUpdateFeatureUrl = () => {
+    if (!newFeature || !newUrl) {
+      showError("Vui lòng chọn tính năng và nhập URL.");
+      return;
+    }
+    setUrlTemplates(prev => ({ ...prev, [newFeature]: newUrl }));
+    setNewUrl('');
+    showSuccess(`Đã cập nhật URL cho tính năng: ${newFeature}`);
+  };
+
+  const handleDeleteFeatureUrl = (featureKey: string) => {
+    setUrlTemplates(prev => {
+      const newTemplates = { ...prev };
+      delete newTemplates[featureKey];
+      return newTemplates;
+    });
+  };
 
   // Save handler for AI API
   const handleSaveApi = async () => {
@@ -168,7 +192,7 @@ const Settings = () => {
     try {
       const { error } = await supabase
         .from('apifb_settings')
-        .upsert({ id: 1, url_templates: urlTemplates, api_key: fbAccessToken });
+        .upsert({ id: 1, api_url: fbApiUrl, url_templates: urlTemplates, api_key: fbAccessToken });
 
       if (error) throw error;
       showSuccess("Đã lưu cấu hình API Facebook!");
@@ -184,9 +208,8 @@ const Settings = () => {
     setFbApiStatus("testing");
     setFbApiError(null);
     try {
-        const urlToTest = (urlTemplates.comment_check || 'http://api.akng.io.vn/graph/me').replace(/{postId}/g, 'me');
         const { data, error } = await supabase.functions.invoke('test-fb-api', {
-            body: { apiUrl: urlToTest, accessToken: fbAccessToken }
+            body: { apiUrl: fbApiUrl, accessToken: fbAccessToken }
         });
 
         if (error) throw error;
@@ -339,15 +362,25 @@ const Settings = () => {
             </CardContent>
           </Card>
         </TabsContent>
-        <TabsContent value="api-facebook" className="mt-4">
+        <TabsContent value="api-facebook" className="mt-4 space-y-6">
           <Card className="shadow-sm rounded-2xl bg-white">
             <CardHeader>
-              <CardTitle>Cấu hình API Facebook Graph</CardTitle>
+              <CardTitle>Cấu hình Chung API Facebook</CardTitle>
               <CardDescription>
-                Nhập thông tin để kết nối với dịch vụ API của bạn.
+                Nhập thông tin kết nối cơ bản đến dịch vụ API của bạn.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="fb-api-url">URL API Gốc</Label>
+                <Input
+                  id="fb-api-url"
+                  placeholder="http://api.akng.io.vn"
+                  value={fbApiUrl}
+                  onChange={(e) => setFbApiUrl(e.target.value)}
+                  className="bg-slate-100 border-none rounded-lg"
+                />
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="fb-access-token">Access Token</Label>
                 <Input
@@ -359,28 +392,6 @@ const Settings = () => {
                   className="bg-slate-100 border-none rounded-lg"
                 />
               </div>
-              <div className="border-t pt-4 mt-4">
-                <h3 className="text-md font-semibold">Cấu hình URL theo tính năng</h3>
-                <p className="text-sm text-muted-foreground mb-4">Định nghĩa các mẫu URL cho từng tính năng cụ thể.</p>
-                <div className="space-y-4 p-4 border rounded-lg bg-slate-50/50">
-                    <div className="space-y-2">
-                        <Label htmlFor="url-comment-check">Check Comment URL</Label>
-                        <Input
-                            id="url-comment-check"
-                            placeholder="http://api.example.com/graph/{postId}/comments"
-                            value={urlTemplates.comment_check}
-                            onChange={(e) => setUrlTemplates(prev => ({ ...prev, comment_check: e.target.value }))}
-                            className="bg-white"
-                        />
-                        <p className="text-xs text-muted-foreground">Sử dụng <code>{`{postId}`}</code> để đại diện cho ID bài viết. Access token sẽ được tự động thêm vào.</p>
-                    </div>
-                    {/* Add other feature URL templates here in the future */}
-                </div>
-              </div>
-              <Button onClick={handleSaveFacebook} disabled={isSavingFb} className="rounded-lg bg-blue-600 hover:bg-blue-700">
-                {isSavingFb && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isSavingFb ? "Đang lưu..." : "Lưu cấu hình"}
-              </Button>
               <div className="border-t pt-6 mt-2">
                 <div className="flex items-center justify-between">
                     <p className="font-medium">Kiểm tra kết nối</p>
@@ -389,7 +400,7 @@ const Settings = () => {
                     {fbApiStatus === "success" && <Badge variant="default" className="bg-green-100 text-green-800">Thành công</Badge>}
                     {fbApiStatus === "error" && <Badge variant="destructive">Thất bại</Badge>}
                 </div>
-                <Button onClick={handleTestFbConnection} disabled={fbApiStatus === "testing" || !urlTemplates.comment_check} className="mt-4 rounded-lg">
+                <Button onClick={handleTestFbConnection} disabled={fbApiStatus === "testing" || !fbApiUrl} className="mt-4 rounded-lg">
                   {fbApiStatus === "testing" ? "Đang kiểm tra..." : "Kiểm tra kết nối"}
                 </Button>
                 {fbApiError && (
@@ -401,7 +412,67 @@ const Settings = () => {
               </div>
             </CardContent>
           </Card>
-          <FacebookApiReference baseUrl={urlTemplates.comment_check.split('/{postId}')[0]} accessToken={fbAccessToken} />
+
+          <Card className="shadow-sm rounded-2xl bg-white">
+            <CardHeader>
+              <CardTitle>Cấu hình URL theo Tính năng</CardTitle>
+              <CardDescription>
+                Định nghĩa các mẫu URL cho từng tính năng cụ thể.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="p-4 border rounded-lg bg-slate-50/50 space-y-4">
+                <div className="grid grid-cols-3 gap-4 items-end">
+                  <div className="col-span-2 space-y-2">
+                    <Label htmlFor="feature-select">Tính năng</Label>
+                    <Select value={newFeature} onValueChange={setNewFeature}>
+                      <SelectTrigger id="feature-select"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="comment_check">Check Comment</SelectItem>
+                        <SelectItem value="post_approval">Check Duyệt Post</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="col-span-3 space-y-2">
+                    <Label htmlFor="feature-url">Mẫu URL</Label>
+                    <Input id="feature-url" placeholder="http://api.example.com/graph/{postId}/comments" value={newUrl} onChange={(e) => setNewUrl(e.target.value)} />
+                    <p className="text-xs text-muted-foreground">Sử dụng <code>{`{postId}`}</code> hoặc các biến khác nếu cần.</p>
+                  </div>
+                </div>
+                <Button onClick={handleAddOrUpdateFeatureUrl}>Thêm / Cập nhật</Button>
+              </div>
+              
+              <div className="mt-6 space-y-2">
+                <h4 className="font-medium text-sm">Danh sách URL đã lưu</h4>
+                {Object.keys(urlTemplates).length > 0 ? (
+                  <div className="border rounded-lg">
+                    {Object.entries(urlTemplates).map(([key, value]) => (
+                      <div key={key} className="flex items-center justify-between p-3 border-b last:border-b-0">
+                        <div>
+                          <p className="font-semibold text-slate-700">{key === 'comment_check' ? 'Check Comment' : key === 'post_approval' ? 'Check Duyệt Post' : key}</p>
+                          <p className="text-xs text-muted-foreground font-mono">{value}</p>
+                        </div>
+                        <Button variant="ghost" size="icon" onClick={() => handleDeleteFeatureUrl(key)} className="text-destructive hover:text-destructive">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">Chưa có URL nào được cấu hình.</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="flex justify-end">
+            <Button onClick={handleSaveFacebook} disabled={isSavingFb} className="rounded-lg bg-blue-600 hover:bg-blue-700">
+              {isSavingFb && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Lưu tất cả cấu hình Facebook
+            </Button>
+          </div>
+
+          <FacebookApiReference baseUrl={fbApiUrl} accessToken={fbAccessToken} />
         </TabsContent>
       </Tabs>
     </main>
