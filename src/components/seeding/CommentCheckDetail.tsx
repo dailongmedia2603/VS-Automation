@@ -27,6 +27,7 @@ type Comment = {
   status: 'visible' | 'not_visible';
   account_name: string | null;
   comment_link: string | null;
+  account_id: string | null;
 };
 
 interface FbComment {
@@ -34,10 +35,10 @@ interface FbComment {
   from?: {
     id: string;
     name: string;
-    link?: string;
   };
   permalink_url?: string;
   id: string;
+  created_time: string;
 }
 
 interface CheckResult {
@@ -121,6 +122,7 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
             status: 'visible' as const,
             account_name: foundFbComment.from?.name || 'Không rõ',
             comment_link: foundFbComment.permalink_url || null,
+            account_id: foundFbComment.from?.id || null,
           });
         } else {
           if (expectedComment.status === 'visible') {
@@ -129,6 +131,7 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
               status: 'not_visible' as const,
               account_name: null,
               comment_link: null,
+              account_id: null,
             });
           }
         }
@@ -279,7 +282,16 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
                       </TableCell>
                       <TableCell>
                         <div className="text-xs text-slate-500">
-                          <p><strong>Account:</strong> {comment.account_name || 'N/A'}</p>
+                          <div className="flex items-center gap-1.5">
+                            <strong>Account:</strong>
+                            {comment.account_id && comment.account_name ? (
+                              <a href={`https://www.facebook.com/${comment.account_id}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium">
+                                {comment.account_name}
+                              </a>
+                            ) : (
+                              <span>{comment.account_name || 'N/A'}</span>
+                            )}
+                          </div>
                           <div className="flex items-center gap-1.5">
                             <strong>Link:</strong> 
                             {comment.comment_link ? (
