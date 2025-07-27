@@ -37,7 +37,7 @@ serve(async (req) => {
       .select('*')
       .eq('post_id', postId);
     if (expectedError) throw new Error(`Lỗi lấy comment dự kiến: ${expectedError.message}`);
-    const expectedComments = expectedCommentsData || []; // Handle null case
+    const expectedComments = expectedCommentsData || [];
 
     // Step 2: Fetch actual comments (from actual_comments)
     const { data: actualCommentsData, error: actualError } = await supabaseAdmin
@@ -45,7 +45,7 @@ serve(async (req) => {
       .select('*')
       .eq('post_id', postId);
     if (actualError) throw new Error(`Lỗi lấy comment thực tế: ${actualError.message}`);
-    const actualComments = actualCommentsData || []; // Handle null case
+    const actualComments = actualCommentsData || [];
 
     // Step 3: Perform comparison
     const updates = [];
@@ -67,18 +67,15 @@ serve(async (req) => {
         foundCount++;
         updates.push({
           id: expectedComment.id,
-          post_id: expectedComment.post_id, // Ensure post_id is included
           status: 'visible',
           account_name: foundFbComment.account_name,
           comment_link: foundFbComment.comment_link,
           account_id: foundFbComment.account_id,
         });
       } else {
-        // Only update if the status was previously 'visible'
         if (expectedComment.status === 'visible') {
           updates.push({
             id: expectedComment.id,
-            post_id: expectedComment.post_id, // Ensure post_id is included
             status: 'not_visible',
             account_name: null,
             comment_link: null,
@@ -88,10 +85,21 @@ serve(async (req) => {
       }
     }
 
-    // Step 4: Batch update the seeding_comments table
+    // Step 4: Batch update using individual UPDATE statements in parallel
     if (updates.length > 0) {
-      const { error: updateError } = await supabaseAdmin.from('seeding_comments').upsert(updates);
-      if (updateError) throw new Error(`Lỗi cập nhật trạng thái: ${updateError.message}`);
+      const updatePromises = updates.map(updateData => {
+        const { id, ...dataToUpdate } = updateData;
+        return supabaseAdmin
+          .from('seeding_comments')
+          .update(dataToUpdate)
+          .eq('id', id);
+      });
+
+      const results = await Promise.all(updatePromises);
+      const firstError = results.find(res => res.error);
+      if (firstError) {
+        throw new Error(`Lỗi cập nhật trạng thái: ${firstError.error.message}`);
+      }
     }
 
     const total = expectedComments.length;
