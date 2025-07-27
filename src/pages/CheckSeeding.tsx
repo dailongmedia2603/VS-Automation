@@ -161,7 +161,7 @@ const CheckSeeding = () => {
     setIsSaving(true);
     let error;
     if (editingProject) {
-      ({ error } = await supabase.from('seeding_projects').update({ name: projectName }).eq('id', editingProject.id));
+      ({ error } = await supabase.from('seeding_projects').update({ name: projectName, status: editingProject.status }).eq('id', editingProject.id));
     } else {
       ({ error } = await supabase.from('seeding_projects').insert({ name: projectName }));
     }
