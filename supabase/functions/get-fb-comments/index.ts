@@ -63,19 +63,24 @@ serve(async (req) => {
       const response = await fetch(nextUrl);
       const data = await response.json();
       
-      if (!response.ok) {
-        const errorMessage = data?.error?.message || `Yêu cầu API thất bại ở trang ${safetyCounter} với mã trạng thái ${response.status}.`;
+      if (!response.ok || data.error) {
+        const errorMessage = data?.error?.message || `Yêu cầu API thất bại với mã trạng thái ${response.status}.`;
         throw new Error(errorMessage);
       }
       
-      if (Array.isArray(data.data)) {
-        for (const comment of data.data) {
+      // Handle both `{"data": [...]}` and `[...]` structures
+      const commentsList = Array.isArray(data) ? data : (data.data && Array.isArray(data.data) ? data.data : []);
+
+      if (commentsList.length > 0) {
+        for (const comment of commentsList) {
           allComments.push(comment);
+          // Also handle nested replies if they exist
           if (comment.comments && Array.isArray(comment.comments.data)) {
             allComments.push(...comment.comments.data);
           }
         }
       }
+      
       nextUrl = (data.paging && data.paging.next) ? data.paging.next : null;
     }
 
