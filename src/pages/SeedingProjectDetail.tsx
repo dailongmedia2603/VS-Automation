@@ -6,7 +6,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, MessageSquare, FileCheck2, ChevronRight, ArrowLeft, Edit, Trash2, Loader2, Check, CheckCircle, Settings, Clock } from 'lucide-react';
+import { PlusCircle, MessageSquare, FileCheck2, ChevronRight, ArrowLeft, Edit, Trash2, Loader2, Check, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -16,7 +16,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { CommentCheckDetail } from '@/components/seeding/CommentCheckDetail';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 type Project = {
   id: number;
@@ -317,36 +316,19 @@ const SeedingProjectDetail = () => {
             {selectedPost ? (
               <div className="w-full h-full flex flex-col gap-6">
                 {selectedPost.type === 'comment_check' ? (
-                  <CommentCheckDetail post={selectedPost} />
+                  <CommentCheckDetail
+                    post={selectedPost}
+                    autoCheckActive={autoCheckActive}
+                    onAutoCheckChange={setAutoCheckActive}
+                    frequencyValue={frequencyValue}
+                    onFrequencyValueChange={setFrequencyValue}
+                    frequencyUnit={frequencyUnit}
+                    onFrequencyUnitChange={setFrequencyUnit}
+                    onSaveSettings={handleSaveAutoCheckSettings}
+                  />
                 ) : (
                   <div className="flex-1">Chức năng Check duyệt post đang được phát triển.</div>
                 )}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><Settings className="h-5 w-5 text-slate-600" />Cài đặt tự động</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50">
-                      <Label htmlFor="auto-check-switch" className="font-medium text-slate-700">Tự động chạy check</Label>
-                      <Switch id="auto-check-switch" checked={autoCheckActive} onCheckedChange={setAutoCheckActive} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Tần suất quét lại</Label>
-                      <div className="flex items-center gap-2">
-                        <Input type="number" value={frequencyValue} onChange={(e) => setFrequencyValue(e.target.value)} className="w-24" />
-                        <Select value={frequencyUnit} onValueChange={setFrequencyUnit}>
-                          <SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="minute">Phút</SelectItem>
-                            <SelectItem value="hour">Giờ</SelectItem>
-                            <SelectItem value="day">Ngày</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <Button onClick={handleSaveAutoCheckSettings}>Lưu cài đặt</Button>
-                  </CardContent>
-                </Card>
               </div>
             ) : (
               <div className="text-center text-slate-500">

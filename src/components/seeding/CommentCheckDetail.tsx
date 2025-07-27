@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -9,10 +9,13 @@ import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, Download, MoreHorizontal, Link as LinkIcon, MessageCircle, Code, PlayCircle, CheckCircle2, XCircle, Loader2, FileText } from 'lucide-react';
+import { Search, Download, MoreHorizontal, Link as LinkIcon, MessageCircle, Code, PlayCircle, CheckCircle2, XCircle, Loader2, FileText, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 
 type Post = {
   id: number;
@@ -45,6 +48,13 @@ interface ErrorLog {
 
 interface CommentCheckDetailProps {
   post: Post;
+  autoCheckActive: boolean;
+  onAutoCheckChange: (checked: boolean) => void;
+  frequencyValue: string;
+  onFrequencyValueChange: (value: string) => void;
+  frequencyUnit: string;
+  onFrequencyUnitChange: (unit: string) => void;
+  onSaveSettings: () => void;
 }
 
 const LogDialog = ({ isOpen, onOpenChange, log, isError }: { isOpen: boolean, onOpenChange: (open: boolean) => void, log: ErrorLog | null, isError: boolean }) => {
@@ -107,7 +117,16 @@ const LogDialog = ({ isOpen, onOpenChange, log, isError }: { isOpen: boolean, on
     );
 };
 
-export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
+export const CommentCheckDetail = ({ 
+  post,
+  autoCheckActive,
+  onAutoCheckChange,
+  frequencyValue,
+  onFrequencyValueChange,
+  frequencyUnit,
+  onFrequencyUnitChange,
+  onSaveSettings
+}: CommentCheckDetailProps) => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -159,7 +178,6 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
         throw { step: 'Lấy dữ liệu', error: fetchError || fetchData, logData: fetchData };
       }
       
-      // Always set log data after step 1 to allow inspection
       setLog({
           step: 'Lấy dữ liệu thành công',
           errorMessage: 'Không có lỗi',
@@ -237,46 +255,79 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
         </CardHeader>
         <CardContent className="flex-1 flex flex-col">
           <Card className="mb-4 bg-slate-50 border-slate-200">
-            <CardContent className="p-4 flex items-center justify-between">
-              <div>
-                <h3 className="font-semibold text-slate-800">Kiểm tra bình luận tự động</h3>
-                <p className="text-sm text-slate-500">Quét bài viết và cập nhật trạng thái các bình luận trong danh sách.</p>
-              </div>
-              <div className="flex items-center gap-4">
-                {checkResult && (
-                  <div className="flex items-center gap-4 text-sm">
-                    <div className="flex items-center gap-2 text-green-600">
-                      <CheckCircle2 className="h-5 w-5" />
-                      <div>
-                        <p className="font-bold">{checkResult.found}</p>
-                        <p className="text-xs text-slate-500">Đã hiện</p>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-slate-800">Kiểm tra bình luận tự động</h3>
+                  <p className="text-sm text-slate-500">Quét bài viết và cập nhật trạng thái các bình luận trong danh sách.</p>
+                </div>
+                <div className="flex items-center gap-4">
+                  {checkResult && (
+                    <div className="flex items-center gap-4 text-sm">
+                      <div className="flex items-center gap-2 text-green-600">
+                        <CheckCircle2 className="h-5 w-5" />
+                        <div>
+                          <p className="font-bold">{checkResult.found}</p>
+                          <p className="text-xs text-slate-500">Đã hiện</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 text-amber-600">
+                        <XCircle className="h-5 w-5" />
+                        <div>
+                          <p className="font-bold">{checkResult.notFound}</p>
+                          <p className="text-xs text-slate-500">Chưa hiện</p>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 text-amber-600">
-                      <XCircle className="h-5 w-5" />
-                      <div>
-                        <p className="font-bold">{checkResult.notFound}</p>
-                        <p className="text-xs text-slate-500">Chưa hiện</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {log && (
-                    <Button 
-                        variant={log.errorMessage !== 'Không có lỗi' ? 'destructive' : 'outline'} 
-                        size="sm" 
-                        onClick={() => setIsLogOpen(true)}
-                    >
-                        <FileText className="mr-2 h-4 w-4" />
-                        {log.errorMessage !== 'Không có lỗi' ? 'Xem Log Lỗi' : 'Xem Log API'}
-                    </Button>
-                )}
-                <Button onClick={handleRunCheck} disabled={isChecking} className="bg-blue-600 hover:bg-blue-700 rounded-lg">
-                  {isChecking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
-                  {isChecking ? 'Đang chạy...' : 'Chạy Check'}
-                </Button>
+                  )}
+                  {log && (
+                      <Button 
+                          variant={log.errorMessage !== 'Không có lỗi' ? 'destructive' : 'outline'} 
+                          size="sm" 
+                          onClick={() => setIsLogOpen(true)}
+                      >
+                          <FileText className="mr-2 h-4 w-4" />
+                          {log.errorMessage !== 'Không có lỗi' ? 'Xem Log Lỗi' : 'Xem Log API'}
+                      </Button>
+                  )}
+                  <Button onClick={handleRunCheck} disabled={isChecking} className="bg-blue-600 hover:bg-blue-700 rounded-lg">
+                    {isChecking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
+                    {isChecking ? 'Đang chạy...' : 'Chạy Check'}
+                  </Button>
+                </div>
               </div>
             </CardContent>
+            <Accordion type="single" collapsible className="w-full px-4 pb-2">
+              <AccordionItem value="settings" className="border-b-0">
+                <AccordionTrigger className="text-sm text-slate-600 hover:no-underline py-2 -mx-2 px-2 rounded-md hover:bg-slate-200/50">
+                  <div className="flex items-center gap-2">
+                    <Settings className="h-4 w-4" />
+                    Cài đặt tự động
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="pt-4 space-y-4">
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-white border">
+                    <Label htmlFor="auto-check-switch" className="font-medium text-slate-700">Tự động chạy check</Label>
+                    <Switch id="auto-check-switch" checked={autoCheckActive} onCheckedChange={onAutoCheckChange} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Tần suất quét lại</Label>
+                    <div className="flex items-center gap-2">
+                      <Input type="number" value={frequencyValue} onChange={(e) => onFrequencyValueChange(e.target.value)} className="w-24 bg-white" />
+                      <Select value={frequencyUnit} onValueChange={onFrequencyUnitChange}>
+                        <SelectTrigger className="w-[120px] bg-white"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="minute">Phút</SelectItem>
+                          <SelectItem value="hour">Giờ</SelectItem>
+                          <SelectItem value="day">Ngày</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <Button onClick={onSaveSettings} size="sm">Lưu cài đặt</Button>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </Card>
           <div className="flex items-center justify-between gap-4 mb-4">
             <div className="relative flex-grow max-w-xs">
