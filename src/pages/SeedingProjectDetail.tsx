@@ -320,10 +320,11 @@ const SeedingProjectDetail = () => {
             "h-full p-6",
             selectedPost ? "overflow-y-auto" : "flex items-center justify-center"
           )}>
-            {selectedPost ? (
+            {selectedPost && project ? (
               <div className="w-full flex flex-col gap-6">
                 {selectedPost.type === 'comment_check' ? (
                   <CommentCheckDetail
+                    project={project}
                     post={selectedPost}
                     autoCheckActive={autoCheckActive}
                     onAutoCheckChange={setAutoCheckActive}

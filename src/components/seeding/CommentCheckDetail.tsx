@@ -18,6 +18,12 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import * as XLSX from 'xlsx';
+
+type Project = {
+  id: number;
+  name: string;
+};
 
 type Post = {
   id: number;
@@ -33,6 +39,7 @@ type Comment = {
   account_name: string | null;
   comment_link: string | null;
   account_id: string | null;
+  commented_at: string | null;
 };
 
 interface CheckResult {
@@ -49,6 +56,7 @@ interface ErrorLog {
 }
 
 interface CommentCheckDetailProps {
+  project: Project;
   post: Post;
   autoCheckActive: boolean;
   onAutoCheckChange: (checked: boolean) => void;
@@ -121,6 +129,7 @@ const LogDialog = ({ isOpen, onOpenChange, log, isError }: { isOpen: boolean, on
 };
 
 export const CommentCheckDetail = ({ 
+  project,
   post,
   autoCheckActive,
   onAutoCheckChange,
@@ -325,6 +334,24 @@ export const CommentCheckDetail = ({
       }
   };
 
+  const handleExportExcel = () => {
+    const dataToExport = filteredComments.map(comment => ({
+        'Dự án': project.name,
+        'Loại': post.type === 'comment_check' ? 'Check Comment' : 'Check Duyệt Post',
+        'Content Comment': comment.content,
+        'Account': comment.account_name || 'N/A',
+        'Link Account': comment.account_id ? `https://www.facebook.com/${comment.account_id}` : 'N/A',
+        'Link Comment': comment.comment_link || 'N/A',
+        'Thời gian Comment': comment.commented_at ? new Date(comment.commented_at).toLocaleString('vi-VN') : 'N/A'
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Comments");
+    XLSX.writeFile(workbook, `${project.name} - ${post.name} - Comments.xlsx`);
+    showSuccess("Đã xuất file Excel thành công!");
+  };
+
   const filteredComments = useMemo(() => {
     return comments.filter(comment => {
       if (statusFilter !== 'all' && comment.status !== statusFilter) return false;
@@ -445,7 +472,7 @@ export const CommentCheckDetail = ({
                   <SelectItem value="not_visible">Chưa hiện</SelectItem>
                 </SelectContent>
               </Select>
-              <Button variant="outline" className="rounded-lg">
+              <Button onClick={handleExportExcel} variant="outline" className="rounded-lg">
                 <Download className="mr-2 h-4 w-4" />
                 Xuất Excel
               </Button>

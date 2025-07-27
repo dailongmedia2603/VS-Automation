@@ -71,6 +71,7 @@ serve(async (req) => {
           account_name: foundFbComment.account_name,
           comment_link: foundFbComment.comment_link,
           account_id: foundFbComment.account_id,
+          commented_at: foundFbComment.created_time,
         });
       } else {
         if (expectedComment.status === 'visible') {
@@ -80,6 +81,7 @@ serve(async (req) => {
             account_name: null,
             comment_link: null,
             account_id: null,
+            commented_at: null,
           });
         }
       }
