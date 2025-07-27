@@ -30,17 +30,6 @@ type Comment = {
   account_id: string | null;
 };
 
-interface FbComment {
-  message: string;
-  from?: {
-    id: string;
-    name: string;
-  };
-  permalink_url?: string;
-  id: string;
-  created_time: string;
-}
-
 interface CheckResult {
   found: number;
   notFound: number;
@@ -98,36 +87,50 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
     setLogData(null);
 
     try {
-      const { data: fbData, error: functionError } = await supabase.functions.invoke('get-fb-comments', {
+      // Step 1: Trigger the Edge Function to fetch data and populate the log table.
+      const { error: functionError } = await supabase.functions.invoke('get-fb-comments', {
         body: { 
           fbPostId: post.links,
           internalPostId: post.id 
         }
       });
-
       if (functionError) throw functionError;
-      if (fbData.error) throw new Error(fbData.error);
-      
-      setLogData(fbData.log);
 
-      const actualComments: FbComment[] = fbData.data || [];
+      // Step 2: Fetch the newly created log from the database. This is our source of truth.
+      const { data: latestLog, error: logError } = await supabase
+        .from('seeding_api_logs')
+        .select('raw_response')
+        .eq('post_id', post.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
       
+      if (logError || !latestLog || !latestLog.raw_response) {
+        throw new Error("Không tìm thấy log API sau khi chạy. Vui lòng thử lại.");
+      }
+      
+      const rawResponseText = latestLog.raw_response;
+      const actualComments = JSON.parse(rawResponseText);
+
+      // Step 3: Perform comparison against the logged data.
       const updates = [];
       let foundCount = 0;
 
       const normalizeString = (str: string) => {
         if (!str) return '';
-        return str
-          .normalize('NFC')
-          .toLowerCase()
-          .replace(/[\s\p{P}]/gu, '');
+        return str.normalize('NFC').toLowerCase().replace(/[\s\p{P}]/gu, '');
       };
+      
+      const normalizedApiComments = actualComments.map((c: any) => ({
+          ...c,
+          normalizedMessage: normalizeString(c.message)
+      }));
 
       for (const expectedComment of comments) {
         const normalizedExpectedContent = normalizeString(expectedComment.content);
         
-        const foundFbComment = actualComments.find(actual => 
-          actual.message && normalizeString(actual.message).includes(normalizedExpectedContent)
+        const foundFbComment = normalizedApiComments.find((actual: any) => 
+          actual.normalizedMessage && actual.normalizedMessage.includes(normalizedExpectedContent)
         );
         
         if (foundFbComment) {
