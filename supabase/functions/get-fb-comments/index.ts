@@ -29,21 +29,28 @@ serve(async (req) => {
       .eq('id', 1)
       .single();
 
-    if (settingsError || !fbSettings || !fbSettings.api_key) {
+    if (settingsError || !fbSettings) {
       throw new Error("Không thể tải cấu hình API Facebook. Vui lòng kiểm tra trang Cài đặt.");
     }
 
-    const { url_templates: urlTemplates, api_key: accessToken } = fbSettings;
+    const { url_templates: urlTemplates, api_key: dbAccessToken } = fbSettings;
     const commentCheckTemplate = urlTemplates?.comment_check;
 
     if (!commentCheckTemplate) {
         throw new Error("Chưa cấu hình URL cho tính năng Check Comment. Vui lòng vào trang Cài đặt.");
     }
 
-    // Replace placeholder and construct the final URL
-    const finalUrl = commentCheckTemplate.replace(/{postId}/g, postId);
-    const fields = 'message,from{id,name},permalink_url,created_time';
-    const initialEndpoint = `${finalUrl}?fields=${fields}&access_token=${accessToken}`;
+    // Use the template directly from settings
+    let initialEndpoint = commentCheckTemplate.replace(/{postId}/g, postId);
+
+    // Append the access token from DB only if it's not already in the template
+    if (!initialEndpoint.includes('access_token=') && dbAccessToken) {
+        if (initialEndpoint.includes('?')) {
+            initialEndpoint += `&access_token=${dbAccessToken}`;
+        } else {
+            initialEndpoint += `?access_token=${dbAccessToken}`;
+        }
+    }
 
     let allComments = [];
     let nextUrl = initialEndpoint;
