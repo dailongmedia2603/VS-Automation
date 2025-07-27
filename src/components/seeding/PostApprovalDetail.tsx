@@ -18,6 +18,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import * as XLSX from 'xlsx';
+import { LogDialog, type ErrorLog } from '@/components/seeding/LogDialog';
 
 type Project = {
   id: number;
@@ -75,6 +76,8 @@ export const PostApprovalDetail = ({
   const [statusFilter, setStatusFilter] = useState<'all' | 'approved' | 'not_found'>('all');
   const [isChecking, setIsChecking] = useState(false);
   const [checkResult, setCheckResult] = useState<CheckResult | null>(null);
+  const [log, setLog] = useState<ErrorLog | null>(null);
+  const [isLogOpen, setIsLogOpen] = useState(false);
   
   const fetchGroups = async () => {
     setIsLoading(true);
@@ -95,11 +98,13 @@ export const PostApprovalDetail = ({
   useEffect(() => {
     fetchGroups();
     setCheckResult(null);
+    setLog(null);
   }, [post.id]);
 
   const handleRunCheck = async () => {
     setIsChecking(true);
     setCheckResult(null);
+    setLog(null);
     const toastId = showLoading("Đang quét các group...");
 
     try {
@@ -113,12 +118,14 @@ export const PostApprovalDetail = ({
 
       dismissToast(toastId);
       setCheckResult(data);
+      setLog({ step: 'Kiểm tra hoàn tất', errorMessage: 'Không có lỗi' });
       showSuccess(`Kiểm tra hoàn tất! Duyệt thành công ${data.approved}/${data.total} group.`);
       onCheckComplete();
       fetchGroups();
 
     } catch (err: any) {
       dismissToast(toastId);
+      setLog({ step: 'Kiểm tra thất bại', errorMessage: err.message });
       showError(`Kiểm tra thất bại: ${err.message}`);
     } finally {
       setIsChecking(false);
@@ -173,6 +180,16 @@ export const PostApprovalDetail = ({
                         </div>
                       </div>
                     </div>
+                  )}
+                  {log && (
+                      <Button 
+                          variant={log.errorMessage !== 'Không có lỗi' ? 'destructive' : 'outline'} 
+                          size="sm" 
+                          onClick={() => setIsLogOpen(true)}
+                      >
+                          <FileText className="mr-2 h-4 w-4" />
+                          {log.errorMessage !== 'Không có lỗi' ? 'Xem Log Lỗi' : 'Xem Log'}
+                      </Button>
                   )}
                   <Button onClick={handleRunCheck} disabled={isChecking} className="bg-blue-600 hover:bg-blue-700 rounded-lg">
                     {isChecking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
@@ -300,6 +317,7 @@ export const PostApprovalDetail = ({
           </div>
         </CardContent>
       </Card>
+      <LogDialog isOpen={isLogOpen} onOpenChange={setIsLogOpen} log={log} isError={log?.errorMessage !== 'Không có lỗi'} />
     </>
   );
 };
