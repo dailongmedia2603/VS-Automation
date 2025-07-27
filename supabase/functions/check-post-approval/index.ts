@@ -7,16 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const normalizeString = (str) => {
-  if (!str) return '';
-  // Remove URLs, multiple spaces, and convert to lowercase for better matching
-  return str
-    .replace(/https?:\/\/[^\s]+/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
-};
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -34,98 +24,62 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { data: post, error: postError } = await supabaseAdmin.from('seeding_posts').select('content').eq('id', postId).single();
-    if (postError) throw new Error(`Failed to fetch post content: ${postError.message}`);
-    if (!post.content) throw new Error("Post has no content to check.");
-
+    // Step 1: Get settings and groups to check
     const { data: fbSettings, error: settingsError } = await supabaseAdmin.from('apifb_settings').select('url_templates, api_key').eq('id', 1).single();
-    if (settingsError || !fbSettings) {
-      throw new Error("Facebook API settings are not configured.");
-    }
-
+    if (settingsError || !fbSettings) throw new Error("Facebook API settings are not configured.");
     const { url_templates: urlTemplates, api_key: accessToken } = fbSettings;
     const postApprovalTemplate = urlTemplates?.post_approval;
-
-    if (!postApprovalTemplate) {
-        throw new Error("Chưa cấu hình URL cho tính năng Check Duyệt Post trong Cài đặt.");
-    }
-
-    const normalizedPostContent = normalizeString(post.content);
+    if (!postApprovalTemplate) throw new Error("Chưa cấu hình URL cho tính năng Check Duyệt Post trong Cài đặt.");
 
     const { data: groups, error: groupsError } = await supabaseAdmin.from('seeding_groups').select('id, group_id').eq('post_id', postId);
     if (groupsError) throw new Error(`Failed to fetch groups for post: ${groupsError.message}`);
 
+    // Step 2: Fetch data for each group and process it
     for (const group of groups) {
       const groupId = group.group_id;
-      
       let feedUrl = postApprovalTemplate.replace(/{group-id}/g, groupId);
-
       if (!feedUrl.includes('access_token=') && accessToken) {
         const separator = feedUrl.includes('?') ? '&' : '?';
         feedUrl += `${separator}access_token=${accessToken}`;
       }
       
-      if (!firstRequestUrl) {
-        firstRequestUrl = feedUrl;
-      }
+      if (!firstRequestUrl) firstRequestUrl = feedUrl;
 
       try {
         const response = await fetch(feedUrl);
         const responseText = await response.text();
-        
-        if (!firstRawResponse) {
-            firstRawResponse = responseText;
-        }
-
-        const feedData = JSON.parse(responseText);
+        if (!firstRawResponse) firstRawResponse = responseText;
 
         if (!response.ok) {
-            console.warn(`API error for group ${groupId}: ${feedData?.error?.message || 'Unknown error'}`);
-            continue;
+          console.warn(`API error for group ${groupId}: ${responseText}`);
+          continue;
         }
 
-        if (feedData.data) {
-          const foundPost = feedData.data.find(p => p.message && normalizeString(p.message).includes(normalizedPostContent));
-          
-          if (foundPost) {
-            await supabaseAdmin.from('seeding_groups').update({
-              status: 'approved',
-              approved_post_link: foundPost.permalink_url,
-              checked_at: new Date().toISOString()
-            }).eq('id', group.id);
-          } else {
-            await supabaseAdmin.from('seeding_groups').update({
-              checked_at: new Date().toISOString(),
-              status: 'not_found'
-            }).eq('id', group.id);
-          }
-        }
+        // Invoke the processing function
+        const { error: processError } = await supabaseAdmin.functions.invoke('process-and-store-duyetpost', {
+          body: { rawResponse: responseText, internalPostId: postId, groupId: groupId }
+        });
+        if (processError) throw new Error(`Lỗi xử lý dữ liệu cho group ${groupId}: ${processError.message}`);
+
       } catch (fetchErr) {
-          console.error(`Failed to fetch feed for group ${groupId}:`, fetchErr.message);
+        console.error(`Failed to fetch or process feed for group ${groupId}:`, fetchErr.message);
       }
     }
 
-    const { data: allGroupsForPost, error: allGroupsError } = await supabaseAdmin.from('seeding_groups').select('status').eq('post_id', postId);
-    if (allGroupsError) throw new Error(`Failed to re-fetch group statuses: ${allGroupsError.message}`);
+    // Step 3: Invoke the comparison function
+    const { data: compareResult, error: compareError } = await supabaseAdmin.functions.invoke('compare-and-update-duyetpost', {
+      body: { postId: postId }
+    });
+    if (compareError) throw new Error(`Lỗi so sánh dữ liệu: ${compareError.message}`);
 
-    const allApproved = allGroupsForPost.every(g => g.status === 'approved');
-    if (allApproved && allGroupsForPost.length > 0) {
-      await supabaseAdmin.from('seeding_posts').update({ status: 'completed' }).eq('id', postId);
-    }
-
-    const total = allGroupsForPost.length;
-    const currentApprovedCount = allGroupsForPost.filter(g => g.status === 'approved').length;
-    
     return new Response(JSON.stringify({
-      approved: currentApprovedCount,
-      pending: total - currentApprovedCount,
-      total: total,
+      ...compareResult,
       requestUrl: firstRequestUrl,
       rawResponse: firstRawResponse
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error) {
-    console.error('Error in check-post-approval function:', error.message);
+    console.error('Error in check-post-approval orchestrator:', error.message);
     return new Response(JSON.stringify({ 
       error: error.message,
       requestUrl: firstRequestUrl,
