@@ -10,13 +10,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { showSuccess, showError } from "@/utils/toast";
 import { useApiSettings } from "@/contexts/ApiSettingsContext";
 import { Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { FacebookApiReference } from "@/components/FacebookApiReference";
 
 const Settings = () => {
   // AI API Settings state
@@ -202,6 +203,17 @@ const Settings = () => {
 
   const pageIsLoading = isLoadingApi || isLoadingIntegrations || isLoadingFb;
 
+  const fbBaseUrl = useMemo(() => {
+    if (fbUrlTemplates.test_connection) {
+      return fbUrlTemplates.test_connection.replace(/\/me$/, '');
+    }
+    if (fbUrlTemplates.get_comments) {
+      const match = fbUrlTemplates.get_comments.match(/^(https?:\/\/[^/]+\/[^/]+)/);
+      return match ? match[1] : 'http://api.akng.io.vn/graph';
+    }
+    return 'http://api.akng.io.vn/graph';
+  }, [fbUrlTemplates]);
+
   if (pageIsLoading) {
     return (
       <main className="flex-1 space-y-6 p-6 sm:p-8">
@@ -337,7 +349,7 @@ const Settings = () => {
             </CardContent>
           </Card>
         </TabsContent>
-        <TabsContent value="api-facebook" className="mt-4">
+        <TabsContent value="api-facebook" className="mt-4 space-y-6">
           <Card className="shadow-sm rounded-2xl bg-white">
             <CardHeader>
               <CardTitle>Cấu hình API Facebook Graph</CardTitle>
@@ -403,6 +415,7 @@ const Settings = () => {
               </div>
             </CardContent>
           </Card>
+          <FacebookApiReference baseUrl={fbBaseUrl} accessToken={fbAccessToken} />
         </TabsContent>
       </Tabs>
     </main>
