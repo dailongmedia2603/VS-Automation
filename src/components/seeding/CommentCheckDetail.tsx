@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { showError, showSuccess } from '@/utils/toast';
+import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -36,11 +36,6 @@ interface CheckResult {
   total: number;
 }
 
-interface LogData {
-    requestUrl: string;
-    rawResponse: string;
-}
-
 interface CommentCheckDetailProps {
   post: Post;
 }
@@ -52,8 +47,6 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
   const [statusFilter, setStatusFilter] = useState<'all' | 'visible' | 'not_visible'>('all');
   const [isChecking, setIsChecking] = useState(false);
   const [checkResult, setCheckResult] = useState<CheckResult | null>(null);
-  const [logData, setLogData] = useState<LogData | null>(null);
-  const [isLogDialogOpen, setIsLogDialogOpen] = useState(false);
 
   const fetchComments = async () => {
     setIsLoading(true);
@@ -74,7 +67,6 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
   useEffect(() => {
     fetchComments();
     setCheckResult(null);
-    setLogData(null);
   }, [post.id]);
 
   const handleRunCheck = async () => {
@@ -84,84 +76,36 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
     }
     setIsChecking(true);
     setCheckResult(null);
-    setLogData(null);
+    const toastId = showLoading("Bước 1/2: Đang lấy dữ liệu bình luận từ Facebook...");
 
     try {
-      // Step 1: Trigger the Edge Function and get the clean data directly.
-      const { data: responseData, error: functionError } = await supabase.functions.invoke('get-fb-comments', {
+      // Step 1: Fetch and store comments from Facebook
+      const { error: fetchError } = await supabase.functions.invoke('get-fb-comments', {
         body: { 
           fbPostId: post.links,
           internalPostId: post.id 
         }
       });
-
-      if (functionError) {
-        const errorMessage = functionError.context?.json ? (await functionError.context.json()).error : functionError.message;
-        throw new Error(errorMessage);
-      }
+      if (fetchError) throw new Error(`Lỗi lấy dữ liệu: ${fetchError.message}`);
       
-      if (!responseData || !responseData.data) {
-        throw new Error("Phản hồi từ server không hợp lệ hoặc không có dữ liệu.");
-      }
+      dismissToast(toastId);
+      const toastId2 = showLoading("Bước 2/2: Đang so sánh và cập nhật trạng thái...");
 
-      const actualComments = responseData.data; // This is the clean, flat array of comments
-      setLogData(responseData.log); // Set log data for the viewer
+      // Step 2: Compare and update statuses
+      const { data: compareResult, error: compareError } = await supabase.functions.invoke('compare-and-update-comments', {
+        body: { postId: post.id }
+      });
+      if (compareError) throw new Error(`Lỗi so sánh: ${compareError.message}`);
 
-      // Step 2: Perform comparison.
-      const updates = [];
-      let foundCount = 0;
-
-      const normalizeString = (str: string) => {
-        if (!str) return '';
-        return str.normalize('NFC').toLowerCase().replace(/[\s\p{P}]/gu, '');
-      };
+      dismissToast(toastId2);
+      setCheckResult(compareResult);
+      showSuccess(`Kiểm tra hoàn tất! Tìm thấy ${compareResult.found}/${compareResult.total} bình luận.`);
       
-      const normalizedApiComments = actualComments.map((c: any) => ({
-          ...c,
-          normalizedMessage: normalizeString(c.message)
-      }));
-
-      for (const expectedComment of comments) {
-        const normalizedExpectedContent = normalizeString(expectedComment.content);
-        
-        const foundFbComment = normalizedApiComments.find((actual: any) => 
-          actual.normalizedMessage && actual.normalizedMessage.includes(normalizedExpectedContent)
-        );
-        
-        if (foundFbComment) {
-          foundCount++;
-          updates.push({
-            id: expectedComment.id,
-            status: 'visible' as const,
-            account_name: foundFbComment.from?.name || 'Không rõ',
-            comment_link: foundFbComment.permalink_url || null,
-            account_id: foundFbComment.from?.id || null,
-          });
-        } else {
-          if (expectedComment.status === 'visible') {
-            updates.push({
-              id: expectedComment.id,
-              status: 'not_visible' as const,
-              account_name: null,
-              comment_link: null,
-              account_id: null,
-            });
-          }
-        }
-      }
-
-      if (updates.length > 0) {
-        const { error: updateError } = await supabase.from('seeding_comments').upsert(updates);
-        if (updateError) throw updateError;
-      }
-
-      const total = comments.length;
-      setCheckResult({ found: foundCount, notFound: total - foundCount, total });
-      showSuccess(`Kiểm tra hoàn tất! Tìm thấy ${foundCount}/${total} bình luận.`);
-      
+      // Step 3: Refresh the UI with the new data
       fetchComments();
 
     } catch (error: any) {
+      if (toastId) dismissToast(toastId);
       showError(`Kiểm tra thất bại: ${error.message}`);
     } finally {
       setIsChecking(false);
@@ -221,12 +165,6 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
                       </div>
                     </div>
                   </div>
-                )}
-                {logData && (
-                    <Button variant="outline" size="sm" onClick={() => setIsLogDialogOpen(true)}>
-                        <FileText className="mr-2 h-4 w-4" />
-                        Xem Log
-                    </Button>
                 )}
                 <Button onClick={handleRunCheck} disabled={isChecking} className="bg-blue-600 hover:bg-blue-700 rounded-lg">
                   {isChecking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
@@ -343,34 +281,6 @@ export const CommentCheckDetail = ({ post }: CommentCheckDetailProps) => {
           </div>
         </CardContent>
       </Card>
-
-      <Dialog open={isLogDialogOpen} onOpenChange={setIsLogDialogOpen}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Nhật ký kiểm tra</DialogTitle>
-            <DialogDescription>
-              Chi tiết về yêu cầu đã gửi và phản hồi nhận được từ API.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <h3 className="font-semibold mb-2">URL đã gửi đi:</h3>
-              <div className="p-3 bg-slate-100 rounded-md text-slate-900 font-mono text-xs break-all">
-                {logData?.requestUrl}
-              </div>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-2">Kết quả thô trả về:</h3>
-              <ScrollArea className="h-64 w-full bg-slate-100 rounded-md border p-4">
-                <pre className="text-xs whitespace-pre-wrap break-all"><code>{JSON.stringify(JSON.parse(logData?.rawResponse || '{}'), null, 2)}</code></pre>
-              </ScrollArea>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button onClick={() => setIsLogDialogOpen(false)}>Đóng</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
 };

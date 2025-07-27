@@ -18,20 +18,15 @@ serve(async (req) => {
   );
 
   const { fbPostId, internalPostId } = await req.json();
-  if (!fbPostId) {
-    return new Response(JSON.stringify({ error: "ID bài viết Facebook là bắt buộc." }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 400,
-    });
-  }
-  if (!internalPostId) {
-    return new Response(JSON.stringify({ error: "ID bài viết nội bộ là bắt buộc." }), {
+  if (!fbPostId || !internalPostId) {
+    return new Response(JSON.stringify({ error: "Cả ID bài viết Facebook và ID nội bộ đều là bắt buộc." }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
     });
   }
 
   try {
+    // Step 1: Fetch API settings from Supabase
     const { data: fbSettings, error: settingsError } = await supabaseAdmin
       .from('apifb_settings')
       .select('url_templates, api_key')
@@ -49,6 +44,7 @@ serve(async (req) => {
         throw new Error("Chưa cấu hình URL cho tính năng Check Comment. Vui lòng vào trang Cài đặt.");
     }
 
+    // Step 2: Fetch all comments from Facebook API with pagination
     const url = new URL(commentCheckTemplate.replace(/{postId}/g, fbPostId));
     const simplifiedFields = 'message,from,permalink_url,created_time,comments';
     url.searchParams.set('fields', simplifiedFields);
@@ -58,7 +54,6 @@ serve(async (req) => {
     const initialEndpoint = url.toString();
 
     const allComments = [];
-    const allRawResponses = []; // Store raw responses from each page
     let nextUrl = initialEndpoint;
     let safetyCounter = 0;
     const MAX_PAGES = 20;
@@ -66,11 +61,8 @@ serve(async (req) => {
     while (nextUrl && safetyCounter < MAX_PAGES) {
       safetyCounter++;
       const response = await fetch(nextUrl);
-      const rawResponseText = await response.text(); // Get raw text first
-      const data = JSON.parse(rawResponseText); // Then parse
+      const data = await response.json();
       
-      allRawResponses.push(data); // Store the parsed object from this page
-
       if (!response.ok) {
         const errorMessage = data?.error?.message || `Yêu cầu API thất bại ở trang ${safetyCounter} với mã trạng thái ${response.status}.`;
         throw new Error(errorMessage);
@@ -87,22 +79,44 @@ serve(async (req) => {
       nextUrl = (data.paging && data.paging.next) ? data.paging.next : null;
     }
 
-    const finalRawResponseString = JSON.stringify(allRawResponses, null, 2);
+    // Step 3: Clear old data for this post from actual_comments table
+    const { error: deleteError } = await supabaseAdmin
+      .from('actual_comments')
+      .delete()
+      .eq('post_id', internalPostId);
 
-    // Log the raw, unprocessed response first
+    if (deleteError) {
+      throw new Error(`Không thể dọn dẹp dữ liệu cũ: ${deleteError.message}`);
+    }
+
+    // Step 4: Insert new data into actual_comments table
+    if (allComments.length > 0) {
+      const commentsToInsert = allComments.map(comment => ({
+        post_id: internalPostId,
+        message: comment.message,
+        account_name: comment.from?.name,
+        account_id: comment.from?.id,
+        comment_link: comment.permalink_url,
+        created_time: comment.created_time,
+      }));
+
+      const { error: insertError } = await supabaseAdmin
+        .from('actual_comments')
+        .insert(commentsToInsert);
+
+      if (insertError) {
+        throw new Error(`Không thể lưu dữ liệu mới: ${insertError.message}`);
+      }
+    }
+
+    // Step 5: Log the successful operation
     await supabaseAdmin.from('seeding_api_logs').insert({
         post_id: internalPostId,
-        raw_response: finalRawResponseString,
+        raw_response: JSON.stringify({ count: allComments.length, message: "Data fetched and stored successfully." }),
         status: 'success'
     });
 
-    // Then, prepare the data to be sent back to the client
-    const responseData = {
-        data: allComments,
-        log: { requestUrl: initialEndpoint, rawResponse: finalRawResponseString }
-    };
-
-    return new Response(JSON.stringify(responseData), {
+    return new Response(JSON.stringify({ success: true, message: `Đã lấy và lưu trữ ${allComments.length} bình luận.` }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
@@ -115,7 +129,7 @@ serve(async (req) => {
         error_message: error.message
     });
 
-    console.error('Error fetching Facebook comments:', error.message);
+    console.error('Error in get-fb-comments function:', error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
