@@ -84,17 +84,16 @@ serve(async (req) => {
           const foundFbComment = actualComments.find(actual => actual.message && actual.message.trim() === expectedComment.content.trim());
           if (foundFbComment) {
             foundCount++;
-            if (expectedComment.status !== 'visible') {
-              updates.push({
-                id: expectedComment.id,
-                status: 'visible',
-                account_name: foundFbComment.from?.name || 'Không rõ',
-                comment_link: foundFbComment.permalink_url || null,
-              });
-            }
+            updates.push({
+              id: expectedComment.id,
+              status: 'visible',
+              account_name: foundFbComment.from?.name || 'Không rõ',
+              account_id: foundFbComment.from?.id || null,
+              comment_link: foundFbComment.permalink_url || `https://facebook.com/${foundFbComment.id}`,
+            });
           } else {
             if (expectedComment.status === 'visible') {
-              updates.push({ id: expectedComment.id, status: 'not_visible', account_name: null, comment_link: null });
+              updates.push({ id: expectedComment.id, status: 'not_visible', account_name: null, account_id: null, comment_link: null });
             }
           }
         }

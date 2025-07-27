@@ -31,6 +31,7 @@ type Comment = {
   content: string;
   status: 'visible' | 'not_visible';
   account_name: string | null;
+  account_id: string | null;
   comment_link: string | null;
 };
 
@@ -39,10 +40,9 @@ interface FbComment {
   from?: {
     id: string;
     name: string;
-    link?: string;
   };
-  permalink_url?: string;
   id: string;
+  permalink_url?: string;
 }
 
 interface CheckResult {
@@ -162,20 +162,20 @@ export const CommentCheckDetail = ({ post, onPostUpdate }: CommentCheckDetailPro
         
         if (foundFbComment) {
           foundCount++;
-          if (expectedComment.status !== 'visible') {
-            updates.push({
-              id: expectedComment.id,
-              status: 'visible' as const,
-              account_name: foundFbComment.from?.name || 'Không rõ',
-              comment_link: foundFbComment.permalink_url || null,
-            });
-          }
+          updates.push({
+            id: expectedComment.id,
+            status: 'visible' as const,
+            account_name: foundFbComment.from?.name || 'Không rõ',
+            account_id: foundFbComment.from?.id || null,
+            comment_link: foundFbComment.permalink_url || `https://facebook.com/${foundFbComment.id}`,
+          });
         } else {
           if (expectedComment.status === 'visible') {
             updates.push({
               id: expectedComment.id,
               status: 'not_visible' as const,
               account_name: null,
+              account_id: null,
               comment_link: null,
             });
           }
@@ -327,7 +327,28 @@ export const CommentCheckDetail = ({ post, onPostUpdate }: CommentCheckDetailPro
                       <TableCell className="font-medium text-slate-500">{index + 1}</TableCell>
                       <TableCell className="max-w-xs break-words text-slate-700">{comment.content}</TableCell>
                       <TableCell><Badge className={cn('pointer-events-none', comment.status === 'visible' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-amber-100 text-amber-800 border-amber-200')}>{comment.status === 'visible' ? 'Đã hiện' : 'Chưa hiện'}</Badge></TableCell>
-                      <TableCell><div className="text-xs text-slate-500"><p><strong>Account:</strong> {comment.account_name || 'N/A'}</p><div className="flex items-center gap-1.5"><strong>Link:</strong> {comment.comment_link ? (<a href={comment.comment_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700" title={comment.comment_link}><LinkIcon className="h-3.5 w-3.5" /></a>) : 'N/A'}</div></div></TableCell>
+                      <TableCell>
+                        <div className="text-xs text-slate-500 space-y-1">
+                          <div className="flex items-center gap-1.5">
+                            <strong>Account:</strong>
+                            {comment.account_id && comment.account_name ? (
+                              <a href={`https://www.facebook.com/${comment.account_id}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 font-medium">
+                                {comment.account_name}
+                              </a>
+                            ) : (
+                              <span>{comment.account_name || 'N/A'}</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <strong>Link:</strong> 
+                            {comment.comment_link ? (
+                              <a href={comment.comment_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700" title={comment.comment_link}>
+                                <LinkIcon className="h-3.5 w-3.5" />
+                              </a>
+                            ) : 'N/A'}
+                          </div>
+                        </div>
+                      </TableCell>
                       <TableCell className="text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem>Sửa</DropdownMenuItem><DropdownMenuItem className="text-destructive">Xóa</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell>
                     </TableRow>
                   ))
