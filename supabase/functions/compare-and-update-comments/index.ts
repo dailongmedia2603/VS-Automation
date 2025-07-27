@@ -67,6 +67,7 @@ serve(async (req) => {
         foundCount++;
         updates.push({
           id: expectedComment.id,
+          post_id: expectedComment.post_id, // Ensure post_id is included
           status: 'visible',
           account_name: foundFbComment.account_name,
           comment_link: foundFbComment.comment_link,
@@ -77,6 +78,7 @@ serve(async (req) => {
         if (expectedComment.status === 'visible') {
           updates.push({
             id: expectedComment.id,
+            post_id: expectedComment.post_id, // Ensure post_id is included
             status: 'not_visible',
             account_name: null,
             comment_link: null,
