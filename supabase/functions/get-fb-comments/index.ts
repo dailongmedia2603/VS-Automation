@@ -35,25 +35,41 @@ serve(async (req) => {
 
     const { api_url: apiUrl, api_key: accessToken } = fbSettings;
     const finalApiUrl = apiUrl || 'http://api.akng.io.vn/graph';
-    
-    // Request all necessary fields for the check
     const fields = 'message,from{id,name},permalink_url,created_time';
-    const fbApiEndpoint = `${finalApiUrl}/${postId}/comments?fields=${fields}&access_token=${accessToken}`;
+    const initialEndpoint = `${finalApiUrl}/${postId}/comments?fields=${fields}&access_token=${accessToken}`;
 
-    const response = await fetch(fbApiEndpoint);
-    const rawResponse = await response.text();
-    const data = JSON.parse(rawResponse);
+    let allComments = [];
+    let nextUrl = initialEndpoint;
+    let firstResponseForLog = null;
 
-    if (!response.ok) {
-      const errorMessage = data?.error?.message || `Yêu cầu API thất bại với mã trạng thái ${response.status}.`;
-      throw new Error(errorMessage);
+    // Loop to handle pagination
+    while (nextUrl) {
+      const response = await fetch(nextUrl);
+      const rawResponse = await response.text();
+      const data = JSON.parse(rawResponse);
+
+      if (!response.ok) {
+        const errorMessage = data?.error?.message || `Yêu cầu API thất bại với mã trạng thái ${response.status}.`;
+        throw new Error(errorMessage);
+      }
+      
+      if (!firstResponseForLog) {
+        firstResponseForLog = rawResponse;
+      }
+
+      if (Array.isArray(data.data)) {
+        allComments.push(...data.data);
+      }
+
+      // Check for the next page link
+      nextUrl = data.paging?.next || null;
     }
 
     const responseData = {
-        data: Array.isArray(data.data) ? data.data : [],
+        data: allComments,
         log: {
-            requestUrl: fbApiEndpoint,
-            rawResponse: rawResponse,
+            requestUrl: initialEndpoint,
+            rawResponse: firstResponseForLog, // Log the first response for debugging
         }
     };
 
