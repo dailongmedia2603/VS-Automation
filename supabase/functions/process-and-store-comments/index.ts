@@ -27,28 +27,40 @@ serve(async (req) => {
 
   try {
     const data = JSON.parse(rawResponse);
-    let allComments = [];
+    const allComments = [];
 
-    // NEW: Intelligent logic to find the comments array
+    // Find the initial list of top-level comments
+    let topLevelComments = [];
     if (data && data.data && Array.isArray(data.data.data)) {
-        // Handles the {"data": {"data": [...]}} structure from your API
-        allComments = data.data.data;
+        // Handles the {"data": {"data": [...]}} structure
+        topLevelComments = data.data.data;
     } else if (data && Array.isArray(data.data)) {
         // Handles the standard Facebook {"data": [...]} structure
-        allComments = data.data;
+        topLevelComments = data.data;
     } else if (Array.isArray(data)) {
         // Handles a flat array [...] structure
-        allComments = data;
+        topLevelComments = data;
     }
 
-    // Clear old data
+    // Process the list to include replies
+    for (const comment of topLevelComments) {
+        // 1. Add the top-level comment itself
+        allComments.push(comment);
+
+        // 2. Check for and add its replies (nested comments)
+        if (comment.comments && Array.isArray(comment.comments.data)) {
+            allComments.push(...comment.comments.data);
+        }
+    }
+
+    // Clear old data for this post
     const { error: deleteError } = await supabaseAdmin
       .from('actual_comments')
       .delete()
       .eq('post_id', internalPostId);
     if (deleteError) throw new Error(`Không thể dọn dẹp dữ liệu cũ: ${deleteError.message}`);
 
-    // Insert new data
+    // Insert new, comprehensive data
     if (allComments.length > 0) {
       const commentsToInsert = allComments.map(comment => ({
         post_id: internalPostId,
