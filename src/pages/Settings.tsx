@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { showSuccess, showError } from "@/utils/toast";
 import { useApiSettings } from "@/contexts/ApiSettingsContext";
 import { Loader2 } from "lucide-react";
@@ -33,7 +33,7 @@ const Settings = () => {
   const [isSavingIntegrations, setIsSavingIntegrations] = useState(false);
 
   // Facebook API Settings state
-  const [fbUrlTemplates, setFbUrlTemplates] = useState({ get_comments: '', test_connection: '' });
+  const [fbApiUrl, setFbApiUrl] = useState('');
   const [fbAccessToken, setFbAccessToken] = useState('');
   const [isLoadingFb, setIsLoadingFb] = useState(true);
   const [isSavingFb, setIsSavingFb] = useState(false);
@@ -53,7 +53,7 @@ const Settings = () => {
       try {
         const [n8nRes, fbRes] = await Promise.all([
           supabase.from('n8n_settings').select('zalo_webhook_url').eq('id', 1).single(),
-          supabase.from('apifb_settings').select('url_templates, api_key').eq('id', 1).single()
+          supabase.from('apifb_settings').select('api_url, api_key').eq('id', 1).single()
         ]);
 
         if (n8nRes.error && n8nRes.error.code !== 'PGRST116') throw n8nRes.error;
@@ -61,7 +61,7 @@ const Settings = () => {
 
         if (fbRes.error && fbRes.error.code !== 'PGRST116') throw fbRes.error;
         if (fbRes.data) {
-          setFbUrlTemplates(fbRes.data.url_templates || { get_comments: '', test_connection: '' });
+          setFbApiUrl(fbRes.data.api_url || '');
           setFbAccessToken(fbRes.data.api_key || '');
         }
       } catch (error: any) {
@@ -168,7 +168,7 @@ const Settings = () => {
     try {
       const { error } = await supabase
         .from('apifb_settings')
-        .upsert({ id: 1, url_templates: fbUrlTemplates, api_key: fbAccessToken });
+        .upsert({ id: 1, api_url: fbApiUrl, api_key: fbAccessToken });
 
       if (error) throw error;
       showSuccess("Đã lưu cấu hình API Facebook!");
@@ -184,8 +184,9 @@ const Settings = () => {
     setFbApiStatus("testing");
     setFbApiError(null);
     try {
+        const urlToTest = fbApiUrl.trim() || 'http://api.akng.io.vn/graph';
         const { data, error } = await supabase.functions.invoke('test-fb-api', {
-            body: { apiUrl: fbUrlTemplates.test_connection, accessToken: fbAccessToken }
+            body: { apiUrl: urlToTest, accessToken: fbAccessToken }
         });
 
         if (error) throw error;
@@ -202,17 +203,6 @@ const Settings = () => {
   };
 
   const pageIsLoading = isLoadingApi || isLoadingIntegrations || isLoadingFb;
-
-  const fbBaseUrl = useMemo(() => {
-    if (fbUrlTemplates.test_connection) {
-      return fbUrlTemplates.test_connection.replace(/\/me$/, '');
-    }
-    if (fbUrlTemplates.get_comments) {
-      const match = fbUrlTemplates.get_comments.match(/^(https?:\/\/[^/]+\/[^/]+)/);
-      return match ? match[1] : 'http://api.akng.io.vn/graph';
-    }
-    return 'http://api.akng.io.vn/graph';
-  }, [fbUrlTemplates]);
 
   if (pageIsLoading) {
     return (
@@ -349,7 +339,7 @@ const Settings = () => {
             </CardContent>
           </Card>
         </TabsContent>
-        <TabsContent value="api-facebook" className="mt-4 space-y-6">
+        <TabsContent value="api-facebook" className="mt-4">
           <Card className="shadow-sm rounded-2xl bg-white">
             <CardHeader>
               <CardTitle>Cấu hình API Facebook Graph</CardTitle>
@@ -359,26 +349,15 @@ const Settings = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="fb-get-comments-url">URL Lấy bình luận</Label>
+                <Label htmlFor="fb-api-url">URL API Get</Label>
                 <Input
-                  id="fb-get-comments-url"
-                  placeholder="http://api.akng.io.vn/graph/{postId}/comments"
-                  value={fbUrlTemplates.get_comments}
-                  onChange={(e) => setFbUrlTemplates(t => ({ ...t, get_comments: e.target.value }))}
+                  id="fb-api-url"
+                  placeholder="http://api.akng.io.vn/graph"
+                  value={fbApiUrl}
+                  onChange={(e) => setFbApiUrl(e.target.value)}
                   className="bg-slate-100 border-none rounded-lg"
                 />
-                <p className="text-xs text-muted-foreground">Sử dụng <code>{'{postId}'}</code> làm placeholder cho ID bài viết.</p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="fb-test-url">URL Kiểm tra kết nối</Label>
-                <Input
-                  id="fb-test-url"
-                  placeholder="http://api.akng.io.vn/graph/me"
-                  value={fbUrlTemplates.test_connection}
-                  onChange={(e) => setFbUrlTemplates(t => ({ ...t, test_connection: e.target.value }))}
-                  className="bg-slate-100 border-none rounded-lg"
-                />
-                <p className="text-xs text-muted-foreground">Endpoint để kiểm tra Access Token, thường là <code>/me</code>.</p>
+                <p className="text-xs text-muted-foreground">Nếu bỏ trống, sẽ sử dụng mặc định: http://api.akng.io.vn/graph</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="fb-access-token">Access Token</Label>
@@ -415,7 +394,7 @@ const Settings = () => {
               </div>
             </CardContent>
           </Card>
-          <FacebookApiReference baseUrl={fbBaseUrl} accessToken={fbAccessToken} />
+          <FacebookApiReference baseUrl={fbApiUrl || 'http://api.akng.io.vn/graph'} accessToken={fbAccessToken} />
         </TabsContent>
       </Tabs>
     </main>
