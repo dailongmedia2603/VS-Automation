@@ -26,36 +26,47 @@ serve(async (req) => {
   }
 
   try {
-    // Clear all old data for this post
+    // Clear all old data for this post to ensure a fresh import
     const { error: deleteError } = await supabaseAdmin
       .from('actual_duyetpost')
       .delete()
       .eq('post_id', internalPostId);
     if (deleteError) throw new Error(`Không thể dọn dẹp dữ liệu cũ: ${deleteError.message}`);
 
-    // Insert new, comprehensive data
-    if (allPosts.length > 0) {
-      const postsToInsert = allPosts.map(post => ({
-        post_id: internalPostId,
-        group_id: post.group_id, // Use the groupId passed from the fetch function
-        message: post.message,
-        account_name: post.from?.name,
-        account_id: post.from?.id,
-        post_link: post.permalink_url,
-        created_time: post.created_time,
-      }));
+    // Proceed only if there's valid data to process
+    if (allPosts && Array.isArray(allPosts) && allPosts.length > 0) {
+      const postsToInsert = allPosts.map(post => {
+        // Apply the user-defined mapping with safety checks
+        const account_name = post.from && post.from.name ? post.from.name : null;
+        const account_id = post.from && post.from.id ? post.from.id : null;
+
+        return {
+          post_id: internalPostId,
+          group_id: post.group_id, // This is added by the 'get-fb-duyetpost' function
+          message: post.message || null,
+          account_name: account_name,
+          account_id: account_id,
+          post_link: post.permalink_url || null,
+          created_time: post.created_time || null,
+        };
+      });
 
       const { error: insertError } = await supabaseAdmin
         .from('actual_duyetpost')
         .insert(postsToInsert);
       if (insertError) throw new Error(`Không thể lưu dữ liệu mới: ${insertError.message}`);
+      
+      return new Response(JSON.stringify({ success: true, count: postsToInsert.length }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
+    } else {
+      // If allPosts is empty, report success with a count of 0
+      return new Response(JSON.stringify({ success: true, count: 0, message: "No posts to insert." }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
     }
-
-    return new Response(JSON.stringify({ success: true, count: allPosts.length }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    });
-
   } catch (error) {
     console.error('Error in process-and-store-duyetpost function:', error.message);
     return new Response(JSON.stringify({ error: error.message }), {
