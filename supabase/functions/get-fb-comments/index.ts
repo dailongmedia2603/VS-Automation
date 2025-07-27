@@ -51,8 +51,8 @@ serve(async (req) => {
     }
 
     let allComments = [];
+    let allRawResponses = [];
     let nextUrl = initialEndpoint;
-    let firstResponseForLog = null;
 
     // Loop to handle pagination
     while (nextUrl) {
@@ -65,9 +65,7 @@ serve(async (req) => {
         throw new Error(errorMessage);
       }
       
-      if (!firstResponseForLog) {
-        firstResponseForLog = rawResponse;
-      }
+      allRawResponses.push(data);
 
       if (Array.isArray(data.data)) {
         allComments.push(...data.data);
@@ -81,7 +79,7 @@ serve(async (req) => {
         data: allComments,
         log: {
             requestUrl: initialEndpoint,
-            rawResponse: firstResponseForLog, // Log the first response for debugging
+            rawResponse: JSON.stringify(allRawResponses, null, 2), // Log all responses
         }
     };
 
