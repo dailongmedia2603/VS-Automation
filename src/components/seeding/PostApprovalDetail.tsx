@@ -105,39 +105,50 @@ export const PostApprovalDetail = ({
     setIsChecking(true);
     setCheckResult(null);
     setLog(null);
-    const toastId = showLoading("Đang quét các group...");
+    let toastId;
+    let logData: Partial<ErrorLog> = {};
 
     try {
-      const { data, error } = await supabase.functions.invoke('check-post-approval', {
+      // Step 1: Fetch raw data
+      toastId = showLoading("Bước 1/3: Đang lấy dữ liệu thô từ API...");
+      const { data: fetchData, error: fetchError } = await supabase.functions.invoke('get-fb-duyetpost', {
         body: { postId: post.id }
       });
+      logData = { requestUrl: fetchData?.requestUrl, rawResponse: fetchData?.rawResponse };
+      if (fetchError || fetchData.error) throw { step: 'Lấy dữ liệu', error: fetchError || fetchData };
 
-      if (error || data.error) {
-        const errorMessage = error?.message || data?.error;
-        setLog({ 
-            step: 'Kiểm tra thất bại', 
-            errorMessage: errorMessage,
-            requestUrl: data?.requestUrl,
-            rawResponse: data?.rawResponse
-        });
-        throw new Error(errorMessage);
-      }
+      // Step 2: Process and store data
+      dismissToast(toastId);
+      toastId = showLoading("Bước 2/3: Đang xử lý và lưu trữ dữ liệu...");
+      const { data: processData, error: processError } = await supabase.functions.invoke('process-and-store-duyetpost', {
+        body: { allPosts: fetchData.allPosts, internalPostId: post.id }
+      });
+      if (processError || processData.error) throw { step: 'Xử lý dữ liệu', error: processError || processData };
+
+      // Step 3: Compare and update
+      dismissToast(toastId);
+      toastId = showLoading("Bước 3/3: Đang so sánh và cập nhật trạng thái...");
+      const { data: compareResult, error: compareError } = await supabase.functions.invoke('compare-and-update-duyetpost', {
+        body: { postId: post.id }
+      });
+      if (compareError || compareResult.error) throw { step: 'So sánh dữ liệu', error: compareError || compareResult };
 
       dismissToast(toastId);
-      setCheckResult(data);
-      setLog({ 
-          step: 'Kiểm tra hoàn tất', 
-          errorMessage: 'Không có lỗi',
-          requestUrl: data.requestUrl,
-          rawResponse: data.rawResponse
-      });
-      showSuccess(`Kiểm tra hoàn tất! Duyệt thành công ${data.approved}/${data.total} group.`);
+      setCheckResult(compareResult);
+      setLog({ ...logData, step: 'Kiểm tra hoàn tất', errorMessage: 'Không có lỗi' });
+      showSuccess(`Kiểm tra hoàn tất! Duyệt thành công ${compareResult.approved}/${compareResult.total} group.`);
       onCheckComplete();
       fetchGroups();
 
-    } catch (err: any) {
+    } catch (e: any) {
       if (toastId) dismissToast(toastId);
-      showError(`Kiểm tra thất bại: ${err.message}`);
+      const errorMessage = e.error?.message || 'Đã xảy ra lỗi không xác định.';
+      setLog({
+          ...logData,
+          step: e.step || 'Không xác định',
+          errorMessage: errorMessage,
+      });
+      showError(`Kiểm tra thất bại ở bước: ${e.step}.`);
     } finally {
       setIsChecking(false);
     }

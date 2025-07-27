@@ -17,31 +17,27 @@ serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
 
-  const { rawResponse, internalPostId, groupId } = await req.json();
-  if (!rawResponse || !internalPostId || !groupId) {
-    return new Response(JSON.stringify({ error: "Dữ liệu thô, ID nội bộ và ID group là bắt buộc." }), {
+  const { allPosts, internalPostId } = await req.json();
+  if (!allPosts || !internalPostId) {
+    return new Response(JSON.stringify({ error: "Dữ liệu bài viết và ID nội bộ là bắt buộc." }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
     });
   }
 
   try {
-    const data = JSON.parse(rawResponse);
-    const posts = data.data || [];
-
-    // Clear old data for this specific post and group
+    // Clear all old data for this post
     const { error: deleteError } = await supabaseAdmin
       .from('actual_duyetpost')
       .delete()
-      .eq('post_id', internalPostId)
-      .eq('group_id', groupId);
+      .eq('post_id', internalPostId);
     if (deleteError) throw new Error(`Không thể dọn dẹp dữ liệu cũ: ${deleteError.message}`);
 
-    // Insert new data
-    if (posts.length > 0) {
-      const postsToInsert = posts.map(post => ({
+    // Insert new, comprehensive data
+    if (allPosts.length > 0) {
+      const postsToInsert = allPosts.map(post => ({
         post_id: internalPostId,
-        group_id: groupId,
+        group_id: post.group_id, // Use the groupId passed from the fetch function
         message: post.message,
         account_name: post.from?.name,
         account_id: post.from?.id,
@@ -55,7 +51,7 @@ serve(async (req) => {
       if (insertError) throw new Error(`Không thể lưu dữ liệu mới: ${insertError.message}`);
     }
 
-    return new Response(JSON.stringify({ success: true, count: posts.length }), {
+    return new Response(JSON.stringify({ success: true, count: allPosts.length }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });

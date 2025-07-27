@@ -24,7 +24,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Step 1: Get settings and groups to check
     const { data: fbSettings, error: settingsError } = await supabaseAdmin.from('apifb_settings').select('url_templates, api_key').eq('id', 1).single();
     if (settingsError || !fbSettings) throw new Error("Facebook API settings are not configured.");
     const { url_templates: urlTemplates, api_key: accessToken } = fbSettings;
@@ -34,7 +33,8 @@ serve(async (req) => {
     const { data: groups, error: groupsError } = await supabaseAdmin.from('seeding_groups').select('id, group_id').eq('post_id', postId);
     if (groupsError) throw new Error(`Failed to fetch groups for post: ${groupsError.message}`);
 
-    // Step 2: Fetch data for each group and process it
+    const allPosts = [];
+
     for (const group of groups) {
       const groupId = group.group_id;
       let feedUrl = postApprovalTemplate.replace(/{group-id}/g, groupId);
@@ -54,32 +54,26 @@ serve(async (req) => {
           console.warn(`API error for group ${groupId}: ${responseText}`);
           continue;
         }
-
-        // Invoke the processing function
-        const { error: processError } = await supabaseAdmin.functions.invoke('process-and-store-duyetpost', {
-          body: { rawResponse: responseText, internalPostId: postId, groupId: groupId }
-        });
-        if (processError) throw new Error(`Lỗi xử lý dữ liệu cho group ${groupId}: ${processError.message}`);
-
+        
+        const feedData = JSON.parse(responseText);
+        if (feedData.data && Array.isArray(feedData.data)) {
+            // Add groupId to each post for later processing
+            const postsWithGroupId = feedData.data.map(p => ({ ...p, group_id: groupId }));
+            allPosts.push(...postsWithGroupId);
+        }
       } catch (fetchErr) {
-        console.error(`Failed to fetch or process feed for group ${groupId}:`, fetchErr.message);
+        console.error(`Failed to fetch feed for group ${groupId}:`, fetchErr.message);
       }
     }
 
-    // Step 3: Invoke the comparison function
-    const { data: compareResult, error: compareError } = await supabaseAdmin.functions.invoke('compare-and-update-duyetpost', {
-      body: { postId: postId }
-    });
-    if (compareError) throw new Error(`Lỗi so sánh dữ liệu: ${compareError.message}`);
-
     return new Response(JSON.stringify({
-      ...compareResult,
+      allPosts,
       requestUrl: firstRequestUrl,
       rawResponse: firstRawResponse
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error) {
-    console.error('Error in check-post-approval orchestrator:', error.message);
+    console.error('Error in get-fb-duyetpost function:', error.message);
     return new Response(JSON.stringify({ 
       error: error.message,
       requestUrl: firstRequestUrl,
