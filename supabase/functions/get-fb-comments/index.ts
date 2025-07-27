@@ -74,11 +74,13 @@ serve(async (req) => {
         allComments.push(...data.data);
       }
 
+      // **SAFE PAGINATION LOGIC**
       // Explicitly check for the 'next' property in the 'paging' object
       if (data.paging && data.paging.next) {
         nextUrl = data.paging.next;
       } else {
-        nextUrl = null; // End the loop if 'next' is not present
+        // If 'paging' or 'next' does not exist, explicitly end the loop
+        nextUrl = null; 
       }
     }
 
