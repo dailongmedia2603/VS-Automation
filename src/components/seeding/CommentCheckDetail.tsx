@@ -19,6 +19,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import * as XLSX from 'xlsx';
+import { format, addMinutes, addHours, addDays } from 'date-fns';
 
 type Project = {
   id: number;
@@ -30,6 +31,7 @@ type Post = {
   name: string;
   links: string | null;
   type: 'comment_check' | 'post_approval';
+  last_checked_at: string | null;
 };
 
 type Comment = {
@@ -362,6 +364,21 @@ export const CommentCheckDetail = ({
 
   const postUrl = post.links ? (post.links.startsWith('http') ? post.links : `https://www.facebook.com/${post.links}`) : '#';
 
+  const nextCheckDate = useMemo(() => {
+    if (!post.last_checked_at) return null;
+    
+    const lastCheckDate = new Date(post.last_checked_at);
+    const value = parseInt(frequencyValue, 10);
+    if (isNaN(value)) return null;
+
+    switch (frequencyUnit) {
+      case 'minute': return addMinutes(lastCheckDate, value);
+      case 'hour': return addHours(lastCheckDate, value);
+      case 'day': return addDays(lastCheckDate, value);
+      default: return null;
+    }
+  }, [post.last_checked_at, frequencyValue, frequencyUnit]);
+
   return (
     <>
       <Card className="w-full h-full shadow-none border-none flex flex-col">
@@ -437,25 +454,44 @@ export const CommentCheckDetail = ({
                     <Label htmlFor="auto-check-switch" className="font-medium text-slate-700">Tự động chạy check</Label>
                     <Switch id="auto-check-switch" checked={autoCheckActive} onCheckedChange={onAutoCheckChange} />
                   </div>
-                  <div className="grid grid-cols-3 gap-4 items-end">
-                    <div className="col-span-2 space-y-2">
-                      <Label>Tần suất quét lại</Label>
-                      <div className="flex items-center gap-2">
-                        <Input type="number" value={frequencyValue} onChange={(e) => onFrequencyValueChange(e.target.value)} className="w-24 bg-white" />
-                        <Select value={frequencyUnit} onValueChange={onFrequencyUnitChange}>
-                          <SelectTrigger className="w-[120px] bg-white"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="minute">Phút</SelectItem>
-                            <SelectItem value="hour">Giờ</SelectItem>
-                            <SelectItem value="day">Ngày</SelectItem>
-                          </SelectContent>
-                        </Select>
+                  
+                  {autoCheckActive && (
+                    <div className="p-4 rounded-lg bg-white border space-y-4">
+                      <div className="grid grid-cols-2 gap-4 items-end">
+                        <div className="space-y-2">
+                          <Label>Tần suất quét lại</Label>
+                          <div className="flex items-center gap-2">
+                            <Input type="number" value={frequencyValue} onChange={(e) => onFrequencyValueChange(e.target.value)} className="w-24 bg-white" />
+                            <Select value={frequencyUnit} onValueChange={onFrequencyUnitChange}>
+                              <SelectTrigger className="w-full bg-white"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="minute">Phút</SelectItem>
+                                <SelectItem value="hour">Giờ</SelectItem>
+                                <SelectItem value="day">Ngày</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <div className="flex justify-end">
+                          <Button onClick={onSaveSettings} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg">Lưu cài đặt</Button>
+                        </div>
+                      </div>
+                      <div className="border-t pt-3 space-y-2 text-sm">
+                          <div className="flex justify-between items-center">
+                              <span className="text-slate-600">Lần check gần nhất:</span>
+                              <span className="font-semibold text-red-600">
+                                  {post.last_checked_at ? format(new Date(post.last_checked_at), 'dd/MM/yyyy HH:mm:ss') : 'Chưa có'}
+                              </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                              <span className="text-slate-600">Lần check tiếp theo:</span>
+                              <span className="font-semibold text-green-600">
+                                  {nextCheckDate ? format(nextCheckDate, 'dd/MM/yyyy HH:mm:ss') : 'Ngay bây giờ'}
+                              </span>
+                          </div>
                       </div>
                     </div>
-                    <div className="flex justify-end">
-                      <Button onClick={onSaveSettings} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg">Lưu cài đặt</Button>
-                    </div>
-                  </div>
+                  )}
                 </AccordionContent>
               </AccordionItem>
             </Accordion>

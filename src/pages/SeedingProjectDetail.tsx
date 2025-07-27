@@ -32,6 +32,7 @@ type Post = {
   type: 'comment_check' | 'post_approval';
   is_active: boolean;
   check_frequency: string | null;
+  last_checked_at: string | null;
 };
 
 const initialNewPostState = {
