@@ -41,6 +41,7 @@ const CheckSeeding = () => {
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | 'all'>('all');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
+  const [unreadCount, setUnreadCount] = useState(0);
   
   const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
@@ -64,6 +65,40 @@ const CheckSeeding = () => {
 
   useEffect(() => {
     fetchProjects();
+
+    const fetchUnreadCount = async () => {
+      const { count, error } = await supabase
+        .from('seeding_posts')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'completed')
+        .eq('is_notification_seen', false);
+
+      if (!error) {
+        setUnreadCount(count || 0);
+      }
+    };
+
+    fetchUnreadCount();
+
+    const channel = supabase
+      .channel('unread-notifications-channel')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'seeding_posts',
+          filter: 'status=eq.completed',
+        },
+        () => {
+          fetchUnreadCount();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const filteredProjects = useMemo(() => {
@@ -209,13 +244,21 @@ const CheckSeeding = () => {
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">Check Seeding</h1>
           <p className="text-muted-foreground mt-2 max-w-2xl">Quản lý và theo dõi tiến độ các dự án seeding của bạn.</p>
         </div>
-        <div>
+        <div className="relative">
           <Link to="/completion-notification">
-            <Button className="bg-green-500 hover:bg-green-600 text-white">
+            <Button className={cn(
+              "bg-green-500 hover:bg-green-600 text-white",
+              unreadCount > 0 && "animate-glow-green"
+            )}>
               <Bell className="mr-2 h-4 w-4" />
               Thông báo hoàn thành
             </Button>
           </Link>
+          {unreadCount > 0 && (
+            <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center pointer-events-none">
+              {unreadCount}
+            </div>
+          )}
         </div>
       </div>
 
