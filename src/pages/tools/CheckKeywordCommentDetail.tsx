@@ -6,7 +6,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, MessageSquare, FileCheck2, ChevronRight, ArrowLeft, Edit, Trash2, Loader2, Check, CheckCircle } from 'lucide-react';
+import { PlusCircle, MessageSquare, FileCheck2, ChevronRight, ArrowLeft, Edit, Trash2, Loader2, Check, CheckCircle, UploadCloud } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -17,6 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { KeywordCommentDetail } from '@/components/tools/KeywordCommentDetail';
 import { KeywordPostDetail } from '@/components/tools/KeywordPostDetail';
 import { Checkbox } from '@/components/ui/checkbox';
+import { ImportKeywordPostsDialog } from '@/components/tools/ImportKeywordPostsDialog';
 
 type Project = {
   id: number;
@@ -59,6 +60,7 @@ const CheckKeywordCommentDetail = () => {
 
   const [selectedPostIds, setSelectedPostIds] = useState<number[]>([]);
   const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
 
   const fetchProjectData = async (isInitialLoad = false) => {
     if (!projectId) return;
@@ -306,6 +308,10 @@ const CheckKeywordCommentDetail = () => {
               Xóa ({selectedPostIds.length})
             </Button>
           )}
+          <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}>
+            <UploadCloud className="mr-2 h-4 w-4" />
+            Import
+          </Button>
           <Button onClick={() => setIsAddDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700"><PlusCircle className="mr-2 h-4 w-4" />Thêm Post</Button>
         </div>
       </div>
@@ -356,6 +362,16 @@ const CheckKeywordCommentDetail = () => {
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>
+
+      <ImportKeywordPostsDialog 
+        isOpen={isImportDialogOpen} 
+        onOpenChange={setIsImportDialogOpen}
+        projectId={projectId!}
+        onSuccess={() => {
+          setIsImportDialogOpen(false);
+          fetchProjectData();
+        }}
+      />
 
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent>
