@@ -168,6 +168,7 @@ export const CommentCheckDetail = ({
       setCheckResult(compareResult);
       showSuccess(`Kiểm tra hoàn tất! Tìm thấy ${compareResult.found}/${compareResult.total} bình luận.`);
       onCheckComplete(); // Notify parent to refetch all data
+      fetchComments(); // Refresh comments list
 
     } catch (e: any) {
       if (toastId) dismissToast(toastId);
