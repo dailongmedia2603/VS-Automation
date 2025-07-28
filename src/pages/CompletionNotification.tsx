@@ -9,6 +9,7 @@ import { ArrowLeft, Bell, MessageSquare, FileCheck2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { showError } from '@/utils/toast';
+import { cn } from '@/lib/utils';
 
 type CompletedPost = {
   id: number;
@@ -17,15 +18,24 @@ type CompletedPost = {
   project_id: number;
   last_checked_at: string;
   seeding_projects: { name: string } | null;
+  is_notification_seen: boolean;
 };
 
-const NotificationItem = ({ post }: { post: CompletedPost }) => {
+const NotificationItem = ({ post, onMarkAsSeen }: { post: CompletedPost, onMarkAsSeen: (postId: number) => void }) => {
   const isCommentCheck = post.type === 'comment_check';
   const Icon = isCommentCheck ? MessageSquare : FileCheck2;
 
   return (
-    <Link to={`/check-seeding/${post.project_id}`} state={{ selectedPostId: post.id }} className="block">
-      <Card className="hover:bg-slate-50 transition-colors">
+    <Link 
+      to={`/check-seeding/${post.project_id}`} 
+      state={{ selectedPostId: post.id }} 
+      className="block relative"
+      onClick={() => onMarkAsSeen(post.id)}
+    >
+      <Card className={cn(
+        "transition-colors",
+        !post.is_notification_seen ? "bg-yellow-50 hover:bg-yellow-100" : "hover:bg-slate-50"
+      )}>
         <CardContent className="p-4 flex items-start gap-4">
           <div className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center ${isCommentCheck ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'}`}>
             <Icon className="h-5 w-5" />
@@ -46,6 +56,12 @@ const NotificationItem = ({ post }: { post: CompletedPost }) => {
           </div>
         </CardContent>
       </Card>
+      {!post.is_notification_seen && (
+        <span className="absolute top-3 right-3 flex h-3 w-3">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+        </span>
+      )}
     </Link>
   );
 };
@@ -56,34 +72,33 @@ const CompletionNotification = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    // Initialize audio only once on the client side
     audioRef.current = new Audio('/sounds/notification.mp3');
   }, []);
 
+  const fetchCompletedPosts = async () => {
+    setIsLoading(true);
+    const { data, error } = await supabase
+      .from('seeding_posts')
+      .select(`
+        id, name, type, project_id, last_checked_at, is_notification_seen,
+        seeding_projects ( name )
+      `)
+      .eq('status', 'completed')
+      .order('last_checked_at', { ascending: false });
+
+    if (error) {
+      showError("Không thể tải thông báo: " + error.message);
+    } else {
+      const formattedData = data?.map(p => ({
+        ...p,
+        seeding_projects: Array.isArray(p.seeding_projects) ? p.seeding_projects[0] || null : p.seeding_projects,
+      })) || [];
+      setNotifications(formattedData as CompletedPost[]);
+    }
+    setIsLoading(false);
+  };
+
   useEffect(() => {
-    const fetchCompletedPosts = async () => {
-      setIsLoading(true);
-      const { data, error } = await supabase
-        .from('seeding_posts')
-        .select(`
-          id, name, type, project_id, last_checked_at,
-          seeding_projects ( name )
-        `)
-        .eq('status', 'completed')
-        .order('last_checked_at', { ascending: false });
-
-      if (error) {
-        showError("Không thể tải thông báo: " + error.message);
-      } else {
-        const formattedData = data?.map(p => ({
-          ...p,
-          seeding_projects: Array.isArray(p.seeding_projects) ? p.seeding_projects[0] || null : p.seeding_projects,
-        })) || [];
-        setNotifications(formattedData as CompletedPost[]);
-      }
-      setIsLoading(false);
-    };
-
     fetchCompletedPosts();
   }, []);
 
@@ -125,6 +140,24 @@ const CompletionNotification = () => {
     };
   }, []);
 
+  const handleMarkAsSeen = async (postId: number) => {
+    setNotifications(prev => 
+      prev.map(n => n.id === postId ? { ...n, is_notification_seen: true } : n)
+    );
+
+    const { error } = await supabase
+      .from('seeding_posts')
+      .update({ is_notification_seen: true })
+      .eq('id', postId);
+    
+    if (error) {
+      showError("Không thể đánh dấu đã xem: " + error.message);
+      setNotifications(prev => 
+        prev.map(n => n.id === postId ? { ...n, is_notification_seen: false } : n)
+      );
+    }
+  };
+
   return (
     <main className="flex-1 space-y-8 p-6 sm:p-8 bg-slate-50">
       <div className="flex items-center gap-4">
@@ -148,7 +181,7 @@ const CompletionNotification = () => {
             </div>
           ) : notifications.length > 0 ? (
             <div className="space-y-3">
-              {notifications.map(post => <NotificationItem key={post.id} post={post} />)}
+              {notifications.map(post => <NotificationItem key={post.id} post={post} onMarkAsSeen={handleMarkAsSeen} />)}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-64 text-center text-slate-500">
