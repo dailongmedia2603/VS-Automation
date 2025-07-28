@@ -26,6 +26,19 @@ type Project = {
   color: string;
 };
 
+const folderColors = [
+  'bg-blue-100 text-blue-600',
+  'bg-green-100 text-green-600',
+  'bg-yellow-100 text-yellow-600',
+  'bg-purple-100 text-purple-600',
+  'bg-red-100 text-red-600',
+  'bg-indigo-100 text-indigo-600',
+  'bg-pink-100 text-pink-600',
+  'bg-teal-100 text-teal-600',
+];
+
+const getRandomColor = () => folderColors[Math.floor(Math.random() * folderColors.length)];
+
 const ContentAi = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [projects, setProjects] = useState<Project[]>([]);
@@ -77,11 +90,13 @@ const ContentAi = () => {
     setIsSaving(true);
 
     try {
+      const randomColor = getRandomColor();
       const { data: newProject, error } = await supabase
         .from('content_ai_ds_du_an')
         .insert({
           name: newProjectName.trim(),
           creator_id: user.id,
+          color: randomColor,
         })
         .select()
         .single();
