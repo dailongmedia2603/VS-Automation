@@ -16,7 +16,7 @@ type CompletedPost = {
   name: string;
   type: 'comment_check' | 'post_approval';
   project_id: number;
-  last_checked_at: string;
+  last_checked_at: string | null;
   seeding_projects: { name: string } | null;
   is_notification_seen: boolean;
 };
@@ -44,7 +44,7 @@ const NotificationItem = ({ post, onMarkAsSeen }: { post: CompletedPost, onMarkA
             <div className="flex items-center justify-between">
               <p className="font-semibold text-slate-800">{post.name}</p>
               <p className="text-xs text-slate-500">
-                {formatDistanceToNow(new Date(post.last_checked_at), { addSuffix: true, locale: vi })}
+                {post.last_checked_at ? formatDistanceToNow(new Date(post.last_checked_at), { addSuffix: true, locale: vi }) : 'Vừa xong'}
               </p>
             </div>
             <p className="text-sm text-slate-600 mt-1">
