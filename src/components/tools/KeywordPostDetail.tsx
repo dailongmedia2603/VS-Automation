@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, MoreHorizontal, PlayCircle, CheckCircle2, XCircle, Loader2, Edit, Trash2, List } from 'lucide-react';
+import { Search, MoreHorizontal, PlayCircle, CheckCircle2, XCircle, Loader2, Edit, Trash2, List, PlusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -146,6 +146,7 @@ export const KeywordPostDetail = ({ project, post, onCheckComplete }: KeywordPos
                 </SelectContent>
               </Select>
               <Button variant="outline" onClick={() => setIsKeywordListOpen(true)}><List className="mr-2 h-4 w-4" />List từ khoá</Button>
+              <Button><PlusCircle className="mr-2 h-4 w-4" />Thêm bài viết</Button>
             </div>
           </div>
 
