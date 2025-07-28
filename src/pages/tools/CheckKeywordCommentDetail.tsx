@@ -28,6 +28,7 @@ type Post = {
   link: string | null;
   status: 'pending' | 'completed';
   type: 'comment' | 'post';
+  keywords: string | null;
 };
 
 const initialNewPostState = {

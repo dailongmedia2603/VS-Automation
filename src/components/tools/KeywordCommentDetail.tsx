@@ -16,7 +16,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Textarea } from '@/components/ui/textarea';
 
 type Project = { id: number; name: string; };
-type Post = { id: number; name: string; link: string | null; };
+type Post = { id: number; name: string; link: string | null; keywords: string | null; };
 type Item = { id: number; content: string; status: 'found' | 'not_found'; found_keywords: string[] | null };
 interface CheckResult { found: number; notFound: number; total: number; }
 
@@ -162,7 +162,7 @@ export const KeywordCommentDetail = ({ project, post, onCheckComplete }: Keyword
           </DialogHeader>
           <Textarea
             readOnly
-            value={items.map(item => item.content).join('\n')}
+            value={post.keywords || ''}
             className="min-h-[200px] bg-slate-50"
           />
           <DialogFooter>
