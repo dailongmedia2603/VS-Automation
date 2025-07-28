@@ -22,6 +22,7 @@ import { supabase } from "@/integrations/supabase/client";
 import hexaLogo from "@/assets/images/dailongmedia.png";
 import { useAuth } from "@/contexts/AuthContext";
 import { showSuccess, showError } from "@/utils/toast";
+import { useNotification } from "@/contexts/NotificationContext";
 
 interface NavItem {
   name: string;
@@ -74,6 +75,7 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
   const { user } = useAuth();
   const [profile, setProfile] = useState<StaffProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
+  const { unreadCount } = useNotification();
 
   useEffect(() => {
     const fetchProfile = async () => {

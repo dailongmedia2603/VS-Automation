@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -7,13 +7,12 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Bell, MessageSquare, FileCheck2, Trash2, Loader2, Volume2, VolumeX } from 'lucide-react';
+import { ArrowLeft, Bell, MessageSquare, FileCheck2, Trash2, Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { cn } from '@/lib/utils';
-
-type SoundPermission = 'prompt' | 'granted' | 'denied';
+import { useNotification } from '@/contexts/NotificationContext';
 
 type CompletedPost = {
   id: number;
@@ -84,20 +83,7 @@ const CompletionNotification = () => {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [soundPermission, setSoundPermission] = useState<SoundPermission>('prompt');
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const soundPermissionRef = useRef(soundPermission);
-  soundPermissionRef.current = soundPermission;
-
-  useEffect(() => {
-    audioRef.current = new Audio('/sounds/notificationnew.mp3');
-    const savedPermission = localStorage.getItem('soundPermission');
-    if (savedPermission === 'granted') {
-      setSoundPermission('granted');
-    } else {
-      setSoundPermission('prompt');
-    }
-  }, []);
+  const { decrementUnreadCount } = useNotification();
 
   const fetchCompletedPosts = async () => {
     setIsLoading(true);
@@ -126,47 +112,12 @@ const CompletionNotification = () => {
     fetchCompletedPosts();
   }, []);
 
-  useEffect(() => {
-    const channel = supabase
-      .channel('completed-posts-channel')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'seeding_posts',
-          filter: 'status=eq.completed',
-        },
-        async (payload) => {
-          if (payload.old.status !== 'completed' && payload.new.status === 'completed') {
-            const { data: projectData, error } = await supabase
-              .from('seeding_projects')
-              .select('name')
-              .eq('id', payload.new.project_id)
-              .single();
-            
-            if (!error && projectData) {
-              const newNotification = {
-                ...payload.new,
-                seeding_projects: { name: projectData.name }
-              } as CompletedPost;
-              
-              setNotifications(prev => [newNotification, ...prev]);
-              if (soundPermissionRef.current === 'granted' && audioRef.current) {
-                audioRef.current.play().catch(e => console.error("Sound play failed even with permission:", e));
-              }
-            }
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
   const handleMarkAsSeen = async (postId: number) => {
+    const notification = notifications.find(n => n.id === postId);
+    if (notification && !notification.is_notification_seen) {
+      decrementUnreadCount();
+    }
+
     setNotifications(prev => 
       prev.map(n => n.id === postId ? { ...n, is_notification_seen: true } : n)
     );
@@ -220,22 +171,6 @@ const CompletionNotification = () => {
     setIsDeleting(false);
   };
 
-  const handleEnableSound = async () => {
-    if (audioRef.current) {
-      try {
-        await audioRef.current.play();
-        showSuccess("Âm thanh thông báo đã được bật!");
-        setSoundPermission('granted');
-        localStorage.setItem('soundPermission', 'granted');
-      } catch (error) {
-        console.error("Failed to enable sound:", error);
-        showError("Không thể bật âm thanh. Vui lòng kiểm tra cài đặt của trình duyệt.");
-        setSoundPermission('denied');
-        localStorage.setItem('soundPermission', 'denied');
-      }
-    }
-  };
-
   return (
     <main className="flex-1 space-y-8 p-6 sm:p-8 bg-slate-50">
       <div className="flex items-center gap-4">
@@ -251,24 +186,6 @@ const CompletionNotification = () => {
           </p>
         </div>
       </div>
-
-      {soundPermission === 'prompt' && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-2xl px-4 z-50">
-            <div className="bg-white rounded-xl shadow-lg p-4 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <VolumeX className="h-6 w-6 text-slate-500 flex-shrink-0" />
-                    <div>
-                        <h3 className="font-semibold text-slate-800">Bật thông báo âm thanh?</h3>
-                        <p className="text-sm text-slate-500">Nhấp để cho phép trình duyệt phát âm thanh.</p>
-                    </div>
-                </div>
-                <Button onClick={handleEnableSound} className="bg-slate-900 hover:bg-slate-800 text-white flex-shrink-0">
-                    <Volume2 className="mr-2 h-4 w-4" />
-                    Bật âm thanh
-                </Button>
-            </div>
-        </div>
-      )}
 
       <Card className="shadow-sm rounded-2xl bg-white">
         <CardHeader className="p-4 border-b">

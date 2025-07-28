@@ -23,6 +23,7 @@ import Tools from "./pages/Tools";
 import CheckKeywordComment from "@/pages/tools/check-keyword-comment";
 import CheckKeywordCommentDetail from "@/pages/tools/CheckKeywordCommentDetail";
 import CompletionNotification from "./pages/CompletionNotification";
+import { NotificationProvider } from "./contexts/NotificationContext";
 
 const queryClient = new QueryClient();
 
@@ -34,28 +35,30 @@ const App = () => (
           <TooltipProvider>
             <Toaster />
             <Sonner />
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route element={<ProtectedRoute />}>
-                <Route element={<AppLayout />}>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/projects" element={<Projects />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="/training-chatbot" element={<TrainingChatbot />} />
-                  <Route path="/training-documents" element={<TrainingDocuments />} />
-                  <Route path="/staff" element={<Staff />} />
-                  <Route path="/content-ai" element={<ContentAi />} />
-                  <Route path="/check-seeding" element={<CheckSeeding />} />
-                  <Route path="/check-seeding/:projectId" element={<SeedingProjectDetail />} />
-                  <Route path="/completion-notification" element={<CompletionNotification />} />
-                  <Route path="/tools" element={<Tools />} />
-                  <Route path="/tools/check-keyword-comment" element={<CheckKeywordComment />} />
-                  <Route path="/tools/check-keyword-comment/:projectId" element={<CheckKeywordCommentDetail />} />
+            <NotificationProvider>
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route element={<ProtectedRoute />}>
+                  <Route element={<AppLayout />}>
+                    <Route path="/" element={<Dashboard />} />
+                    <Route path="/projects" element={<Projects />} />
+                    <Route path="/settings" element={<Settings />} />
+                    <Route path="/training-chatbot" element={<TrainingChatbot />} />
+                    <Route path="/training-documents" element={<TrainingDocuments />} />
+                    <Route path="/staff" element={<Staff />} />
+                    <Route path="/content-ai" element={<ContentAi />} />
+                    <Route path="/check-seeding" element={<CheckSeeding />} />
+                    <Route path="/check-seeding/:projectId" element={<SeedingProjectDetail />} />
+                    <Route path="/completion-notification" element={<CompletionNotification />} />
+                    <Route path="/tools" element={<Tools />} />
+                    <Route path="/tools/check-keyword-comment" element={<CheckKeywordComment />} />
+                    <Route path="/tools/check-keyword-comment/:projectId" element={<CheckKeywordCommentDetail />} />
+                  </Route>
                 </Route>
-              </Route>
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </NotificationProvider>
           </TooltipProvider>
         </QueryClientProvider>
       </ApiSettingsProvider>

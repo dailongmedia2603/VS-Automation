@@ -20,6 +20,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
+import { useNotification } from '@/contexts/NotificationContext';
 
 type ProjectStatus = 'checking' | 'completed' | 'archived';
 type Project = {
@@ -41,7 +42,7 @@ const CheckSeeding = () => {
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | 'all'>('all');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
-  const [unreadCount, setUnreadCount] = useState(0);
+  const { unreadCount } = useNotification();
   
   const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
@@ -65,40 +66,6 @@ const CheckSeeding = () => {
 
   useEffect(() => {
     fetchProjects();
-
-    const fetchUnreadCount = async () => {
-      const { count, error } = await supabase
-        .from('seeding_posts')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'completed')
-        .eq('is_notification_seen', false);
-
-      if (!error) {
-        setUnreadCount(count || 0);
-      }
-    };
-
-    fetchUnreadCount();
-
-    const channel = supabase
-      .channel('unread-notifications-channel')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'seeding_posts',
-          filter: 'status=eq.completed',
-        },
-        () => {
-          fetchUnreadCount();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, []);
 
   const filteredProjects = useMemo(() => {
