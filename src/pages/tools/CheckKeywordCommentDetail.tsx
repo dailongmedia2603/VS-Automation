@@ -34,6 +34,7 @@ const initialNewPostState = {
   name: '',
   type: 'comment' as 'comment' | 'post',
   link: '',
+  keywords: '',
 };
 
 const CheckKeywordCommentDetail = () => {
@@ -111,19 +112,65 @@ const CheckKeywordCommentDetail = () => {
 
   const handleAddPost = async () => {
     if (!newPostData.name.trim() || !projectId) {
-      showError("Tên không được để trống.");
+      showError("Tên Post không được để trống.");
       return;
     }
+    if (newPostData.type === 'comment' && !newPostData.link.trim()) {
+      showError("Link/ID bài viết không được để trống.");
+      return;
+    }
+    if (newPostData.type === 'post' && !newPostData.link.trim()) {
+      showError("Nội dung Post không được để trống.");
+      return;
+    }
+
     setIsSaving(true);
-    const { error } = await supabase.from('keyword_check_posts').insert({ ...newPostData, project_id: projectId });
-    if (error) showError("Thêm post thất bại: " + error.message);
-    else {
+    const toastId = showLoading("Đang tạo post...");
+
+    try {
+      const postToInsert = {
+        project_id: projectId,
+        name: newPostData.name,
+        type: newPostData.type,
+        link: newPostData.link,
+      };
+
+      const { data: newPost, error: postError } = await supabase
+        .from('keyword_check_posts')
+        .insert(postToInsert)
+        .select()
+        .single();
+
+      if (postError) throw postError;
+
+      if (newPostData.keywords.trim()) {
+        const itemsToInsert = newPostData.keywords
+          .split('\n')
+          .filter(line => line.trim() !== '')
+          .map(content => ({
+            post_id: newPost.id,
+            content: content.trim(),
+          }));
+        
+        if (itemsToInsert.length > 0) {
+          const { error: itemsError } = await supabase
+            .from('keyword_check_items')
+            .insert(itemsToInsert);
+          if (itemsError) throw itemsError;
+        }
+      }
+      
+      dismissToast(toastId);
       showSuccess("Đã thêm post thành công!");
       setIsAddDialogOpen(false);
       setNewPostData(initialNewPostState);
       fetchProjectData();
+    } catch (error: any) {
+      dismissToast(toastId);
+      showError("Thêm post thất bại: " + error.message);
+    } finally {
+      setIsSaving(false);
     }
-    setIsSaving(false);
   };
 
   const PostList = ({ posts, onSelectPost }: { posts: Post[], onSelectPost: (post: Post) => void }) => {
@@ -202,11 +249,36 @@ const CheckKeywordCommentDetail = () => {
         </ResizablePanel>
       </ResizablePanelGroup>
 
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}><DialogContent><DialogHeader><DialogTitle>Thêm Post Mới</DialogTitle></DialogHeader><div className="space-y-4 py-4">
-        <div className="space-y-2"><Label>Tên Post</Label><Input value={newPostData.name} onChange={(e) => setNewPostData(d => ({...d, name: e.target.value}))} /></div>
-        <div className="space-y-2"><Label>Loại</Label><Select value={newPostData.type} onValueChange={(v) => setNewPostData(d => ({...d, type: v as any}))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="comment">Check Keyword Comment</SelectItem><SelectItem value="post">Check Keyword Post</SelectItem></SelectContent></Select></div>
-        <div className="space-y-2"><Label>Link/ID bài viết Facebook</Label><Input value={newPostData.link} onChange={(e) => setNewPostData(d => ({...d, link: e.target.value}))} /></div>
-      </div><DialogFooter><Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Hủy</Button><Button onClick={handleAddPost} disabled={isSaving}>{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Lưu</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Thêm Post Mới</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2"><Label>Tên Post</Label><Input value={newPostData.name} onChange={(e) => setNewPostData(d => ({...d, name: e.target.value}))} /></div>
+            <div className="space-y-2"><Label>Loại</Label><Select value={newPostData.type} onValueChange={(v) => setNewPostData(d => ({...d, type: v as any}))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="comment">Check Keyword Comment</SelectItem><SelectItem value="post">Check Keyword Post</SelectItem></SelectContent></Select></div>
+            
+            {newPostData.type === 'comment' ? (
+              <div className="space-y-2">
+                <Label>Link/ID bài viết Facebook</Label>
+                <Input value={newPostData.link} onChange={(e) => setNewPostData(d => ({...d, link: e.target.value}))} />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>Nội dung Post</Label>
+                <Textarea value={newPostData.link} onChange={(e) => setNewPostData(d => ({...d, link: e.target.value}))} className="min-h-[120px]" placeholder="Nhập toàn bộ nội dung bài viết vào đây..." />
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>Danh sách từ khóa (mỗi từ khóa một dòng)</Label>
+              <Textarea value={newPostData.keywords} onChange={(e) => setNewPostData(d => ({...d, keywords: e.target.value}))} className="min-h-[120px]" placeholder="Từ khóa 1..." />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Hủy</Button>
+            <Button onClick={handleAddPost} disabled={isSaving}>{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Lưu</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Bạn có chắc chắn?</AlertDialogTitle><AlertDialogDescription>Hành động này sẽ xóa vĩnh viễn post "{postToDelete?.name}".</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Hủy</AlertDialogCancel><AlertDialogAction onClick={handleConfirmDelete} className="bg-red-600 hover:bg-red-700">Xóa</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     </main>
   );
