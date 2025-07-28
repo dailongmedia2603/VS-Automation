@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type Project = { id: number; name: string; };
 type Post = { id: number; name: string; link: string | null; keywords: string | null; };
@@ -42,6 +43,9 @@ export const KeywordPostDetail = ({ project, post, onCheckComplete }: KeywordPos
 
   const [itemToDelete, setItemToDelete] = useState<Item | null>(null);
   const [isKeywordListOpen, setIsKeywordListOpen] = useState(false);
+  
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'found' | 'not_found'>('all');
 
   const fetchItem = async () => {
     setIsLoading(true);
@@ -105,6 +109,13 @@ export const KeywordPostDetail = ({ project, post, onCheckComplete }: KeywordPos
     });
   }, [post.keywords, item]);
 
+  const filteredItem = useMemo(() => {
+    if (!item) return null;
+    if (statusFilter !== 'all' && item.status !== statusFilter) return null;
+    if (searchTerm && !item.content.toLowerCase().includes(searchTerm.toLowerCase())) return null;
+    return item;
+  }, [item, searchTerm, statusFilter]);
+
   return (
     <>
       <Card className="w-full h-full shadow-none border-none flex flex-col">
@@ -119,21 +130,35 @@ export const KeywordPostDetail = ({ project, post, onCheckComplete }: KeywordPos
               <Button onClick={handleRunCheck} disabled={isChecking} className="bg-blue-600 hover:bg-blue-700 rounded-lg">{isChecking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}{isChecking ? 'Đang chạy...' : 'Chạy Check'}</Button>
             </div>
           </div></CardContent></Card>
+          
           <div className="flex items-center justify-between gap-4 mb-4">
+            <div className="relative flex-grow max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Tìm kiếm trong nội dung..." className="pl-9" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+            </div>
             <div className="flex items-center gap-2">
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+                <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tất cả</SelectItem>
+                  <SelectItem value="found">Tìm thấy</SelectItem>
+                  <SelectItem value="not_found">Chưa tìm thấy</SelectItem>
+                </SelectContent>
+              </Select>
               <Button variant="outline" onClick={() => setIsKeywordListOpen(true)}><List className="mr-2 h-4 w-4" />List từ khoá</Button>
             </div>
           </div>
+
           <div className="border rounded-lg overflow-auto flex-1"><Table><TableHeader><TableRow><TableHead>Nội dung Post</TableHead><TableHead>Kết quả</TableHead><TableHead>Từ khoá tìm thấy</TableHead><TableHead className="text-right">Thao tác</TableHead></TableRow></TableHeader>
             <TableBody>
               {isLoading ? (<TableRow><TableCell colSpan={4}><Skeleton className="h-8 w-full" /></TableCell></TableRow>) : 
-              item ? (<TableRow key={item.id}>
-                <TableCell className="max-w-md break-words whitespace-pre-wrap">{item.content}</TableCell>
-                <TableCell><Badge className={cn(item.status === 'found' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800')}>{item.status === 'found' ? 'Tìm thấy' : 'Chưa tìm thấy'}</Badge></TableCell>
-                <TableCell>{item.found_keywords?.join(', ')}</TableCell>
-                <TableCell className="text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal /></Button></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuItem onClick={() => { setEditingItem(item); setEditedContent(item.content); }}><Edit className="mr-2 h-4 w-4" />Sửa</DropdownMenuItem><DropdownMenuItem onClick={() => setItemToDelete(item)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell>
+              filteredItem ? (<TableRow key={filteredItem.id}>
+                <TableCell className="max-w-md break-words whitespace-pre-wrap">{filteredItem.content}</TableCell>
+                <TableCell><Badge className={cn(filteredItem.status === 'found' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800')}>{filteredItem.status === 'found' ? 'Tìm thấy' : 'Chưa tìm thấy'}</Badge></TableCell>
+                <TableCell>{filteredItem.found_keywords?.join(', ')}</TableCell>
+                <TableCell className="text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal /></Button></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuItem onClick={() => { setEditingItem(filteredItem); setEditedContent(filteredItem.content); }}><Edit className="mr-2 h-4 w-4" />Sửa</DropdownMenuItem><DropdownMenuItem onClick={() => setItemToDelete(filteredItem)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell>
               </TableRow>) : 
-              (<TableRow><TableCell colSpan={4} className="text-center h-24">Không có nội dung nào.</TableCell></TableRow>)}
+              (<TableRow><TableCell colSpan={4} className="text-center h-24">{item ? 'Không có kết quả phù hợp với bộ lọc.' : 'Không có nội dung nào.'}</TableCell></TableRow>)}
             </TableBody>
           </Table></div>
         </CardContent>
