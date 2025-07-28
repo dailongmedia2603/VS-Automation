@@ -187,7 +187,7 @@ export const KeywordCommentDetail = ({ project, post, onCheckComplete }: Keyword
               filteredItems.length > 0 ? (filteredItems.map((item, index) => <TableRow key={item.id}>
                 <TableCell>{index + 1}</TableCell>
                 <TableCell className="max-w-xs break-words">{item.content}</TableCell>
-                <TableCell><Badge className={cn(item.status === 'found' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800')}>{item.status === 'found' ? 'Tìm thấy' : 'Chưa tìm thấy'}</Badge></TableCell>
+                <TableCell><Badge className={cn('pointer-events-none', item.status === 'found' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800')}>{item.status === 'found' ? 'Tìm thấy' : 'Chưa tìm thấy'}</Badge></TableCell>
                 <TableCell>{item.found_keywords?.join(', ')}</TableCell>
                 <TableCell className="text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal /></Button></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuItem onClick={() => { setEditingItem(item); setEditedContent(item.content); }}><Edit className="mr-2 h-4 w-4" />Sửa</DropdownMenuItem><DropdownMenuItem onClick={() => setItemToDelete(item)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell>
               </TableRow>)) : 

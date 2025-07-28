@@ -222,7 +222,7 @@ export const KeywordPostDetail = ({ project, post, onCheckComplete, onAddPost }:
               {isLoading ? (<TableRow><TableCell colSpan={4}><Skeleton className="h-8 w-full" /></TableCell></TableRow>) : 
               filteredItem ? (<TableRow key={filteredItem.id}>
                 <TableCell className="max-w-md break-words whitespace-pre-wrap">{filteredItem.content}</TableCell>
-                <TableCell><Badge className={cn(filteredItem.status === 'found' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800')}>{filteredItem.status === 'found' ? 'Tìm thấy' : 'Chưa tìm thấy'}</Badge></TableCell>
+                <TableCell><Badge className={cn('pointer-events-none', filteredItem.status === 'found' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800')}>{filteredItem.status === 'found' ? 'Tìm thấy' : 'Chưa tìm thấy'}</Badge></TableCell>
                 <TableCell>{filteredItem.found_keywords?.join(', ')}</TableCell>
                 <TableCell className="text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal /></Button></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuItem onClick={() => { setEditingItem(filteredItem); setEditedContent(filteredItem.content); }}><Edit className="mr-2 h-4 w-4" />Sửa</DropdownMenuItem><DropdownMenuItem onClick={() => setItemToDelete(filteredItem)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell>
               </TableRow>) : 
