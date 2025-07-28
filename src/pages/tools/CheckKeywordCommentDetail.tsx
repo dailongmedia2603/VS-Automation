@@ -355,7 +355,7 @@ const CheckKeywordCommentDetail = () => {
             {selectedPost && project ? (
               selectedPost.type === 'comment' ? 
                 <KeywordCommentDetail key={selectedPost.id} project={project} post={selectedPost} onCheckComplete={fetchProjectData} /> :
-                <KeywordPostDetail key={selectedPost.id} project={project} post={selectedPost} onCheckComplete={fetchProjectData} onAddPost={() => setIsAddDialogOpen(true)} />
+                <KeywordPostDetail key={selectedPost.id} project={project} post={selectedPost} onCheckComplete={fetchProjectData} />
             ) : (
               <div className="text-center text-slate-500"><p className="font-semibold text-lg">Chọn một mục để xem chi tiết</p></div>
             )}

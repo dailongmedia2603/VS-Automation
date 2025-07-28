@@ -191,7 +191,7 @@ export const KeywordCommentDetail = ({ project, post, onCheckComplete }: Keyword
                 <TableCell>{item.found_keywords?.join(', ')}</TableCell>
                 <TableCell className="text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal /></Button></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuItem onClick={() => { setEditingItem(item); setEditedContent(item.content); }}><Edit className="mr-2 h-4 w-4" />Sửa</DropdownMenuItem><DropdownMenuItem onClick={() => setItemToDelete(item)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell>
               </TableRow>)) : 
-              (<TableRow><TableCell colSpan={5} className="text-center h-24">Không có bình luận nào.</TableCell></TableRow>)}
+              (<TableRow><TableCell colSpan={5} className="text-center h-24"><div className="flex flex-col items-center gap-2"><MessageCircle className="h-10 w-10 text-slate-400" /><span className="font-medium">Không có bình luận nào</span><span className="text-xs">Hãy thử thêm comment mới hoặc thay đổi bộ lọc.</span></div></TableCell></TableRow>)}
             </TableBody>
           </Table></div>
         </CardContent>
