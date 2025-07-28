@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -48,6 +48,7 @@ const initialNewPostState = {
 
 const SeedingProjectDetail = () => {
   const { projectId } = useParams<{ projectId: string }>();
+  const location = useLocation();
   const [project, setProject] = useState<Project | null>(null);
   const [commentCheckPosts, setCommentCheckPosts] = useState<Post[]>([]);
   const [postApprovalPosts, setPostApprovalPosts] = useState<Post[]>([]);
@@ -133,6 +134,19 @@ const SeedingProjectDetail = () => {
   useEffect(() => {
     fetchProjectData(true);
   }, [projectId]);
+
+  useEffect(() => {
+    const selectedPostId = location.state?.selectedPostId;
+    if (selectedPostId && (commentCheckPosts.length > 0 || postApprovalPosts.length > 0)) {
+      const allPosts = [...commentCheckPosts, ...postApprovalPosts];
+      const postToSelect = allPosts.find(p => p.id === selectedPostId);
+      if (postToSelect) {
+        setSelectedPost(postToSelect);
+        // Clear state to prevent re-selection on refresh or other navigation
+        window.history.replaceState({}, document.title);
+      }
+    }
+  }, [location.state, commentCheckPosts, postApprovalPosts]);
 
   const handleSaveName = async () => {
     if (!editingPostId) return;
