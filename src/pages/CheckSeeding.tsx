@@ -250,7 +250,7 @@ const CheckSeeding = () => {
               "bg-green-500 hover:bg-green-600 text-white",
               unreadCount > 0 && "animate-glow-green"
             )}>
-              <Bell className="mr-2 h-4 w-4" />
+              <Bell className={cn("mr-2 h-4 w-4", unreadCount > 0 && "animate-ring-bell")} />
               Thông báo hoàn thành
             </Button>
           </Link>
