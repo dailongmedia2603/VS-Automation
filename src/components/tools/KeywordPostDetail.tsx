@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, MoreHorizontal, PlayCircle, CheckCircle2, XCircle, Loader2, Edit, Trash2, List, PlusCircle } from 'lucide-react';
+import { Search, Download, MoreHorizontal, PlayCircle, CheckCircle2, XCircle, Loader2, Edit, Trash2, List, PlusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -16,6 +16,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import * as XLSX from 'xlsx';
 
 type Project = { id: number; name: string; };
 type Post = { id: number; name: string; link: string | null; keywords: string | null; };
@@ -142,6 +143,27 @@ export const KeywordPostDetail = ({ project, post, onCheckComplete, onAddPost }:
     }
   };
 
+  const handleExportExcel = () => {
+    if (!item) {
+      showError("Không có dữ liệu để xuất.");
+      return;
+    }
+
+    const dataToExport = [{
+      'Dự án': project.name,
+      'Tên Post': post.name,
+      'Nội dung Post': item.content,
+      'Trạng thái': item.status === 'found' ? 'Tìm thấy' : 'Chưa tìm thấy',
+      'Từ khóa tìm thấy': item.found_keywords?.join(', ') || '',
+    }];
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Post Content");
+    XLSX.writeFile(workbook, `${project.name} - ${post.name} - Post.xlsx`);
+    showSuccess("Đã xuất file Excel thành công!");
+  };
+
   const keywordStats = useMemo(() => {
     if (!post.keywords) return [];
     const keywords = post.keywords.split('\n').map(k => k.trim()).filter(Boolean);
@@ -190,6 +212,7 @@ export const KeywordPostDetail = ({ project, post, onCheckComplete, onAddPost }:
                 </SelectContent>
               </Select>
               <Button variant="outline" onClick={() => setIsKeywordListOpen(true)}><List className="mr-2 h-4 w-4" />List từ khoá</Button>
+              <Button variant="outline" onClick={handleExportExcel}><Download className="mr-2 h-4 w-4" />Xuất Excel</Button>
               <Button onClick={onAddPost}><PlusCircle className="mr-2 h-4 w-4" />Thêm bài viết</Button>
             </div>
           </div>

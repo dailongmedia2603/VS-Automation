@@ -9,12 +9,13 @@ import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, MoreHorizontal, MessageCircle, PlayCircle, CheckCircle2, XCircle, Loader2, PlusCircle, Edit, Trash2, List } from 'lucide-react';
+import { Search, Download, MoreHorizontal, MessageCircle, PlayCircle, CheckCircle2, XCircle, Loader2, PlusCircle, Edit, Trash2, List } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import * as XLSX from 'xlsx';
 
 type Project = { id: number; name: string; };
 type Post = { id: number; name: string; link: string | null; keywords: string | null; };
@@ -116,6 +117,27 @@ export const KeywordCommentDetail = ({ project, post, onCheckComplete }: Keyword
     }
   };
 
+  const handleExportExcel = () => {
+    const dataToExport = filteredItems.map(item => ({
+      'Dự án': project.name,
+      'Tên Post': post.name,
+      'Nội dung Comment': item.content,
+      'Trạng thái': item.status === 'found' ? 'Tìm thấy' : 'Chưa tìm thấy',
+      'Từ khóa tìm thấy': item.found_keywords?.join(', ') || '',
+    }));
+
+    if (dataToExport.length === 0) {
+      showError("Không có dữ liệu để xuất.");
+      return;
+    }
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Comments");
+    XLSX.writeFile(workbook, `${project.name} - ${post.name} - Comments.xlsx`);
+    showSuccess("Đã xuất file Excel thành công!");
+  };
+
   const filteredItems = useMemo(() => items.filter(item => 
     (statusFilter === 'all' || item.status === statusFilter) &&
     item.content.toLowerCase().includes(searchTerm.toLowerCase())
@@ -155,6 +177,7 @@ export const KeywordCommentDetail = ({ project, post, onCheckComplete }: Keyword
             <div className="flex items-center gap-2">
               <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}><SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Tất cả</SelectItem><SelectItem value="found">Tìm thấy</SelectItem><SelectItem value="not_found">Chưa tìm thấy</SelectItem></SelectContent></Select>
               <Button variant="outline" onClick={() => setIsKeywordListOpen(true)}><List className="mr-2 h-4 w-4" />List từ khoá</Button>
+              <Button variant="outline" onClick={handleExportExcel}><Download className="mr-2 h-4 w-4" />Xuất Excel</Button>
               <Button onClick={() => setIsAddItemDialogOpen(true)}><PlusCircle className="mr-2 h-4 w-4" />Thêm bình luận</Button>
             </div>
           </div>
