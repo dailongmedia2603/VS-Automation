@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,63 +11,162 @@ import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from '@/components/ui/label';
 import { showSuccess, showError } from '@/utils/toast';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { Skeleton } from '@/components/ui/skeleton';
+import { formatDistanceToNow } from 'date-fns';
+import { vi } from 'date-fns/locale';
 
-// Dummy data for now
-const initialStats = [
-  { title: 'Tổng số dự án', value: '12', icon: Folder, color: 'bg-blue-500' },
-  { title: 'Tổng số tài liệu', value: '256', icon: FileText, color: 'bg-green-500' },
-  { title: 'AI đã tạo', value: '1.2M từ', icon: Bot, color: 'bg-purple-500' },
-];
-
-const initialProjects = [
-  { id: 1, name: 'Chiến dịch Marketing T9', files: 42, size: '2.1 GB', modified: '2 giờ trước', color: 'bg-blue-100 text-blue-600' },
-  { id: 2, name: 'Bài viết Blog SEO', files: 78, size: '4.5 GB', modified: 'Hôm qua', color: 'bg-green-100 text-green-600' },
-  { id: 3, name: 'Kịch bản Video YouTube', files: 15, size: '870 MB', modified: '23/07/2024', color: 'bg-yellow-100 text-yellow-600' },
-  { id: 4, name: 'Nội dung Social Media', files: 120, size: '1.2 GB', modified: '19/07/2024', color: 'bg-purple-100 text-purple-600' },
-  { id: 5, name: 'Email Newsletters', files: 33, size: '450 MB', modified: '15/07/2024', color: 'bg-red-100 text-red-600' },
-  { id: 6, name: 'Website Copywriting', files: 8, size: '120 MB', modified: '12/07/2024', color: 'bg-indigo-100 text-indigo-600' },
-];
+type Project = {
+  id: number;
+  name: string;
+  files: number;
+  size: string;
+  updated_at: string;
+  color: string;
+};
 
 const ContentAi = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [projects, setProjects] = useState(initialProjects);
-  const [stats, setStats] = useState(initialStats);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isCreateProjectDialogOpen, setIsCreateProjectDialogOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
-  const handleCreateProject = () => {
-    if (!newProjectName.trim()) {
+  const fetchProjects = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('content_ai_ds_du_an')
+        .select('*')
+        .order('updated_at', { ascending: false });
+
+      if (error) throw error;
+      setProjects(data || []);
+    } catch (error: any) {
+      showError("Không thể tải dự án: " + error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  const stats = useMemo(() => {
+    const totalProjects = projects.length;
+    const totalFiles = projects.reduce((acc, p) => acc + p.files, 0);
+    const aiWords = '1.2M'; // This is a dummy value for now
+
+    return [
+      { title: 'Tổng số dự án', value: String(totalProjects), icon: Folder, color: 'bg-blue-500' },
+      { title: 'Tổng số tài liệu', value: String(totalFiles), icon: FileText, color: 'bg-green-500' },
+      { title: 'AI đã tạo', value: `${aiWords} từ`, icon: Bot, color: 'bg-purple-500' },
+    ];
+  }, [projects]);
+
+  const handleCreateProject = async () => {
+    if (!newProjectName.trim() || !user) {
       showError("Tên dự án không được để trống.");
       return;
     }
     setIsSaving(true);
 
-    // Simulate API call
-    setTimeout(() => {
-      const newProject = {
-        id: Date.now(),
-        name: newProjectName.trim(),
-        files: 0,
-        size: '0 KB',
-        modified: 'Vừa xong',
-        color: 'bg-gray-100 text-gray-600',
-      };
-      setProjects(prevProjects => [newProject, ...prevProjects]);
-      
-      setStats(prevStats => prevStats.map(stat => 
-        stat.title === 'Tổng số dự án' 
-          ? { ...stat, value: String(parseInt(stat.value) + 1) } 
-          : stat
-      ));
+    try {
+      const { data: newProject, error } = await supabase
+        .from('content_ai_ds_du_an')
+        .insert({
+          name: newProjectName.trim(),
+          creator_id: user.id,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
 
       setNewProjectName('');
       setIsCreateProjectDialogOpen(false);
-      setIsSaving(false);
       showSuccess("Đã tạo dự án thành công!");
-      navigate(`/content-ai/${newProject.id}`);
-    }, 500);
+      await fetchProjects();
+      if (newProject) {
+        navigate(`/content-ai/${newProject.id}`);
+      }
+    } catch (error: any) {
+      showError("Tạo dự án thất bại: " + error.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const renderProjectView = () => {
+    if (isLoading) {
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-48 w-full rounded-2xl" />)}
+        </div>
+      );
+    }
+
+    if (projects.length === 0) {
+        return (
+            <div className="text-center py-16 text-muted-foreground col-span-full">
+                <Folder className="mx-auto h-12 w-12" />
+                <h3 className="mt-4 text-lg font-semibold">Chưa có dự án nào</h3>
+                <p className="mt-1 text-sm">Hãy bắt đầu bằng cách tạo dự án mới.</p>
+            </div>
+        )
+    }
+
+    if (viewMode === 'grid') {
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {projects.map(project => (
+            <ProjectFolder 
+              key={project.id} 
+              id={project.id}
+              name={project.name}
+              files={project.files}
+              size={project.size}
+              modified={formatDistanceToNow(new Date(project.updated_at), { addSuffix: true, locale: vi })}
+              color={project.color}
+            />
+          ))}
+        </div>
+      );
+    }
+
+    return (
+      <div className="border rounded-2xl bg-white overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Tên dự án</TableHead>
+              <TableHead>Số lượng file</TableHead>
+              <TableHead>Kích thước</TableHead>
+              <TableHead>Sửa đổi lần cuối</TableHead>
+              <TableHead><span className="sr-only">Actions</span></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {projects.map(project => (
+              <ProjectListItem 
+                key={project.id} 
+                id={project.id}
+                name={project.name}
+                files={project.files}
+                size={project.size}
+                modified={formatDistanceToNow(new Date(project.updated_at), { addSuffix: true, locale: vi })}
+                color={project.color}
+              />
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    );
   };
 
   return (
@@ -122,32 +221,7 @@ const ContentAi = () => {
         </div>
 
         {/* Project View */}
-        {viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {projects.map(project => (
-              <ProjectFolder key={project.id} {...project} />
-            ))}
-          </div>
-        ) : (
-          <div className="border rounded-2xl bg-white overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Tên dự án</TableHead>
-                  <TableHead>Số lượng file</TableHead>
-                  <TableHead>Kích thước</TableHead>
-                  <TableHead>Sửa đổi lần cuối</TableHead>
-                  <TableHead><span className="sr-only">Actions</span></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {projects.map(project => (
-                  <ProjectListItem key={project.id} {...project} />
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
+        {renderProjectView()}
       </main>
 
       <Dialog open={isCreateProjectDialogOpen} onOpenChange={setIsCreateProjectDialogOpen}>
