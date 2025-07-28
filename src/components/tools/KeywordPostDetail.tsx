@@ -25,6 +25,7 @@ interface KeywordPostDetailProps {
   project: Project;
   post: Post;
   onCheckComplete: () => void;
+  onAddPost: () => void;
 }
 
 const normalizeString = (str: string | null | undefined): string => {
@@ -32,7 +33,7 @@ const normalizeString = (str: string | null | undefined): string => {
   return str.normalize('NFC').toLowerCase();
 };
 
-export const KeywordPostDetail = ({ project, post, onCheckComplete }: KeywordPostDetailProps) => {
+export const KeywordPostDetail = ({ project, post, onCheckComplete, onAddPost }: KeywordPostDetailProps) => {
   const [item, setItem] = useState<Item | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isChecking, setIsChecking] = useState(false);
@@ -146,7 +147,7 @@ export const KeywordPostDetail = ({ project, post, onCheckComplete }: KeywordPos
                 </SelectContent>
               </Select>
               <Button variant="outline" onClick={() => setIsKeywordListOpen(true)}><List className="mr-2 h-4 w-4" />List từ khoá</Button>
-              <Button><PlusCircle className="mr-2 h-4 w-4" />Thêm bài viết</Button>
+              <Button onClick={onAddPost}><PlusCircle className="mr-2 h-4 w-4" />Thêm bài viết</Button>
             </div>
           </div>
 
