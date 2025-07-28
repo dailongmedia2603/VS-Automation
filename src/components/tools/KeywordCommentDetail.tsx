@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, MoreHorizontal, MessageCircle, PlayCircle, CheckCircle2, XCircle, Loader2, PlusCircle, Edit, Trash2 } from 'lucide-react';
+import { Search, MoreHorizontal, MessageCircle, PlayCircle, CheckCircle2, XCircle, Loader2, PlusCircle, Edit, Trash2, List } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -42,6 +42,7 @@ export const KeywordCommentDetail = ({ project, post, onCheckComplete }: Keyword
   const [editedContent, setEditedContent] = useState('');
 
   const [itemToDelete, setItemToDelete] = useState<Item | null>(null);
+  const [isKeywordListOpen, setIsKeywordListOpen] = useState(false);
 
   const fetchItems = async () => {
     setIsLoading(true);
@@ -132,18 +133,21 @@ export const KeywordCommentDetail = ({ project, post, onCheckComplete }: Keyword
             <div className="relative flex-grow max-w-xs"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" /><Input placeholder="Tìm kiếm từ khóa..." className="pl-9" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
             <div className="flex items-center gap-2">
               <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}><SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Tất cả</SelectItem><SelectItem value="found">Tìm thấy</SelectItem><SelectItem value="not_found">Chưa tìm thấy</SelectItem></SelectContent></Select>
+              <Button variant="outline" onClick={() => setIsKeywordListOpen(true)}><List className="mr-2 h-4 w-4" />List từ khoá</Button>
               <Button onClick={() => setIsAddItemDialogOpen(true)}><PlusCircle className="mr-2 h-4 w-4" />Thêm từ khóa</Button>
             </div>
           </div>
-          <div className="border rounded-lg overflow-auto flex-1"><Table><TableHeader><TableRow><TableHead>STT</TableHead><TableHead>Từ khóa</TableHead><TableHead>Kết quả</TableHead><TableHead className="text-right">Thao tác</TableHead></TableRow></TableHeader>
+          <div className="border rounded-lg overflow-auto flex-1"><Table><TableHeader><TableRow><TableHead>STT</TableHead><TableHead>Nội dung comment</TableHead><TableHead>Kết quả</TableHead><TableHead>Từ khoá</TableHead><TableHead className="text-right">Thao tác</TableHead></TableRow></TableHeader>
             <TableBody>
-              {isLoading ? ([...Array(3)].map((_, i) => <TableRow key={i}><TableCell colSpan={4}><Skeleton className="h-8 w-full" /></TableCell></TableRow>)) : 
+              {isLoading ? ([...Array(3)].map((_, i) => <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell></TableRow>)) : 
               filteredItems.length > 0 ? (filteredItems.map((item, index) => <TableRow key={item.id}>
-                <TableCell>{index + 1}</TableCell><TableCell>{item.content}</TableCell>
+                <TableCell>{index + 1}</TableCell>
+                <TableCell className="max-w-xs break-words">{post.link}</TableCell>
                 <TableCell><Badge className={cn(item.status === 'found' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800')}>{item.status === 'found' ? 'Tìm thấy' : 'Chưa tìm thấy'}</Badge></TableCell>
+                <TableCell>{item.content}</TableCell>
                 <TableCell className="text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal /></Button></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuItem onClick={() => { setEditingItem(item); setEditedContent(item.content); }}><Edit className="mr-2 h-4 w-4" />Sửa</DropdownMenuItem><DropdownMenuItem onClick={() => setItemToDelete(item)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell>
               </TableRow>)) : 
-              (<TableRow><TableCell colSpan={4} className="text-center h-24">Không có từ khóa nào.</TableCell></TableRow>)}
+              (<TableRow><TableCell colSpan={5} className="text-center h-24">Không có từ khóa nào.</TableCell></TableRow>)}
             </TableBody>
           </Table></div>
         </CardContent>
@@ -151,6 +155,21 @@ export const KeywordCommentDetail = ({ project, post, onCheckComplete }: Keyword
       <Dialog open={isAddItemDialogOpen} onOpenChange={setIsAddItemDialogOpen}><DialogContent><DialogHeader><DialogTitle>Thêm từ khóa</DialogTitle><DialogDescription>Nhập danh sách từ khóa, mỗi từ khóa trên một dòng.</DialogDescription></DialogHeader><div className="py-4"><Textarea value={newItemsText} onChange={(e) => setNewItemsText(e.target.value)} className="min-h-[150px]" /></div><DialogFooter><Button variant="outline" onClick={() => setIsAddItemDialogOpen(false)}>Hủy</Button><Button onClick={handleSaveNewItems} disabled={isSavingItems}>{isSavingItems && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Lưu</Button></DialogFooter></DialogContent></Dialog>
       <Dialog open={!!editingItem} onOpenChange={() => setEditingItem(null)}><DialogContent><DialogHeader><DialogTitle>Sửa từ khóa</DialogTitle></DialogHeader><div className="py-4"><Input value={editedContent} onChange={(e) => setEditedContent(e.target.value)} /></div><DialogFooter><Button variant="outline" onClick={() => setEditingItem(null)}>Hủy</Button><Button onClick={handleUpdateItem}>Lưu</Button></DialogFooter></DialogContent></Dialog>
       <AlertDialog open={!!itemToDelete} onOpenChange={() => setItemToDelete(null)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Bạn có chắc chắn?</AlertDialogTitle><AlertDialogDescription>Từ khóa "{itemToDelete?.content}" sẽ bị xóa vĩnh viễn.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Hủy</AlertDialogCancel><AlertDialogAction onClick={handleDeleteItem} className="bg-red-600">Xóa</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+      <Dialog open={isKeywordListOpen} onOpenChange={setIsKeywordListOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Danh sách từ khóa cho "{post.name}"</DialogTitle>
+          </DialogHeader>
+          <Textarea
+            readOnly
+            value={items.map(item => item.content).join('\n')}
+            className="min-h-[200px] bg-slate-50"
+          />
+          <DialogFooter>
+            <Button onClick={() => setIsKeywordListOpen(false)}>Đóng</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };
