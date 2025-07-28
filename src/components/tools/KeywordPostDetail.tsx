@@ -15,6 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 
 type Project = { id: number; name: string; };
 type Post = { id: number; name: string; link: string | null; keywords: string | null; };
@@ -47,6 +48,11 @@ export const KeywordPostDetail = ({ project, post, onCheckComplete, onAddPost }:
   
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'found' | 'not_found'>('all');
+
+  const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
+  const [updatedContent, setUpdatedContent] = useState('');
+  const [updatedKeywords, setUpdatedKeywords] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   const fetchItem = async () => {
     setIsLoading(true);
@@ -96,6 +102,43 @@ export const KeywordPostDetail = ({ project, post, onCheckComplete, onAddPost }:
       showSuccess("Đã xóa nội dung post!");
       setItemToDelete(null);
       fetchItem();
+    }
+  };
+
+  const handleOpenUpdateDialog = () => {
+    setUpdatedContent(item?.content || '');
+    setUpdatedKeywords(post.keywords || '');
+    setIsUpdateDialogOpen(true);
+  };
+
+  const handleSaveContentAndKeywords = async () => {
+    setIsSaving(true);
+    const toastId = showLoading("Đang cập nhật...");
+    try {
+      const postUpdatePromise = supabase
+        .from('keyword_check_posts')
+        .update({ keywords: updatedKeywords })
+        .eq('id', post.id);
+      
+      const itemUpdatePromise = item 
+        ? supabase.from('keyword_check_items').update({ content: updatedContent }).eq('id', item.id)
+        : supabase.from('keyword_check_items').insert({ post_id: post.id, content: updatedContent });
+
+      const [postResult, itemResult] = await Promise.all([postUpdatePromise, itemUpdatePromise]);
+
+      if (postResult.error) throw postResult.error;
+      if (itemResult.error) throw itemResult.error;
+
+      dismissToast(toastId);
+      showSuccess("Đã cập nhật thành công!");
+      setIsUpdateDialogOpen(false);
+      fetchItem();
+      onCheckComplete();
+    } catch (error: any) {
+      dismissToast(toastId);
+      showError("Cập nhật thất bại: " + error.message);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -207,6 +250,30 @@ export const KeywordPostDetail = ({ project, post, onCheckComplete, onAddPost }:
           </div>
           <DialogFooter>
             <Button onClick={() => setIsKeywordListOpen(false)} className="bg-blue-600 hover:bg-blue-700">Đóng</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={isUpdateDialogOpen} onOpenChange={setIsUpdateDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cập nhật nội dung và từ khóa</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="post-content">Nội dung bài viết</Label>
+              <Textarea id="post-content" value={updatedContent} onChange={(e) => setUpdatedContent(e.target.value)} className="min-h-[150px]" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="post-keywords">Từ khoá (mỗi từ khóa một dòng)</Label>
+              <Textarea id="post-keywords" value={updatedKeywords} onChange={(e) => setUpdatedKeywords(e.target.value)} className="min-h-[100px]" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsUpdateDialogOpen(false)}>Hủy</Button>
+            <Button onClick={handleSaveContentAndKeywords} disabled={isSaving}>
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Lưu
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
