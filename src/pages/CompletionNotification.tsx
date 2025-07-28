@@ -13,7 +13,7 @@ import { vi } from 'date-fns/locale';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { cn } from '@/lib/utils';
 
-type SoundPermission = 'prompt' | 'granted';
+type SoundPermission = 'prompt' | 'granted' | 'denied';
 
 type CompletedPost = {
   id: number;
@@ -86,12 +86,16 @@ const CompletionNotification = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [soundPermission, setSoundPermission] = useState<SoundPermission>('prompt');
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const soundPermissionRef = useRef(soundPermission);
+  soundPermissionRef.current = soundPermission;
 
   useEffect(() => {
     audioRef.current = new Audio('/sounds/notificationnew.mp3');
     const savedPermission = localStorage.getItem('soundPermission');
     if (savedPermission === 'granted') {
       setSoundPermission('granted');
+    } else {
+      setSoundPermission('prompt');
     }
   }, []);
 
@@ -148,7 +152,7 @@ const CompletionNotification = () => {
               } as CompletedPost;
               
               setNotifications(prev => [newNotification, ...prev]);
-              if (soundPermission === 'granted' && audioRef.current) {
+              if (soundPermissionRef.current === 'granted' && audioRef.current) {
                 audioRef.current.play().catch(e => console.error("Sound play failed even with permission:", e));
               }
             }
@@ -160,7 +164,7 @@ const CompletionNotification = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [soundPermission]);
+  }, []);
 
   const handleMarkAsSeen = async (postId: number) => {
     setNotifications(prev => 
@@ -216,17 +220,19 @@ const CompletionNotification = () => {
     setIsDeleting(false);
   };
 
-  const handleEnableSound = () => {
+  const handleEnableSound = async () => {
     if (audioRef.current) {
-      audioRef.current.play()
-        .then(() => {
-          showSuccess("Âm thanh thông báo đã được bật!");
-          setSoundPermission('granted');
-          localStorage.setItem('soundPermission', 'granted');
-        })
-        .catch(() => {
-          showError("Không thể bật âm thanh. Vui lòng kiểm tra cài đặt trình duyệt của bạn.");
-        });
+      try {
+        await audioRef.current.play();
+        showSuccess("Âm thanh thông báo đã được bật!");
+        setSoundPermission('granted');
+        localStorage.setItem('soundPermission', 'granted');
+      } catch (error) {
+        console.error("Failed to enable sound:", error);
+        showError("Không thể bật âm thanh. Vui lòng kiểm tra cài đặt của trình duyệt.");
+        setSoundPermission('denied');
+        localStorage.setItem('soundPermission', 'denied');
+      }
     }
   };
 
