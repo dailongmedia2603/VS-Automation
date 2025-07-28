@@ -5,6 +5,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Folder, FileText, Bot, PlusCircle, Search, List, LayoutGrid, ChevronDown } from 'lucide-react';
 import { StatWidget } from '@/components/content-ai/StatWidget';
 import { ProjectFolder } from '@/components/content-ai/ProjectFolder';
+import { ProjectListItem } from '@/components/content-ai/ProjectListItem';
+import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 // Dummy data for now
 const stats = [
@@ -75,12 +77,33 @@ const ContentAi = () => {
         </div>
       </div>
 
-      {/* Project Folders Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        {projects.map(project => (
-          <ProjectFolder key={project.id} {...project} />
-        ))}
-      </div>
+      {/* Project View */}
+      {viewMode === 'grid' ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {projects.map(project => (
+            <ProjectFolder key={project.id} {...project} />
+          ))}
+        </div>
+      ) : (
+        <div className="border rounded-2xl bg-white overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Tên dự án</TableHead>
+                <TableHead>Số lượng file</TableHead>
+                <TableHead>Kích thước</TableHead>
+                <TableHead>Sửa đổi lần cuối</TableHead>
+                <TableHead><span className="sr-only">Actions</span></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {projects.map(project => (
+                <ProjectListItem key={project.id} {...project} />
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
     </main>
   );
 };
