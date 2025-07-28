@@ -14,6 +14,7 @@ import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast
 import { format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { Label } from '@/components/ui/label';
+import { Link } from 'react-router-dom';
 
 type Project = {
   id: number;
@@ -195,7 +196,11 @@ const CheckKeywordComment = () => {
                   filteredProjects.map((project) => (
                     <TableRow key={project.id}>
                       <TableCell><Checkbox checked={selectedIds.includes(project.id)} onCheckedChange={(checked) => handleSelectRow(project.id, !!checked)} /></TableCell>
-                      <TableCell className="font-medium text-slate-800">{project.name}</TableCell>
+                      <TableCell className="font-medium">
+                        <Link to={`/tools/check-keyword-comment/${project.id}`} className="hover:underline text-slate-800">
+                          {project.name}
+                        </Link>
+                      </TableCell>
                       <TableCell>{format(new Date(project.created_at), 'dd/MM/yyyy')}</TableCell>
                       <TableCell>{project.creator_name || project.creator_email || 'Không rõ'}</TableCell>
                       <TableCell className="text-right">

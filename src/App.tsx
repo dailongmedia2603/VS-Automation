@@ -21,6 +21,7 @@ import CheckSeeding from "./pages/CheckSeeding";
 import SeedingProjectDetail from "./pages/SeedingProjectDetail";
 import Tools from "./pages/Tools";
 import CheckKeywordComment from "@/pages/tools/check-keyword-comment";
+import CheckKeywordCommentDetail from "@/pages/tools/CheckKeywordCommentDetail";
 
 const queryClient = new QueryClient();
 
@@ -48,6 +49,7 @@ const App = () => (
                   <Route path="/check-seeding/:projectId" element={<SeedingProjectDetail />} />
                   <Route path="/tools" element={<Tools />} />
                   <Route path="/tools/check-keyword-comment" element={<CheckKeywordComment />} />
+                  <Route path="/tools/check-keyword-comment/:projectId" element={<CheckKeywordCommentDetail />} />
                 </Route>
               </Route>
               <Route path="*" element={<NotFound />} />
