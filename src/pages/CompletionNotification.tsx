@@ -75,7 +75,11 @@ const CompletionNotification = () => {
       if (error) {
         showError("Không thể tải thông báo: " + error.message);
       } else {
-        setNotifications(data as CompletedPost[]);
+        const formattedData = data?.map(p => ({
+          ...p,
+          seeding_projects: Array.isArray(p.seeding_projects) ? p.seeding_projects[0] || null : p.seeding_projects,
+        })) || [];
+        setNotifications(formattedData as CompletedPost[]);
       }
       setIsLoading(false);
     };
