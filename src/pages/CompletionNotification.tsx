@@ -7,11 +7,12 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Bell, MessageSquare, FileCheck2, Trash2, Loader2 } from 'lucide-react';
+import { ArrowLeft, Bell, MessageSquare, FileCheck2, Trash2, Loader2, Volume2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { cn } from '@/lib/utils';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 type CompletedPost = {
   id: number;
@@ -82,6 +83,7 @@ const CompletionNotification = () => {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showEnableSoundPrompt, setShowEnableSoundPrompt] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -141,7 +143,11 @@ const CompletionNotification = () => {
               } as CompletedPost;
               
               setNotifications(prev => [newNotification, ...prev]);
-              audioRef.current?.play().catch(e => console.error("Error playing sound:", e));
+              if (audioRef.current) {
+                audioRef.current.play().catch(() => {
+                  setShowEnableSoundPrompt(true);
+                });
+              }
             }
           }
         }
@@ -207,6 +213,19 @@ const CompletionNotification = () => {
     setIsDeleting(false);
   };
 
+  const handleEnableSound = () => {
+    if (audioRef.current) {
+      audioRef.current.play()
+        .then(() => {
+          setShowEnableSoundPrompt(false);
+          showSuccess("Âm thanh thông báo đã được bật!");
+        })
+        .catch(() => {
+          showError("Không thể bật âm thanh. Vui lòng kiểm tra cài đặt trình duyệt của bạn.");
+        });
+    }
+  };
+
   return (
     <main className="flex-1 space-y-8 p-6 sm:p-8 bg-slate-50">
       <div className="flex items-center gap-4">
@@ -222,6 +241,20 @@ const CompletionNotification = () => {
           </p>
         </div>
       </div>
+
+      {showEnableSoundPrompt && (
+        <Alert className="bg-yellow-50 border-yellow-200 text-yellow-800">
+          <Volume2 className="h-4 w-4 !text-yellow-800" />
+          <AlertTitle className="font-semibold">Bật thông báo âm thanh</AlertTitle>
+          <AlertDescription className="flex items-center justify-between">
+            Trình duyệt của bạn đã chặn âm thanh. Nhấn vào nút bên cạnh để bật.
+            <Button onClick={handleEnableSound} size="sm" className="bg-yellow-200 text-yellow-900 hover:bg-yellow-300">
+              Bật âm thanh
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Card className="shadow-sm rounded-2xl bg-white">
         <CardHeader className="p-4 border-b">
           <div className="flex items-center justify-between">
