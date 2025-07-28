@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Textarea } from '@/components/ui/textarea';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 type Project = { id: number; name: string; };
 type Post = { id: number; name: string; link: string | null; keywords: string | null; };
@@ -25,6 +26,11 @@ interface KeywordCommentDetailProps {
   post: Post;
   onCheckComplete: () => void;
 }
+
+const normalizeString = (str: string | null | undefined): string => {
+  if (!str) return '';
+  return str.normalize('NFC').toLowerCase();
+};
 
 export const KeywordCommentDetail = ({ project, post, onCheckComplete }: KeywordCommentDetailProps) => {
   const [items, setItems] = useState<Item[]>([]);
@@ -115,6 +121,21 @@ export const KeywordCommentDetail = ({ project, post, onCheckComplete }: Keyword
     item.content.toLowerCase().includes(searchTerm.toLowerCase())
   ), [items, searchTerm, statusFilter]);
 
+  const keywordStats = useMemo(() => {
+    if (!post.keywords) return [];
+    const keywords = post.keywords.split('\n').map(k => k.trim()).filter(Boolean);
+    
+    return keywords.map(keyword => {
+        const normalizedKeyword = normalizeString(keyword);
+        const count = items.filter(item => 
+            item.found_keywords && 
+            Array.isArray(item.found_keywords) &&
+            item.found_keywords.some(foundKw => normalizeString(foundKw) === normalizedKeyword)
+        ).length;
+        return { keyword, count };
+    });
+  }, [post.keywords, items]);
+
   return (
     <>
       <Card className="w-full h-full shadow-none border-none flex flex-col">
@@ -156,17 +177,45 @@ export const KeywordCommentDetail = ({ project, post, onCheckComplete }: Keyword
       <Dialog open={!!editingItem} onOpenChange={() => setEditingItem(null)}><DialogContent><DialogHeader><DialogTitle>Sửa bình luận</DialogTitle></DialogHeader><div className="py-4"><Textarea value={editedContent} onChange={(e) => setEditedContent(e.target.value)} className="min-h-[100px]" /></div><DialogFooter><Button variant="outline" onClick={() => setEditingItem(null)}>Hủy</Button><Button onClick={handleUpdateItem}>Lưu</Button></DialogFooter></DialogContent></Dialog>
       <AlertDialog open={!!itemToDelete} onOpenChange={() => setItemToDelete(null)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Bạn có chắc chắn?</AlertDialogTitle><AlertDialogDescription>Bình luận "{itemToDelete?.content}" sẽ bị xóa vĩnh viễn.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Hủy</AlertDialogCancel><AlertDialogAction onClick={handleDeleteItem} className="bg-red-600">Xóa</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
       <Dialog open={isKeywordListOpen} onOpenChange={setIsKeywordListOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Danh sách từ khóa cho "{post.name}"</DialogTitle>
+            <DialogTitle className="text-xl font-bold">Danh sách từ khóa cho "{post.name}"</DialogTitle>
+            <DialogDescription>
+              Thống kê số lượng bình luận chứa từng từ khóa.
+            </DialogDescription>
           </DialogHeader>
-          <Textarea
-            readOnly
-            value={post.keywords || ''}
-            className="min-h-[200px] bg-slate-50"
-          />
+          <div className="py-4">
+            <ScrollArea className="h-[300px] border rounded-md">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[50px]">STT</TableHead>
+                    <TableHead>Từ khóa</TableHead>
+                    <TableHead className="text-right">Số lượng</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {keywordStats.length > 0 ? (
+                    keywordStats.map((stat, index) => (
+                      <TableRow key={index}>
+                        <TableCell>{index + 1}</TableCell>
+                        <TableCell className="font-medium">{stat.keyword}</TableCell>
+                        <TableCell className="text-right font-bold">{stat.count}</TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center h-24">
+                        Chưa có từ khóa nào được thêm.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+          </div>
           <DialogFooter>
-            <Button onClick={() => setIsKeywordListOpen(false)}>Đóng</Button>
+            <Button onClick={() => setIsKeywordListOpen(false)} className="bg-blue-600 hover:bg-blue-700">Đóng</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
