@@ -6,7 +6,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, MessageSquare, FileCheck2, ChevronRight, ArrowLeft, Edit, Trash2, Loader2, Check, CheckCircle } from 'lucide-react';
+import { PlusCircle, MessageSquare, FileCheck2, ChevronRight, ArrowLeft, Edit, Trash2, Loader2, Check, CheckCircle, UploadCloud } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -35,7 +35,7 @@ type Post = {
 const initialNewPostState = {
   name: '',
   type: 'comment' as 'comment' | 'post',
-  link: '',
+  link: '', // This will hold comments for 'comment' type, and post content for 'post' type
   keywords: '',
 };
 
@@ -349,7 +349,7 @@ const CheckKeywordCommentDetail = () => {
             {selectedPost && project ? (
               selectedPost.type === 'comment' ? 
                 <KeywordCommentDetail key={selectedPost.id} project={project} post={selectedPost} onCheckComplete={fetchProjectData} /> :
-                <KeywordPostDetail key={selectedPost.id} project={project} post={selectedPost} />
+                <KeywordPostDetail key={selectedPost.id} project={project} post={selectedPost} onCheckComplete={fetchProjectData} />
             ) : (
               <div className="text-center text-slate-500"><p className="font-semibold text-lg">Chọn một mục để xem chi tiết</p></div>
             )}
