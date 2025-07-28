@@ -31,46 +31,44 @@ serve(async (req) => {
   }
 
   try {
-    // 1. Get post content (stored in 'link' field)
+    // 1. Get post to retrieve keywords
     const { data: post, error: postError } = await supabaseAdmin
       .from('keyword_check_posts')
-      .select('link') // 'link' now contains the content to check
+      .select('keywords, type')
       .eq('id', postId)
       .single();
-    if (postError || !post || !post.link) throw new Error("Không tìm thấy post hoặc post không có nội dung.");
+    if (postError || !post) throw new Error("Không tìm thấy post hoặc không thể lấy từ khóa.");
 
-    const contentToCheck = post.link;
-    const normalizedContent = normalizeString(contentToCheck);
+    const keywords = (post.keywords || '').split('\n').map(k => k.trim()).filter(k => k);
+    if (keywords.length === 0) throw new Error("Chưa có từ khóa nào được cấu hình cho post này.");
 
-    // 2. Get keywords to check
-    const { data: keywords, error: keywordsError } = await supabaseAdmin
+    // 2. Get all items (comments or post content) to check
+    const { data: items, error: itemsError } = await supabaseAdmin
       .from('keyword_check_items')
-      .select('*')
+      .select('id, content')
       .eq('post_id', postId);
-    if (keywordsError) throw new Error("Lỗi lấy danh sách từ khóa.");
+    if (itemsError) throw new Error("Lỗi lấy danh sách nội dung cần kiểm tra.");
 
     // 3. Compare and prepare updates
     const updates = [];
-    let foundCount = 0;
+    let itemsWithFoundKeywords = 0;
 
-    for (const keyword of keywords) {
-      const normalizedKeyword = normalizeString(keyword.content);
+    for (const item of items) {
+      const normalizedContent = normalizeString(item.content);
+      const foundKeywords = keywords.filter(kw => normalizedContent.includes(normalizeString(kw)));
       
-      if (normalizedContent.includes(normalizedKeyword)) {
-        foundCount++;
-        updates.push({
-          id: keyword.id,
-          status: 'found',
-        });
-      } else {
-        updates.push({
-          id: keyword.id,
-          status: 'not_found',
-        });
+      if (foundKeywords.length > 0) {
+        itemsWithFoundKeywords++;
       }
+
+      updates.push({
+        id: item.id,
+        status: foundKeywords.length > 0 ? 'found' : 'not_found',
+        found_keywords: foundKeywords.length > 0 ? foundKeywords : null,
+      });
     }
 
-    // 4. Batch update
+    // 4. Batch update items
     if (updates.length > 0) {
       const updatePromises = updates.map(updateData => {
         const { id, ...dataToUpdate } = updateData;
@@ -79,11 +77,11 @@ serve(async (req) => {
       await Promise.all(updatePromises);
     }
     
-    // 5. Update post status
-    const allFound = foundCount === keywords.length && keywords.length > 0;
-    await supabaseAdmin.from('keyword_check_posts').update({ status: allFound ? 'completed' : 'pending' }).eq('id', postId);
+    // 5. Update parent post status
+    const allItemsFound = itemsWithFoundKeywords === items.length && items.length > 0;
+    await supabaseAdmin.from('keyword_check_posts').update({ status: allItemsFound ? 'completed' : 'pending' }).eq('id', postId);
 
-    const result = { found: foundCount, notFound: keywords.length - foundCount, total: keywords.length };
+    const result = { found: itemsWithFoundKeywords, notFound: items.length - itemsWithFoundKeywords, total: items.length };
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,

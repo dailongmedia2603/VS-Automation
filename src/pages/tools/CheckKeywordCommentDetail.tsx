@@ -128,7 +128,8 @@ const CheckKeywordCommentDetail = () => {
         project_id: projectId,
         name: newPostData.name,
         type: newPostData.type,
-        link: newPostData.link, // 'link' now stores content for both types
+        link: newPostData.type === 'post' ? newPostData.link : null,
+        keywords: newPostData.keywords,
       };
 
       const { data: newPost, error: postError } = await supabase
@@ -139,21 +140,27 @@ const CheckKeywordCommentDetail = () => {
 
       if (postError) throw postError;
 
-      if (newPostData.keywords.trim()) {
-        const itemsToInsert = newPostData.keywords
+      let itemsToInsert = [];
+      if (newPostData.type === 'comment') {
+        itemsToInsert = newPostData.link
           .split('\n')
           .filter(line => line.trim() !== '')
           .map(content => ({
             post_id: newPost.id,
             content: content.trim(),
           }));
-        
-        if (itemsToInsert.length > 0) {
-          const { error: itemsError } = await supabase
-            .from('keyword_check_items')
-            .insert(itemsToInsert);
-          if (itemsError) throw itemsError;
-        }
+      } else { // type === 'post'
+        itemsToInsert.push({
+          post_id: newPost.id,
+          content: newPostData.link.trim(),
+        });
+      }
+      
+      if (itemsToInsert.length > 0) {
+        const { error: itemsError } = await supabase
+          .from('keyword_check_items')
+          .insert(itemsToInsert);
+        if (itemsError) throw itemsError;
       }
       
       dismissToast(toastId);
