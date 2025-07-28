@@ -11,7 +11,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, Search, Archive, Trash2, FolderClock, CheckCircle, ListTodo, ChevronDown, Loader2, ArchiveRestore, MoreHorizontal, Edit } from 'lucide-react';
+import { PlusCircle, Search, Archive, Trash2, FolderClock, CheckCircle, ListTodo, ChevronDown, Loader2, ArchiveRestore, MoreHorizontal, Edit, Bell } from 'lucide-react';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { format } from 'date-fns';
 import { SeedingStatCard } from '@/components/SeedingStatCard';
@@ -204,9 +204,19 @@ const CheckSeeding = () => {
 
   return (
     <main className="flex-1 space-y-8 p-6 sm:p-8 bg-slate-50">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">Check Seeding</h1>
-        <p className="text-muted-foreground mt-2 max-w-2xl">Quản lý và theo dõi tiến độ các dự án seeding của bạn.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Check Seeding</h1>
+          <p className="text-muted-foreground mt-2 max-w-2xl">Quản lý và theo dõi tiến độ các dự án seeding của bạn.</p>
+        </div>
+        <div>
+          <Link to="/completion-notification">
+            <Button className="bg-green-500 hover:bg-green-600 text-white">
+              <Bell className="mr-2 h-4 w-4" />
+              Thông báo hoàn thành
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

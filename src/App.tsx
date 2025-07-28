@@ -22,6 +22,7 @@ import SeedingProjectDetail from "./pages/SeedingProjectDetail";
 import Tools from "./pages/Tools";
 import CheckKeywordComment from "@/pages/tools/check-keyword-comment";
 import CheckKeywordCommentDetail from "@/pages/tools/CheckKeywordCommentDetail";
+import CompletionNotification from "./pages/CompletionNotification";
 
 const queryClient = new QueryClient();
 
@@ -47,6 +48,7 @@ const App = () => (
                   <Route path="/content-ai" element={<ContentAi />} />
                   <Route path="/check-seeding" element={<CheckSeeding />} />
                   <Route path="/check-seeding/:projectId" element={<SeedingProjectDetail />} />
+                  <Route path="/completion-notification" element={<CompletionNotification />} />
                   <Route path="/tools" element={<Tools />} />
                   <Route path="/tools/check-keyword-comment" element={<CheckKeywordComment />} />
                   <Route path="/tools/check-keyword-comment/:projectId" element={<CheckKeywordCommentDetail />} />
