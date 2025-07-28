@@ -122,7 +122,7 @@ const CheckKeywordCommentDetail = () => {
     }
 
     setIsSaving(true);
-    const toastId = showLoading("Đang tạo post...");
+    let toastId = showLoading("Đang tạo post...");
 
     try {
       const postToInsert = {
@@ -165,12 +165,29 @@ const CheckKeywordCommentDetail = () => {
       }
       
       dismissToast(toastId);
-      showSuccess("Đã thêm post thành công!");
+      showSuccess("Đã thêm post thành công! Bắt đầu quét tự động...");
+      
+      // --- AUTO CHECK LOGIC ---
+      const checkToastId = showLoading("Đang quét tự động...");
+      const { data: checkData, error: checkError } = await supabase.functions.invoke('check-keywords-in-comments', { 
+        body: { postId: newPost.id } 
+      });
+      dismissToast(checkToastId);
+
+      if (checkError || (checkData && checkData.error)) {
+          showError(`Quét tự động thất bại: ${checkError?.message || checkData?.error}`);
+      } else {
+          showSuccess(`Quét tự động hoàn tất! Tìm thấy ${checkData.found}/${checkData.total} từ khóa.`);
+      }
+      // --- END AUTO CHECK LOGIC ---
+
       setIsAddDialogOpen(false);
       setNewPostData(initialNewPostState);
-      fetchProjectData();
+      await fetchProjectData();
+      setSelectedPost(newPost as Post);
+
     } catch (error: any) {
-      dismissToast(toastId);
+      if (toastId) dismissToast(toastId);
       showError("Thêm post thất bại: " + error.message);
     } finally {
       setIsSaving(false);
