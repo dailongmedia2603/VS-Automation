@@ -81,13 +81,27 @@ export const ImportKeywordPostsDialog = ({ isOpen, onOpenChange, projectId, onSu
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
         
-        const requiredFields = ['post_name', 'post_type', 'content', 'keywords'];
+        if (jsonData.length === 0) {
+          throw new Error("File Excel trống hoặc không có dữ liệu.");
+        }
+
         const firstRow = jsonData[0] || {};
-        if (!requiredFields.every(field => field in firstRow)) {
+        const headers = Object.keys(firstRow).map(h => h.toLowerCase().trim());
+        const requiredFields = ['post_name', 'post_type', 'content', 'keywords'];
+        
+        if (!requiredFields.every(field => headers.includes(field))) {
           throw new Error("File Excel thiếu các cột bắt buộc: post_name, post_type, content, keywords.");
         }
 
-        setParsedData(jsonData as ParsedRow[]);
+        const normalizedData = jsonData.map(row => {
+          const newRow: any = {};
+          for (const key in row) {
+            newRow[key.toLowerCase().trim()] = row[key];
+          }
+          return newRow;
+        });
+
+        setParsedData(normalizedData as ParsedRow[]);
       } catch (error: any) {
         showError(`Lỗi đọc file: ${error.message}`);
         setFile(null);
@@ -129,7 +143,7 @@ export const ImportKeywordPostsDialog = ({ isOpen, onOpenChange, projectId, onSu
         if (newPost) {
           let itemsToInsert = [];
           if (row.post_type === 'comment') {
-            itemsToInsert = row.content
+            itemsToInsert = String(row.content)
               .split('\n')
               .filter(line => line.trim() !== '')
               .map(content => ({
@@ -139,7 +153,7 @@ export const ImportKeywordPostsDialog = ({ isOpen, onOpenChange, projectId, onSu
           } else { // type === 'post'
             itemsToInsert.push({
               post_id: newPost.id,
-              content: row.content.trim(),
+              content: String(row.content).trim(),
             });
           }
           
