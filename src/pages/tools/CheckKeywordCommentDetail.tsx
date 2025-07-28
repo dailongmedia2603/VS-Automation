@@ -6,7 +6,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, MessageSquare, FileCheck2, ChevronRight, ArrowLeft, Edit, Trash2, Loader2, Check, CheckCircle, UploadCloud } from 'lucide-react';
+import { PlusCircle, MessageSquare, FileCheck2, ChevronRight, ArrowLeft, Edit, Trash2, Loader2, Check, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from '@/components/ui/textarea';
 import { KeywordCommentDetail } from '@/components/tools/KeywordCommentDetail';
 import { KeywordPostDetail } from '@/components/tools/KeywordPostDetail';
+import { Checkbox } from '@/components/ui/checkbox';
 
 type Project = {
   id: number;
@@ -34,7 +35,7 @@ type Post = {
 const initialNewPostState = {
   name: '',
   type: 'comment' as 'comment' | 'post',
-  link: '', // This will hold comments for 'comment' type, and post content for 'post' type
+  link: '',
   keywords: '',
 };
 
@@ -56,6 +57,9 @@ const CheckKeywordCommentDetail = () => {
   const [newPostData, setNewPostData] = useState(initialNewPostState);
   const [isSaving, setIsSaving] = useState(false);
 
+  const [selectedPostIds, setSelectedPostIds] = useState<number[]>([]);
+  const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
+
   const fetchProjectData = async (isInitialLoad = false) => {
     if (!projectId) return;
     if (isInitialLoad) setIsLoading(true);
@@ -76,6 +80,7 @@ const CheckKeywordCommentDetail = () => {
       if (selectedPost) {
         const updatedSelectedPost = allPosts.find(p => p.id === selectedPost.id);
         if (updatedSelectedPost) setSelectedPost(updatedSelectedPost);
+        else setSelectedPost(allPosts[0] || null);
       } else if (allPosts.length > 0) {
         setSelectedPost(allPosts[0]);
       }
@@ -167,7 +172,6 @@ const CheckKeywordCommentDetail = () => {
       dismissToast(toastId);
       showSuccess("Đã thêm post thành công! Bắt đầu quét tự động...");
       
-      // --- AUTO CHECK LOGIC ---
       const checkToastId = showLoading("Đang quét tự động...");
       const { data: checkData, error: checkError } = await supabase.functions.invoke('check-keywords-in-comments', { 
         body: { postId: newPost.id } 
@@ -179,7 +183,6 @@ const CheckKeywordCommentDetail = () => {
       } else {
           showSuccess(`Quét tự động hoàn tất! Tìm thấy ${checkData.found}/${checkData.total} từ khóa.`);
       }
-      // --- END AUTO CHECK LOGIC ---
 
       setIsAddDialogOpen(false);
       setNewPostData(initialNewPostState);
@@ -194,42 +197,94 @@ const CheckKeywordCommentDetail = () => {
     }
   };
 
+  const handleToggleSelectPost = (postId: number) => {
+    setSelectedPostIds(prev => 
+        prev.includes(postId) 
+            ? prev.filter(id => id !== postId) 
+            : [...prev, postId]
+    );
+  };
+
+  const handleToggleSelectAll = (posts: Post[]) => {
+    const postIds = posts.map(p => p.id);
+    const allSelected = posts.every(p => selectedPostIds.includes(p.id));
+    if (allSelected) {
+      setSelectedPostIds(prev => prev.filter(id => !postIds.includes(id)));
+    } else {
+      setSelectedPostIds(prev => [...new Set([...prev, ...postIds])]);
+    }
+  };
+
+  const handleConfirmBulkDelete = async () => {
+    if (selectedPostIds.length === 0) return;
+    const toastId = showLoading(`Đang xóa ${selectedPostIds.length} post...`);
+    const { error } = await supabase.from('keyword_check_posts').delete().in('id', selectedPostIds);
+    dismissToast(toastId);
+    if (error) {
+        showError("Xóa hàng loạt thất bại: " + error.message);
+    } else {
+        showSuccess("Đã xóa thành công!");
+        if (selectedPost && selectedPostIds.includes(selectedPost.id)) {
+            setSelectedPost(null);
+        }
+        setSelectedPostIds([]);
+        fetchProjectData();
+    }
+    setIsBulkDeleteDialogOpen(false);
+  };
+
   const PostList = ({ posts, onSelectPost }: { posts: Post[], onSelectPost: (post: Post) => void }) => {
     const inputRef = useRef<HTMLInputElement>(null);
     useEffect(() => { if (editingPostId && inputRef.current) inputRef.current.focus(); }, [editingPostId]);
 
     return (
       <div className="flex flex-col gap-1 pl-2">
-        {posts.map((post) => (
-          <div
-            key={post.id}
-            onClick={() => editingPostId !== post.id && onSelectPost(post)}
-            className={cn(
-              "group w-full text-left p-2 rounded-md text-sm flex items-center justify-between cursor-pointer",
-              post.status === 'completed' ? "bg-green-50 text-green-800 hover:bg-green-100" : 
-              selectedPost?.id === post.id && editingPostId !== post.id ? "bg-blue-100 text-blue-700 font-semibold hover:bg-blue-100" : "hover:bg-slate-100"
-            )}
-          >
-            {editingPostId === post.id ? (
-              <div className="flex-1 flex items-center gap-1">
-                <Input ref={inputRef} value={editingName} onChange={(e) => setEditingName(e.target.value)} onBlur={handleSaveName} onKeyDown={(e) => e.key === 'Enter' && handleSaveName()} className="h-7 text-sm" />
-                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleSaveName}><Check className="h-4 w-4" /></Button>
+        {posts.map((post) => {
+          const isSelected = selectedPostIds.includes(post.id);
+          return (
+            <div
+              key={post.id}
+              className={cn(
+                "group w-full text-left p-2 rounded-md text-sm flex items-center justify-between",
+                editingPostId !== post.id && "cursor-pointer",
+                post.status === 'completed' ? "bg-green-50 text-green-800 hover:bg-green-100" : 
+                selectedPost?.id === post.id && editingPostId !== post.id ? "bg-blue-100 text-blue-700 font-semibold hover:bg-blue-100" : "hover:bg-slate-100"
+              )}
+            >
+              <div className="flex items-center gap-2 flex-1" onClick={() => editingPostId !== post.id && onSelectPost(post)}>
+                <Checkbox
+                  checked={isSelected}
+                  onCheckedChange={() => handleToggleSelectPost(post.id)}
+                  onClick={(e) => e.stopPropagation()}
+                  className={cn(
+                    "transition-opacity",
+                    isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                  )}
+                />
+                {editingPostId === post.id ? (
+                  <div className="flex-1 flex items-center gap-1">
+                    <Input ref={inputRef} value={editingName} onChange={(e) => setEditingName(e.target.value)} onBlur={handleSaveName} onKeyDown={(e) => e.key === 'Enter' && handleSaveName()} className="h-7 text-sm" />
+                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleSaveName}><Check className="h-4 w-4" /></Button>
+                  </div>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    {post.status === 'completed' && <CheckCircle className="h-4 w-4 text-green-500" />}
+                    {post.name}
+                  </span>
+                )}
               </div>
-            ) : (
-              <>
-                <span className="flex items-center gap-2">
-                  {post.status === 'completed' && <CheckCircle className="h-4 w-4 text-green-500" />}
-                  {post.name}
-                </span>
-                <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setEditingPostId(post.id); setEditingName(post.name); }}><Edit className="h-3 w-3" /></Button>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); setPostToDelete(post); setIsDeleteDialogOpen(true); }}><Trash2 className="h-3 w-3" /></Button>
+              {editingPostId !== post.id && (
+                <div className="flex items-center">
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setEditingPostId(post.id); setEditingName(post.name); }}><Edit className="h-3 w-3" /></Button>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); setPostToDelete(post); setIsDeleteDialogOpen(true); }}><Trash2 className="h-3 w-3" /></Button>
+                  </div>
                   <ChevronRight className={cn("h-4 w-4 text-slate-400", selectedPost?.id === post.id && "text-blue-700")} />
                 </div>
-              </>
-            )}
-          </div>
-        ))}
+              )}
+            </div>
+          );
+        })}
       </div>
     );
   };
@@ -244,15 +299,47 @@ const CheckKeywordCommentDetail = () => {
           <Link to="/tools/check-keyword-comment"><Button variant="outline" size="icon"><ArrowLeft className="h-4 w-4" /></Button></Link>
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">{project.name}</h1>
         </div>
-        <Button onClick={() => setIsAddDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700"><PlusCircle className="mr-2 h-4 w-4" />Thêm Post</Button>
+        <div className="flex items-center gap-2">
+          {selectedPostIds.length > 0 && (
+            <Button variant="destructive" onClick={() => setIsBulkDeleteDialogOpen(true)}>
+              <Trash2 className="mr-2 h-4 w-4" />
+              Xóa ({selectedPostIds.length})
+            </Button>
+          )}
+          <Button onClick={() => setIsAddDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700"><PlusCircle className="mr-2 h-4 w-4" />Thêm Post</Button>
+        </div>
       </div>
 
       <ResizablePanelGroup direction="horizontal" className="flex-1 rounded-2xl border bg-white shadow-sm overflow-hidden">
         <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
           <div className="flex flex-col h-full p-4">
             <Accordion type="multiple" defaultValue={['check-keyword-comment', 'check-keyword-post']} className="w-full">
-              <AccordionItem value="check-keyword-comment"><AccordionTrigger className="text-base font-semibold hover:no-underline"><div className="flex items-center gap-2"><MessageSquare className="h-5 w-5 text-blue-600" />Check Keyword Comment ({commentPosts.length})</div></AccordionTrigger><AccordionContent><PostList posts={commentPosts} onSelectPost={setSelectedPost} /></AccordionContent></AccordionItem>
-              <AccordionItem value="check-keyword-post"><AccordionTrigger className="text-base font-semibold hover:no-underline"><div className="flex items-center gap-2"><FileCheck2 className="h-5 w-5 text-green-600" />Check Keyword Post ({postPosts.length})</div></AccordionTrigger><AccordionContent><PostList posts={postPosts} onSelectPost={setSelectedPost} /></AccordionContent></AccordionItem>
+              <AccordionItem value="check-keyword-comment">
+                <AccordionTrigger className="text-base font-semibold hover:no-underline">
+                  <div className="flex items-center gap-2 w-full" onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={commentPosts.length > 0 && commentPosts.every(p => selectedPostIds.includes(p.id))}
+                      onCheckedChange={() => handleToggleSelectAll(commentPosts)}
+                    />
+                    <MessageSquare className="h-5 w-5 text-blue-600" />
+                    <span>Check Keyword Comment ({commentPosts.length})</span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent><PostList posts={commentPosts} onSelectPost={setSelectedPost} /></AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="check-keyword-post">
+                <AccordionTrigger className="text-base font-semibold hover:no-underline">
+                  <div className="flex items-center gap-2 w-full" onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={postPosts.length > 0 && postPosts.every(p => selectedPostIds.includes(p.id))}
+                      onCheckedChange={() => handleToggleSelectAll(postPosts)}
+                    />
+                    <FileCheck2 className="h-5 w-5 text-green-600" />
+                    <span>Check Keyword Post ({postPosts.length})</span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent><PostList posts={postPosts} onSelectPost={setSelectedPost} /></AccordionContent>
+              </AccordionItem>
             </Accordion>
           </div>
         </ResizablePanel>
@@ -301,6 +388,7 @@ const CheckKeywordCommentDetail = () => {
         </DialogContent>
       </Dialog>
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Bạn có chắc chắn?</AlertDialogTitle><AlertDialogDescription>Hành động này sẽ xóa vĩnh viễn post "{postToDelete?.name}".</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Hủy</AlertDialogCancel><AlertDialogAction onClick={handleConfirmDelete} className="bg-red-600 hover:bg-red-700">Xóa</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+      <AlertDialog open={isBulkDeleteDialogOpen} onOpenChange={setIsBulkDeleteDialogOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Bạn có chắc chắn?</AlertDialogTitle><AlertDialogDescription>Hành động này sẽ xóa vĩnh viễn {selectedPostIds.length} post đã chọn.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Hủy</AlertDialogCancel><AlertDialogAction onClick={handleConfirmBulkDelete} className="bg-red-600 hover:bg-red-700">Xóa</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     </main>
   );
 };
