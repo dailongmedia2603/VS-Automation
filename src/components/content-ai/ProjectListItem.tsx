@@ -11,9 +11,12 @@ interface ProjectListItemProps {
   size: string;
   modified: string;
   color: string;
+  onEdit: () => void;
+  onShare: () => void;
+  onDelete: () => void;
 }
 
-export const ProjectListItem = ({ id, name, files, size, modified, color }: ProjectListItemProps) => {
+export const ProjectListItem = ({ id, name, files, size, modified, color, onEdit, onShare, onDelete }: ProjectListItemProps) => {
   const navigate = useNavigate();
 
   const handleNavigate = () => {
@@ -41,9 +44,9 @@ export const ProjectListItem = ({ id, name, files, size, modified, color }: Proj
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem><Edit className="mr-2 h-4 w-4" />Sửa</DropdownMenuItem>
-            <DropdownMenuItem><Share2 className="mr-2 h-4 w-4" />Chia sẻ</DropdownMenuItem>
-            <DropdownMenuItem className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem>
+            <DropdownMenuItem onSelect={onEdit}><Edit className="mr-2 h-4 w-4" />Sửa</DropdownMenuItem>
+            <DropdownMenuItem onSelect={onShare}><Share2 className="mr-2 h-4 w-4" />Chia sẻ</DropdownMenuItem>
+            <DropdownMenuItem onSelect={onDelete} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </TableCell>

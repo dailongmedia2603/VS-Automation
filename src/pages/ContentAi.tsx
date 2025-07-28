@@ -9,6 +9,7 @@ import { ProjectFolder } from '@/components/content-ai/ProjectFolder';
 import { ProjectListItem } from '@/components/content-ai/ProjectListItem';
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
 import { showSuccess, showError } from '@/utils/toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -43,9 +44,12 @@ const ContentAi = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isCreateProjectDialogOpen, setIsCreateProjectDialogOpen] = useState(false);
-  const [newProjectName, setNewProjectName] = useState('');
+  const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [projectName, setProjectName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -82,39 +86,68 @@ const ContentAi = () => {
     ];
   }, [projects]);
 
-  const handleCreateProject = async () => {
-    if (!newProjectName.trim() || !user) {
+  const handleOpenDialog = (project: Project | null = null) => {
+    setEditingProject(project);
+    setProjectName(project ? project.name : '');
+    setIsProjectDialogOpen(true);
+  };
+
+  const handleSaveProject = async () => {
+    if (!projectName.trim() || !user) {
       showError("Tên dự án không được để trống.");
       return;
     }
     setIsSaving(true);
 
     try {
-      const randomColor = getRandomColor();
-      const { data: newProject, error } = await supabase
-        .from('content_ai_ds_du_an')
-        .insert({
-          name: newProjectName.trim(),
-          creator_id: user.id,
-          color: randomColor,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setNewProjectName('');
-      setIsCreateProjectDialogOpen(false);
-      showSuccess("Đã tạo dự án thành công!");
-      await fetchProjects();
-      if (newProject) {
-        navigate(`/content-ai/${newProject.id}`);
+      if (editingProject) { // Update existing project
+        const { error } = await supabase
+          .from('content_ai_ds_du_an')
+          .update({ name: projectName.trim() })
+          .eq('id', editingProject.id);
+        if (error) throw error;
+        showSuccess("Đã cập nhật dự án thành công!");
+      } else { // Create new project
+        const randomColor = getRandomColor();
+        const { data: newProject, error } = await supabase
+          .from('content_ai_ds_du_an')
+          .insert({ name: projectName.trim(), creator_id: user.id, color: randomColor })
+          .select().single();
+        if (error) throw error;
+        showSuccess("Đã tạo dự án thành công!");
+        if (newProject) navigate(`/content-ai/${newProject.id}`);
       }
+      
+      setIsProjectDialogOpen(false);
+      fetchProjects();
     } catch (error: any) {
-      showError("Tạo dự án thất bại: " + error.message);
+      showError(`Lưu dự án thất bại: ${error.message}`);
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleOpenDeleteDialog = (project: Project) => {
+    setProjectToDelete(project);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDeleteProject = async () => {
+    if (!projectToDelete) return;
+    const { error } = await supabase.from('content_ai_ds_du_an').delete().eq('id', projectToDelete.id);
+    if (error) {
+      showError("Xóa thất bại: " + error.message);
+    } else {
+      showSuccess("Đã xóa dự án!");
+      fetchProjects();
+    }
+    setIsDeleteDialogOpen(false);
+  };
+
+  const handleShareProject = (project: Project) => {
+    const url = `${window.location.origin}/content-ai/${project.id}`;
+    navigator.clipboard.writeText(url);
+    showSuccess("Đã sao chép liên kết chia sẻ!");
   };
 
   const renderProjectView = () => {
@@ -136,18 +169,21 @@ const ContentAi = () => {
         )
     }
 
+    const projectActions = (project: Project) => ({
+      onEdit: () => handleOpenDialog(project),
+      onShare: () => handleShareProject(project),
+      onDelete: () => handleOpenDeleteDialog(project),
+    });
+
     if (viewMode === 'grid') {
       return (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {projects.map(project => (
             <ProjectFolder 
               key={project.id} 
-              id={project.id}
-              name={project.name}
-              files={project.files}
-              size={project.size}
+              {...project}
               modified={formatDistanceToNow(new Date(project.updated_at), { addSuffix: true, locale: vi })}
-              color={project.color}
+              {...projectActions(project)}
             />
           ))}
         </div>
@@ -170,12 +206,9 @@ const ContentAi = () => {
             {projects.map(project => (
               <ProjectListItem 
                 key={project.id} 
-                id={project.id}
-                name={project.name}
-                files={project.files}
-                size={project.size}
+                {...project}
                 modified={formatDistanceToNow(new Date(project.updated_at), { addSuffix: true, locale: vi })}
-                color={project.color}
+                {...projectActions(project)}
               />
             ))}
           </TableBody>
@@ -194,20 +227,18 @@ const ContentAi = () => {
               Quản lý, sáng tạo và tối ưu hóa tất cả nội dung của bạn ở một nơi duy nhất.
             </p>
           </div>
-          <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setIsCreateProjectDialogOpen(true)}>
+          <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => handleOpenDialog()}>
             <PlusCircle className="mr-2 h-4 w-4" />
             Tạo dự án mới
           </Button>
         </div>
 
-        {/* Stat Widgets */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {stats.map(stat => (
             <StatWidget key={stat.title} title={stat.title} value={stat.value} icon={stat.icon} color={stat.color} />
           ))}
         </div>
 
-        {/* Toolbar */}
         <div className="flex items-center justify-between gap-4">
           <div className="relative flex-grow max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -235,37 +266,51 @@ const ContentAi = () => {
           </div>
         </div>
 
-        {/* Project View */}
         {renderProjectView()}
       </main>
 
-      <Dialog open={isCreateProjectDialogOpen} onOpenChange={setIsCreateProjectDialogOpen}>
+      <Dialog open={isProjectDialogOpen} onOpenChange={setIsProjectDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Tạo dự án mới</DialogTitle>
+            <DialogTitle>{editingProject ? 'Sửa dự án' : 'Tạo dự án mới'}</DialogTitle>
             <DialogDescription>
-              Nhập tên cho dự án mới của bạn. Bạn có thể thay đổi sau.
+              {editingProject ? 'Thay đổi tên cho dự án của bạn.' : 'Nhập tên cho dự án mới của bạn.'}
             </DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-2">
             <Label htmlFor="project-name">Tên dự án</Label>
             <Input
               id="project-name"
-              value={newProjectName}
-              onChange={(e) => setNewProjectName(e.target.value)}
+              value={projectName}
+              onChange={(e) => setProjectName(e.target.value)}
               placeholder="VD: Chiến dịch Marketing Mùa Hè"
-              onKeyDown={(e) => e.key === 'Enter' && handleCreateProject()}
+              onKeyDown={(e) => e.key === 'Enter' && handleSaveProject()}
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsCreateProjectDialogOpen(false)}>Hủy</Button>
-            <Button onClick={handleCreateProject} disabled={isSaving}>
+            <Button variant="outline" onClick={() => setIsProjectDialogOpen(false)}>Hủy</Button>
+            <Button onClick={handleSaveProject} disabled={isSaving}>
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Tạo dự án
+              Lưu
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Bạn có chắc chắn muốn xóa?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Hành động này không thể hoàn tác. Dự án "{projectToDelete?.name}" sẽ bị xóa vĩnh viễn.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Hủy</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteProject} className="bg-red-600 hover:bg-red-700">Xóa</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };
