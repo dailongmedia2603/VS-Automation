@@ -87,7 +87,7 @@ const CompletionNotification = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    audioRef.current = new Audio('/sounds/notification.mp3');
+    audioRef.current = new Audio('/sounds/notificationnew.mp3');
   }, []);
 
   const fetchCompletedPosts = async () => {
