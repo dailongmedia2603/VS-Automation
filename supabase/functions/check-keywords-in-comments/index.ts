@@ -31,13 +31,16 @@ serve(async (req) => {
   }
 
   try {
-    // 1. Get post link
+    // 1. Get post content (stored in 'link' field)
     const { data: post, error: postError } = await supabaseAdmin
       .from('keyword_check_posts')
-      .select('link')
+      .select('link') // 'link' now contains the content to check
       .eq('id', postId)
       .single();
-    if (postError || !post || !post.link) throw new Error("Không tìm thấy bài viết hoặc bài viết thiếu link.");
+    if (postError || !post || !post.link) throw new Error("Không tìm thấy post hoặc post không có nội dung.");
+
+    const contentToCheck = post.link;
+    const normalizedContent = normalizeString(contentToCheck);
 
     // 2. Get keywords to check
     const { data: keywords, error: keywordsError } = await supabaseAdmin
@@ -46,46 +49,28 @@ serve(async (req) => {
       .eq('post_id', postId);
     if (keywordsError) throw new Error("Lỗi lấy danh sách từ khóa.");
 
-    // 3. Get comments from Facebook
-    const { data: fbData, error: fbError } = await supabaseAdmin.functions.invoke('get-fb-comments', {
-      body: { fbPostId: post.link }
-    });
-    if (fbError || fbData.error) throw new Error(fbError?.message || fbData?.error);
-    
-    const rawComments = JSON.parse(fbData.rawResponse);
-    const comments = rawComments?.data?.data || rawComments?.data || [];
-
-    // 4. Compare and prepare updates
+    // 3. Compare and prepare updates
     const updates = [];
     let foundCount = 0;
 
     for (const keyword of keywords) {
       const normalizedKeyword = normalizeString(keyword.content);
-      const foundComment = comments.find(c => c.message && normalizeString(c.message).includes(normalizedKeyword));
-
-      if (foundComment) {
+      
+      if (normalizedContent.includes(normalizedKeyword)) {
         foundCount++;
         updates.push({
           id: keyword.id,
           status: 'found',
-          found_by_account_name: foundComment.from?.name,
-          found_by_account_id: foundComment.from?.id,
-          found_comment_link: foundComment.permalink_url,
-          found_at: foundComment.created_time,
         });
       } else {
         updates.push({
           id: keyword.id,
           status: 'not_found',
-          found_by_account_name: null,
-          found_by_account_id: null,
-          found_comment_link: null,
-          found_at: null,
         });
       }
     }
 
-    // 5. Batch update
+    // 4. Batch update
     if (updates.length > 0) {
       const updatePromises = updates.map(updateData => {
         const { id, ...dataToUpdate } = updateData;
@@ -94,8 +79,8 @@ serve(async (req) => {
       await Promise.all(updatePromises);
     }
     
-    // 6. Update post status
-    const allFound = foundCount === keywords.length;
+    // 5. Update post status
+    const allFound = foundCount === keywords.length && keywords.length > 0;
     await supabaseAdmin.from('keyword_check_posts').update({ status: allFound ? 'completed' : 'pending' }).eq('id', postId);
 
     const result = { found: foundCount, notFound: keywords.length - foundCount, total: keywords.length };

@@ -9,16 +9,15 @@ import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, Download, MoreHorizontal, Link as LinkIcon, MessageCircle, Code, PlayCircle, CheckCircle2, XCircle, Loader2, PlusCircle, Edit, Trash2 } from 'lucide-react';
+import { Search, MoreHorizontal, MessageCircle, PlayCircle, CheckCircle2, XCircle, Loader2, PlusCircle, Edit, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Textarea } from '@/components/ui/textarea';
-import * as XLSX from 'xlsx';
 
 type Project = { id: number; name: string; };
 type Post = { id: number; name: string; link: string | null; };
-type Item = { id: number; content: string; status: 'found' | 'not_found'; found_by_account_name: string | null; found_comment_link: string | null; found_by_account_id: string | null; };
+type Item = { id: number; content: string; status: 'found' | 'not_found'; };
 interface CheckResult { found: number; notFound: number; total: number; }
 
 interface KeywordCommentDetailProps {
@@ -57,7 +56,7 @@ export const KeywordCommentDetail = ({ project, post, onCheckComplete }: Keyword
   const handleRunCheck = async () => {
     setIsChecking(true);
     setCheckResult(null);
-    const toastId = showLoading("Đang quét bình luận...");
+    const toastId = showLoading("Đang quét nội dung...");
     try {
       const { data, error } = await supabase.functions.invoke('check-keywords-in-comments', { body: { postId: post.id } });
       if (error || data.error) throw new Error(error?.message || data?.error);
@@ -119,15 +118,11 @@ export const KeywordCommentDetail = ({ project, post, onCheckComplete }: Keyword
     <>
       <Card className="w-full h-full shadow-none border-none flex flex-col">
         <CardHeader>
-          <div className="flex justify-between items-center">
-            <h2 className="text-lg font-semibold text-slate-800">{post.name}</h2>
-            {post.link && <a href={post.link.startsWith('http') ? post.link : `https://facebook.com/${post.link}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800"><LinkIcon className="h-4 w-4" /></a>}
-          </div>
-          {post.link && <div className="mt-2 p-3 bg-blue-50 rounded-md text-slate-900 font-mono text-xs flex items-center gap-2"><Code className="h-4 w-4" /><span className="font-bold text-green-600">ID</span><span>{post.link}</span></div>}
+          <h2 className="text-lg font-semibold text-slate-800">{post.name}</h2>
         </CardHeader>
         <CardContent className="flex-1 flex flex-col">
           <Card className="mb-4 bg-slate-50 border-slate-200"><CardContent className="p-4"><div className="flex items-center justify-between">
-            <div><h3 className="font-semibold text-slate-800">Kiểm tra từ khóa tự động</h3><p className="text-sm text-slate-500">Quét bài viết và cập nhật trạng thái các từ khóa trong danh sách.</p></div>
+            <div><h3 className="font-semibold text-slate-800">Kiểm tra từ khóa</h3><p className="text-sm text-slate-500">Quét nội dung và cập nhật trạng thái các từ khóa trong danh sách.</p></div>
             <div className="flex items-center gap-4">
               {checkResult && <div className="flex items-center gap-4 text-sm"><div className="flex items-center gap-2 text-green-600"><CheckCircle2 className="h-5 w-5" /><div><p className="font-bold">{checkResult.found}</p><p className="text-xs">Tìm thấy</p></div></div><div className="flex items-center gap-2 text-amber-600"><XCircle className="h-5 w-5" /><div><p className="font-bold">{checkResult.notFound}</p><p className="text-xs">Chưa thấy</p></div></div></div>}
               <Button onClick={handleRunCheck} disabled={isChecking} className="bg-blue-600 hover:bg-blue-700 rounded-lg">{isChecking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}{isChecking ? 'Đang chạy...' : 'Chạy Check'}</Button>
@@ -140,16 +135,15 @@ export const KeywordCommentDetail = ({ project, post, onCheckComplete }: Keyword
               <Button onClick={() => setIsAddItemDialogOpen(true)}><PlusCircle className="mr-2 h-4 w-4" />Thêm từ khóa</Button>
             </div>
           </div>
-          <div className="border rounded-lg overflow-auto flex-1"><Table><TableHeader><TableRow><TableHead>STT</TableHead><TableHead>Từ khóa</TableHead><TableHead>Kết quả</TableHead><TableHead>Báo cáo</TableHead><TableHead className="text-right">Thao tác</TableHead></TableRow></TableHeader>
+          <div className="border rounded-lg overflow-auto flex-1"><Table><TableHeader><TableRow><TableHead>STT</TableHead><TableHead>Từ khóa</TableHead><TableHead>Kết quả</TableHead><TableHead className="text-right">Thao tác</TableHead></TableRow></TableHeader>
             <TableBody>
-              {isLoading ? ([...Array(3)].map((_, i) => <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell></TableRow>)) : 
+              {isLoading ? ([...Array(3)].map((_, i) => <TableRow key={i}><TableCell colSpan={4}><Skeleton className="h-8 w-full" /></TableCell></TableRow>)) : 
               filteredItems.length > 0 ? (filteredItems.map((item, index) => <TableRow key={item.id}>
                 <TableCell>{index + 1}</TableCell><TableCell>{item.content}</TableCell>
                 <TableCell><Badge className={cn(item.status === 'found' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800')}>{item.status === 'found' ? 'Tìm thấy' : 'Chưa tìm thấy'}</Badge></TableCell>
-                <TableCell><div className="text-xs">{item.found_by_account_name && <div><strong>Account:</strong> <a href={`https://facebook.com/${item.found_by_account_id}`} target="_blank" className="text-blue-600">{item.found_by_account_name}</a></div>}{item.found_comment_link && <div><strong>Link:</strong> <a href={item.found_comment_link} target="_blank" className="text-blue-600"><LinkIcon className="h-3.5 w-3.5 inline" /></a></div>}</div></TableCell>
                 <TableCell className="text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal /></Button></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuItem onClick={() => { setEditingItem(item); setEditedContent(item.content); }}><Edit className="mr-2 h-4 w-4" />Sửa</DropdownMenuItem><DropdownMenuItem onClick={() => setItemToDelete(item)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell>
               </TableRow>)) : 
-              (<TableRow><TableCell colSpan={5} className="text-center h-24">Không có từ khóa nào.</TableCell></TableRow>)}
+              (<TableRow><TableCell colSpan={4} className="text-center h-24">Không có từ khóa nào.</TableCell></TableRow>)}
             </TableBody>
           </Table></div>
         </CardContent>

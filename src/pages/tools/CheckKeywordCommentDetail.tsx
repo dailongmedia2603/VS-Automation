@@ -33,7 +33,7 @@ type Post = {
 const initialNewPostState = {
   name: '',
   type: 'comment' as 'comment' | 'post',
-  link: '',
+  link: '', // This will hold comments for 'comment' type, and post content for 'post' type
   keywords: '',
 };
 
@@ -115,12 +115,8 @@ const CheckKeywordCommentDetail = () => {
       showError("Tên Post không được để trống.");
       return;
     }
-    if (newPostData.type === 'comment' && !newPostData.link.trim()) {
-      showError("Link/ID bài viết không được để trống.");
-      return;
-    }
-    if (newPostData.type === 'post' && !newPostData.link.trim()) {
-      showError("Nội dung Post không được để trống.");
+    if (!newPostData.link.trim()) {
+      showError("Nội dung không được để trống.");
       return;
     }
 
@@ -132,7 +128,7 @@ const CheckKeywordCommentDetail = () => {
         project_id: projectId,
         name: newPostData.name,
         type: newPostData.type,
-        link: newPostData.link,
+        link: newPostData.link, // 'link' now stores content for both types
       };
 
       const { data: newPost, error: postError } = await supabase
@@ -258,8 +254,8 @@ const CheckKeywordCommentDetail = () => {
             
             {newPostData.type === 'comment' ? (
               <div className="space-y-2">
-                <Label>Link/ID bài viết Facebook</Label>
-                <Input value={newPostData.link} onChange={(e) => setNewPostData(d => ({...d, link: e.target.value}))} />
+                <Label>Nội dung comment (mỗi comment một dòng)</Label>
+                <Textarea value={newPostData.link} onChange={(e) => setNewPostData(d => ({...d, link: e.target.value}))} className="min-h-[120px]" placeholder="Comment 1..." />
               </div>
             ) : (
               <div className="space-y-2">
