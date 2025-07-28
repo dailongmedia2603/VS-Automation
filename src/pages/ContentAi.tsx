@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -34,6 +35,7 @@ const ContentAi = () => {
   const [isCreateProjectDialogOpen, setIsCreateProjectDialogOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const navigate = useNavigate();
 
   const handleCreateProject = () => {
     if (!newProjectName.trim()) {
@@ -54,7 +56,6 @@ const ContentAi = () => {
       };
       setProjects(prevProjects => [newProject, ...prevProjects]);
       
-      // Update stats
       setStats(prevStats => prevStats.map(stat => 
         stat.title === 'Tổng số dự án' 
           ? { ...stat, value: String(parseInt(stat.value) + 1) } 
@@ -65,6 +66,7 @@ const ContentAi = () => {
       setIsCreateProjectDialogOpen(false);
       setIsSaving(false);
       showSuccess("Đã tạo dự án thành công!");
+      navigate(`/content-ai/${newProject.id}`);
     }, 500);
   };
 

@@ -17,6 +17,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import TrainingDocuments from "./pages/TrainingDocuments";
 import ContentAi from "./pages/ContentAi";
+import ProjectDetail from "./pages/ProjectDetail";
 import CheckSeeding from "./pages/CheckSeeding";
 import SeedingProjectDetail from "./pages/SeedingProjectDetail";
 import Tools from "./pages/Tools";
@@ -48,6 +49,7 @@ const App = () => (
                     <Route path="/training-documents" element={<TrainingDocuments />} />
                     <Route path="/staff" element={<Staff />} />
                     <Route path="/content-ai" element={<ContentAi />} />
+                    <Route path="/content-ai/:projectId" element={<ProjectDetail />} />
                     <Route path="/check-seeding" element={<CheckSeeding />} />
                     <Route path="/check-seeding/:projectId" element={<SeedingProjectDetail />} />
                     <Route path="/completion-notification" element={<CompletionNotification />} />
