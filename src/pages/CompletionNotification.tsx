@@ -13,6 +13,8 @@ import { vi } from 'date-fns/locale';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { cn } from '@/lib/utils';
 
+type SoundPermission = 'prompt' | 'granted';
+
 type CompletedPost = {
   id: number;
   name: string;
@@ -82,11 +84,15 @@ const CompletionNotification = () => {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [showEnableSoundPrompt, setShowEnableSoundPrompt] = useState(false);
+  const [soundPermission, setSoundPermission] = useState<SoundPermission>('prompt');
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     audioRef.current = new Audio('/sounds/notificationnew.mp3');
+    const savedPermission = localStorage.getItem('soundPermission');
+    if (savedPermission === 'granted') {
+      setSoundPermission('granted');
+    }
   }, []);
 
   const fetchCompletedPosts = async () => {
@@ -142,10 +148,8 @@ const CompletionNotification = () => {
               } as CompletedPost;
               
               setNotifications(prev => [newNotification, ...prev]);
-              if (audioRef.current) {
-                audioRef.current.play().catch(() => {
-                  setShowEnableSoundPrompt(true);
-                });
+              if (soundPermission === 'granted' && audioRef.current) {
+                audioRef.current.play().catch(e => console.error("Sound play failed even with permission:", e));
               }
             }
           }
@@ -156,7 +160,7 @@ const CompletionNotification = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [soundPermission]);
 
   const handleMarkAsSeen = async (postId: number) => {
     setNotifications(prev => 
@@ -216,8 +220,9 @@ const CompletionNotification = () => {
     if (audioRef.current) {
       audioRef.current.play()
         .then(() => {
-          setShowEnableSoundPrompt(false);
           showSuccess("Âm thanh thông báo đã được bật!");
+          setSoundPermission('granted');
+          localStorage.setItem('soundPermission', 'granted');
         })
         .catch(() => {
           showError("Không thể bật âm thanh. Vui lòng kiểm tra cài đặt trình duyệt của bạn.");
@@ -241,7 +246,7 @@ const CompletionNotification = () => {
         </div>
       </div>
 
-      {showEnableSoundPrompt && (
+      {soundPermission === 'prompt' && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-2xl px-4 z-50">
             <div className="bg-white rounded-xl shadow-lg p-4 flex items-center justify-between">
                 <div className="flex items-center gap-4">
