@@ -7,7 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Helper to parse frequency string like "1_hour" into milliseconds
 const parseFrequency = (freq) => {
   if (!freq) return null;
   const [value, unit] = freq.split('_');
@@ -33,10 +32,9 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // 1. Get all active posts that need checking
     const { data: posts, error: fetchError } = await supabaseAdmin
       .from('seeding_posts')
-      .select('id, links, check_frequency, last_checked_at')
+      .select('id, links, type, check_frequency, last_checked_at')
       .eq('is_active', true)
       .eq('status', 'checking');
 
@@ -47,11 +45,10 @@ serve(async (req) => {
 
     for (const post of posts) {
       const interval = parseFrequency(post.check_frequency);
-      if (!interval) continue; // Skip if frequency is invalid
+      if (!interval) continue;
 
       const lastChecked = post.last_checked_at ? new Date(post.last_checked_at) : null;
 
-      // Check if it's time to run
       if (!lastChecked || (now.getTime() - lastChecked.getTime()) >= interval) {
         postsToCheck.push(post);
       }
@@ -64,28 +61,34 @@ serve(async (req) => {
       });
     }
 
-    // 2. Trigger checks for due posts in parallel
     const checkPromises = postsToCheck.map(async (post) => {
       try {
-        console.log(`Checking post ID: ${post.id}`);
+        console.log(`Checking post ID: ${post.id}, type: ${post.type}`);
         
-        // Update last_checked_at immediately to prevent race conditions
         await supabaseAdmin.from('seeding_posts').update({ last_checked_at: now.toISOString() }).eq('id', post.id);
 
-        // Invoke the checking process (chain of functions)
-        const { data: fetchData, error: fetchError } = await supabaseAdmin.functions.invoke('get-fb-comments', {
-          body: { fbPostId: post.links }
-        });
-        if (fetchError || fetchData.error) throw new Error(fetchError?.message || fetchData?.error);
+        if (post.type === 'comment_check') {
+            const { data: fetchData, error: fetchError } = await supabaseAdmin.functions.invoke('get-fb-comments', { body: { fbPostId: post.links } });
+            if (fetchError || fetchData.error) throw new Error(fetchError?.message || fetchData?.error);
 
-        const { data: processData, error: processError } = await supabaseAdmin.functions.invoke('process-and-store-comments', {
-          body: { rawResponse: fetchData.rawResponse, internalPostId: post.id }
-        });
-        if (processError || processData.error) throw new Error(processError?.message || processData?.error);
+            const { data: processData, error: processError } = await supabaseAdmin.functions.invoke('process-and-store-comments', { body: { rawResponse: fetchData.rawResponse, internalPostId: post.id } });
+            if (processError || processData.error) throw new Error(processError?.message || processData?.error);
 
-        await supabaseAdmin.functions.invoke('compare-and-update-comments', {
-          body: { postId: post.id }
-        });
+            await supabaseAdmin.functions.invoke('compare-and-update-comments', { body: { postId: post.id } });
+
+        } else if (post.type === 'post_approval') {
+            const sinceDate = post.last_checked_at ? new Date(post.last_checked_at) : new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
+            const untilDate = now;
+            const timeCheckString = `&since=${sinceDate.toISOString()}&until=${untilDate.toISOString()}`;
+            
+            const { data: fetchData, error: fetchError } = await supabaseAdmin.functions.invoke('get-fb-duyetpost', { body: { postId: post.id, timeCheckString } });
+            if (fetchError || (fetchData && fetchData.error)) throw new Error(fetchError?.message || fetchData?.error);
+
+            const { data: processData, error: processError } = await supabaseAdmin.functions.invoke('process-and-store-duyetpost', { body: { allPosts: fetchData.allPosts, internalPostId: post.id } });
+            if (processError || (processData && processData.error)) throw new Error(processError?.message || processData?.error);
+
+            await supabaseAdmin.functions.invoke('compare-and-update-duyetpost', { body: { postId: post.id } });
+        }
         
         return { id: post.id, status: 'success' };
       } catch (error) {
