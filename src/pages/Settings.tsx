@@ -27,6 +27,8 @@ const Settings = () => {
   const [isSavingApi, setIsSavingApi] = useState(false);
   const [status, setStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [geminiStatus, setGeminiStatus] = useState<'idle' | 'testing' | 'success' | 'error'>("idle");
+  const [geminiError, setGeminiError] = useState<string | null>(null);
 
   // Integrations state
   const [webhookUrl, setWebhookUrl] = useState('');
@@ -168,6 +170,30 @@ const Settings = () => {
       const errorMessage = err.message || "Đã xảy ra lỗi không xác định.";
       setError(errorMessage);
       showError(`Kiểm tra thất bại: ${errorMessage}`);
+    }
+  };
+
+  const handleTestGeminiConnection = async () => {
+    setGeminiStatus("testing");
+    setGeminiError(null);
+    try {
+        const { data, error } = await supabase.functions.invoke('test-gemini-api', {
+            body: { apiKey: localSettings.googleGeminiApiKey }
+        });
+
+        if (error) {
+            const errorBody = await error.context.json();
+            throw new Error(errorBody.error || error.message);
+        }
+        if (data.error) throw new Error(data.error);
+
+        setGeminiStatus("success");
+        showSuccess("Kết nối API Google Gemini thành công!");
+    } catch (err: any) {
+        setGeminiStatus("error");
+        const errorMessage = err.message || "Đã xảy ra lỗi không xác định.";
+        setGeminiError(errorMessage);
+        showError(`Kiểm tra thất bại: ${errorMessage}`);
     }
   };
 
@@ -353,10 +379,31 @@ const Settings = () => {
                   className="bg-slate-100 border-none rounded-lg"
                 />
               </div>
-              <Button onClick={handleSaveApi} disabled={isSavingApi} className="rounded-lg bg-blue-600 hover:bg-blue-700">
-                {isSavingApi && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isSavingApi ? "Đang lưu..." : "Lưu thay đổi"}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button onClick={handleSaveApi} disabled={isSavingApi} className="rounded-lg bg-blue-600 hover:bg-blue-700">
+                  {isSavingApi && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {isSavingApi ? "Đang lưu..." : "Lưu thay đổi"}
+                </Button>
+                <Button onClick={handleTestGeminiConnection} disabled={geminiStatus === "testing"} variant="outline" className="rounded-lg">
+                  {geminiStatus === "testing" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Kiểm tra kết nối
+                </Button>
+              </div>
+              <div className="border-t pt-6">
+                <div className="flex items-center justify-between">
+                    <p className="font-medium">Trạng thái kết nối</p>
+                    {geminiStatus === "idle" && <Badge variant="outline">Chưa kiểm tra</Badge>}
+                    {geminiStatus === "testing" && <Badge variant="secondary">Đang kiểm tra...</Badge>}
+                    {geminiStatus === "success" && <Badge variant="default" className="bg-green-100 text-green-800">Thành công</Badge>}
+                    {geminiStatus === "error" && <Badge variant="destructive">Thất bại</Badge>}
+                </div>
+                {geminiError && (
+                  <div className="mt-4 text-sm text-destructive p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                    <p className="font-bold">Chi tiết lỗi:</p>
+                    <p className="font-mono break-all">{geminiError}</p>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
