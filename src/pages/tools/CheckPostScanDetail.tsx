@@ -57,6 +57,7 @@ const CheckPostScanDetail = () => {
   // State for date pickers
   const [scanDateRange, setScanDateRange] = useState<DateRange | undefined>();
   const [filterDateRange, setFilterDateRange] = useState<DateRange | undefined>();
+  const [filterDatePickerOpen, setFilterDatePickerOpen] = useState(false);
 
   useEffect(() => {
     const fetchProjectData = async () => {
@@ -142,6 +143,13 @@ const CheckPostScanDetail = () => {
     } finally {
       dismissToast(toastId);
       setIsScanning(false);
+    }
+  };
+
+  const handleFilterDateSelect = (range: DateRange | undefined) => {
+    setFilterDateRange(range);
+    if (range?.from && range?.to) {
+      setFilterDatePickerOpen(false);
     }
   };
 
@@ -258,7 +266,7 @@ const CheckPostScanDetail = () => {
                 <CardTitle>Kết quả</CardTitle>
                 <CardDescription>Kết quả quét sẽ được hiển thị ở đây.</CardDescription>
               </div>
-              <Popover>
+              <Popover open={filterDatePickerOpen} onOpenChange={setFilterDatePickerOpen}>
                 <PopoverTrigger asChild>
                   <Button variant={"outline"} className={cn("w-[240px] justify-start text-left font-normal bg-white", !filterDateRange && "text-muted-foreground")}>
                     <CalendarIcon className="mr-2 h-4 w-4" />
@@ -267,11 +275,11 @@ const CheckPostScanDetail = () => {
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
                   <div className="p-2 flex flex-col items-start">
-                    <Button variant="ghost" className="w-full justify-start" onClick={() => setFilterDateRange({ from: new Date(), to: new Date() })}>Hôm nay</Button>
-                    <Button variant="ghost" className="w-full justify-start" onClick={() => { const yesterday = subDays(new Date(), 1); setFilterDateRange({ from: yesterday, to: yesterday }); }}>Hôm qua</Button>
-                    <Button variant="ghost" className="w-full justify-start" onClick={() => setFilterDateRange(undefined)}>Tất cả</Button>
+                    <Button variant="ghost" className="w-full justify-start" onClick={() => { setFilterDateRange({ from: new Date(), to: new Date() }); setFilterDatePickerOpen(false); }}>Hôm nay</Button>
+                    <Button variant="ghost" className="w-full justify-start" onClick={() => { const yesterday = subDays(new Date(), 1); setFilterDateRange({ from: yesterday, to: yesterday }); setFilterDatePickerOpen(false); }}>Hôm qua</Button>
+                    <Button variant="ghost" className="w-full justify-start" onClick={() => { setFilterDateRange(undefined); setFilterDatePickerOpen(false); }}>Tất cả</Button>
                   </div>
-                  <Calendar initialFocus mode="range" defaultMonth={filterDateRange?.from} selected={filterDateRange} onSelect={setFilterDateRange} numberOfMonths={1} />
+                  <Calendar initialFocus mode="range" defaultMonth={filterDateRange?.from} selected={filterDateRange} onSelect={handleFilterDateSelect} numberOfMonths={1} />
                 </PopoverContent>
               </Popover>
             </div>
