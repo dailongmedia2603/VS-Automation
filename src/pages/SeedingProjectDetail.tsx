@@ -6,10 +6,10 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, MessageSquare, FileCheck2, ChevronRight, ArrowLeft, Edit, Trash2, Loader2, Check, CheckCircle, UploadCloud, PlayCircle, X } from 'lucide-react';
+import { PlusCircle, MessageSquare, FileCheck2, ChevronRight, ArrowLeft, Edit, Trash2, Loader2, Check, CheckCircle, UploadCloud, PlayCircle, X, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -47,6 +47,7 @@ type SeedingTask = {
   progress_current: number;
   progress_total: number;
   current_post_id: number | null;
+  error_message: string | null;
 };
 
 const initialNewPostState = {
@@ -208,11 +209,19 @@ const SeedingProjectDetail = () => {
         .from('seeding_tasks')
         .select('*')
         .eq('project_id', projectId)
-        .in('status', ['pending', 'running'])
+        .in('status', ['pending', 'running', 'failed'])
+        .order('created_at', { ascending: false })
+        .limit(1)
         .single();
       
-      if (data) setActiveTask(data);
-      else setActiveTask(null);
+      if (data) {
+        setActiveTask(data);
+        if (data.status === 'completed' || data.status === 'cancelled') {
+          setActiveTask(null);
+        }
+      } else {
+        setActiveTask(null);
+      }
     };
 
     fetchActiveTask();
@@ -227,7 +236,7 @@ const SeedingProjectDetail = () => {
   }, [projectId, activeTask]);
 
   useEffect(() => {
-    if (activeTask && (activeTask.status === 'completed' || activeTask.status === 'failed' || activeTask.status === 'cancelled')) {
+    if (activeTask && (activeTask.status === 'completed' || activeTask.status === 'cancelled')) {
       showSuccess("Tác vụ đã hoàn tất!");
       fetchProjectData();
       setActiveTask(null);
@@ -442,7 +451,28 @@ const SeedingProjectDetail = () => {
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">{project.name}</h1>
         </div>
         <div className="flex items-center gap-2">
-          {activeTask ? (
+          {activeTask && activeTask.status === 'failed' && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive">
+                  <AlertTriangle className="mr-2 h-4 w-4" />
+                  Quét thất bại - Xem lỗi
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Chi tiết lỗi</AlertDialogTitle>
+                  <AlertDialogDescription className="font-mono bg-slate-100 p-4 rounded-md text-slate-800 break-all">
+                    {activeTask.error_message || "Đã xảy ra lỗi không xác định."}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogAction onClick={() => setActiveTask(null)}>Đã hiểu</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+          {activeTask && (activeTask.status === 'running' || activeTask.status === 'pending') ? (
             <div className="flex items-center gap-2 w-64">
               <div className="flex-1">
                 <Progress value={(activeTask.progress_current / activeTask.progress_total) * 100} className="h-2" />
