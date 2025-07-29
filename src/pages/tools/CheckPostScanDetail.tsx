@@ -150,7 +150,7 @@ const CheckPostScanDetail = () => {
       if (data.error) throw new Error(data.error);
       
       setResults(data);
-      showSuccess(`Quét hoàn tất! Tìm thấy ${data.length} bài viết phù hợp.`);
+      showSuccess(`Quét hoàn tất! Tìm thấy ${data.filter((r: any) => r.scanned_at >= new Date().toISOString().slice(0,10)).length} bài viết mới.`);
       
       const { data: newLogData } = await supabase.from('log_post_scan').select('*').eq('project_id', projectId).single();
       setLog(newLogData);

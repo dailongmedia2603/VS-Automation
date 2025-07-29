@@ -102,8 +102,6 @@ serve(async (req) => {
       console.error(`Failed to save scan log for project ${projectId}:`, logError.message);
     }
 
-    await supabaseAdmin.from('post_scan_results').delete().eq('project_id', projectId);
-
     let finalResults = [];
     if (allMatchedPosts.length > 0) {
       const { data: insertedData, error: insertError } = await supabaseAdmin
@@ -117,7 +115,15 @@ serve(async (req) => {
 
     await supabaseAdmin.from('post_scan_projects').update({ last_scanned_at: new Date().toISOString() }).eq('id', projectId);
 
-    return new Response(JSON.stringify(finalResults), {
+    const { data: allProjectResults, error: allResultsError } = await supabaseAdmin
+      .from('post_scan_results')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('scanned_at', { ascending: false });
+
+    if (allResultsError) throw allResultsError;
+
+    return new Response(JSON.stringify(allProjectResults), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
