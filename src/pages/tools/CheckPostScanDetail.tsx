@@ -32,6 +32,7 @@ type Project = {
   group_ids: string | null;
   scan_frequency: string | null;
   is_active: boolean;
+  is_ai_check_active: boolean;
 };
 
 type ScanResult = {
@@ -41,6 +42,7 @@ type ScanResult = {
   found_keywords: string[];
   scanned_at: string;
   group_id: string;
+  ai_check_result: string | null;
 };
 
 type ScanLog = {
@@ -67,6 +69,7 @@ const CheckPostScanDetail = () => {
   const [keywords, setKeywords] = useState('');
   const [groupIds, setGroupIds] = useState('');
   const [isActive, setIsActive] = useState(false);
+  const [isAiCheckActive, setIsAiCheckActive] = useState(false);
   const [frequencyValue, setFrequencyValue] = useState('1');
   const [frequencyUnit, setFrequencyUnit] = useState('day');
   
@@ -86,6 +89,7 @@ const CheckPostScanDetail = () => {
         setKeywords(data.keywords || '');
         setGroupIds(data.group_ids || '');
         setIsActive(data.is_active);
+        setIsAiCheckActive(data.is_ai_check_active);
         const [value, unit] = data.scan_frequency?.split('_') || ['1', 'day'];
         setFrequencyValue(value);
         setFrequencyUnit(unit);
@@ -108,18 +112,25 @@ const CheckPostScanDetail = () => {
   }, [projectId]);
 
   const filteredResults = useMemo(() => {
-    const dateFiltered = results.filter(result => {
-      if (!filterDateRange?.from) return true;
+    let tempResults = results;
+
+    if (project?.is_ai_check_active) {
+      tempResults = tempResults.filter(result => result.ai_check_result === 'Có');
+    }
+
+    if (filterDateRange?.from) {
       const start = startOfDay(filterDateRange.from);
       const end = filterDateRange.to ? endOfDay(filterDateRange.to) : endOfDay(filterDateRange.from);
-      const resultDate = new Date(result.scanned_at);
-      return isWithinInterval(resultDate, { start, end });
-    });
+      tempResults = tempResults.filter(result => {
+        const resultDate = new Date(result.scanned_at);
+        return isWithinInterval(resultDate, { start, end });
+      });
+    }
 
     const uniqueResults: ScanResult[] = [];
     const seen = new Set<string>();
 
-    for (const result of dateFiltered) {
+    for (const result of tempResults) {
       const keywordsKey = [...(result.found_keywords || [])].sort().join(',');
       const uniqueKey = `${result.post_content}|${keywordsKey}`;
 
@@ -130,7 +141,7 @@ const CheckPostScanDetail = () => {
     }
 
     return uniqueResults;
-  }, [results, filterDateRange]);
+  }, [results, filterDateRange, project?.is_ai_check_active]);
 
   const handleSave = async () => {
     if (!project) return;
@@ -141,6 +152,7 @@ const CheckPostScanDetail = () => {
         keywords,
         group_ids: groupIds,
         is_active: isActive,
+        is_ai_check_active: isAiCheckActive,
         scan_frequency: `${frequencyValue}_${frequencyUnit}`
       })
       .eq('id', project.id);
@@ -303,38 +315,51 @@ const CheckPostScanDetail = () => {
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm rounded-2xl bg-white">
-          <CardHeader>
-            <CardTitle>Cấu hình tự động</CardTitle>
-            <CardDescription>Thiết lập để hệ thống tự động quét.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200">
-              <Label className="font-medium text-slate-800">Kích hoạt quét tự động</Label>
-              <Switch checked={isActive} onCheckedChange={setIsActive} />
-            </div>
-            <div className="space-y-2">
-              <Label>Tần suất chạy lại</Label>
-              <div className="flex items-center gap-2">
-                <Input 
-                  type="number" 
-                  value={frequencyValue} 
-                  onChange={e => setFrequencyValue(e.target.value)} 
-                  className="w-24 bg-slate-50 border-slate-200 rounded-lg" 
-                />
-                <Select value={frequencyUnit} onValueChange={setFrequencyUnit}>
-                  <SelectTrigger className="bg-slate-50 border-slate-200 rounded-lg">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="hour">Giờ</SelectItem>
-                    <SelectItem value="day">Ngày</SelectItem>
-                  </SelectContent>
-                </Select>
+        <div className="space-y-6">
+          <Card className="shadow-sm rounded-2xl bg-white">
+            <CardHeader>
+              <CardTitle>Check content scan</CardTitle>
+              <CardDescription>Sử dụng AI để lọc nội dung bài viết.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200">
+                <Label className="font-medium text-slate-800">Kích hoạt AI Check</Label>
+                <Switch checked={isAiCheckActive} onCheckedChange={setIsAiCheckActive} />
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+          <Card className="shadow-sm rounded-2xl bg-white">
+            <CardHeader>
+              <CardTitle>Cấu hình tự động</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200">
+                <Label className="font-medium text-slate-800">Kích hoạt quét tự động</Label>
+                <Switch checked={isActive} onCheckedChange={setIsActive} />
+              </div>
+              <div className="space-y-2">
+                <Label>Tần suất chạy lại</Label>
+                <div className="flex items-center gap-2">
+                  <Input 
+                    type="number" 
+                    value={frequencyValue} 
+                    onChange={e => setFrequencyValue(e.target.value)} 
+                    className="w-24 bg-slate-50 border-slate-200 rounded-lg" 
+                  />
+                  <Select value={frequencyUnit} onValueChange={setFrequencyUnit}>
+                    <SelectTrigger className="bg-slate-50 border-slate-200 rounded-lg">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="hour">Giờ</SelectItem>
+                      <SelectItem value="day">Ngày</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <Card className="shadow-sm rounded-2xl bg-white">

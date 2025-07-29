@@ -28,10 +28,13 @@ serve(async (req) => {
 
     const { data: project, error: projectError } = await supabaseAdmin
       .from('post_scan_projects')
-      .select('keywords, group_ids')
+      .select('keywords, group_ids, is_ai_check_active')
       .eq('id', projectId)
       .single();
     if (projectError) throw projectError;
+
+    const { data: aiSettings, error: settingsError } = await supabaseAdmin.from('ai_settings').select('api_key, post_scan_ai_prompt').eq('id', 1).single();
+    if (settingsError) throw new Error("Chưa cấu hình AI.");
 
     const keywords = (project.keywords || '').split('\n').map(k => normalizeString(k.trim())).filter(Boolean);
     const groupIds = (project.group_ids || '').split('\n').map(id => id.trim()).filter(Boolean);
@@ -39,8 +42,8 @@ serve(async (req) => {
       throw new Error("Vui lòng cấu hình từ khóa và ID group.");
     }
 
-    const { data: fbSettings, error: settingsError } = await supabaseAdmin.from('apifb_settings').select('url_templates, api_key').eq('id', 1).single();
-    if (settingsError || !fbSettings) throw new Error("Chưa cấu hình API Facebook.");
+    const { data: fbSettings, error: fbSettingsError } = await supabaseAdmin.from('apifb_settings').select('url_templates, api_key').eq('id', 1).single();
+    if (fbSettingsError || !fbSettings) throw new Error("Chưa cấu hình API Facebook.");
     const { url_templates: urlTemplates, api_key: accessToken } = fbSettings;
     const postApprovalTemplate = urlTemplates?.post_approval;
     if (!postApprovalTemplate) throw new Error("Chưa cấu hình URL cho Check Duyệt Post.");
@@ -57,18 +60,7 @@ serve(async (req) => {
 
       const response = await fetch(feedUrl);
       const responseText = await response.text();
-
-      if (!response.ok) {
-        let errorMsg = `API error for group ${groupId}: Status ${response.status}`;
-        try {
-          const errorJson = JSON.parse(responseText);
-          errorMsg += ` - ${errorJson?.error?.message || 'Unknown API error'}`;
-        } catch (e) {
-          errorMsg += ` - ${responseText}`;
-        }
-        console.warn(errorMsg);
-        continue;
-      }
+      if (!response.ok) continue;
       
       const feedData = JSON.parse(responseText);
       const postsArray = (feedData.data && feedData.data.data && Array.isArray(feedData.data.data)) ? feedData.data.data : (feedData.data && Array.isArray(feedData.data)) ? feedData.data : [];
@@ -77,6 +69,20 @@ serve(async (req) => {
         const normalizedContent = normalizeString(post.message);
         const foundKeywords = keywords.filter(kw => normalizedContent.includes(kw));
         if (foundKeywords.length > 0) {
+          let aiResult = null;
+          if (project.is_ai_check_active && aiSettings.api_key && aiSettings.post_scan_ai_prompt) {
+            const geminiPrompt = `${aiSettings.post_scan_ai_prompt}\n\nNội dung bài viết:\n${post.message}`;
+            const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${aiSettings.api_key}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ contents: [{ parts: [{ text: geminiPrompt }] }] }),
+            });
+            if (geminiRes.ok) {
+              const geminiData = await geminiRes.json();
+              aiResult = geminiData.candidates?.[0]?.content?.parts?.[0]?.text.trim() || 'Không';
+            }
+          }
+
           allMatchedPosts.push({
             project_id: projectId,
             post_content: post.message,
@@ -85,53 +91,22 @@ serve(async (req) => {
             post_author_id: post.from?.id,
             group_id: groupId,
             found_keywords: foundKeywords,
+            ai_check_result: aiResult,
           });
         }
       }
     }
 
-    const { error: logError } = await supabaseAdmin
-      .from('log_post_scan')
-      .upsert({
-        project_id: projectId,
-        request_urls: allRequestUrls,
-        created_at: new Date().toISOString()
-      });
-
-    if (logError) {
-      console.error(`Failed to save scan log for project ${projectId}:`, logError.message);
-    }
-
-    let finalResults = [];
+    await supabaseAdmin.from('log_post_scan').upsert({ project_id: projectId, request_urls: allRequestUrls, created_at: new Date().toISOString() });
     if (allMatchedPosts.length > 0) {
-      const { data: insertedData, error: insertError } = await supabaseAdmin
-        .from('post_scan_results')
-        .insert(allMatchedPosts)
-        .select();
-      
-      if (insertError) throw insertError;
-      finalResults = insertedData;
+      await supabaseAdmin.from('post_scan_results').insert(allMatchedPosts);
     }
-
     await supabaseAdmin.from('post_scan_projects').update({ last_scanned_at: new Date().toISOString() }).eq('id', projectId);
 
-    const { data: allProjectResults, error: allResultsError } = await supabaseAdmin
-      .from('post_scan_results')
-      .select('*')
-      .eq('project_id', projectId)
-      .order('scanned_at', { ascending: false });
-
-    if (allResultsError) throw allResultsError;
-
-    return new Response(JSON.stringify(allProjectResults), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    });
+    const { data: allProjectResults } = await supabaseAdmin.from('post_scan_results').select('*').eq('project_id', projectId).order('scanned_at', { ascending: false });
+    return new Response(JSON.stringify(allProjectResults || []), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
-    });
+    return new Response(JSON.stringify({ error: error.message }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 });
   }
 })

@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FacebookApiReference } from "@/components/FacebookApiReference";
+import { Textarea } from "@/components/ui/textarea";
 
 const Settings = () => {
   // AI API Settings state
@@ -107,6 +108,7 @@ const Settings = () => {
         api_url: localSettings.apiUrl,
         api_key: localSettings.apiKey,
         embedding_model_name: localSettings.embeddingModelName,
+        post_scan_ai_prompt: localSettings.postScanAiPrompt,
       };
       const { error } = await supabase.from('ai_settings').upsert(dataToSave);
       if (error) throw error;
@@ -306,6 +308,16 @@ const Settings = () => {
                 <p className="text-xs text-muted-foreground">
                   Quan trọng: Chọn model embedding mà nhà cung cấp API của bạn đã cấp quyền.
                 </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="post-scan-prompt">Prompt cho AI Scan Post</Label>
+                <Textarea
+                  id="post-scan-prompt"
+                  value={localSettings.postScanAiPrompt}
+                  onChange={(e) => setLocalSettings({ ...localSettings, postScanAiPrompt: e.target.value })}
+                  className="bg-slate-100 border-none rounded-lg min-h-[120px]"
+                  placeholder="Ví dụ: Dựa vào nội dung bài viết, hãy xác định xem bài viết này có phải là bài tuyển dụng không. Chỉ trả lời 'Có' hoặc 'Không'."
+                />
               </div>
               <Button onClick={handleSaveApi} disabled={isSavingApi} className="rounded-lg bg-blue-600 hover:bg-blue-700">
                 {isSavingApi && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
