@@ -11,16 +11,17 @@ interface ProjectListItemProps {
   size: string;
   modified: string;
   color: string;
+  basePath: string;
   onEdit: () => void;
   onShare: () => void;
   onDelete: () => void;
 }
 
-export const ProjectListItem = ({ id, name, files, size, modified, color, onEdit, onShare, onDelete }: ProjectListItemProps) => {
+export const ProjectListItem = ({ id, name, files, size, modified, color, basePath, onEdit, onShare, onDelete }: ProjectListItemProps) => {
   const navigate = useNavigate();
 
   const handleNavigate = () => {
-    navigate(`/content-ai/${id}`);
+    navigate(`${basePath}/${id}`);
   };
 
   return (

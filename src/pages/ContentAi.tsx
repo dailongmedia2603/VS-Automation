@@ -5,8 +5,8 @@ import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Folder, FileText, Bot, PlusCircle, Search, List, LayoutGrid, ChevronDown, Loader2 } from 'lucide-react';
 import { StatWidget } from '@/components/content-ai/StatWidget';
-import { ProjectFolder } from '@/components/content-ai/ProjectFolder';
-import { ProjectListItem } from '@/components/content-ai/ProjectListItem';
+import { ProjectFolder } from '@/components/ProjectFolder';
+import { ProjectListItem } from '@/components/ProjectListItem';
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -182,6 +182,7 @@ const ContentAi = () => {
             <ProjectFolder 
               key={project.id} 
               {...project}
+              basePath="/content-ai"
               modified={formatDistanceToNow(new Date(project.updated_at), { addSuffix: true, locale: vi })}
               {...projectActions(project)}
             />
@@ -207,6 +208,7 @@ const ContentAi = () => {
               <ProjectListItem 
                 key={project.id} 
                 {...project}
+                basePath="/content-ai"
                 modified={formatDistanceToNow(new Date(project.updated_at), { addSuffix: true, locale: vi })}
                 {...projectActions(project)}
               />

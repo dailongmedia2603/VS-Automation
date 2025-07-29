@@ -10,14 +10,15 @@ interface ProjectFolderProps {
   size: string;
   modified: string;
   color: string;
+  basePath: string;
   onEdit: () => void;
   onShare: () => void;
   onDelete: () => void;
 }
 
-export const ProjectFolder = ({ id, name, files, size, modified, color, onEdit, onShare, onDelete }: ProjectFolderProps) => {
+export const ProjectFolder = ({ id, name, files, size, modified, color, basePath, onEdit, onShare, onDelete }: ProjectFolderProps) => {
   return (
-    <Link to={`/content-ai/${id}`} className="group block h-full">
+    <Link to={`${basePath}/${id}`} className="group block h-full">
       <Card className="group transition-all duration-300 hover:shadow-lg hover:-translate-y-1 rounded-2xl flex flex-col cursor-pointer h-full">
         <CardHeader className="flex-row items-start justify-between pb-2">
           <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${color}`}>
