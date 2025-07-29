@@ -18,26 +18,37 @@ serve(async (req) => {
   );
 
   try {
-    // 1. Find a pending task
-    const { data: task, error: findError } = await supabaseAdmin
+    // 1. Find a running or pending task
+    let { data: task, error: findError } = await supabaseAdmin
       .from('seeding_tasks')
       .select('*')
-      .eq('status', 'pending')
-      .order('created_at', { ascending: true })
+      .eq('status', 'running')
       .limit(1)
       .single();
 
+    if (!task) {
+      ({ data: task, error: findError } = await supabaseAdmin
+        .from('seeding_tasks')
+        .select('*')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .single());
+    }
+
     if (findError || !task) {
-      return new Response(JSON.stringify({ message: "No pending tasks to process." }), {
+      return new Response(JSON.stringify({ message: "No tasks to process." }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // 2. Set task to running
-    await supabaseAdmin.from('seeding_tasks').update({ status: 'running', updated_at: new Date().toISOString() }).eq('id', task.id);
+    // 2. If task was pending, set to running
+    if (task.status === 'pending') {
+      await supabaseAdmin.from('seeding_tasks').update({ status: 'running', updated_at: new Date().toISOString() }).eq('id', task.id);
+    }
 
-    // 3. Get posts for the task
-    const { data: posts, error: postsError } = await supabaseAdmin
+    // 3. Find ONE unprocessed post for this task
+    const { data: allPosts, error: postsError } = await supabaseAdmin
       .from('seeding_posts')
       .select('id, links, type')
       .eq('project_id', task.project_id)
@@ -45,55 +56,54 @@ serve(async (req) => {
     
     if (postsError) throw postsError;
 
-    // 4. Process each post sequentially
-    let processedCount = 0;
-    for (const post of posts) {
-      // Check if task was cancelled before processing next post
-      const { data: currentTask } = await supabaseAdmin.from('seeding_tasks').select('status').eq('id', task.id).single();
-      if (currentTask.status === 'cancelled') {
-        await supabaseAdmin.from('seeding_tasks').update({ updated_at: new Date().toISOString() }).eq('id', task.id);
-        break; // Exit loop
-      }
+    const post = allPosts[0]; // Process only the first one found
 
-      try {
-        // Re-use existing check logic
-        if (post.type === 'comment_check') {
-            const { data: fetchData, error: fetchError } = await supabaseAdmin.functions.invoke('get-fb-comments', { body: { fbPostId: post.links } });
-            if (fetchError || fetchData.error) throw new Error(fetchError?.message || fetchData?.error);
-            const { data: processData, error: processError } = await supabaseAdmin.functions.invoke('process-and-store-comments', { body: { rawResponse: fetchData.rawResponse, internalPostId: post.id } });
-            if (processError || processData.error) throw new Error(processError?.message || processData?.error);
-            await supabaseAdmin.functions.invoke('compare-and-update-comments', { body: { postId: post.id } });
-        } else if (post.type === 'post_approval') {
-            const timeCheckString = `&since=${new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()}&until=${new Date().toISOString()}`;
-            const { data: fetchData, error: fetchError } = await supabaseAdmin.functions.invoke('get-fb-duyetpost', { body: { postId: post.id, timeCheckString } });
-            if (fetchError || (fetchData && fetchData.error)) throw new Error(fetchError?.message || fetchData?.error);
-            const { data: processData, error: processError } = await supabaseAdmin.functions.invoke('process-and-store-duyetpost', { body: { allPosts: fetchData.allPosts, internalPostId: post.id } });
-            if (processError || (processData && processData.error)) throw new Error(processError?.message || processData?.error);
-            await supabaseAdmin.functions.invoke('compare-and-update-duyetpost', { body: { postId: post.id } });
-        }
-        processedCount++;
-        await supabaseAdmin.from('seeding_tasks').update({ progress_current: processedCount, updated_at: new Date().toISOString() }).eq('id', task.id);
-      } catch (postError) {
-        console.error(`Error processing post ${post.id}:`, postError.message);
-        // Continue to next post even if one fails
-      }
-    }
-
-    // 5. Finalize task status
-    const { data: finalTask } = await supabaseAdmin.from('seeding_tasks').select('status').eq('id', task.id).single();
-    if (finalTask.status !== 'cancelled') {
+    if (!post) {
+      // No more posts to check, mark task as completed
       await supabaseAdmin.from('seeding_tasks').update({ status: 'completed', updated_at: new Date().toISOString() }).eq('id', task.id);
+      return new Response(JSON.stringify({ message: `Task ${task.id} completed. No more posts to process.` }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    return new Response(JSON.stringify({ message: `Task ${task.id} processed.`, processed: processedCount }), {
+    // 4. Process this single post
+    try {
+      if (post.type === 'comment_check') {
+          const { data: fetchData, error: fetchError } = await supabaseAdmin.functions.invoke('get-fb-comments', { body: { fbPostId: post.links } });
+          if (fetchError || fetchData.error) throw new Error(fetchError?.message || fetchData?.error);
+          const { data: processData, error: processError } = await supabaseAdmin.functions.invoke('process-and-store-comments', { body: { rawResponse: fetchData.rawResponse, internalPostId: post.id } });
+          if (processError || processData.error) throw new Error(processError?.message || processData?.error);
+          await supabaseAdmin.functions.invoke('compare-and-update-comments', { body: { postId: post.id } });
+      } else if (post.type === 'post_approval') {
+          const timeCheckString = `&since=${new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()}&until=${new Date().toISOString()}`;
+          const { data: fetchData, error: fetchError } = await supabaseAdmin.functions.invoke('get-fb-duyetpost', { body: { postId: post.id, timeCheckString } });
+          if (fetchError || (fetchData && fetchData.error)) throw new Error(fetchError?.message || fetchData?.error);
+          const { data: processData, error: processError } = await supabaseAdmin.functions.invoke('process-and-store-duyetpost', { body: { allPosts: fetchData.allPosts, internalPostId: post.id } });
+          if (processError || (processData && processData.error)) throw new Error(processError?.message || processData?.error);
+          await supabaseAdmin.functions.invoke('compare-and-update-duyetpost', { body: { postId: post.id } });
+      }
+    } catch (postError) {
+      console.error(`Error processing post ${post.id}:`, postError.message);
+      // Even if a post fails, we increment the progress to avoid getting stuck
+    }
+
+    // 5. Update progress
+    const newProgress = task.progress_current + 1;
+    const updateData = {
+      progress_current: newProgress,
+      updated_at: new Date().toISOString(),
+      status: newProgress >= task.progress_total ? 'completed' : 'running'
+    };
+    await supabaseAdmin.from('seeding_tasks').update(updateData).eq('id', task.id);
+
+    return new Response(JSON.stringify({ message: `Task ${task.id} processed post ${post.id}. Progress: ${newProgress}/${task.progress_total}` }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    // If the worker itself fails, try to mark the task as failed
-    const { data: task } = await supabaseAdmin.from('seeding_tasks').select('id').eq('status', 'running').limit(1).single();
-    if (task) {
-      await supabaseAdmin.from('seeding_tasks').update({ status: 'failed', error_message: error.message }).eq('id', task.id);
+    const { data: runningTask } = await supabaseAdmin.from('seeding_tasks').select('id').eq('status', 'running').limit(1).single();
+    if (runningTask) {
+      await supabaseAdmin.from('seeding_tasks').update({ status: 'failed', error_message: error.message }).eq('id', runningTask.id);
     }
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
