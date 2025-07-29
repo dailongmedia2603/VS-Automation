@@ -23,18 +23,24 @@ serve(async (req) => {
     );
 
     if (posts.length > 0) {
-      const resultsToInsert = posts.map(p => ({
-        project_id: projectId,
-        post_content: p.post_content,
-        post_link: p.post_link,
-        post_author_name: p.post_author_name,
-        post_author_id: p.post_author_id,
-        group_id: p.group_id,
-        found_keywords: p.found_keywords,
-        ai_check_result: p.ai_check_result,
-        ai_check_details: p.ai_check_details,
-      }));
-      await supabaseAdmin.from('post_scan_results').insert(resultsToInsert);
+      // Filter out posts where AI check result is 'Có'
+      const resultsToInsert = posts
+        .filter(p => p.ai_check_result !== 'Có')
+        .map(p => ({
+          project_id: projectId,
+          post_content: p.post_content,
+          post_link: p.post_link,
+          post_author_name: p.post_author_name,
+          post_author_id: p.post_author_id,
+          group_id: p.group_id,
+          found_keywords: p.found_keywords,
+          ai_check_result: p.ai_check_result,
+          ai_check_details: p.ai_check_details,
+        }));
+
+      if (resultsToInsert.length > 0) {
+        await supabaseAdmin.from('post_scan_results').insert(resultsToInsert);
+      }
     }
 
     await supabaseAdmin.from('post_scan_projects').update({ last_scanned_at: new Date().toISOString() }).eq('id', projectId);

@@ -120,10 +120,6 @@ const CheckPostScanDetail = () => {
   const filteredResults = useMemo(() => {
     let tempResults = results;
 
-    if (isAiCheckActive) {
-      tempResults = tempResults.filter(result => result.ai_check_result === 'Không');
-    }
-
     if (filterDateRange?.from) {
       const start = startOfDay(filterDateRange.from);
       const end = filterDateRange.to ? endOfDay(filterDateRange.to) : endOfDay(filterDateRange.from);
@@ -147,7 +143,7 @@ const CheckPostScanDetail = () => {
     }
 
     return uniqueResults;
-  }, [results, filterDateRange, isAiCheckActive]);
+  }, [results, filterDateRange]);
 
   const handleSave = async () => {
     if (!project) return;
@@ -214,7 +210,7 @@ const CheckPostScanDetail = () => {
 
       setResults(storeData);
       dismissToast(toastId);
-      showSuccess(`Quét hoàn tất! Tìm thấy ${finalPosts.length} bài viết mới.`);
+      showSuccess(`Quét hoàn tất! Tìm thấy ${finalPosts.filter(p => p.ai_check_result !== 'Có').length} bài viết mới.`);
       
       const { data: newLogData } = await supabase.from('log_post_scan').select('*').eq('project_id', projectId).single();
       setLog(newLogData);
