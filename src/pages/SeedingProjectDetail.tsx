@@ -6,7 +6,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, MessageSquare, FileCheck2, ChevronRight, ArrowLeft, Edit, Trash2, Loader2, Check, CheckCircle, UploadCloud, PlayCircle } from 'lucide-react';
+import { PlusCircle, MessageSquare, FileCheck2, ChevronRight, ArrowLeft, Edit, Trash2, Loader2, Check, CheckCircle, UploadCloud, PlayCircle, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -20,6 +20,7 @@ import { PostApprovalDetail } from '@/components/seeding/PostApprovalDetail';
 import { ImportPostsDialog } from '@/components/seeding/ImportPostsDialog';
 import { subDays } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 
 type Project = {
   id: number;
@@ -40,6 +41,13 @@ type Post = {
   total_count: number;
 };
 
+type SeedingTask = {
+  id: number;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  progress_current: number;
+  progress_total: number;
+};
+
 const initialNewPostState = {
   name: '',
   type: 'comment_check' as 'comment_check' | 'post_approval',
@@ -58,6 +66,7 @@ const SeedingProjectDetail = () => {
   const [postApprovalPosts, setPostApprovalPosts] = useState<Post[]>([]);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeTask, setActiveTask] = useState<SeedingTask | null>(null);
 
   const [editingPostId, setEditingPostId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState('');
@@ -68,7 +77,6 @@ const SeedingProjectDetail = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newPostData, setNewPostData] = useState(initialNewPostState);
   const [isSaving, setIsSaving] = useState(false);
-  const [isCheckingAll, setIsCheckingAll] = useState(false);
 
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
 
@@ -99,7 +107,6 @@ const SeedingProjectDetail = () => {
             showSuccess(`Quét lần đầu hoàn tất! Tìm thấy ${compareResult.found}/${compareResult.total} bình luận.`);
 
         } else if (post.type === 'post_approval') {
-            // For the first check, scan the last 5 days to be safe.
             const timeCheckString = `&since=${subDays(new Date(), 5).toISOString()}&until=${new Date().toISOString()}`;
             
             const { data: fetchData, error: fetchError } = await supabase.functions.invoke('get-fb-duyetpost', { body: { postId: post.id, timeCheckString } });
@@ -143,7 +150,7 @@ const SeedingProjectDetail = () => {
       showError("Lưu cài đặt thất bại: " + error.message);
     } else {
       showSuccess("Đã lưu cài đặt tự động!");
-      fetchProjectData(); // Refresh data
+      fetchProjectData();
     }
   };
 
@@ -164,12 +171,9 @@ const SeedingProjectDetail = () => {
       setCommentCheckPosts(allPosts.filter(p => p.type === 'comment_check'));
       setPostApprovalPosts(allPosts.filter(p => p.type === 'post_approval'));
 
-      // Update selected post with new data if it exists
       if (selectedPost) {
         const updatedSelectedPost = allPosts.find(p => p.id === selectedPost.id);
-        if (updatedSelectedPost) {
-          setSelectedPost(updatedSelectedPost);
-        }
+        if (updatedSelectedPost) setSelectedPost(updatedSelectedPost);
       }
 
     } catch (error: any) {
@@ -190,11 +194,44 @@ const SeedingProjectDetail = () => {
       const postToSelect = allPosts.find(p => p.id === selectedPostId);
       if (postToSelect) {
         setSelectedPost(postToSelect);
-        // Clear state to prevent re-selection on refresh or other navigation
         window.history.replaceState({}, document.title);
       }
     }
   }, [location.state, commentCheckPosts, postApprovalPosts]);
+
+  useEffect(() => {
+    if (!projectId) return;
+
+    const fetchActiveTask = async () => {
+      const { data, error } = await supabase
+        .from('seeding_tasks')
+        .select('*')
+        .eq('project_id', projectId)
+        .in('status', ['pending', 'running'])
+        .single();
+      
+      if (data) setActiveTask(data);
+      else setActiveTask(null);
+    };
+
+    fetchActiveTask();
+
+    const interval = setInterval(() => {
+      if (activeTask && (activeTask.status === 'pending' || activeTask.status === 'running')) {
+        fetchActiveTask();
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [projectId, activeTask]);
+
+  useEffect(() => {
+    if (activeTask && (activeTask.status === 'completed' || activeTask.status === 'failed' || activeTask.status === 'cancelled')) {
+      showSuccess("Tác vụ đã hoàn tất!");
+      fetchProjectData();
+      setActiveTask(null);
+    }
+  }, [activeTask]);
 
   const handleSaveName = async () => {
     if (!editingPostId) return;
@@ -205,9 +242,8 @@ const SeedingProjectDetail = () => {
     }
 
     const { error } = await supabase.from('seeding_posts').update({ name: editingName.trim() }).eq('id', editingPostId);
-    if (error) {
-      showError("Cập nhật tên thất bại: " + error.message);
-    } else {
+    if (error) showError("Cập nhật tên thất bại: " + error.message);
+    else {
       showSuccess("Đã cập nhật tên post!");
       fetchProjectData();
     }
@@ -217,9 +253,8 @@ const SeedingProjectDetail = () => {
   const handleConfirmDelete = async () => {
     if (!postToDelete) return;
     const { error } = await supabase.from('seeding_posts').delete().eq('id', postToDelete.id);
-    if (error) {
-      showError("Xóa post thất bại: " + error.message);
-    } else {
+    if (error) showError("Xóa post thất bại: " + error.message);
+    else {
       showSuccess("Đã xóa post thành công!");
       if (selectedPost?.id === postToDelete.id) setSelectedPost(null);
       fetchProjectData();
@@ -255,36 +290,17 @@ const SeedingProjectDetail = () => {
       if (postError) throw postError;
 
       if (newPostData.type === 'comment_check' && newPostData.comments.trim()) {
-        const commentsToInsert = newPostData.comments
-          .split('\n')
-          .filter(line => line.trim() !== '')
-          .map(content => ({
-            post_id: newPost.id,
-            content: content.trim(),
-          }));
-        
+        const commentsToInsert = newPostData.comments.split('\n').filter(line => line.trim() !== '').map(content => ({ post_id: newPost.id, content: content.trim() }));
         if (commentsToInsert.length > 0) {
-          const { error: commentsError } = await supabase
-            .from('seeding_comments')
-            .insert(commentsToInsert);
+          const { error: commentsError } = await supabase.from('seeding_comments').insert(commentsToInsert);
           if (commentsError) throw commentsError;
         }
       }
 
       if (newPostData.type === 'post_approval' && newPostData.links.trim()) {
-        const groupsToInsert = newPostData.links
-          .split('\n')
-          .map(line => line.trim())
-          .filter(line => line !== '')
-          .map(groupId => ({
-            post_id: newPost.id,
-            group_id: groupId,
-          }));
-        
+        const groupsToInsert = newPostData.links.split('\n').map(line => line.trim()).filter(line => line !== '').map(groupId => ({ post_id: newPost.id, group_id: groupId }));
         if (groupsToInsert.length > 0) {
-          const { error: groupsError } = await supabase
-            .from('seeding_groups')
-            .insert(groupsToInsert);
+          const { error: groupsError } = await supabase.from('seeding_groups').insert(groupsToInsert);
           if (groupsError) throw groupsError;
         }
       }
@@ -310,31 +326,26 @@ const SeedingProjectDetail = () => {
 
   const handleCheckAll = async () => {
     if (!projectId) return;
-    const postsToCheck = [...commentCheckPosts, ...postApprovalPosts].filter(p => p.status !== 'completed');
-    if (postsToCheck.length === 0) {
-        showSuccess("Tất cả các bài viết đã được hoàn thành!");
-        return;
+    const { data, error } = await supabase.functions.invoke('create-seeding-task', {
+      body: { projectId }
+    });
+    if (error) showError(`Không thể bắt đầu: ${error.message}`);
+    else if (data.message) showSuccess(data.message);
+    else {
+      setActiveTask(data);
+      showSuccess("Đã bắt đầu tác vụ quét hàng loạt!");
     }
+  };
 
-    setIsCheckingAll(true);
-    const toastId = showLoading(`Đang quét ${postsToCheck.length} bài viết...`);
-
-    try {
-        const { data, error } = await supabase.functions.invoke('check-all-posts-for-project', {
-            body: { projectId }
-        });
-
-        if (error) throw error;
-        if (data.error) throw new Error(data.error);
-
-        dismissToast(toastId);
-        showSuccess(data.message || "Đã quét tất cả các bài viết thành công!");
-        fetchProjectData();
-    } catch (error: any) {
-        dismissToast(toastId);
-        showError(`Quét hàng loạt thất bại: ${error.message}`);
-    } finally {
-        setIsCheckingAll(false);
+  const handleCancelTask = async () => {
+    if (!activeTask) return;
+    const { error } = await supabase.functions.invoke('cancel-seeding-task', {
+      body: { taskId: activeTask.id }
+    });
+    if (error) showError(`Không thể dừng: ${error.message}`);
+    else {
+      showSuccess("Đã gửi yêu cầu dừng tác vụ.");
+      setActiveTask(prev => prev ? { ...prev, status: 'cancelled' } : null);
     }
   };
 
@@ -417,10 +428,24 @@ const SeedingProjectDetail = () => {
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">{project.name}</h1>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={handleCheckAll} disabled={isCheckingAll}>
-            {isCheckingAll ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
-            Check tất cả
-          </Button>
+          {activeTask ? (
+            <div className="flex items-center gap-2 w-64">
+              <div className="flex-1">
+                <Progress value={(activeTask.progress_current / activeTask.progress_total) * 100} className="h-2" />
+                <p className="text-xs text-center mt-1 text-slate-500">
+                  Đang quét... ({activeTask.progress_current}/{activeTask.progress_total})
+                </p>
+              </div>
+              <Button variant="destructive" size="icon" onClick={handleCancelTask}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            <Button variant="outline" onClick={handleCheckAll}>
+              <PlayCircle className="mr-2 h-4 w-4" />
+              Check tất cả
+            </Button>
+          )}
           <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}>
             <UploadCloud className="mr-2 h-4 w-4" />
             Import
