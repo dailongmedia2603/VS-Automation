@@ -95,31 +95,31 @@ export const PermissionsManager = () => {
   const handleSaveAll = async () => {
     setIsSaving(true);
     const toastId = showLoading("Đang lưu tất cả quyền...");
-    let errorCount = 0;
-    let firstErrorMessage = '';
 
-    for (const staff of staffList) {
-      const { error } = await supabase
+    const updatePromises = staffList.map(staff =>
+      supabase
         .from('staff')
         .update({ permissions: staff.permissions })
-        .eq('id', staff.id);
+        .eq('id', staff.id)
+    );
 
-      if (error) {
-        errorCount++;
-        if (!firstErrorMessage) {
-          firstErrorMessage = error.message;
-        }
-        console.error(`Failed to update permissions for ${staff.name}:`, error);
+    try {
+      const results = await Promise.allSettled(updatePromises);
+      
+      const failedUpdates = results.filter(result => result.status === 'rejected');
+      
+      if (failedUpdates.length > 0) {
+        console.error("Failed updates:", failedUpdates);
+        const firstError = (failedUpdates[0] as PromiseRejectedResult).reason;
+        throw new Error(`Lưu thất bại cho ${failedUpdates.length} nhân viên. Lỗi đầu tiên: ${firstError.message}`);
       }
-    }
-    
-    dismissToast(toastId);
-    setIsSaving(false);
 
-    if (errorCount === 0) {
       showSuccess("Đã lưu tất cả thay đổi về quyền thành công!");
-    } else {
-      showError(`Lưu thất bại cho ${errorCount} nhân viên. Lỗi đầu tiên: ${firstErrorMessage}`);
+    } catch (error: any) {
+      showError(error.message);
+    } finally {
+      dismissToast(toastId);
+      setIsSaving(false);
     }
   };
 
