@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Save, Settings, PlayCircle, Loader2, Calendar as CalendarIcon, Download } from 'lucide-react';
+import { ArrowLeft, Save, PlayCircle, Loader2, Calendar as CalendarIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -131,12 +131,21 @@ const CheckPostScanDetail = () => {
   if (isLoading) {
     return (
       <main className="flex-1 p-6 sm:p-8 bg-slate-50">
-        <Skeleton className="h-10 w-1/3 mb-6" />
-        <div className="space-y-6">
-          <Skeleton className="h-64 w-full" />
-          <Skeleton className="h-48 w-full" />
-          <Skeleton className="h-96 w-full" />
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <Skeleton className="h-10 w-10 rounded-md" />
+            <div>
+              <Skeleton className="h-8 w-64 mb-2" />
+              <Skeleton className="h-4 w-48" />
+            </div>
+          </div>
+          <Skeleton className="h-10 w-32 rounded-lg" />
         </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <Skeleton className="h-64 lg:col-span-2 rounded-2xl" />
+          <Skeleton className="h-64 rounded-2xl" />
+        </div>
+        <Skeleton className="h-96 w-full rounded-2xl" />
       </main>
     );
   }
@@ -147,56 +156,119 @@ const CheckPostScanDetail = () => {
     <main className="flex-1 space-y-6 p-6 sm:p-8 bg-slate-50">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link to="/tools/check-post-scan"><Button variant="outline" size="icon"><ArrowLeft className="h-4 w-4" /></Button></Link>
+          <Link to="/tools/check-post-scan">
+            <Button variant="outline" size="icon" className="bg-white">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-slate-900">{project.name}</h1>
-            <p className="text-muted-foreground mt-1 text-sm">Tạo lúc: {format(new Date(project.created_at), 'dd/MM/yyyy HH:mm')}</p>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Tạo lúc: {format(new Date(project.created_at), 'dd/MM/yyyy HH:mm', { locale: vi })}
+            </p>
           </div>
         </div>
-        <Button onClick={handleSave} disabled={isSaving}>
+        <Button onClick={handleSave} disabled={isSaving} className="bg-slate-900 hover:bg-slate-800 text-white rounded-lg">
           {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
           Lưu thay đổi
         </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2"><CardHeader><CardTitle>Thông tin chung</CardTitle></CardHeader>
+        <Card className="lg:col-span-2 shadow-sm rounded-2xl bg-white">
+          <CardHeader>
+            <CardTitle>Thông tin chung</CardTitle>
+          </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2"><Label>Danh sách từ khóa (mỗi từ khóa 1 dòng)</Label><Textarea value={keywords} onChange={e => setKeywords(e.target.value)} className="min-h-[150px]" /></div>
-            <div className="space-y-2"><Label>Danh sách ID Group (mỗi ID 1 dòng)</Label><Textarea value={groupIds} onChange={e => setGroupIds(e.target.value)} className="min-h-[150px]" /></div>
+            <div className="space-y-2">
+              <Label>Danh sách từ khóa (mỗi từ khóa 1 dòng)</Label>
+              <Textarea 
+                value={keywords} 
+                onChange={e => setKeywords(e.target.value)} 
+                className="min-h-[200px] bg-slate-50 border-slate-200 rounded-lg" 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Danh sách ID Group (mỗi ID 1 dòng)</Label>
+              <Textarea 
+                value={groupIds} 
+                onChange={e => setGroupIds(e.target.value)} 
+                className="min-h-[200px] bg-slate-50 border-slate-200 rounded-lg" 
+              />
+            </div>
           </CardContent>
         </Card>
 
-        <Card><CardHeader><CardTitle>Cấu hình tự động</CardTitle><CardDescription>Thiết lập để hệ thống tự động quét.</CardDescription></CardHeader>
+        <Card className="shadow-sm rounded-2xl bg-white">
+          <CardHeader>
+            <CardTitle>Cấu hình tự động</CardTitle>
+            <CardDescription>Thiết lập để hệ thống tự động quét.</CardDescription>
+          </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border"><Label className="font-medium">Kích hoạt quét tự động</Label><Switch checked={isActive} onCheckedChange={setIsActive} /></div>
-            <div className="space-y-2"><Label>Tần suất chạy lại</Label><div className="flex items-center gap-2"><Input type="number" value={frequencyValue} onChange={e => setFrequencyValue(e.target.value)} className="w-24" /><Select value={frequencyUnit} onValueChange={setFrequencyUnit}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="hour">Giờ</SelectItem><SelectItem value="day">Ngày</SelectItem></SelectContent></Select></div></div>
+            <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200">
+              <Label className="font-medium text-slate-800">Kích hoạt quét tự động</Label>
+              <Switch checked={isActive} onCheckedChange={setIsActive} />
+            </div>
+            <div className="space-y-2">
+              <Label>Tần suất chạy lại</Label>
+              <div className="flex items-center gap-2">
+                <Input 
+                  type="number" 
+                  value={frequencyValue} 
+                  onChange={e => setFrequencyValue(e.target.value)} 
+                  className="w-24 bg-slate-50 border-slate-200 rounded-lg" 
+                />
+                <Select value={frequencyUnit} onValueChange={setFrequencyUnit}>
+                  <SelectTrigger className="bg-slate-50 border-slate-200 rounded-lg">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hour">Giờ</SelectItem>
+                    <SelectItem value="day">Ngày</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
+      <Card className="shadow-sm rounded-2xl bg-white">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <div><CardTitle>Kết quả</CardTitle><CardDescription>Kết quả quét sẽ được hiển thị ở đây.</CardDescription></div>
+            <div>
+              <CardTitle>Kết quả</CardTitle>
+              <CardDescription>Kết quả quét sẽ được hiển thị ở đây.</CardDescription>
+            </div>
             <div className="flex items-center gap-2">
-              <Popover><PopoverTrigger asChild><Button variant={"outline"} className={cn("w-[280px] justify-start text-left font-normal", !dateRange && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{dateRange?.from ? (dateRange.to ? <>{format(dateRange.from, "dd/MM/y")} - {format(dateRange.to, "dd/MM/y")}</> : format(dateRange.from, "dd/MM/y")) : (<span>Chọn khoảng thời gian quét</span>)}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar initialFocus mode="range" defaultMonth={dateRange?.from} selected={dateRange} onSelect={setDateRange} numberOfMonths={2} /></PopoverContent></Popover>
-              <Button onClick={handleRunScan} disabled={isScanning}>{isScanning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}Chạy quét</Button>
+              <Popover><PopoverTrigger asChild><Button variant={"outline"} className={cn("w-[280px] justify-start text-left font-normal bg-white", !dateRange && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{dateRange?.from ? (dateRange.to ? <>{format(dateRange.from, "dd/MM/y")} - {format(dateRange.to, "dd/MM/y")}</> : format(dateRange.from, "dd/MM/y")) : (<span>Chọn khoảng thời gian quét</span>)}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar initialFocus mode="range" defaultMonth={dateRange?.from} selected={dateRange} onSelect={setDateRange} numberOfMonths={2} /></PopoverContent></Popover>
+              <Button onClick={handleRunScan} disabled={isScanning} className="bg-slate-900 hover:bg-slate-800 text-white rounded-lg">
+                {isScanning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
+                Chạy quét
+              </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent>
           <div className="border rounded-lg overflow-hidden">
-            <Table><TableHeader><TableRow><TableHead>Nội dung bài viết</TableHead><TableHead>Link</TableHead><TableHead>Từ khóa</TableHead><TableHead>Ngày check</TableHead></TableRow></TableHeader>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nội dung bài viết</TableHead>
+                  <TableHead>Link</TableHead>
+                  <TableHead>Từ khóa</TableHead>
+                  <TableHead>Ngày check</TableHead>
+                </TableRow>
+              </TableHeader>
               <TableBody>
                 {results.length > 0 ? results.map(result => (
                   <TableRow key={result.id}>
                     <TableCell className="max-w-md"><p className="line-clamp-3 whitespace-pre-wrap">{result.post_content}</p></TableCell>
                     <TableCell><a href={result.post_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Xem bài viết</a></TableCell>
                     <TableCell><div className="flex flex-wrap gap-1">{result.found_keywords.map(kw => <Badge key={kw} variant="secondary">{kw}</Badge>)}</div></TableCell>
-                    <TableCell>{format(new Date(result.scanned_at), 'dd/MM/yyyy HH:mm')}</TableCell>
+                    <TableCell>{format(new Date(result.scanned_at), 'dd/MM/yyyy HH:mm', { locale: vi })}</TableCell>
                   </TableRow>
-                )) : (<TableRow><TableCell colSpan={4} className="text-center h-24">Chưa có kết quả.</TableCell></TableRow>)}
+                )) : (<TableRow><TableCell colSpan={4} className="text-center h-24 text-slate-500">Chưa có kết quả.</TableCell></TableRow>)}
               </TableBody>
             </Table>
           </div>
