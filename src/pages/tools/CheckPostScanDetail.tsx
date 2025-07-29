@@ -324,7 +324,7 @@ const CheckPostScanDetail = () => {
       <Card className="shadow-sm rounded-2xl bg-white">
         <CardContent className="p-4">
           <Accordion type="single" collapsible className="w-full">
-            <AccordionItem value="config">
+            <AccordionItem value="config" className="border-b-0">
               <AccordionTrigger className="text-base font-semibold hover:no-underline px-2">
                 <div className="flex items-center gap-2"><Settings className="h-5 w-5" />Cấu hình & Tùy chọn</div>
               </AccordionTrigger>
