@@ -101,16 +101,28 @@ const CheckPostScanDetail = () => {
   }, [projectId]);
 
   const filteredResults = useMemo(() => {
-    if (!filterDateRange?.from) {
-      return results;
-    }
-    const start = startOfDay(filterDateRange.from);
-    const end = filterDateRange.to ? endOfDay(filterDateRange.to) : endOfDay(filterDateRange.from);
-
-    return results.filter(result => {
+    const dateFiltered = results.filter(result => {
+      if (!filterDateRange?.from) return true;
+      const start = startOfDay(filterDateRange.from);
+      const end = filterDateRange.to ? endOfDay(filterDateRange.to) : endOfDay(filterDateRange.from);
       const resultDate = new Date(result.scanned_at);
       return isWithinInterval(resultDate, { start, end });
     });
+
+    const uniqueResults: ScanResult[] = [];
+    const seen = new Set<string>();
+
+    for (const result of dateFiltered) {
+      const keywordsKey = [...(result.found_keywords || [])].sort().join(',');
+      const uniqueKey = `${result.post_content}|${keywordsKey}`;
+
+      if (!seen.has(uniqueKey)) {
+        seen.add(uniqueKey);
+        uniqueResults.push(result);
+      }
+    }
+
+    return uniqueResults;
   }, [results, filterDateRange]);
 
   const handleSave = async () => {
