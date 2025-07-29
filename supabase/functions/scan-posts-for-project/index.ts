@@ -70,17 +70,20 @@ serve(async (req) => {
         const foundKeywords = keywords.filter(kw => normalizedContent.includes(kw));
         if (foundKeywords.length > 0) {
           let aiResult = null;
+          let aiDetails = null;
           if (project.is_ai_check_active && aiSettings.google_gemini_api_key && project.post_scan_ai_prompt) {
             const geminiPrompt = `${project.post_scan_ai_prompt}\n\nNội dung bài viết:\n${post.message}`;
+            let geminiData = null;
             const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${aiSettings.google_gemini_api_key}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ contents: [{ parts: [{ text: geminiPrompt }] }] }),
             });
             if (geminiRes.ok) {
-              const geminiData = await geminiRes.json();
+              geminiData = await geminiRes.json();
               aiResult = geminiData.candidates?.[0]?.content?.parts?.[0]?.text.trim() || 'Không';
             }
+            aiDetails = { prompt: geminiPrompt, response: geminiData };
           }
 
           allMatchedPosts.push({
@@ -92,6 +95,7 @@ serve(async (req) => {
             group_id: groupId,
             found_keywords: foundKeywords,
             ai_check_result: aiResult,
+            ai_check_details: aiDetails,
           });
         }
       }

@@ -23,6 +23,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import * as XLSX from 'xlsx';
+import { AiLogDialog } from '@/components/tools/AiLogDialog';
 
 type Project = {
   id: number;
@@ -44,6 +45,7 @@ type ScanResult = {
   scanned_at: string;
   group_id: string;
   ai_check_result: string | null;
+  ai_check_details: { prompt: string; response: any; } | null;
 };
 
 type ScanLog = {
@@ -61,6 +63,7 @@ const CheckPostScanDetail = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [isLogOpen, setIsLogOpen] = useState(false);
+  const [isAiLogOpen, setIsAiLogOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [selectedResultIds, setSelectedResultIds] = useState<number[]>([]);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
@@ -321,9 +324,15 @@ const CheckPostScanDetail = () => {
 
         <div className="space-y-6">
           <Card className="shadow-sm rounded-2xl bg-white">
-            <CardHeader>
-              <CardTitle>Check content scan</CardTitle>
-              <CardDescription>Sử dụng AI để lọc nội dung bài viết.</CardDescription>
+            <CardHeader className="flex flex-row items-start justify-between">
+              <div>
+                <CardTitle>Check content scan</CardTitle>
+                <CardDescription>Sử dụng AI để lọc nội dung bài viết.</CardDescription>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => setIsAiLogOpen(true)}>
+                <FileText className="mr-2 h-4 w-4" />
+                Log
+              </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200">
@@ -515,6 +524,12 @@ const CheckPostScanDetail = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AiLogDialog 
+        isOpen={isAiLogOpen} 
+        onOpenChange={setIsAiLogOpen} 
+        logs={results.filter(r => r.ai_check_details)} 
+      />
 
       <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
         <AlertDialogContent>
