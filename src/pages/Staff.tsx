@@ -14,9 +14,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { PlusCircle, Edit, Trash2, Search, Loader2, Upload } from 'lucide-react';
 import { showSuccess, showError } from '@/utils/toast';
 import { cn } from '@/lib/utils';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from '@/contexts/AuthContext';
+import { PermissionsManager } from '@/components/PermissionsManager';
 
 type StaffMember = {
-  id: string; // Now UUID from auth.users
+  id: string;
   name: string;
   role: string;
   email: string;
@@ -25,7 +28,7 @@ type StaffMember = {
   password?: string;
 };
 
-const Staff = () => {
+const StaffList = () => {
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -113,7 +116,6 @@ const Staff = () => {
       }
 
       if (!selectedStaff.id) {
-        // Adding a new user
         if (!selectedStaff.password) {
           showError("Mật khẩu không được để trống khi thêm nhân viên mới.");
           setIsSaving(false);
@@ -130,7 +132,6 @@ const Staff = () => {
         if (error) throw error;
         showSuccess("Đã thêm nhân sự thành công!");
       } else {
-        // Editing an existing user
         const { error } = await supabase.functions.invoke('update-user', {
           body: {
             userId: selectedStaff.id,
@@ -162,90 +163,81 @@ const Staff = () => {
   }, [staffList, searchTerm]);
 
   return (
-    <main className="flex-1 space-y-6 p-6 sm:p-8">
-      <Card className="shadow-sm rounded-2xl bg-white">
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold">Quản lý nhân sự</CardTitle>
-          <CardDescription>Thêm, sửa, xóa và quản lý thông tin các thành viên trong nhóm của bạn.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex justify-between items-center mb-6">
-            <div className="relative w-full max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Tìm kiếm nhân sự..."
-                className="pl-9 rounded-lg bg-slate-100 border-none"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <Button onClick={handleAddNew} className="rounded-lg bg-blue-600 hover:bg-blue-700">
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Thêm nhân viên
-            </Button>
-          </div>
-          <div className="border rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nhân viên</TableHead>
-                  <TableHead>Chức vụ</TableHead>
-                  <TableHead>Trạng thái</TableHead>
-                  <TableHead className="text-right">Hành động</TableHead>
+    <>
+      <div className="flex justify-between items-center mb-6">
+        <div className="relative w-full max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Tìm kiếm nhân sự..."
+            className="pl-9 rounded-lg bg-slate-100 border-none"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <Button onClick={handleAddNew} className="rounded-lg bg-blue-600 hover:bg-blue-700">
+          <PlusCircle className="mr-2 h-4 w-4" />
+          Thêm nhân viên
+        </Button>
+      </div>
+      <div className="border rounded-lg overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Nhân viên</TableHead>
+              <TableHead>Chức vụ</TableHead>
+              <TableHead>Trạng thái</TableHead>
+              <TableHead className="text-right">Hành động</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              [...Array(5)].map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell><div className="flex items-center gap-3"><Skeleton className="h-10 w-10 rounded-full" /><div className="space-y-1"><Skeleton className="h-4 w-32" /><Skeleton className="h-3 w-40" /></div></div></TableCell>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="h-8 w-20" /></TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  [...Array(5)].map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell><div className="flex items-center gap-3"><Skeleton className="h-10 w-10 rounded-full" /><div className="space-y-1"><Skeleton className="h-4 w-32" /><Skeleton className="h-3 w-40" /></div></div></TableCell>
-                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
-                      <TableCell className="text-right"><Skeleton className="h-8 w-20" /></TableCell>
-                    </TableRow>
-                  ))
-                ) : filteredStaff.length > 0 ? (
-                  filteredStaff.map((staff) => (
-                    <TableRow key={staff.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar>
-                            <AvatarImage src={staff.avatar_url ?? undefined} alt={staff.name} />
-                            <AvatarFallback>{staff.name.charAt(0)}</AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="font-medium">{staff.name}</p>
-                            <p className="text-sm text-muted-foreground">{staff.email}</p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{staff.role}</TableCell>
-                      <TableCell>
-                        <Badge variant={staff.status === 'active' ? 'default' : 'outline'} className={cn(staff.status === 'active' && 'bg-green-100 text-green-800 border-green-200')}>
-                          {staff.status === 'active' ? 'Hoạt động' : 'Tạm nghỉ'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" onClick={() => handleEdit(staff)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => { setStaffToDelete(staff); setIsAlertOpen(true); }}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center h-24">Không tìm thấy nhân sự nào.</TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-
+              ))
+            ) : filteredStaff.length > 0 ? (
+              filteredStaff.map((staff) => (
+                <TableRow key={staff.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <Avatar>
+                        <AvatarImage src={staff.avatar_url ?? undefined} alt={staff.name} />
+                        <AvatarFallback>{staff.name.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium">{staff.name}</p>
+                        <p className="text-sm text-muted-foreground">{staff.email}</p>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>{staff.role}</TableCell>
+                  <TableCell>
+                    <Badge variant={staff.status === 'active' ? 'default' : 'outline'} className={cn(staff.status === 'active' && 'bg-green-100 text-green-800 border-green-200')}>
+                      {staff.status === 'active' ? 'Hoạt động' : 'Tạm nghỉ'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="ghost" size="icon" onClick={() => handleEdit(staff)}>
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => { setStaffToDelete(staff); setIsAlertOpen(true); }}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={4} className="text-center h-24">Không tìm thấy nhân sự nào.</TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -288,6 +280,40 @@ const Staff = () => {
           <AlertDialogFooter><AlertDialogCancel onClick={() => setStaffToDelete(null)} className="rounded-lg">Hủy</AlertDialogCancel><AlertDialogAction onClick={handleDelete} disabled={isSaving} className="rounded-lg bg-red-600 hover:bg-red-700">{isSaving ? 'Đang xóa...' : 'Xóa'}</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </>
+  );
+};
+
+const Staff = () => {
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === 'Admin';
+
+  return (
+    <main className="flex-1 space-y-6 p-6 sm:p-8">
+      <Card className="shadow-sm rounded-2xl bg-white">
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold">Quản lý nhân sự</CardTitle>
+          <CardDescription>Thêm, sửa, xóa và quản lý thông tin các thành viên trong nhóm của bạn.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isAdmin ? (
+            <Tabs defaultValue="list" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 max-w-sm">
+                <TabsTrigger value="list">Danh sách nhân sự</TabsTrigger>
+                <TabsTrigger value="permissions">Phân quyền</TabsTrigger>
+              </TabsList>
+              <TabsContent value="list" className="mt-6">
+                <StaffList />
+              </TabsContent>
+              <TabsContent value="permissions">
+                <PermissionsManager />
+              </TabsContent>
+            </Tabs>
+          ) : (
+            <StaffList />
+          )}
+        </CardContent>
+      </Card>
     </main>
   );
 };
