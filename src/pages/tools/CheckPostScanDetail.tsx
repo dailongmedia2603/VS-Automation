@@ -397,7 +397,6 @@ const CheckPostScanDetail = () => {
             <div className="flex items-center gap-4">
               <div>
                 <CardTitle>Kết quả</CardTitle>
-                <CardDescription>Kết quả quét sẽ được hiển thị ở đây.</CardDescription>
               </div>
               {selectedResultIds.length > 0 ? (
                 <Button variant="destructive" size="sm" onClick={() => setIsDeleteAlertOpen(true)}>
