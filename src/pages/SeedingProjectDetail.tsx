@@ -19,6 +19,7 @@ import { CommentCheckDetail } from '@/components/seeding/CommentCheckDetail';
 import { PostApprovalDetail } from '@/components/seeding/PostApprovalDetail';
 import { ImportPostsDialog } from '@/components/seeding/ImportPostsDialog';
 import { subDays } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
 
 type Project = {
   id: number;
@@ -35,6 +36,8 @@ type Post = {
   is_active: boolean;
   check_frequency: string | null;
   last_checked_at: string | null;
+  visible_count: number;
+  total_count: number;
 };
 
 const initialNewPostState = {
@@ -153,10 +156,10 @@ const SeedingProjectDetail = () => {
       setProject(projectData);
 
       const { data: postsData, error: postsError } = await supabase
-        .from('seeding_posts').select('*').eq('project_id', projectId).order('created_at', { ascending: true });
+        .rpc('get_posts_with_stats_by_project', { p_project_id: projectId });
       if (postsError) throw postsError;
       
-      const allPosts = postsData || [];
+      const allPosts = (postsData as Post[]) || [];
       setCommentCheckPosts(allPosts.filter(p => p.type === 'comment_check'));
       setPostApprovalPosts(allPosts.filter(p => p.type === 'post_approval'));
 
@@ -344,11 +347,16 @@ const SeedingProjectDetail = () => {
               </div>
             ) : (
               <>
-                <span className="flex items-center gap-2">
-                  {post.status === 'completed' && <CheckCircle className="h-4 w-4 text-green-500" />}
-                  {post.name}
+                <span className="flex items-center gap-2 truncate flex-1">
+                  {post.status === 'completed' && <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />}
+                  <span className="truncate">{post.name}</span>
                 </span>
-                <div className="flex items-center">
+                <div className="flex items-center flex-shrink-0">
+                  {post.total_count > 0 && (
+                    <Badge variant="outline" className="mr-2 font-mono text-xs">
+                      {post.visible_count}/{post.total_count}
+                    </Badge>
+                  )}
                   <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setEditingPostId(post.id); setEditingName(post.name); }}>
                       <Edit className="h-3 w-3" />
