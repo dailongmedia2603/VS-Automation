@@ -8,7 +8,6 @@ interface ProjectListItemProps {
   id: number;
   name: string;
   files: number;
-  size: string;
   modified: string;
   color: string;
   basePath: string;
@@ -17,7 +16,7 @@ interface ProjectListItemProps {
   onDelete: () => void;
 }
 
-export const ProjectListItem = ({ id, name, files, size, modified, color, basePath, onEdit, onShare, onDelete }: ProjectListItemProps) => {
+export const ProjectListItem = ({ id, name, files, modified, color, basePath, onEdit, onShare, onDelete }: ProjectListItemProps) => {
   const navigate = useNavigate();
 
   const handleNavigate = () => {
@@ -34,8 +33,7 @@ export const ProjectListItem = ({ id, name, files, size, modified, color, basePa
           <span className="text-slate-800">{name}</span>
         </div>
       </TableCell>
-      <TableCell className="text-slate-500">{files} files</TableCell>
-      <TableCell className="text-slate-500">{size}</TableCell>
+      <TableCell className="text-slate-500">{files} bài viết</TableCell>
       <TableCell className="text-slate-500">{modified}</TableCell>
       <TableCell className="text-right">
         <DropdownMenu>

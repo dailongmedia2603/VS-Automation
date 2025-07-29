@@ -25,13 +25,13 @@ type Project = {
   creator_id: string;
   creator_name: string | null;
   creator_email: string | null;
+  results_count: number;
 };
 
 type DisplayProject = {
   id: number;
   name: string;
   files: number;
-  size: string;
   modified: string;
   color: string;
 };
@@ -76,10 +76,9 @@ const CheckPostScan = () => {
     return filteredProjects.map(p => ({
       id: p.id,
       name: p.name,
-      files: 0, // Placeholder
-      size: 'N/A', // Placeholder
+      files: p.results_count,
       modified: formatDistanceToNow(new Date(p.created_at), { addSuffix: true, locale: vi }),
-      color: 'bg-green-100 text-green-600', // Default color for this tool
+      color: 'bg-green-100 text-green-600',
     }));
   }, [filteredProjects]);
 
@@ -188,9 +187,8 @@ const CheckPostScan = () => {
           <TableHeader>
             <TableRow>
               <TableHead>Tên dự án</TableHead>
-              <TableHead>Số lượng file</TableHead>
-              <TableHead>Kích thước</TableHead>
-              <TableHead>Sửa đổi lần cuối</TableHead>
+              <TableHead>Số bài viết</TableHead>
+              <TableHead>Ngày tạo</TableHead>
               <TableHead><span className="sr-only">Actions</span></TableHead>
             </TableRow>
           </TableHeader>

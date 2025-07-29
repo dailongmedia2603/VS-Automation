@@ -1,13 +1,12 @@
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Folder, MoreVertical, FileText, HardDrive, Edit, Trash2, Share2 } from "lucide-react";
+import { Folder, MoreVertical, FileText, Edit, Trash2, Share2 } from "lucide-react";
 import { Link } from "react-router-dom";
 
 interface ProjectFolderProps {
   id: number;
   name: string;
   files: number;
-  size: string;
   modified: string;
   color: string;
   basePath: string;
@@ -16,7 +15,7 @@ interface ProjectFolderProps {
   onDelete: () => void;
 }
 
-export const ProjectFolder = ({ id, name, files, size, modified, color, basePath, onEdit, onShare, onDelete }: ProjectFolderProps) => {
+export const ProjectFolder = ({ id, name, files, modified, color, basePath, onEdit, onShare, onDelete }: ProjectFolderProps) => {
   return (
     <Link to={`${basePath}/${id}`} className="group block h-full">
       <Card className="group transition-all duration-300 hover:shadow-lg hover:-translate-y-1 rounded-2xl flex flex-col cursor-pointer h-full">
@@ -42,16 +41,12 @@ export const ProjectFolder = ({ id, name, files, size, modified, color, basePath
           <div className="flex items-center gap-4 text-xs text-slate-500 mt-2">
             <div className="flex items-center gap-1.5">
               <FileText className="h-3 w-3" />
-              <span>{files} files</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <HardDrive className="h-3 w-3" />
-              <span>{size}</span>
+              <span>{files} bài viết</span>
             </div>
           </div>
         </CardContent>
         <CardFooter>
-          <p className="text-xs text-slate-400">Sửa đổi lần cuối: {modified}</p>
+          <p className="text-xs text-slate-400">Tạo: {modified}</p>
         </CardFooter>
       </Card>
     </Link>
