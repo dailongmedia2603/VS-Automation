@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
@@ -86,6 +86,15 @@ const SeedingProjectDetail = () => {
   const [autoCheckActive, setAutoCheckActive] = useState(false);
   const [frequencyValue, setFrequencyValue] = useState('1');
   const [frequencyUnit, setFrequencyUnit] = useState('hour');
+
+  const allPosts = useMemo(() => [...commentCheckPosts, ...postApprovalPosts], [commentCheckPosts, postApprovalPosts]);
+  const currentPostName = useMemo(() => {
+    if (activeTask?.current_post_id) {
+      const post = allPosts.find(p => p.id === activeTask.current_post_id);
+      return post?.name;
+    }
+    return null;
+  }, [activeTask?.current_post_id, allPosts]);
 
   const runInitialCheck = async (post: Post) => {
     if (!post.is_active) return;
@@ -486,7 +495,7 @@ const SeedingProjectDetail = () => {
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">{project.name}</h1>
         </div>
         <div className="flex items-center gap-2">
-          {activeTask && activeTask.status === 'failed' && (
+          {activeTask && activeTask.status === 'failed' ? (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="destructive">
@@ -506,13 +515,14 @@ const SeedingProjectDetail = () => {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-          )}
-          {activeTask && (activeTask.status === 'running' || activeTask.status === 'pending') ? (
+          ) : activeTask && (activeTask.status === 'running' || activeTask.status === 'pending') ? (
             <div className="flex items-center gap-2 w-64">
               <div className="flex-1">
                 <Progress value={(activeTask.progress_current / activeTask.progress_total) * 100} className="h-2" />
-                <p className="text-xs text-center mt-1 text-slate-500">
-                  Đang quét... ({activeTask.progress_current}/{activeTask.progress_total})
+                <p className="text-xs text-center mt-1 text-slate-500 truncate" title={currentPostName ? `Đang check: ${currentPostName}` : `Đang quét...`}>
+                  {currentPostName 
+                    ? `Đang check: ${currentPostName}` 
+                    : `Đang quét...`} ({activeTask.progress_current}/{activeTask.progress_total})
                 </p>
               </div>
               <Button variant="destructive" size="icon" onClick={handleCancelTask}>
