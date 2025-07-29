@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Save, PlayCircle, Loader2, Calendar as CalendarIcon } from 'lucide-react';
+import { ArrowLeft, Save, PlayCircle, Loader2, Calendar as CalendarIcon, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -19,6 +19,7 @@ import { vi } from 'date-fns/locale';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 type Project = {
   id: number;
@@ -39,13 +40,21 @@ type ScanResult = {
   group_id: string;
 };
 
+type ScanLog = {
+  project_id: number;
+  request_urls: string[];
+  created_at: string;
+};
+
 const CheckPostScanDetail = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const [project, setProject] = useState<Project | null>(null);
   const [results, setResults] = useState<ScanResult[]>([]);
+  const [log, setLog] = useState<ScanLog | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+  const [isLogOpen, setIsLogOpen] = useState(false);
 
   // Form state
   const [keywords, setKeywords] = useState('');
@@ -77,6 +86,10 @@ const CheckPostScanDetail = () => {
         const { data: resultsData, error: resultsError } = await supabase.from('post_scan_results').select('*').eq('project_id', projectId).order('scanned_at', { ascending: false });
         if (resultsError) throw resultsError;
         setResults(resultsData || []);
+
+        const { data: logData, error: logError } = await supabase.from('log_post_scan').select('*').eq('project_id', projectId).single();
+        if (logError && logError.code !== 'PGRST116') throw logError;
+        setLog(logData);
 
       } catch (error: any) {
         showError("Không thể tải dữ liệu dự án: " + error.message);
@@ -138,6 +151,10 @@ const CheckPostScanDetail = () => {
       
       setResults(data);
       showSuccess(`Quét hoàn tất! Tìm thấy ${data.length} bài viết phù hợp.`);
+      
+      const { data: newLogData } = await supabase.from('log_post_scan').select('*').eq('project_id', projectId).single();
+      setLog(newLogData);
+
     } catch (error: any) {
       showError(`Quét thất bại: ${error.message}`);
     } finally {
@@ -295,6 +312,10 @@ const CheckPostScanDetail = () => {
                   <Calendar initialFocus mode="range" defaultMonth={scanDateRange?.from} selected={scanDateRange} onSelect={setScanDateRange} numberOfMonths={2} />
                 </PopoverContent>
               </Popover>
+              <Button variant="outline" className="bg-white" onClick={() => setIsLogOpen(true)} disabled={!log}>
+                <FileText className="mr-2 h-4 w-4" />
+                Log
+              </Button>
               <Button onClick={handleRunScan} disabled={isScanning} className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
                 {isScanning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
                 Chạy quét
@@ -329,6 +350,34 @@ const CheckPostScanDetail = () => {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={isLogOpen} onOpenChange={setIsLogOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Nhật ký quét API</DialogTitle>
+            <DialogDescription>
+              Đây là danh sách các URL đã được sử dụng trong lần quét gần nhất.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 max-h-[60vh] overflow-y-auto pr-4">
+            {log && log.request_urls && log.request_urls.length > 0 ? (
+              <div className="space-y-2">
+                <p className="text-sm text-slate-500">Quét lúc: {format(new Date(log.created_at), 'dd/MM/yyyy HH:mm:ss', { locale: vi })}</p>
+                <div className="p-3 bg-slate-100 rounded-md text-slate-900 font-mono text-xs space-y-2">
+                  {log.request_urls.map((url, index) => (
+                    <div key={index} className="break-all">{url}</div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="text-slate-500">Chưa có log nào được ghi lại.</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setIsLogOpen(false)}>Đóng</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 };

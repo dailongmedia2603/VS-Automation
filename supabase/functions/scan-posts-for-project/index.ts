@@ -46,11 +46,14 @@ serve(async (req) => {
     if (!postApprovalTemplate) throw new Error("Chưa cấu hình URL cho Check Duyệt Post.");
 
     const allMatchedPosts = [];
+    const allRequestUrls = [];
+
     for (const groupId of groupIds) {
       let feedUrl = postApprovalTemplate.replace(/{group-id}/g, groupId).replace('{time_check}', timeCheckString || '');
       if (!feedUrl.includes('access_token=') && accessToken) {
         feedUrl += (feedUrl.includes('?') ? '&' : '?') + `access_token=${accessToken}`;
       }
+      allRequestUrls.push(feedUrl);
 
       const response = await fetch(feedUrl);
       const responseText = await response.text();
@@ -85,6 +88,18 @@ serve(async (req) => {
           });
         }
       }
+    }
+
+    const { error: logError } = await supabaseAdmin
+      .from('log_post_scan')
+      .upsert({
+        project_id: projectId,
+        request_urls: allRequestUrls,
+        created_at: new Date().toISOString()
+      });
+
+    if (logError) {
+      console.error(`Failed to save scan log for project ${projectId}:`, logError.message);
     }
 
     await supabaseAdmin.from('post_scan_results').delete().eq('project_id', projectId);
