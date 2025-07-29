@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Save, PlayCircle, Loader2, Calendar as CalendarIcon, FileText, Trash2 } from 'lucide-react';
+import { ArrowLeft, Save, PlayCircle, Loader2, Calendar as CalendarIcon, FileText, Download } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -20,8 +20,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Checkbox } from '@/components/ui/checkbox';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import * as XLSX from 'xlsx';
 
 type Project = {
   id: number;
@@ -57,9 +56,7 @@ const CheckPostScanDetail = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [isLogOpen, setIsLogOpen] = useState(false);
-  const [selectedResultIds, setSelectedResultIds] = useState<number[]>([]);
-  const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Form state
   const [keywords, setKeywords] = useState('');
@@ -187,27 +184,24 @@ const CheckPostScanDetail = () => {
     }
   };
 
-  const handleDeleteSelected = async () => {
-    setIsDeleting(true);
-    const toastId = showLoading(`Đang xóa ${selectedResultIds.length} kết quả...`);
-    try {
-        const { error } = await supabase
-            .from('post_scan_results')
-            .delete()
-            .in('id', selectedResultIds);
-        
-        if (error) throw error;
-
-        showSuccess("Đã xóa thành công!");
-        setResults(prev => prev.filter(r => !selectedResultIds.includes(r.id)));
-        setSelectedResultIds([]);
-    } catch (error: any) {
-        showError("Xóa thất bại: " + error.message);
-    } finally {
-        dismissToast(toastId);
-        setIsDeleteAlertOpen(false);
-        setIsDeleting(false);
+  const handleExportExcel = () => {
+    if (filteredResults.length === 0) {
+      showError("Không có dữ liệu để xuất.");
+      return;
     }
+    setIsExporting(true);
+    const dataToExport = filteredResults.map(result => ({
+      'ID Group': result.group_id,
+      'Từ khóa': result.found_keywords.join(', '),
+      'Nội dung bài viết': result.post_content,
+      'Link': result.post_link,
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Scan Results");
+    XLSX.writeFile(workbook, `export_${project?.name || 'scan'}.xlsx`);
+    setIsExporting(false);
   };
 
   if (isLoading) {
@@ -323,31 +317,28 @@ const CheckPostScanDetail = () => {
                 <CardTitle>Kết quả</CardTitle>
                 <CardDescription>Kết quả quét sẽ được hiển thị ở đây.</CardDescription>
               </div>
-              {selectedResultIds.length > 0 ? (
-                <Button variant="destructive" size="sm" onClick={() => setIsDeleteAlertOpen(true)}>
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Xóa ({selectedResultIds.length})
-                </Button>
-              ) : (
-                <Popover open={filterDatePickerOpen} onOpenChange={setFilterDatePickerOpen}>
-                  <PopoverTrigger asChild>
-                    <Button variant={"outline"} className={cn("w-[240px] justify-start text-left font-normal bg-white", !filterDateRange && "text-muted-foreground")}>
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {filterDateRange?.from ? (filterDateRange.to ? <>{format(filterDateRange.from, "dd/MM/y")} - {format(filterDateRange.to, "dd/MM/y")}</> : format(filterDateRange.from, "dd/MM/y")) : (<span>Lọc theo ngày</span>)}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <div className="p-2 flex flex-col items-start">
-                      <Button variant="ghost" className="w-full justify-start" onClick={() => { setFilterDateRange({ from: new Date(), to: new Date() }); setFilterDatePickerOpen(false); }}>Hôm nay</Button>
-                      <Button variant="ghost" className="w-full justify-start" onClick={() => { const yesterday = subDays(new Date(), 1); setFilterDateRange({ from: yesterday, to: yesterday }); setFilterDatePickerOpen(false); }}>Hôm qua</Button>
-                      <Button variant="ghost" className="w-full justify-start" onClick={() => { setFilterDateRange(undefined); setFilterDatePickerOpen(false); }}>Tất cả</Button>
-                    </div>
-                    <Calendar initialFocus mode="range" defaultMonth={filterDateRange?.from} selected={filterDateRange} onSelect={handleFilterDateSelect} numberOfMonths={1} />
-                  </PopoverContent>
-                </Popover>
-              )}
+              <Popover open={filterDatePickerOpen} onOpenChange={setFilterDatePickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant={"outline"} className={cn("w-[240px] justify-start text-left font-normal bg-white", !filterDateRange && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {filterDateRange?.from ? (filterDateRange.to ? <>{format(filterDateRange.from, "dd/MM/y")} - {format(filterDateRange.to, "dd/MM/y")}</> : format(filterDateRange.from, "dd/MM/y")) : (<span>Lọc theo ngày</span>)}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <div className="p-2 flex flex-col items-start">
+                    <Button variant="ghost" className="w-full justify-start" onClick={() => { setFilterDateRange({ from: new Date(), to: new Date() }); setFilterDatePickerOpen(false); }}>Hôm nay</Button>
+                    <Button variant="ghost" className="w-full justify-start" onClick={() => { const yesterday = subDays(new Date(), 1); setFilterDateRange({ from: yesterday, to: yesterday }); setFilterDatePickerOpen(false); }}>Hôm qua</Button>
+                    <Button variant="ghost" className="w-full justify-start" onClick={() => { setFilterDateRange(undefined); setFilterDatePickerOpen(false); }}>Tất cả</Button>
+                  </div>
+                  <Calendar initialFocus mode="range" defaultMonth={filterDateRange?.from} selected={filterDateRange} onSelect={handleFilterDateSelect} numberOfMonths={1} />
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="flex items-center gap-2">
+              <Button variant="outline" className="bg-white" onClick={handleExportExcel} disabled={isExporting}>
+                {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                Xuất Excel
+              </Button>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant={"outline"} className={cn("w-[280px] justify-start text-left font-normal bg-white", !scanDateRange && "text-muted-foreground")}>
@@ -375,18 +366,6 @@ const CheckPostScanDetail = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-12">
-                    <Checkbox
-                      checked={selectedResultIds.length === filteredResults.length && filteredResults.length > 0}
-                      onCheckedChange={(checked) => {
-                          if (checked) {
-                              setSelectedResultIds(filteredResults.map(r => r.id));
-                          } else {
-                              setSelectedResultIds([]);
-                          }
-                      }}
-                    />
-                  </TableHead>
                   <TableHead>Nội dung bài viết</TableHead>
                   <TableHead>Link</TableHead>
                   <TableHead>Từ khóa</TableHead>
@@ -397,25 +376,13 @@ const CheckPostScanDetail = () => {
               <TableBody>
                 {filteredResults.length > 0 ? filteredResults.map(result => (
                   <TableRow key={result.id}>
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedResultIds.includes(result.id)}
-                        onCheckedChange={() => {
-                            setSelectedResultIds(prev => 
-                                prev.includes(result.id)
-                                    ? prev.filter(id => id !== result.id)
-                                    : [...prev, result.id]
-                            );
-                        }}
-                      />
-                    </TableCell>
                     <TableCell className="max-w-md"><p className="line-clamp-3 whitespace-pre-wrap">{result.post_content}</p></TableCell>
                     <TableCell><a href={result.post_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Xem bài viết</a></TableCell>
                     <TableCell><div className="flex flex-wrap gap-1">{result.found_keywords.map(kw => <Badge key={kw} variant="secondary">{kw}</Badge>)}</div></TableCell>
                     <TableCell>{result.group_id}</TableCell>
                     <TableCell>{format(new Date(result.scanned_at), 'dd/MM/yyyy HH:mm', { locale: vi })}</TableCell>
                   </TableRow>
-                )) : (<TableRow><TableCell colSpan={6} className="text-center h-24 text-slate-500">Chưa có kết quả.</TableCell></TableRow>)}
+                )) : (<TableRow><TableCell colSpan={5} className="text-center h-24 text-slate-500">Chưa có kết quả.</TableCell></TableRow>)}
               </TableBody>
             </Table>
           </div>
@@ -449,24 +416,6 @@ const CheckPostScanDetail = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Bạn có chắc chắn muốn xóa?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Hành động này sẽ xóa vĩnh viễn {selectedResultIds.length} kết quả đã chọn.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Hủy</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteSelected} disabled={isDeleting} className="bg-red-600 hover:bg-red-700">
-              {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Xóa
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </main>
   );
 };
