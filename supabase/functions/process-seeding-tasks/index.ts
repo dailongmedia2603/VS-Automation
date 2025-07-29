@@ -17,26 +17,33 @@ serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
 
+  let task = null;
+
   try {
     // 1. Find a running or pending task
-    let { data: task, error: findError } = await supabaseAdmin
+    let { data: runningTask, error: runningTaskError } = await supabaseAdmin
       .from('seeding_tasks')
       .select('*')
       .eq('status', 'running')
       .limit(1)
       .single();
 
+    if (runningTaskError && runningTaskError.code !== 'PGRST116') throw runningTaskError;
+    task = runningTask;
+
     if (!task) {
-      ({ data: task, error: findError } = await supabaseAdmin
+      let { data: pendingTask, error: pendingTaskError } = await supabaseAdmin
         .from('seeding_tasks')
         .select('*')
         .eq('status', 'pending')
         .order('created_at', { ascending: true })
         .limit(1)
-        .single());
+        .single();
+      if (pendingTaskError && pendingTaskError.code !== 'PGRST116') throw pendingTaskError;
+      task = pendingTask;
     }
 
-    if (findError || !task) {
+    if (!task) {
       return new Response(JSON.stringify({ message: "No tasks to process." }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -53,7 +60,6 @@ serve(async (req) => {
       .single();
 
     if (!post) {
-      // No more posts to check, mark task as completed
       await supabaseAdmin.from('seeding_tasks').update({ status: 'completed', current_post_id: null, updated_at: new Date().toISOString() }).eq('id', task.id);
       return new Response(JSON.stringify({ message: `Task ${task.id} completed.` }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
@@ -104,9 +110,8 @@ serve(async (req) => {
     return new Response(JSON.stringify({ message: `Task ${task.id} processed post ${post.id}.` }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error) {
-    const { data: runningTask } = await supabaseAdmin.from('seeding_tasks').select('id').eq('status', 'running').limit(1).single();
-    if (runningTask) {
-      await supabaseAdmin.from('seeding_tasks').update({ status: 'failed', error_message: error.message }).eq('id', runningTask.id);
+    if (task && task.id) {
+      await supabaseAdmin.from('seeding_tasks').update({ status: 'failed', error_message: error.message }).eq('id', task.id);
     }
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
