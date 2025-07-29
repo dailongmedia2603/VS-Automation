@@ -6,7 +6,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, MessageSquare, FileCheck2, ChevronRight, ArrowLeft, Edit, Trash2, Loader2, Check, CheckCircle, UploadCloud } from 'lucide-react';
+import { PlusCircle, MessageSquare, FileCheck2, ChevronRight, ArrowLeft, Edit, Trash2, Loader2, Check, CheckCircle, UploadCloud, PlayCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -68,6 +68,7 @@ const SeedingProjectDetail = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newPostData, setNewPostData] = useState(initialNewPostState);
   const [isSaving, setIsSaving] = useState(false);
+  const [isCheckingAll, setIsCheckingAll] = useState(false);
 
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
 
@@ -307,6 +308,36 @@ const SeedingProjectDetail = () => {
     }
   };
 
+  const handleCheckAll = async () => {
+    if (!projectId) return;
+    const postsToCheck = [...commentCheckPosts, ...postApprovalPosts].filter(p => p.status !== 'completed');
+    if (postsToCheck.length === 0) {
+        showSuccess("Tất cả các bài viết đã được hoàn thành!");
+        return;
+    }
+
+    setIsCheckingAll(true);
+    const toastId = showLoading(`Đang quét ${postsToCheck.length} bài viết...`);
+
+    try {
+        const { data, error } = await supabase.functions.invoke('check-all-posts-for-project', {
+            body: { projectId }
+        });
+
+        if (error) throw error;
+        if (data.error) throw new Error(data.error);
+
+        dismissToast(toastId);
+        showSuccess(data.message || "Đã quét tất cả các bài viết thành công!");
+        fetchProjectData();
+    } catch (error: any) {
+        dismissToast(toastId);
+        showError(`Quét hàng loạt thất bại: ${error.message}`);
+    } finally {
+        setIsCheckingAll(false);
+    }
+  };
+
   const commentCount = newPostData.comments.split('\n').filter(line => line.trim() !== '').length;
 
   const PostList = ({ posts, onSelectPost }: { posts: Post[], onSelectPost: (post: Post) => void }) => {
@@ -386,6 +417,10 @@ const SeedingProjectDetail = () => {
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">{project.name}</h1>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleCheckAll} disabled={isCheckingAll}>
+            {isCheckingAll ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
+            Check tất cả
+          </Button>
           <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}>
             <UploadCloud className="mr-2 h-4 w-4" />
             Import
