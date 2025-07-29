@@ -178,25 +178,51 @@ const CheckPostScanDetail = () => {
 
   const handleRunScan = async () => {
     setIsScanning(true);
-    const toastId = showLoading("Đang quét các group...");
+    const totalSteps = isAiCheckActive ? 2 : 1;
+    let toastId;
+
     try {
+      // Step 1: Scan and filter posts
+      toastId = showLoading(`Bước 1/${totalSteps}: Đang quét bài viết...`);
       const timeCheckString = generateTimeCheckString(scanDateRange);
-      const { data, error } = await supabase.functions.invoke('scan-posts-for-project', {
+      const { data: scanData, error: scanError } = await supabase.functions.invoke('scan-and-filter-posts', {
         body: { projectId, timeCheckString }
       });
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
+      if (scanError) throw scanError;
+      if (scanData.error) throw new Error(scanData.error);
       
-      setResults(data);
-      showSuccess(`Quét hoàn tất! Tìm thấy ${data.filter((r: any) => r.scanned_at >= new Date().toISOString().slice(0,10)).length} bài viết mới.`);
+      let finalPosts = scanData.posts;
+
+      // Step 2 (Optional): AI Check
+      if (isAiCheckActive && finalPosts.length > 0) {
+        dismissToast(toastId);
+        toastId = showLoading(`Bước 2/2: AI đang check content...`);
+        const { data: aiData, error: aiError } = await supabase.functions.invoke('check-posts-with-ai', {
+          body: { projectId, posts: finalPosts }
+        });
+        if (aiError) throw aiError;
+        if (aiData.error) throw new Error(aiData.error);
+        finalPosts = aiData.posts;
+      }
+
+      // Final Step: Store results
+      const { data: storeData, error: storeError } = await supabase.functions.invoke('store-scan-results', {
+        body: { projectId, posts: finalPosts }
+      });
+      if (storeError) throw storeError;
+      if (storeData.error) throw new Error(storeData.error);
+
+      setResults(storeData);
+      dismissToast(toastId);
+      showSuccess(`Quét hoàn tất! Tìm thấy ${finalPosts.length} bài viết mới.`);
       
       const { data: newLogData } = await supabase.from('log_post_scan').select('*').eq('project_id', projectId).single();
       setLog(newLogData);
 
     } catch (error: any) {
+      if (toastId) dismissToast(toastId);
       showError(`Quét thất bại: ${error.message}`);
     } finally {
-      dismissToast(toastId);
       setIsScanning(false);
     }
   };

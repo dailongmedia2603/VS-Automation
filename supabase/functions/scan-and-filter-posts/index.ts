@@ -28,13 +28,10 @@ serve(async (req) => {
 
     const { data: project, error: projectError } = await supabaseAdmin
       .from('post_scan_projects')
-      .select('keywords, group_ids, is_ai_check_active, post_scan_ai_prompt')
+      .select('keywords, group_ids')
       .eq('id', projectId)
       .single();
     if (projectError) throw projectError;
-
-    const { data: aiSettings, error: settingsError } = await supabaseAdmin.from('ai_settings').select('google_gemini_api_key, gemini_scan_model').eq('id', 1).single();
-    if (settingsError) throw new Error("Chưa cấu hình AI.");
 
     const keywords = (project.keywords || '').split('\n').map(k => normalizeString(k.trim())).filter(Boolean);
     const groupIds = (project.group_ids || '').split('\n').map(id => id.trim()).filter(Boolean);
@@ -69,47 +66,21 @@ serve(async (req) => {
         const normalizedContent = normalizeString(post.message);
         const foundKeywords = keywords.filter(kw => normalizedContent.includes(kw));
         if (foundKeywords.length > 0) {
-          let aiResult = null;
-          let aiDetails = null;
-          if (project.is_ai_check_active && aiSettings.google_gemini_api_key && project.post_scan_ai_prompt) {
-            const geminiPrompt = `${project.post_scan_ai_prompt}\n\nNội dung bài viết:\n${post.message}`;
-            const modelToUse = aiSettings.gemini_scan_model || 'gemini-pro';
-            let geminiData = null;
-            const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${aiSettings.google_gemini_api_key}`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ contents: [{ parts: [{ text: geminiPrompt }] }] }),
-            });
-            if (geminiRes.ok) {
-              geminiData = await geminiRes.json();
-              aiResult = geminiData.candidates?.[0]?.content?.parts?.[0]?.text.trim() || 'Không';
-            }
-            aiDetails = { prompt: geminiPrompt, response: geminiData };
-          }
-
           allMatchedPosts.push({
-            project_id: projectId,
             post_content: post.message,
             post_link: post.permalink_url,
             post_author_name: post.from?.name,
             post_author_id: post.from?.id,
             group_id: groupId,
             found_keywords: foundKeywords,
-            ai_check_result: aiResult,
-            ai_check_details: aiDetails,
           });
         }
       }
     }
 
     await supabaseAdmin.from('log_post_scan').upsert({ project_id: projectId, request_urls: allRequestUrls, created_at: new Date().toISOString() });
-    if (allMatchedPosts.length > 0) {
-      await supabaseAdmin.from('post_scan_results').insert(allMatchedPosts);
-    }
-    await supabaseAdmin.from('post_scan_projects').update({ last_scanned_at: new Date().toISOString() }).eq('id', projectId);
 
-    const { data: allProjectResults } = await supabaseAdmin.from('post_scan_results').select('*').eq('project_id', projectId).order('scanned_at', { ascending: false });
-    return new Response(JSON.stringify(allProjectResults || []), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ posts: allMatchedPosts }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error) {
     return new Response(JSON.stringify({ error: error.message }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 });
