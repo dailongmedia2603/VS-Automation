@@ -21,7 +21,12 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { data: { user } } = await supabaseAdmin.auth.getUser();
+    // Get user from Authorization header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) throw new Error("Missing Authorization header");
+    const jwt = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(jwt);
+    if (userError) throw userError;
     if (!user) throw new Error("User not authenticated.");
 
     const { count, error: countError } = await supabaseAdmin
