@@ -1,20 +1,22 @@
 import { useState, useEffect, useMemo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Folder, PlusCircle, Search, List, LayoutGrid, ChevronDown, Loader2 } from 'lucide-react';
+import { StatWidget } from '@/components/content-ai/StatWidget';
+import { ProjectFolder } from '@/components/content-ai/ProjectFolder';
+import { ProjectListItem } from '@/components/content-ai/ProjectListItem';
+import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, Search, Trash2, MoreHorizontal, Edit, Loader2 } from 'lucide-react';
-import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
-import { format } from 'date-fns';
-import { useAuth } from '@/contexts/AuthContext';
 import { Label } from '@/components/ui/label';
-import { Link } from 'react-router-dom';
+import { showSuccess, showError } from '@/utils/toast';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { Skeleton } from '@/components/ui/skeleton';
+import { formatDistanceToNow } from 'date-fns';
+import { vi } from 'date-fns/locale';
 
 type Project = {
   id: number;
@@ -25,31 +27,39 @@ type Project = {
   creator_email: string | null;
 };
 
+type DisplayProject = {
+  id: number;
+  name: string;
+  files: number;
+  size: string;
+  modified: string;
+  color: string;
+};
+
 const CheckPostScan = () => {
-  const { user } = useAuth();
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  
-  const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
+  const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [projectName, setProjectName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
-  const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const { user } = useAuth();
 
   const fetchProjects = async () => {
     setIsLoading(true);
-    const { data, error } = await supabase.rpc('get_post_scan_projects_with_creator');
-    if (error) {
+    try {
+      const { data, error } = await supabase.rpc('get_post_scan_projects_with_creator');
+      if (error) throw error;
+      setProjects(data || []);
+    } catch (error: any) {
       showError("Không thể tải dự án: " + error.message);
-      setProjects([]);
-    } else {
-      setProjects(data as Project[] || []);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   useEffect(() => {
@@ -62,182 +72,213 @@ const CheckPostScan = () => {
     );
   }, [projects, searchTerm]);
 
-  const handleSelectAll = (checked: boolean) => {
-    setSelectedIds(checked ? filteredProjects.map(p => p.id) : []);
-  };
+  const displayProjects: DisplayProject[] = useMemo(() => {
+    return filteredProjects.map(p => ({
+      id: p.id,
+      name: p.name,
+      files: 0, // Placeholder
+      size: 'N/A', // Placeholder
+      modified: formatDistanceToNow(new Date(p.created_at), { addSuffix: true, locale: vi }),
+      color: 'bg-green-100 text-green-600', // Default color for this tool
+    }));
+  }, [filteredProjects]);
 
-  const handleSelectRow = (id: number, checked: boolean) => {
-    setSelectedIds(prev => checked ? [...prev, id] : prev.filter(i => i !== id));
-  };
+  const stats = useMemo(() => {
+    return [
+      { title: 'Tổng số dự án', value: String(projects.length), icon: Folder, color: 'bg-blue-500' },
+    ];
+  }, [projects]);
 
-  const handleBulkDelete = async () => {
-    const toastId = showLoading('Đang xóa...');
-    const { error } = await supabase.from('post_scan_projects').delete().in('id', selectedIds);
-    dismissToast(toastId);
-
-    if (error) {
-      showError(`Xóa thất bại: ${error.message}`);
-    } else {
-      showSuccess('Đã xóa thành công!');
-    }
-    
-    setSelectedIds([]);
-    fetchProjects();
-  };
-
-  const handleOpenAddDialog = () => {
-    setEditingProject(null);
-    setProjectName('');
-    setIsAddEditDialogOpen(true);
-  };
-
-  const handleOpenEditDialog = (project: Project) => {
+  const handleOpenDialog = (project: Project | null = null) => {
     setEditingProject(project);
-    setProjectName(project.name);
-    setIsAddEditDialogOpen(true);
+    setProjectName(project ? project.name : '');
+    setIsProjectDialogOpen(true);
   };
 
   const handleSaveProject = async () => {
-    if (!projectName.trim()) {
+    if (!projectName.trim() || !user) {
       showError("Tên dự án không được để trống.");
       return;
     }
     setIsSaving(true);
-    let error;
-    if (editingProject) {
-      ({ error } = await supabase.from('post_scan_projects').update({ name: projectName }).eq('id', editingProject.id));
-    } else {
-      ({ error } = await supabase.from('post_scan_projects').insert({ name: projectName, creator_id: user?.id }));
-    }
-
-    if (error) {
-      showError("Lưu dự án thất bại: " + error.message);
-    } else {
-      showSuccess(`Đã ${editingProject ? 'cập nhật' : 'thêm'} dự án thành công!`);
-      setIsAddEditDialogOpen(false);
+    try {
+      if (editingProject) {
+        const { error } = await supabase
+          .from('post_scan_projects')
+          .update({ name: projectName.trim() })
+          .eq('id', editingProject.id);
+        if (error) throw error;
+        showSuccess("Đã cập nhật dự án thành công!");
+      } else {
+        const { error } = await supabase
+          .from('post_scan_projects')
+          .insert({ name: projectName.trim(), creator_id: user.id });
+        if (error) throw error;
+        showSuccess("Đã tạo dự án thành công!");
+      }
+      setIsProjectDialogOpen(false);
       fetchProjects();
+    } catch (error: any) {
+      showError(`Lưu dự án thất bại: ${error.message}`);
+    } finally {
+      setIsSaving(false);
     }
-    setIsSaving(false);
   };
 
-  const handleDeleteProject = (project: Project) => {
+  const handleOpenDeleteDialog = (project: Project) => {
     setProjectToDelete(project);
-    setIsDeleteAlertOpen(true);
+    setIsDeleteDialogOpen(true);
   };
 
-  const confirmDelete = async () => {
+  const handleDeleteProject = async () => {
     if (!projectToDelete) return;
-    const toastId = showLoading("Đang xóa...");
     const { error } = await supabase.from('post_scan_projects').delete().eq('id', projectToDelete.id);
-    dismissToast(toastId);
     if (error) {
       showError("Xóa thất bại: " + error.message);
     } else {
-      showSuccess("Đã xóa dự án thành công!");
+      showSuccess("Đã xóa dự án!");
       fetchProjects();
     }
-    setIsDeleteAlertOpen(false);
-    setProjectToDelete(null);
+    setIsDeleteDialogOpen(false);
+  };
+
+  const renderProjectView = () => {
+    if (isLoading) {
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-48 w-full rounded-2xl" />)}
+        </div>
+      );
+    }
+
+    if (displayProjects.length === 0) {
+        return (
+            <div className="text-center py-16 text-muted-foreground col-span-full">
+                <Folder className="mx-auto h-12 w-12" />
+                <h3 className="mt-4 text-lg font-semibold">Chưa có dự án nào</h3>
+                <p className="mt-1 text-sm">Hãy bắt đầu bằng cách tạo dự án mới.</p>
+            </div>
+        )
+    }
+
+    const projectActions = (project: Project) => ({
+      onEdit: () => handleOpenDialog(project),
+      onShare: () => { /* Not implemented for this tool */ },
+      onDelete: () => handleOpenDeleteDialog(project),
+    });
+
+    if (viewMode === 'grid') {
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {displayProjects.map((project, index) => (
+            <ProjectFolder 
+              key={project.id} 
+              {...project}
+              {...projectActions(filteredProjects[index])}
+            />
+          ))}
+        </div>
+      );
+    }
+
+    return (
+      <div className="border rounded-2xl bg-white overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Tên dự án</TableHead>
+              <TableHead>Số lượng file</TableHead>
+              <TableHead>Kích thước</TableHead>
+              <TableHead>Sửa đổi lần cuối</TableHead>
+              <TableHead><span className="sr-only">Actions</span></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {displayProjects.map((project, index) => (
+              <ProjectListItem 
+                key={project.id} 
+                {...project}
+                {...projectActions(filteredProjects[index])}
+              />
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    );
   };
 
   return (
-    <main className="flex-1 space-y-8 p-6 sm:p-8 bg-slate-50">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">Check Post Scan</h1>
-        <p className="text-muted-foreground mt-2 max-w-2xl">
-          Quản lý các dự án quét bài viết mới trên group hàng ngày.
-        </p>
-      </div>
+    <>
+      <main className="flex-1 space-y-8 p-6 sm:p-8 bg-slate-50">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900">Check Post Scan</h1>
+            <p className="text-muted-foreground mt-2 max-w-2xl">
+              Quản lý các dự án quét bài viết mới trên group hàng ngày.
+            </p>
+          </div>
+          <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => handleOpenDialog()}>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Tạo dự án mới
+          </Button>
+        </div>
 
-      <Card className="shadow-sm rounded-2xl bg-white">
-        <CardHeader>
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="relative flex-grow max-w-xs">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Tìm kiếm dự án..." className="pl-9" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-            </div>
-            <div className="flex items-center gap-2">
-              {selectedIds.length > 0 && (
-                <Button variant="destructive" onClick={handleBulkDelete}>
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Xóa ({selectedIds.length})
-                </Button>
-              )}
-              <Button onClick={handleOpenAddDialog} className="bg-blue-600 hover:bg-blue-700">
-                <PlusCircle className="mr-2 h-4 w-4" />Thêm dự án
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {stats.map(stat => (
+            <StatWidget key={stat.title} title={stat.title} value={stat.value} icon={stat.icon} color={stat.color} />
+          ))}
+        </div>
+
+        <div className="flex items-center justify-between gap-4">
+          <div className="relative flex-grow max-w-xs">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Tìm kiếm dự án..." className="pl-9 bg-white rounded-lg" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+          </div>
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="bg-white rounded-lg">Sắp xếp theo <ChevronDown className="ml-2 h-4 w-4" /></Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem>Tên</DropdownMenuItem>
+                <DropdownMenuItem>Ngày tạo</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <div className="flex items-center gap-1 p-1 bg-slate-200/75 rounded-lg">
+              <Button size="icon" variant={viewMode === 'grid' ? 'default' : 'ghost'} onClick={() => setViewMode('grid')} className={viewMode === 'grid' ? 'bg-white text-blue-600 shadow-sm rounded-md' : 'text-slate-600'}>
+                <LayoutGrid className="h-4 w-4" />
+              </Button>
+              <Button size="icon" variant={viewMode === 'list' ? 'default' : 'ghost'} onClick={() => setViewMode('list')} className={viewMode === 'list' ? 'bg-white text-blue-600 shadow-sm rounded-md' : 'text-slate-600'}>
+                <List className="h-4 w-4" />
               </Button>
             </div>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="border rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12"><Checkbox checked={selectedIds.length > 0 && selectedIds.length === filteredProjects.length && filteredProjects.length > 0} onCheckedChange={handleSelectAll} /></TableHead>
-                  <TableHead>Dự án</TableHead>
-                  <TableHead>Ngày tạo</TableHead>
-                  <TableHead>Người tạo</TableHead>
-                  <TableHead className="text-right">Thao tác</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  [...Array(5)].map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell><Skeleton className="h-5 w-5" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-48" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                      <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
-                    </TableRow>
-                  ))
-                ) : filteredProjects.length > 0 ? (
-                  filteredProjects.map((project) => (
-                    <TableRow key={project.id}>
-                      <TableCell><Checkbox checked={selectedIds.includes(project.id)} onCheckedChange={(checked) => handleSelectRow(project.id, !!checked)} /></TableCell>
-                      <TableCell className="font-medium">
-                        <Link to={`/tools/check-post-scan/${project.id}`} className="hover:underline text-slate-800">
-                          {project.name}
-                        </Link>
-                      </TableCell>
-                      <TableCell>{format(new Date(project.created_at), 'dd/MM/yyyy')}</TableCell>
-                      <TableCell>{project.creator_name || project.creator_email || 'Không rõ'}</TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleOpenEditDialog(project)}><Edit className="mr-2 h-4 w-4" />Sửa</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDeleteProject(project)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow><TableCell colSpan={5} className="text-center h-24">Không có dự án nào.</TableCell></TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      <Dialog open={isAddEditDialogOpen} onOpenChange={setIsAddEditDialogOpen}>
+        {renderProjectView()}
+      </main>
+
+      <Dialog open={isProjectDialogOpen} onOpenChange={setIsProjectDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold">{editingProject ? 'Sửa dự án' : 'Thêm dự án mới'}</DialogTitle>
-            <DialogDescription>{editingProject ? 'Chỉnh sửa tên cho dự án của bạn.' : 'Nhập tên cho dự án mới.'}</DialogDescription>
+            <DialogTitle>{editingProject ? 'Sửa dự án' : 'Tạo dự án mới'}</DialogTitle>
+            <DialogDescription>
+              {editingProject ? 'Thay đổi tên cho dự án của bạn.' : 'Nhập tên cho dự án mới của bạn.'}
+            </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <Label htmlFor="project-name" className="sr-only">Tên dự án</Label>
-            <Input id="project-name" placeholder="VD: Dự án quét group ABC" value={projectName} onChange={(e) => setProjectName(e.target.value)} className="h-11 bg-slate-100/70 border-slate-200" />
+          <div className="py-4 space-y-2">
+            <Label htmlFor="project-name">Tên dự án</Label>
+            <Input
+              id="project-name"
+              value={projectName}
+              onChange={(e) => setProjectName(e.target.value)}
+              placeholder="VD: Dự án quét group ABC"
+              onKeyDown={(e) => e.key === 'Enter' && handleSaveProject()}
+            />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddEditDialogOpen(false)} className="rounded-lg">Hủy</Button>
-            <Button onClick={handleSaveProject} disabled={isSaving} className="rounded-lg bg-blue-600 hover:bg-blue-700">
+            <Button variant="outline" onClick={() => setIsProjectDialogOpen(false)}>Hủy</Button>
+            <Button onClick={handleSaveProject} disabled={isSaving}>
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Lưu
             </Button>
@@ -245,19 +286,21 @@ const CheckPostScan = () => {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Bạn có chắc chắn muốn xóa?</AlertDialogTitle>
-            <AlertDialogDescription>Hành động này không thể hoàn tác. Dự án "{projectToDelete?.name}" sẽ bị xóa vĩnh viễn.</AlertDialogDescription>
+            <AlertDialogDescription>
+              Hành động này không thể hoàn tác. Dự án "{projectToDelete?.name}" sẽ bị xóa vĩnh viễn.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setProjectToDelete(null)}>Hủy</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">Xóa</AlertDialogAction>
+            <AlertDialogCancel>Hủy</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteProject} className="bg-red-600 hover:bg-red-700">Xóa</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </main>
+    </>
   );
 };
 
