@@ -336,14 +336,49 @@ const SeedingProjectDetail = () => {
 
   const handleCheckAll = async () => {
     if (!projectId) return;
-    const { data, error } = await supabase.functions.invoke('create-seeding-task', {
-      body: { projectId }
-    });
-    if (error) showError(`Không thể bắt đầu: ${error.message}`);
-    else if (data.message) showSuccess(data.message);
-    else {
-      setActiveTask(data);
-      showSuccess("Đã bắt đầu tác vụ quét hàng loạt!");
+    const toastId = showLoading("Đang tạo tác vụ quét...");
+    try {
+      // Step 1: Create the seeding task
+      const { data: taskData, error: createTaskError } = await supabase.functions.invoke('create-seeding-task', {
+        body: { projectId }
+      });
+
+      if (createTaskError) {
+        let errorMessage = createTaskError.message;
+        try {
+            // Supabase Edge Functions often nest the real error message
+            const contextError = await createTaskError.context.json();
+            if (contextError.error) errorMessage = contextError.error;
+        } catch (e) { /* ignore parsing error */ }
+        throw new Error(errorMessage);
+      }
+      
+      // Case where the function returns a message (e.g., no posts to check)
+      if (taskData.message) {
+        dismissToast(toastId);
+        showSuccess(taskData.message);
+        return;
+      }
+
+      // A task was successfully created
+      setActiveTask(taskData);
+      dismissToast(toastId);
+      showSuccess("Đã tạo tác vụ! Bắt đầu xử lý bài viết đầu tiên...");
+
+      // Step 2: Immediately trigger the first run of the processor function.
+      // This is a "fire and forget" call to kickstart the process instantly.
+      // The cron job will handle subsequent runs.
+      supabase.functions.invoke('process-seeding-tasks').then(({ error: processError }) => {
+        if (processError) {
+          // This is not a critical failure for the user, as the cron job will pick it up.
+          // We can just log it for debugging purposes.
+          console.warn("Initial task processing trigger failed, but the cron job will take over.", processError);
+        }
+      });
+
+    } catch (error: any) {
+      if (toastId) dismissToast(toastId);
+      showError(`Không thể bắt đầu: ${error.message}`);
     }
   };
 
