@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Save, PlayCircle, Loader2, Calendar as CalendarIcon, FileText, Download, Trash2, Settings, Info, Bot } from 'lucide-react';
+import { ArrowLeft, Save, PlayCircle, Loader2, Calendar as CalendarIcon, FileText, Download, Trash2, Settings } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -215,7 +215,7 @@ const CheckPostScanDetail = () => {
 
       setResults(storeData);
       dismissToast(toastId);
-      showSuccess(`Quét hoàn tất! Tìm thấy ${finalPosts.filter(p => p.ai_check_result !== 'Có').length} bài viết mới.`);
+      showSuccess(`Quét hoàn tất! Tìm thấy ${finalPosts.filter((p: any) => p.ai_check_result !== 'Có').length} bài viết mới.`);
       
       const { data: newLogsData, error: newLogsError } = await supabase.from('log_post_scan').select('*').eq('project_id', projectId).order('created_at', { ascending: false });
       if (newLogsError) throw newLogsError;
@@ -269,7 +269,7 @@ const CheckPostScanDetail = () => {
         if (error) throw error;
 
         showSuccess("Đã xóa thành công!");
-        setResults(prev => prev.filter(r => !selectedResultIds.includes(r.id)));
+        setResults(prev => prev.filter((r: ScanResult) => !selectedResultIds.includes(r.id)));
         setSelectedResultIds([]);
     } catch (error: any) {
         showError("Xóa thất bại: " + error.message);

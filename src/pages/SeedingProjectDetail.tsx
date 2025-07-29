@@ -393,11 +393,12 @@ const SeedingProjectDetail = () => {
 
   const handleCancelTask = async () => {
     if (!activeTask) return;
-    const { error } = await supabase.functions.invoke('cancel-seeding-task', {
+    const { error: cancelError } = await supabase.functions.invoke('cancel-seeding-task', {
       body: { taskId: activeTask.id }
     });
-    if (error) showError(`Không thể dừng: ${error.message}`);
-    else {
+    if (cancelError) {
+      showError(`Không thể dừng: ${cancelError.message}`);
+    } else {
       showSuccess("Đã gửi yêu cầu dừng tác vụ.");
       setActiveTask(prev => prev ? { ...prev, status: 'cancelled' } : null);
     }
@@ -660,7 +661,7 @@ const SeedingProjectDetail = () => {
                     <Label htmlFor="post-comments">Danh sách comment</Label>
                     <span className="text-xs font-medium text-slate-500">Số lượng: {commentCount}</span>
                   </div>
-                  <Textarea id="post-comments" value={newPostData.comments} onChange={(e) => setNewPostData(d => ({...d, comments: e.target.value}))} className="min-h-[120px]" />
+                  <Textarea id="post-comments" value={newPostData.comments} onChange={(e) => setNewPostData(d => ({...d, comments: e.target.value}))} className="min-h-[120px]" placeholder="Comment 1..." />
                 </div>
               </div>
             )}
@@ -693,12 +694,7 @@ const SeedingProjectDetail = () => {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Bạn có chắc chắn muốn xóa?</AlertDialogTitle><AlertDialogDescription>Hành động này không thể hoàn tác. Post "{postToDelete?.name}" sẽ bị xóa vĩnh viễn.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel onClick={() => setPostToDelete(null)}>Hủy</AlertDialogCancel><AlertDialogAction onClick={handleConfirmDelete} className="bg-red-600 hover:bg-red-700">Xóa</AlertDialogAction></AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Bạn có chắc chắn?</AlertDialogTitle><AlertDialogDescription>Hành động này không thể hoàn tác. Post "{postToDelete?.name}" sẽ bị xóa vĩnh viễn.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setPostToDelete(null)}>Hủy</AlertDialogCancel><AlertDialogAction onClick={handleConfirmDelete} className="bg-red-600 hover:bg-red-700">Xóa</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     </main>
   );
 };

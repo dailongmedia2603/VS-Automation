@@ -75,7 +75,7 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
   const { user } = useAuth();
   const [profile, setProfile] = useState<StaffProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
-  const { unreadCount } = useNotification();
+  useNotification();
 
   useEffect(() => {
     const fetchProfile = async () => {
