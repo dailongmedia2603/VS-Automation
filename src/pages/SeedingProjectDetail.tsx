@@ -18,6 +18,7 @@ import { Switch } from '@/components/ui/switch';
 import { CommentCheckDetail } from '@/components/seeding/CommentCheckDetail';
 import { PostApprovalDetail } from '@/components/seeding/PostApprovalDetail';
 import { ImportPostsDialog } from '@/components/seeding/ImportPostsDialog';
+import { subDays } from 'date-fns';
 
 type Project = {
   id: number;
@@ -71,6 +72,49 @@ const SeedingProjectDetail = () => {
   const [autoCheckActive, setAutoCheckActive] = useState(false);
   const [frequencyValue, setFrequencyValue] = useState('1');
   const [frequencyUnit, setFrequencyUnit] = useState('hour');
+
+  const runInitialCheck = async (post: Post) => {
+    if (!post.is_active) return;
+
+    const toastId = showLoading(`Bắt đầu quét tự động lần đầu cho "${post.name}"...`);
+
+    try {
+        if (post.type === 'comment_check') {
+            if (!post.links) throw new Error("Bài viết thiếu ID để kiểm tra.");
+            
+            const { data: fetchData, error: fetchError } = await supabase.functions.invoke('get-fb-comments', { body: { fbPostId: post.links } });
+            if (fetchError || (fetchData && fetchData.error)) throw new Error(fetchError?.message || fetchData?.error);
+
+            const { data: processData, error: processError } = await supabase.functions.invoke('process-and-store-comments', { body: { rawResponse: fetchData.rawResponse, internalPostId: post.id } });
+            if (processError || (processData && processData.error)) throw new Error(processError?.message || processData?.error);
+
+            const { data: compareResult, error: compareError } = await supabase.functions.invoke('compare-and-update-comments', { body: { postId: post.id } });
+            if (compareError || (compareResult && compareResult.error)) throw new Error(compareError?.message || compareResult?.error);
+            
+            dismissToast(toastId);
+            showSuccess(`Quét lần đầu hoàn tất! Tìm thấy ${compareResult.found}/${compareResult.total} bình luận.`);
+
+        } else if (post.type === 'post_approval') {
+            // For the first check, scan the last 5 days to be safe.
+            const timeCheckString = `&since=${subDays(new Date(), 5).toISOString()}&until=${new Date().toISOString()}`;
+            
+            const { data: fetchData, error: fetchError } = await supabase.functions.invoke('get-fb-duyetpost', { body: { postId: post.id, timeCheckString } });
+            if (fetchError || (fetchData && fetchData.error)) throw new Error(fetchError?.message || fetchData?.error);
+
+            const { data: processData, error: processError } = await supabase.functions.invoke('process-and-store-duyetpost', { body: { allPosts: fetchData.allPosts, internalPostId: post.id } });
+            if (processError || (processData && processData.error)) throw new Error(processError?.message || processData?.error);
+
+            const { data: compareResult, error: compareError } = await supabase.functions.invoke('compare-and-update-duyetpost', { body: { postId: post.id } });
+            if (compareError || (compareResult && compareResult.error)) throw new Error(compareError?.message || compareResult?.error);
+
+            dismissToast(toastId);
+            showSuccess(`Quét lần đầu hoàn tất! Duyệt thành công ${compareResult.approved}/${compareResult.total} group.`);
+        }
+    } catch (err: any) {
+        if (toastId) dismissToast(toastId);
+        showError(`Quét tự động lần đầu thất bại: ${err.message}`);
+    }
+  };
 
   useEffect(() => {
     if (selectedPost) {
@@ -243,11 +287,17 @@ const SeedingProjectDetail = () => {
       
       dismissToast(toastId);
       showSuccess("Đã thêm post thành công!");
+
+      if (newPostData.is_active && newPost) {
+        await runInitialCheck(newPost as Post);
+      }
+      
       setIsAddDialogOpen(false);
       setNewPostData(initialNewPostState);
-      fetchProjectData();
+      await fetchProjectData();
+
     } catch (error: any) {
-      dismissToast(toastId);
+      if (toastId) dismissToast(toastId);
       showError("Thêm post thất bại: " + error.message);
     } finally {
       setIsSaving(false);
@@ -409,9 +459,14 @@ const SeedingProjectDetail = () => {
         isOpen={isImportDialogOpen} 
         onOpenChange={setIsImportDialogOpen}
         projectId={projectId!}
-        onSuccess={() => {
+        onSuccess={(importedPosts) => {
           setIsImportDialogOpen(false);
-          fetchProjectData();
+          (async () => {
+            for (const post of importedPosts) {
+              await runInitialCheck(post);
+            }
+            await fetchProjectData();
+          })();
         }}
       />
 

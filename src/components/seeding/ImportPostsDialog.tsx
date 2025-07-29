@@ -13,7 +13,7 @@ interface ImportPostsDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   projectId: string;
-  onSuccess: () => void;
+  onSuccess: (importedPosts: any[]) => void;
 }
 
 type ParsedRow = {
@@ -129,6 +129,7 @@ export const ImportPostsDialog = ({ isOpen, onOpenChange, projectId, onSuccess }
     const totalPosts = postsToImport.length;
     let successCount = 0;
     let failedCount = 0;
+    const successfulPosts: any[] = [];
 
     for (let i = 0; i < totalPosts; i++) {
       const postData = postsToImport[i];
@@ -149,6 +150,7 @@ export const ImportPostsDialog = ({ isOpen, onOpenChange, projectId, onSuccess }
         if (postError) throw postError;
 
         if (newPost) {
+          successfulPosts.push(newPost);
           // Handle comments for 'comment_check'
           if (postData.type === 'comment_check' && postData.comments.length > 0) {
             const commentsToInsert = postData.comments.map(commentContent => ({
@@ -187,7 +189,7 @@ export const ImportPostsDialog = ({ isOpen, onOpenChange, projectId, onSuccess }
     }
     setIsImporting(false);
     if (successCount > 0) {
-      onSuccess();
+      onSuccess(successfulPosts);
     }
   };
 
