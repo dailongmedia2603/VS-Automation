@@ -24,8 +24,12 @@ export const PermissionRoute = ({ resource, action }: PermissionRouteProps) => {
     }
 
     const hasPermission = () => {
-        if (profile?.role === 'Admin') return true;
-        return profile?.permissions?.[resource]?.includes(action);
+        // TẠM THỜI MỞ TẤT CẢ QUYỀN ĐỂ DEBUG
+        return true;
+
+        // Logic phân quyền gốc:
+        // if (profile?.role === 'Admin') return true;
+        // return profile?.permissions?.[resource]?.includes(action);
     };
 
     if (!hasPermission()) {
