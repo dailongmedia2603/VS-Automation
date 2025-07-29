@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Save, PlayCircle, Loader2, Calendar as CalendarIcon, FileText, Download, Trash2 } from 'lucide-react';
+import { ArrowLeft, Save, PlayCircle, Loader2, Calendar as CalendarIcon, FileText, Download, Trash2, Settings, Info, Bot } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -24,6 +24,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import * as XLSX from 'xlsx';
 import { AiLogDialog } from '@/components/tools/AiLogDialog';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 type Project = {
   id: number;
@@ -118,7 +119,11 @@ const CheckPostScanDetail = () => {
   }, [projectId]);
 
   const filteredResults = useMemo(() => {
-    let tempResults = results.filter(result => result.ai_check_result !== 'Có');
+    let tempResults = results;
+
+    if (isAiCheckActive) {
+      tempResults = tempResults.filter(result => result.ai_check_result === 'Không');
+    }
 
     if (filterDateRange?.from) {
       const start = startOfDay(filterDateRange.from);
@@ -143,7 +148,7 @@ const CheckPostScanDetail = () => {
     }
 
     return uniqueResults;
-  }, [results, filterDateRange]);
+  }, [results, filterDateRange, isAiCheckActive]);
 
   const handleSave = async () => {
     if (!project) return;
@@ -286,10 +291,7 @@ const CheckPostScanDetail = () => {
           </div>
           <Skeleton className="h-10 w-32 rounded-lg" />
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          <Skeleton className="h-64 lg:col-span-2 rounded-2xl" />
-          <Skeleton className="h-64 rounded-2xl" />
-        </div>
+        <Skeleton className="h-48 w-full rounded-2xl mb-6" />
         <Skeleton className="h-96 w-full rounded-2xl" />
       </main>
     );
@@ -319,107 +321,50 @@ const CheckPostScanDetail = () => {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2 shadow-sm rounded-2xl bg-white">
-          <CardHeader>
-            <CardTitle>Thông tin chung</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label>Danh sách từ khóa (mỗi từ khóa 1 dòng)</Label>
-              <Textarea 
-                value={keywords} 
-                onChange={e => setKeywords(e.target.value)} 
-                className="min-h-[200px] bg-slate-50 border-slate-200 rounded-lg" 
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Danh sách ID Group (mỗi ID 1 dòng)</Label>
-              <Textarea 
-                value={groupIds} 
-                onChange={e => setGroupIds(e.target.value)} 
-                className="min-h-[200px] bg-slate-50 border-slate-200 rounded-lg" 
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-6">
-          <Card className="shadow-sm rounded-2xl bg-white">
-            <CardHeader className="flex flex-row items-start justify-between">
-              <div>
-                <CardTitle>Check content scan</CardTitle>
-                <CardDescription>Sử dụng AI để lọc nội dung bài viết.</CardDescription>
-              </div>
-              <Button variant="outline" size="sm" onClick={() => setIsAiLogOpen(true)}>
-                <FileText className="mr-2 h-4 w-4" />
-                Log
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200">
-                <Label className="font-medium text-slate-800">Kích hoạt AI Check</Label>
-                <Switch checked={isAiCheckActive} onCheckedChange={setIsAiCheckActive} />
-              </div>
-              {isAiCheckActive && (
-                <>
-                  <p className="text-xs text-muted-foreground px-1">
-                    Chỉ hiển thị khi kết quả AI phản hồi là: <strong>KHÔNG</strong>
-                  </p>
-                  <div className="space-y-2">
-                    <Label>Prompt cho AI</Label>
-                    <Textarea
-                      value={aiPrompt}
-                      onChange={e => setAiPrompt(e.target.value)}
-                      className="min-h-[120px] bg-slate-50 border-slate-200 rounded-lg"
-                      placeholder="Ví dụ: Dựa vào nội dung bài viết, hãy xác định xem bài viết này có phải là bài tuyển dụng không. Chỉ trả lời 'Có' hoặc 'Không'."
-                    />
+      <Card className="shadow-sm rounded-2xl bg-white">
+        <CardContent className="p-4">
+          <Accordion type="single" collapsible className="w-full">
+            <AccordionItem value="config">
+              <AccordionTrigger className="text-base font-semibold hover:no-underline px-2">
+                <div className="flex items-center gap-2"><Settings className="h-5 w-5" />Cấu hình & Tùy chọn</div>
+              </AccordionTrigger>
+              <AccordionContent className="pt-4 space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <Card className="lg:col-span-2 shadow-none border">
+                    <CardHeader><CardTitle>Thông tin chung</CardTitle></CardHeader>
+                    <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2"><Label>Danh sách từ khóa (mỗi từ khóa 1 dòng)</Label><Textarea value={keywords} onChange={e => setKeywords(e.target.value)} className="min-h-[150px] bg-slate-50" /></div>
+                      <div className="space-y-2"><Label>Danh sách ID Group (mỗi ID 1 dòng)</Label><Textarea value={groupIds} onChange={e => setGroupIds(e.target.value)} className="min-h-[150px] bg-slate-50" /></div>
+                    </CardContent>
+                  </Card>
+                  <div className="space-y-6">
+                    <Card className="shadow-none border">
+                      <CardHeader><CardTitle>Check content scan</CardTitle></CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex items-center justify-between"><Label>Kích hoạt AI Check</Label><Switch checked={isAiCheckActive} onCheckedChange={setIsAiCheckActive} /></div>
+                        {isAiCheckActive && (<><p className="text-xs text-muted-foreground">Chỉ hiển thị khi kết quả AI phản hồi là: <strong>KHÔNG</strong></p><div className="space-y-2"><Label>Prompt cho AI</Label><Textarea value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} className="min-h-[80px] bg-slate-50" /></div></>)}
+                      </CardContent>
+                    </Card>
+                    <Card className="shadow-none border">
+                      <CardHeader><CardTitle>Cấu hình tự động</CardTitle></CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex items-center justify-between"><Label>Kích hoạt quét tự động</Label><Switch checked={isActive} onCheckedChange={setIsActive} /></div>
+                        <div className="space-y-2"><Label>Tần suất chạy lại</Label><div className="flex items-center gap-2"><Input type="number" value={frequencyValue} onChange={e => setFrequencyValue(e.target.value)} className="w-24 bg-slate-50" /><Select value={frequencyUnit} onValueChange={setFrequencyUnit}><SelectTrigger className="bg-slate-50"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="hour">Giờ</SelectItem><SelectItem value="day">Ngày</SelectItem></SelectContent></Select></div></div>
+                      </CardContent>
+                    </Card>
                   </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-          <Card className="shadow-sm rounded-2xl bg-white">
-            <CardHeader>
-              <CardTitle>Cấu hình tự động</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200">
-                <Label className="font-medium text-slate-800">Kích hoạt quét tự động</Label>
-                <Switch checked={isActive} onCheckedChange={setIsActive} />
-              </div>
-              <div className="space-y-2">
-                <Label>Tần suất chạy lại</Label>
-                <div className="flex items-center gap-2">
-                  <Input 
-                    type="number" 
-                    value={frequencyValue} 
-                    onChange={e => setFrequencyValue(e.target.value)} 
-                    className="w-24 bg-slate-50 border-slate-200 rounded-lg" 
-                  />
-                  <Select value={frequencyUnit} onValueChange={setFrequencyUnit}>
-                    <SelectTrigger className="bg-slate-50 border-slate-200 rounded-lg">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="hour">Giờ</SelectItem>
-                      <SelectItem value="day">Ngày</SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </CardContent>
+      </Card>
 
       <Card className="shadow-sm rounded-2xl bg-white">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div>
-                <CardTitle>Kết quả</CardTitle>
-              </div>
+              <CardTitle>Kết quả</CardTitle>
               {selectedResultIds.length > 0 ? (
                 <Button variant="destructive" size="sm" onClick={() => setIsDeleteAlertOpen(true)}>
                   <Trash2 className="mr-2 h-4 w-4" />
