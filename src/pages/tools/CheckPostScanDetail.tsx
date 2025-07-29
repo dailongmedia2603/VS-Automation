@@ -119,11 +119,7 @@ const CheckPostScanDetail = () => {
   }, [projectId]);
 
   const filteredResults = useMemo(() => {
-    let tempResults = results;
-
-    if (isAiCheckActive) {
-      tempResults = tempResults.filter(result => result.ai_check_result === 'Không');
-    }
+    let tempResults = results.filter(result => result.ai_check_result !== 'Có');
 
     if (filterDateRange?.from) {
       const start = startOfDay(filterDateRange.from);
@@ -148,7 +144,7 @@ const CheckPostScanDetail = () => {
     }
 
     return uniqueResults;
-  }, [results, filterDateRange, isAiCheckActive]);
+  }, [results, filterDateRange]);
 
   const handleSave = async () => {
     if (!project) return;
@@ -339,7 +335,16 @@ const CheckPostScanDetail = () => {
                   </Card>
                   <div className="space-y-6">
                     <Card className="shadow-none border">
-                      <CardHeader><CardTitle>Check content scan</CardTitle></CardHeader>
+                      <CardHeader className="flex flex-row items-start justify-between">
+                        <div>
+                          <CardTitle>Check content scan</CardTitle>
+                          <CardDescription>Sử dụng AI để lọc nội dung bài viết.</CardDescription>
+                        </div>
+                        <Button variant="outline" size="sm" onClick={() => setIsAiLogOpen(true)}>
+                          <FileText className="mr-2 h-4 w-4" />
+                          Log
+                        </Button>
+                      </CardHeader>
                       <CardContent className="space-y-4">
                         <div className="flex items-center justify-between"><Label>Kích hoạt AI Check</Label><Switch checked={isAiCheckActive} onCheckedChange={setIsAiCheckActive} /></div>
                         {isAiCheckActive && (<><p className="text-xs text-muted-foreground">Chỉ hiển thị khi kết quả AI phản hồi là: <strong>KHÔNG</strong></p><div className="space-y-2"><Label>Prompt cho AI</Label><Textarea value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} className="min-h-[80px] bg-slate-50" /></div></>)}
