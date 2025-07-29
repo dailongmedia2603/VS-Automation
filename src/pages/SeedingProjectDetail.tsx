@@ -340,7 +340,7 @@ const SeedingProjectDetail = () => {
 
       <ResizablePanelGroup direction="horizontal" className="flex-1 rounded-2xl border bg-white shadow-sm overflow-hidden">
         <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
-          <div className="flex flex-col h-full p-4">
+          <div className="flex flex-col h-full p-4 overflow-y-auto">
             <Accordion type="multiple" defaultValue={['check-comment', 'approve-post']} className="w-full">
               <AccordionItem value="check-comment">
                 <AccordionTrigger className="text-base font-semibold hover:no-underline">
