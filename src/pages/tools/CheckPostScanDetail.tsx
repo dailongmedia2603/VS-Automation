@@ -33,6 +33,7 @@ type Project = {
   scan_frequency: string | null;
   is_active: boolean;
   is_ai_check_active: boolean;
+  post_scan_ai_prompt: string | null;
 };
 
 type ScanResult = {
@@ -70,6 +71,7 @@ const CheckPostScanDetail = () => {
   const [groupIds, setGroupIds] = useState('');
   const [isActive, setIsActive] = useState(false);
   const [isAiCheckActive, setIsAiCheckActive] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
   const [frequencyValue, setFrequencyValue] = useState('1');
   const [frequencyUnit, setFrequencyUnit] = useState('day');
   
@@ -90,6 +92,7 @@ const CheckPostScanDetail = () => {
         setGroupIds(data.group_ids || '');
         setIsActive(data.is_active);
         setIsAiCheckActive(data.is_ai_check_active);
+        setAiPrompt(data.post_scan_ai_prompt || '');
         const [value, unit] = data.scan_frequency?.split('_') || ['1', 'day'];
         setFrequencyValue(value);
         setFrequencyUnit(unit);
@@ -153,6 +156,7 @@ const CheckPostScanDetail = () => {
         group_ids: groupIds,
         is_active: isActive,
         is_ai_check_active: isAiCheckActive,
+        post_scan_ai_prompt: aiPrompt,
         scan_frequency: `${frequencyValue}_${frequencyUnit}`
       })
       .eq('id', project.id);
@@ -321,11 +325,22 @@ const CheckPostScanDetail = () => {
               <CardTitle>Check content scan</CardTitle>
               <CardDescription>Sử dụng AI để lọc nội dung bài viết.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
               <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200">
                 <Label className="font-medium text-slate-800">Kích hoạt AI Check</Label>
                 <Switch checked={isAiCheckActive} onCheckedChange={setIsAiCheckActive} />
               </div>
+              {isAiCheckActive && (
+                <div className="space-y-2">
+                  <Label>Prompt cho AI</Label>
+                  <Textarea
+                    value={aiPrompt}
+                    onChange={e => setAiPrompt(e.target.value)}
+                    className="min-h-[120px] bg-slate-50 border-slate-200 rounded-lg"
+                    placeholder="Ví dụ: Dựa vào nội dung bài viết, hãy xác định xem bài viết này có phải là bài tuyển dụng không. Chỉ trả lời 'Có' hoặc 'Không'."
+                  />
+                </div>
+              )}
             </CardContent>
           </Card>
           <Card className="shadow-sm rounded-2xl bg-white">

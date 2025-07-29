@@ -108,7 +108,6 @@ const Settings = () => {
         api_url: localSettings.apiUrl,
         api_key: localSettings.apiKey,
         embedding_model_name: localSettings.embeddingModelName,
-        post_scan_ai_prompt: localSettings.postScanAiPrompt,
         google_gemini_api_key: localSettings.googleGeminiApiKey,
       };
       const { error } = await supabase.from('ai_settings').upsert(dataToSave);
@@ -352,16 +351,6 @@ const Settings = () => {
                   value={localSettings.googleGeminiApiKey}
                   onChange={(e) => setLocalSettings({ ...localSettings, googleGeminiApiKey: e.target.value })}
                   className="bg-slate-100 border-none rounded-lg"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="post-scan-prompt">Prompt cho AI Scan Post</Label>
-                <Textarea
-                  id="post-scan-prompt"
-                  value={localSettings.postScanAiPrompt}
-                  onChange={(e) => setLocalSettings({ ...localSettings, postScanAiPrompt: e.target.value })}
-                  className="bg-slate-100 border-none rounded-lg min-h-[120px]"
-                  placeholder="Ví dụ: Dựa vào nội dung bài viết, hãy xác định xem bài viết này có phải là bài tuyển dụng không. Chỉ trả lời 'Có' hoặc 'Không'."
                 />
               </div>
               <Button onClick={handleSaveApi} disabled={isSavingApi} className="rounded-lg bg-blue-600 hover:bg-blue-700">

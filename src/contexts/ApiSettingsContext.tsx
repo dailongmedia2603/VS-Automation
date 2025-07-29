@@ -6,7 +6,6 @@ interface ApiSettings {
   apiUrl: string;
   apiKey: string;
   embeddingModelName: string;
-  postScanAiPrompt: string;
   googleGeminiApiKey: string;
 }
 
@@ -23,7 +22,6 @@ export const ApiSettingsProvider = ({ children }: { children: ReactNode }) => {
     apiUrl: '',
     apiKey: '',
     embeddingModelName: 'text-embedding-3-small',
-    postScanAiPrompt: '',
     googleGeminiApiKey: '',
   });
   const [isLoading, setIsLoading] = useState(true);
@@ -34,7 +32,7 @@ export const ApiSettingsProvider = ({ children }: { children: ReactNode }) => {
       try {
         const { data, error } = await supabase
           .from('ai_settings')
-          .select('api_url, api_key, embedding_model_name, post_scan_ai_prompt, google_gemini_api_key')
+          .select('api_url, api_key, embedding_model_name, google_gemini_api_key')
           .eq('id', 1)
           .single();
 
@@ -47,7 +45,6 @@ export const ApiSettingsProvider = ({ children }: { children: ReactNode }) => {
             apiUrl: data.api_url || '',
             apiKey: data.api_key || '',
             embeddingModelName: data.embedding_model_name || 'text-embedding-3-small',
-            postScanAiPrompt: data.post_scan_ai_prompt || '',
             googleGeminiApiKey: data.google_gemini_api_key || '',
           };
           setSettings(formattedSettings);
