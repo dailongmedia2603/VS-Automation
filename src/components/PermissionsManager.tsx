@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
-import { showSuccess, showError } from '@/utils/toast';
+import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { Button } from './ui/button';
 import { Save } from 'lucide-react';
 
@@ -94,19 +94,32 @@ export const PermissionsManager = () => {
 
   const handleSaveAll = async () => {
     setIsSaving(true);
-    const updates = staffList.map(staff => 
-      supabase.from('staff').update({ permissions: staff.permissions }).eq('id', staff.id)
-    );
+    const toastId = showLoading("Đang lưu tất cả quyền...");
+    let errorCount = 0;
+    let firstErrorMessage = '';
+
+    for (const staff of staffList) {
+      const { error } = await supabase
+        .from('staff')
+        .update({ permissions: staff.permissions })
+        .eq('id', staff.id);
+
+      if (error) {
+        errorCount++;
+        if (!firstErrorMessage) {
+          firstErrorMessage = error.message;
+        }
+        console.error(`Failed to update permissions for ${staff.name}:`, error);
+      }
+    }
     
-    try {
-      const results = await Promise.all(updates);
-      const firstError = results.find(res => res.error);
-      if (firstError) throw firstError.error;
-      showSuccess("Đã lưu tất cả thay đổi về quyền!");
-    } catch (error: any) {
-      showError("Lưu thất bại: " + error.message);
-    } finally {
-      setIsSaving(false);
+    dismissToast(toastId);
+    setIsSaving(false);
+
+    if (errorCount === 0) {
+      showSuccess("Đã lưu tất cả thay đổi về quyền thành công!");
+    } else {
+      showError(`Lưu thất bại cho ${errorCount} nhân viên. Lỗi đầu tiên: ${firstErrorMessage}`);
     }
   };
 
