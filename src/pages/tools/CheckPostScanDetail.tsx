@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Save, PlayCircle, Loader2, Calendar as CalendarIcon } from 'lucide-react';
@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { DateRange } from "react-day-picker"
-import { format, startOfDay, endOfDay } from "date-fns"
+import { format, startOfDay, endOfDay, subDays, isWithinInterval } from "date-fns"
 import { vi } from 'date-fns/locale';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -36,6 +36,7 @@ type ScanResult = {
   post_link: string;
   found_keywords: string[];
   scanned_at: string;
+  group_id: string;
 };
 
 const CheckPostScanDetail = () => {
@@ -81,6 +82,19 @@ const CheckPostScanDetail = () => {
     };
     fetchProjectData();
   }, [projectId]);
+
+  const filteredResults = useMemo(() => {
+    if (!dateRange?.from) {
+      return results; // If no filter is set, show all
+    }
+    const start = startOfDay(dateRange.from);
+    const end = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
+
+    return results.filter(result => {
+      const resultDate = new Date(result.scanned_at);
+      return isWithinInterval(resultDate, { start, end });
+    });
+  }, [results, dateRange]);
 
   const handleSave = async () => {
     if (!project) return;
@@ -241,7 +255,22 @@ const CheckPostScanDetail = () => {
               <CardDescription>Kết quả quét sẽ được hiển thị ở đây.</CardDescription>
             </div>
             <div className="flex items-center gap-2">
-              <Popover><PopoverTrigger asChild><Button variant={"outline"} className={cn("w-[280px] justify-start text-left font-normal bg-white", !dateRange && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{dateRange?.from ? (dateRange.to ? <>{format(dateRange.from, "dd/MM/y")} - {format(dateRange.to, "dd/MM/y")}</> : format(dateRange.from, "dd/MM/y")) : (<span>Chọn khoảng thời gian quét</span>)}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar initialFocus mode="range" defaultMonth={dateRange?.from} selected={dateRange} onSelect={setDateRange} numberOfMonths={2} /></PopoverContent></Popover>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant={"outline"} className={cn("w-[280px] justify-start text-left font-normal bg-white", !dateRange && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateRange?.from ? (dateRange.to ? <>{format(dateRange.from, "dd/MM/y")} - {format(dateRange.to, "dd/MM/y")}</> : format(dateRange.from, "dd/MM/y")) : (<span>Tất cả thời gian</span>)}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <div className="p-2 flex flex-col items-start">
+                    <Button variant="ghost" className="w-full justify-start" onClick={() => setDateRange({ from: new Date(), to: new Date() })}>Hôm nay</Button>
+                    <Button variant="ghost" className="w-full justify-start" onClick={() => { const yesterday = subDays(new Date(), 1); setDateRange({ from: yesterday, to: yesterday }); }}>Hôm qua</Button>
+                    <Button variant="ghost" className="w-full justify-start" onClick={() => setDateRange(undefined)}>Tất cả</Button>
+                  </div>
+                  <Calendar initialFocus mode="range" defaultMonth={dateRange?.from} selected={dateRange} onSelect={setDateRange} numberOfMonths={2} />
+                </PopoverContent>
+              </Popover>
               <Button onClick={handleRunScan} disabled={isScanning} className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
                 {isScanning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
                 Chạy quét
@@ -257,18 +286,20 @@ const CheckPostScanDetail = () => {
                   <TableHead>Nội dung bài viết</TableHead>
                   <TableHead>Link</TableHead>
                   <TableHead>Từ khóa</TableHead>
+                  <TableHead>ID Group</TableHead>
                   <TableHead>Ngày check</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {results.length > 0 ? results.map(result => (
+                {filteredResults.length > 0 ? filteredResults.map(result => (
                   <TableRow key={result.id}>
                     <TableCell className="max-w-md"><p className="line-clamp-3 whitespace-pre-wrap">{result.post_content}</p></TableCell>
                     <TableCell><a href={result.post_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Xem bài viết</a></TableCell>
                     <TableCell><div className="flex flex-wrap gap-1">{result.found_keywords.map(kw => <Badge key={kw} variant="secondary">{kw}</Badge>)}</div></TableCell>
+                    <TableCell>{result.group_id}</TableCell>
                     <TableCell>{format(new Date(result.scanned_at), 'dd/MM/yyyy HH:mm', { locale: vi })}</TableCell>
                   </TableRow>
-                )) : (<TableRow><TableCell colSpan={4} className="text-center h-24 text-slate-500">Chưa có kết quả.</TableCell></TableRow>)}
+                )) : (<TableRow><TableCell colSpan={5} className="text-center h-24 text-slate-500">Chưa có kết quả.</TableCell></TableRow>)}
               </TableBody>
             </Table>
           </div>
