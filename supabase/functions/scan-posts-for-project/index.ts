@@ -47,18 +47,27 @@ serve(async (req) => {
 
     const allMatchedPosts = [];
     for (const groupId of groupIds) {
-      let feedUrl = postApprovalTemplate.replace(/{group-id}/g, groupId).replace(/{time_check}/g, timeCheckString || '');
+      let feedUrl = postApprovalTemplate.replace(/{group-id}/g, groupId).replace('{time_check}', timeCheckString || '');
       if (!feedUrl.includes('access_token=') && accessToken) {
         feedUrl += (feedUrl.includes('?') ? '&' : '?') + `access_token=${accessToken}`;
       }
 
       const response = await fetch(feedUrl);
-      const feedData = await response.json();
+      const responseText = await response.text();
+
       if (!response.ok) {
-        console.warn(`API error for group ${groupId}: ${feedData?.error?.message || 'Unknown error'}`);
+        let errorMsg = `API error for group ${groupId}: Status ${response.status}`;
+        try {
+          const errorJson = JSON.parse(responseText);
+          errorMsg += ` - ${errorJson?.error?.message || 'Unknown API error'}`;
+        } catch (e) {
+          errorMsg += ` - ${responseText}`;
+        }
+        console.warn(errorMsg);
         continue;
       }
       
+      const feedData = JSON.parse(responseText);
       const postsArray = (feedData.data && feedData.data.data && Array.isArray(feedData.data.data)) ? feedData.data.data : (feedData.data && Array.isArray(feedData.data)) ? feedData.data : [];
 
       for (const post of postsArray) {
@@ -80,14 +89,20 @@ serve(async (req) => {
 
     await supabaseAdmin.from('post_scan_results').delete().eq('project_id', projectId);
 
+    let finalResults = [];
     if (allMatchedPosts.length > 0) {
-      const { error: insertError } = await supabaseAdmin.from('post_scan_results').insert(allMatchedPosts);
+      const { data: insertedData, error: insertError } = await supabaseAdmin
+        .from('post_scan_results')
+        .insert(allMatchedPosts)
+        .select();
+      
       if (insertError) throw insertError;
+      finalResults = insertedData;
     }
 
     await supabaseAdmin.from('post_scan_projects').update({ last_scanned_at: new Date().toISOString() }).eq('id', projectId);
 
-    return new Response(JSON.stringify(allMatchedPosts), {
+    return new Response(JSON.stringify(finalResults), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
