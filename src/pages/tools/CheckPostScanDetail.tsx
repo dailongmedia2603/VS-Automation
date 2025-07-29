@@ -53,7 +53,10 @@ const CheckPostScanDetail = () => {
   const [isActive, setIsActive] = useState(false);
   const [frequencyValue, setFrequencyValue] = useState('1');
   const [frequencyUnit, setFrequencyUnit] = useState('day');
-  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  
+  // State for date pickers
+  const [scanDateRange, setScanDateRange] = useState<DateRange | undefined>();
+  const [filterDateRange, setFilterDateRange] = useState<DateRange | undefined>();
 
   useEffect(() => {
     const fetchProjectData = async () => {
@@ -84,17 +87,17 @@ const CheckPostScanDetail = () => {
   }, [projectId]);
 
   const filteredResults = useMemo(() => {
-    if (!dateRange?.from) {
-      return results; // If no filter is set, show all
+    if (!filterDateRange?.from) {
+      return results;
     }
-    const start = startOfDay(dateRange.from);
-    const end = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
+    const start = startOfDay(filterDateRange.from);
+    const end = filterDateRange.to ? endOfDay(filterDateRange.to) : endOfDay(filterDateRange.from);
 
     return results.filter(result => {
       const resultDate = new Date(result.scanned_at);
       return isWithinInterval(resultDate, { start, end });
     });
-  }, [results, dateRange]);
+  }, [results, filterDateRange]);
 
   const handleSave = async () => {
     if (!project) return;
@@ -125,7 +128,7 @@ const CheckPostScanDetail = () => {
     setIsScanning(true);
     const toastId = showLoading("Đang quét các group...");
     try {
-      const timeCheckString = generateTimeCheckString(dateRange);
+      const timeCheckString = generateTimeCheckString(scanDateRange);
       const { data, error } = await supabase.functions.invoke('scan-posts-for-project', {
         body: { projectId, timeCheckString }
       });
@@ -250,25 +253,38 @@ const CheckPostScanDetail = () => {
       <Card className="shadow-sm rounded-2xl bg-white">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Kết quả</CardTitle>
-              <CardDescription>Kết quả quét sẽ được hiển thị ở đây.</CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-4">
+              <div>
+                <CardTitle>Kết quả</CardTitle>
+                <CardDescription>Kết quả quét sẽ được hiển thị ở đây.</CardDescription>
+              </div>
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant={"outline"} className={cn("w-[280px] justify-start text-left font-normal bg-white", !dateRange && "text-muted-foreground")}>
+                  <Button variant={"outline"} className={cn("w-[240px] justify-start text-left font-normal bg-white", !filterDateRange && "text-muted-foreground")}>
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dateRange?.from ? (dateRange.to ? <>{format(dateRange.from, "dd/MM/y")} - {format(dateRange.to, "dd/MM/y")}</> : format(dateRange.from, "dd/MM/y")) : (<span>Tất cả thời gian</span>)}
+                    {filterDateRange?.from ? (filterDateRange.to ? <>{format(filterDateRange.from, "dd/MM/y")} - {format(filterDateRange.to, "dd/MM/y")}</> : format(filterDateRange.from, "dd/MM/y")) : (<span>Lọc theo ngày</span>)}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
                   <div className="p-2 flex flex-col items-start">
-                    <Button variant="ghost" className="w-full justify-start" onClick={() => setDateRange({ from: new Date(), to: new Date() })}>Hôm nay</Button>
-                    <Button variant="ghost" className="w-full justify-start" onClick={() => { const yesterday = subDays(new Date(), 1); setDateRange({ from: yesterday, to: yesterday }); }}>Hôm qua</Button>
-                    <Button variant="ghost" className="w-full justify-start" onClick={() => setDateRange(undefined)}>Tất cả</Button>
+                    <Button variant="ghost" className="w-full justify-start" onClick={() => setFilterDateRange({ from: new Date(), to: new Date() })}>Hôm nay</Button>
+                    <Button variant="ghost" className="w-full justify-start" onClick={() => { const yesterday = subDays(new Date(), 1); setFilterDateRange({ from: yesterday, to: yesterday }); }}>Hôm qua</Button>
+                    <Button variant="ghost" className="w-full justify-start" onClick={() => setFilterDateRange(undefined)}>Tất cả</Button>
                   </div>
-                  <Calendar initialFocus mode="range" defaultMonth={dateRange?.from} selected={dateRange} onSelect={setDateRange} numberOfMonths={2} />
+                  <Calendar initialFocus mode="range" defaultMonth={filterDateRange?.from} selected={filterDateRange} onSelect={setFilterDateRange} numberOfMonths={1} />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="flex items-center gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant={"outline"} className={cn("w-[280px] justify-start text-left font-normal bg-white", !scanDateRange && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {scanDateRange?.from ? (scanDateRange.to ? <>{format(scanDateRange.from, "dd/MM/y")} - {format(scanDateRange.to, "dd/MM/y")}</> : format(scanDateRange.from, "dd/MM/y")) : (<span>Chọn khoảng thời gian quét</span>)}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar initialFocus mode="range" defaultMonth={scanDateRange?.from} selected={scanDateRange} onSelect={setScanDateRange} numberOfMonths={2} />
                 </PopoverContent>
               </Popover>
               <Button onClick={handleRunScan} disabled={isScanning} className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
