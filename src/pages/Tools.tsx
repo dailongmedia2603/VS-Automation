@@ -1,5 +1,5 @@
 import { ToolCard } from "@/components/ToolCard";
-import { MessageSquareQuote } from "lucide-react";
+import { MessageSquareQuote, ScanSearch } from "lucide-react";
 
 const tools = [
   {
@@ -8,6 +8,13 @@ const tools = [
     icon: MessageSquareQuote,
     href: "/tools/check-keyword-comment",
     color: "bg-blue-100 text-blue-600",
+  },
+  {
+    title: "Check Post Scan",
+    description: "Quét các bài viết mới trên group hàng ngày.",
+    icon: ScanSearch,
+    href: "/tools/check-post-scan",
+    color: "bg-green-100 text-green-600",
   },
 ];
 

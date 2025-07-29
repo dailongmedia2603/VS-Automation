@@ -25,6 +25,8 @@ import CheckKeywordComment from "@/pages/tools/check-keyword-comment";
 import CheckKeywordCommentDetail from "@/pages/tools/CheckKeywordCommentDetail";
 import CompletionNotification from "./pages/CompletionNotification";
 import { NotificationProvider } from "./contexts/NotificationContext";
+import CheckPostScan from "@/pages/tools/CheckPostScan";
+import CheckPostScanDetail from "@/pages/tools/CheckPostScanDetail";
 
 const queryClient = new QueryClient();
 
@@ -56,6 +58,8 @@ const App = () => (
                     <Route path="/tools" element={<Tools />} />
                     <Route path="/tools/check-keyword-comment" element={<CheckKeywordComment />} />
                     <Route path="/tools/check-keyword-comment/:projectId" element={<CheckKeywordCommentDetail />} />
+                    <Route path="/tools/check-post-scan" element={<CheckPostScan />} />
+                    <Route path="/tools/check-post-scan/:projectId" element={<CheckPostScanDetail />} />
                   </Route>
                 </Route>
                 <Route path="*" element={<NotFound />} />
