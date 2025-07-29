@@ -78,7 +78,8 @@ serve(async (req) => {
       }
     }
 
-    await supabaseAdmin.from('log_post_scan').upsert({ project_id: projectId, request_urls: allRequestUrls, created_at: new Date().toISOString() });
+    // Use insert instead of upsert to create a history
+    await supabaseAdmin.from('log_post_scan').insert({ project_id: projectId, request_urls: allRequestUrls });
 
     return new Response(JSON.stringify({ posts: allMatchedPosts }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 

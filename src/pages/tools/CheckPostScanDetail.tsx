@@ -50,6 +50,7 @@ type ScanResult = {
 };
 
 type ScanLog = {
+  id: number;
   project_id: number;
   request_urls: string[];
   created_at: string;
@@ -59,11 +60,13 @@ const CheckPostScanDetail = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const [project, setProject] = useState<Project | null>(null);
   const [results, setResults] = useState<ScanResult[]>([]);
-  const [log, setLog] = useState<ScanLog | null>(null);
+  const [logs, setLogs] = useState<ScanLog[]>([]);
+  const [lastScanLog, setLastScanLog] = useState<ScanLog | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
-  const [isLogOpen, setIsLogOpen] = useState(false);
+  const [isManualScanLogOpen, setIsManualScanLogOpen] = useState(false);
+  const [isHistoryLogOpen, setIsHistoryLogOpen] = useState(false);
   const [isAiLogOpen, setIsAiLogOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [selectedResultIds, setSelectedResultIds] = useState<number[]>([]);
@@ -84,37 +87,38 @@ const CheckPostScanDetail = () => {
   const [filterDateRange, setFilterDateRange] = useState<DateRange | undefined>();
   const [filterDatePickerOpen, setFilterDatePickerOpen] = useState(false);
 
+  const fetchProjectData = async () => {
+    if (!projectId) return;
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.from('post_scan_projects').select('*').eq('id', projectId).single();
+      if (error) throw error;
+      setProject(data);
+      setKeywords(data.keywords || '');
+      setGroupIds(data.group_ids || '');
+      setIsActive(data.is_active);
+      setIsAiCheckActive(data.is_ai_check_active);
+      setAiPrompt(data.post_scan_ai_prompt || '');
+      const [value, unit] = data.scan_frequency?.split('_') || ['1', 'day'];
+      setFrequencyValue(value);
+      setFrequencyUnit(unit);
+
+      const { data: resultsData, error: resultsError } = await supabase.from('post_scan_results').select('*').eq('project_id', projectId).order('scanned_at', { ascending: false });
+      if (resultsError) throw resultsError;
+      setResults(resultsData || []);
+
+      const { data: logsData, error: logsError } = await supabase.from('log_post_scan').select('*').eq('project_id', projectId).order('created_at', { ascending: false });
+      if (logsError) throw logsError;
+      setLogs(logsData || []);
+
+    } catch (error: any) {
+      showError("Không thể tải dữ liệu dự án: " + error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchProjectData = async () => {
-      if (!projectId) return;
-      setIsLoading(true);
-      try {
-        const { data, error } = await supabase.from('post_scan_projects').select('*').eq('id', projectId).single();
-        if (error) throw error;
-        setProject(data);
-        setKeywords(data.keywords || '');
-        setGroupIds(data.group_ids || '');
-        setIsActive(data.is_active);
-        setIsAiCheckActive(data.is_ai_check_active);
-        setAiPrompt(data.post_scan_ai_prompt || '');
-        const [value, unit] = data.scan_frequency?.split('_') || ['1', 'day'];
-        setFrequencyValue(value);
-        setFrequencyUnit(unit);
-
-        const { data: resultsData, error: resultsError } = await supabase.from('post_scan_results').select('*').eq('project_id', projectId).order('scanned_at', { ascending: false });
-        if (resultsError) throw resultsError;
-        setResults(resultsData || []);
-
-        const { data: logData, error: logError } = await supabase.from('log_post_scan').select('*').eq('project_id', projectId).single();
-        if (logError && logError.code !== 'PGRST116') throw logError;
-        setLog(logData);
-
-      } catch (error: any) {
-        showError("Không thể tải dữ liệu dự án: " + error.message);
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchProjectData();
   }, [projectId]);
 
@@ -213,8 +217,10 @@ const CheckPostScanDetail = () => {
       dismissToast(toastId);
       showSuccess(`Quét hoàn tất! Tìm thấy ${finalPosts.filter(p => p.ai_check_result !== 'Có').length} bài viết mới.`);
       
-      const { data: newLogData } = await supabase.from('log_post_scan').select('*').eq('project_id', projectId).single();
-      setLog(newLogData);
+      const { data: newLogsData, error: newLogsError } = await supabase.from('log_post_scan').select('*').eq('project_id', projectId).order('created_at', { ascending: false });
+      if (newLogsError) throw newLogsError;
+      setLogs(newLogsData || []);
+      setLastScanLog(newLogsData?.[0] || null);
 
     } catch (error: any) {
       if (toastId) dismissToast(toastId);
@@ -351,7 +357,13 @@ const CheckPostScanDetail = () => {
                       </CardContent>
                     </Card>
                     <Card className="shadow-none border">
-                      <CardHeader><CardTitle>Cấu hình tự động</CardTitle></CardHeader>
+                      <CardHeader className="flex flex-row items-center justify-between">
+                        <CardTitle>Cấu hình tự động</CardTitle>
+                        <Button variant="outline" size="sm" onClick={() => setIsHistoryLogOpen(true)}>
+                          <FileText className="mr-2 h-4 w-4" />
+                          Log
+                        </Button>
+                      </CardHeader>
                       <CardContent className="space-y-4">
                         <div className="flex items-center justify-between"><Label>Kích hoạt quét tự động</Label><Switch checked={isActive} onCheckedChange={setIsActive} /></div>
                         <div className="space-y-2"><Label>Tần suất chạy lại</Label><div className="flex items-center gap-2"><Input type="number" value={frequencyValue} onChange={e => setFrequencyValue(e.target.value)} className="w-24 bg-slate-50" /><Select value={frequencyUnit} onValueChange={setFrequencyUnit}><SelectTrigger className="bg-slate-50"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="hour">Giờ</SelectItem><SelectItem value="day">Ngày</SelectItem></SelectContent></Select></div></div>
@@ -410,7 +422,7 @@ const CheckPostScanDetail = () => {
                   <Calendar initialFocus mode="range" defaultMonth={scanDateRange?.from} selected={scanDateRange} onSelect={setScanDateRange} numberOfMonths={2} />
                 </PopoverContent>
               </Popover>
-              <Button variant="outline" className="bg-white" onClick={() => setIsLogOpen(true)} disabled={!log}>
+              <Button variant="outline" className="bg-white" onClick={() => setIsManualScanLogOpen(true)} disabled={!lastScanLog}>
                 <FileText className="mr-2 h-4 w-4" />
                 Log
               </Button>
@@ -473,20 +485,20 @@ const CheckPostScanDetail = () => {
         </CardContent>
       </Card>
 
-      <Dialog open={isLogOpen} onOpenChange={setIsLogOpen}>
+      <Dialog open={isManualScanLogOpen} onOpenChange={setIsManualScanLogOpen}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Nhật ký quét API</DialogTitle>
+            <DialogTitle>Nhật ký quét API (Thủ công)</DialogTitle>
             <DialogDescription>
-              Đây là danh sách các URL đã được sử dụng trong lần quét gần nhất.
+              Đây là danh sách các URL đã được sử dụng trong lần quét thủ công gần nhất.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4 max-h-[60vh] overflow-y-auto pr-4">
-            {log && log.request_urls && log.request_urls.length > 0 ? (
+            {lastScanLog && lastScanLog.request_urls && lastScanLog.request_urls.length > 0 ? (
               <div className="space-y-2">
-                <p className="text-sm text-slate-500">Quét lúc: {format(new Date(log.created_at), 'dd/MM/yyyy HH:mm:ss', { locale: vi })}</p>
+                <p className="text-sm text-slate-500">Quét lúc: {format(new Date(lastScanLog.created_at), 'dd/MM/yyyy HH:mm:ss', { locale: vi })}</p>
                 <div className="p-3 bg-slate-100 rounded-md text-slate-900 font-mono text-xs space-y-2">
-                  {log.request_urls.map((url, index) => (
+                  {lastScanLog.request_urls.map((url, index) => (
                     <div key={index} className="break-all">{url}</div>
                   ))}
                 </div>
@@ -496,7 +508,44 @@ const CheckPostScanDetail = () => {
             )}
           </div>
           <DialogFooter>
-            <Button onClick={() => setIsLogOpen(false)}>Đóng</Button>
+            <Button onClick={() => setIsManualScanLogOpen(false)}>Đóng</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isHistoryLogOpen} onOpenChange={setIsHistoryLogOpen}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Lịch sử quét</DialogTitle>
+            <DialogDescription>
+              Danh sách các lần quét đã được thực hiện cho dự án này.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 max-h-[60vh] overflow-y-auto pr-4">
+            {logs.length > 0 ? (
+              <Accordion type="single" collapsible className="w-full space-y-2">
+                {logs.map((logItem, index) => (
+                  <AccordionItem value={`item-${index}`} key={logItem.id} className="border rounded-lg px-4">
+                    <AccordionTrigger>
+                      Quét lúc: {format(new Date(logItem.created_at), 'dd/MM/yyyy HH:mm:ss', { locale: vi })}
+                    </AccordionTrigger>
+                    <AccordionContent className="space-y-2 pt-2">
+                      <h4 className="font-semibold text-sm">URL đã sử dụng:</h4>
+                      <div className="p-3 bg-slate-100 rounded-md text-slate-900 font-mono text-xs space-y-2">
+                        {logItem.request_urls.map((url, urlIndex) => (
+                          <div key={urlIndex} className="break-all">{url}</div>
+                        ))}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            ) : (
+              <p className="text-slate-500 text-center py-8">Chưa có lịch sử quét nào.</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setIsHistoryLogOpen(false)}>Đóng</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
