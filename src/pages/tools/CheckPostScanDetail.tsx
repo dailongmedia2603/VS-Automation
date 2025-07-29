@@ -496,7 +496,6 @@ const CheckPostScanDetail = () => {
                   <TableHead>Link</TableHead>
                   <TableHead>Từ khóa</TableHead>
                   <TableHead>ID Group</TableHead>
-                  <TableHead>AI Check</TableHead>
                   <TableHead>Ngày check</TableHead>
                 </TableRow>
               </TableHeader>
@@ -519,18 +518,9 @@ const CheckPostScanDetail = () => {
                     <TableCell><a href={result.post_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Xem bài viết</a></TableCell>
                     <TableCell><div className="flex flex-wrap gap-1">{result.found_keywords.map(kw => <Badge key={kw} variant="secondary">{kw}</Badge>)}</div></TableCell>
                     <TableCell>{result.group_id}</TableCell>
-                    <TableCell>
-                      {result.ai_check_result ? (
-                        <Badge variant={result.ai_check_result === 'Có' ? 'default' : 'destructive'}>
-                          {result.ai_check_result}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline">Chưa check</Badge>
-                      )}
-                    </TableCell>
                     <TableCell>{format(new Date(result.scanned_at), 'dd/MM/yyyy HH:mm', { locale: vi })}</TableCell>
                   </TableRow>
-                )) : (<TableRow><TableCell colSpan={7} className="text-center h-24 text-slate-500">Chưa có kết quả.</TableCell></TableRow>)}
+                )) : (<TableRow><TableCell colSpan={6} className="text-center h-24 text-slate-500">Chưa có kết quả.</TableCell></TableRow>)}
               </TableBody>
             </Table>
           </div>
