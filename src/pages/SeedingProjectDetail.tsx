@@ -223,6 +223,10 @@ const SeedingProjectDetail = () => {
         .limit(1)
         .single();
       
+      if (error && error.code !== 'PGRST116') {
+        console.error("Error fetching active task:", error);
+      }
+      
       if (data) {
         setActiveTask(data);
         if (data.status === 'completed' || data.status === 'cancelled') {
