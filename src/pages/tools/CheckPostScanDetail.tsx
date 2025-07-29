@@ -1,92 +1,207 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Save, Settings, PlayCircle, Loader2, Calendar as CalendarIcon, Download } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { showError } from '@/utils/toast';
+import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
+import { DateRange } from "react-day-picker"
+import { format, startOfDay, endOfDay } from "date-fns"
+import { vi } from 'date-fns/locale';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 type Project = {
   id: number;
   name: string;
+  created_at: string;
+  keywords: string | null;
+  group_ids: string | null;
+  scan_frequency: string | null;
+  is_active: boolean;
+};
+
+type ScanResult = {
+  id: number;
+  post_content: string;
+  post_link: string;
+  found_keywords: string[];
+  scanned_at: string;
 };
 
 const CheckPostScanDetail = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const [project, setProject] = useState<Project | null>(null);
+  const [results, setResults] = useState<ScanResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+
+  // Form state
+  const [keywords, setKeywords] = useState('');
+  const [groupIds, setGroupIds] = useState('');
+  const [isActive, setIsActive] = useState(false);
+  const [frequencyValue, setFrequencyValue] = useState('1');
+  const [frequencyUnit, setFrequencyUnit] = useState('day');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
 
   useEffect(() => {
-    const fetchProject = async () => {
+    const fetchProjectData = async () => {
       if (!projectId) return;
       setIsLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('post_scan_projects')
-          .select('id, name')
-          .eq('id', projectId)
-          .single();
-        
+        const { data, error } = await supabase.from('post_scan_projects').select('*').eq('id', projectId).single();
         if (error) throw error;
         setProject(data);
+        setKeywords(data.keywords || '');
+        setGroupIds(data.group_ids || '');
+        setIsActive(data.is_active);
+        const [value, unit] = data.scan_frequency?.split('_') || ['1', 'day'];
+        setFrequencyValue(value);
+        setFrequencyUnit(unit);
+
+        const { data: resultsData, error: resultsError } = await supabase.from('post_scan_results').select('*').eq('project_id', projectId).order('scanned_at', { ascending: false });
+        if (resultsError) throw resultsError;
+        setResults(resultsData || []);
+
       } catch (error: any) {
-        showError("Không thể tải thông tin dự án: " + error.message);
+        showError("Không thể tải dữ liệu dự án: " + error.message);
       } finally {
         setIsLoading(false);
       }
     };
-
-    fetchProject();
+    fetchProjectData();
   }, [projectId]);
+
+  const handleSave = async () => {
+    if (!project) return;
+    setIsSaving(true);
+    const { error } = await supabase
+      .from('post_scan_projects')
+      .update({
+        keywords,
+        group_ids: groupIds,
+        is_active: isActive,
+        scan_frequency: `${frequencyValue}_${frequencyUnit}`
+      })
+      .eq('id', project.id);
+    
+    if (error) showError("Lưu thất bại: " + error.message);
+    else showSuccess("Đã lưu cấu hình thành công!");
+    setIsSaving(false);
+  };
+
+  const generateTimeCheckString = (range: DateRange | undefined): string => {
+    if (!range?.from) return '';
+    const since = startOfDay(range.from).toISOString();
+    const until = endOfDay(range.to || range.from).toISOString();
+    return `&since=${since}&until=${until}`;
+  };
+
+  const handleRunScan = async () => {
+    setIsScanning(true);
+    const toastId = showLoading("Đang quét các group...");
+    try {
+      const timeCheckString = generateTimeCheckString(dateRange);
+      const { data, error } = await supabase.functions.invoke('scan-posts-for-project', {
+        body: { projectId, timeCheckString }
+      });
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+      
+      setResults(data);
+      showSuccess(`Quét hoàn tất! Tìm thấy ${data.length} bài viết phù hợp.`);
+    } catch (error: any) {
+      showError(`Quét thất bại: ${error.message}`);
+    } finally {
+      dismissToast(toastId);
+      setIsScanning(false);
+    }
+  };
 
   if (isLoading) {
     return (
-      <main className="flex-1 space-y-8 p-6 sm:p-8 bg-slate-50">
-        <div className="flex items-center gap-4">
-          <Skeleton className="h-10 w-10 rounded-md" />
-          <div>
-            <Skeleton className="h-8 w-64 mb-2" />
-            <Skeleton className="h-4 w-96" />
-          </div>
+      <main className="flex-1 p-6 sm:p-8 bg-slate-50">
+        <Skeleton className="h-10 w-1/3 mb-6" />
+        <div className="space-y-6">
+          <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-48 w-full" />
+          <Skeleton className="h-96 w-full" />
         </div>
       </main>
     );
   }
 
-  if (!project) {
-    return (
-      <main className="flex-1 space-y-8 p-6 sm:p-8 bg-slate-50">
-        <div className="flex items-center gap-4">
-          <Link to="/tools/check-post-scan">
-            <Button variant="outline" size="icon">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-            Không tìm thấy dự án
-          </h1>
-        </div>
-      </main>
-    );
-  }
+  if (!project) return <main className="flex-1 p-6 sm:p-8 bg-slate-50">...</main>;
 
   return (
-    <main className="flex-1 space-y-8 p-6 sm:p-8 bg-slate-50">
-      <div className="flex items-center gap-4">
-        <Link to="/tools/check-post-scan">
-          <Button variant="outline" size="icon">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-            {project.name}
-          </h1>
-          <p className="text-muted-foreground mt-2 max-w-2xl">
-            Đây là trang chi tiết cho công cụ Check Post Scan. Chức năng sẽ được phát triển thêm.
-          </p>
+    <main className="flex-1 space-y-6 p-6 sm:p-8 bg-slate-50">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Link to="/tools/check-post-scan"><Button variant="outline" size="icon"><ArrowLeft className="h-4 w-4" /></Button></Link>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900">{project.name}</h1>
+            <p className="text-muted-foreground mt-1 text-sm">Tạo lúc: {format(new Date(project.created_at), 'dd/MM/yyyy HH:mm')}</p>
+          </div>
         </div>
+        <Button onClick={handleSave} disabled={isSaving}>
+          {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+          Lưu thay đổi
+        </Button>
       </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-2"><CardHeader><CardTitle>Thông tin chung</CardTitle></CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2"><Label>Danh sách từ khóa (mỗi từ khóa 1 dòng)</Label><Textarea value={keywords} onChange={e => setKeywords(e.target.value)} className="min-h-[150px]" /></div>
+            <div className="space-y-2"><Label>Danh sách ID Group (mỗi ID 1 dòng)</Label><Textarea value={groupIds} onChange={e => setGroupIds(e.target.value)} className="min-h-[150px]" /></div>
+          </CardContent>
+        </Card>
+
+        <Card><CardHeader><CardTitle>Cấu hình tự động</CardTitle><CardDescription>Thiết lập để hệ thống tự động quét.</CardDescription></CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border"><Label className="font-medium">Kích hoạt quét tự động</Label><Switch checked={isActive} onCheckedChange={setIsActive} /></div>
+            <div className="space-y-2"><Label>Tần suất chạy lại</Label><div className="flex items-center gap-2"><Input type="number" value={frequencyValue} onChange={e => setFrequencyValue(e.target.value)} className="w-24" /><Select value={frequencyUnit} onValueChange={setFrequencyUnit}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="hour">Giờ</SelectItem><SelectItem value="day">Ngày</SelectItem></SelectContent></Select></div></div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div><CardTitle>Kết quả</CardTitle><CardDescription>Kết quả quét sẽ được hiển thị ở đây.</CardDescription></div>
+            <div className="flex items-center gap-2">
+              <Popover><PopoverTrigger asChild><Button variant={"outline"} className={cn("w-[280px] justify-start text-left font-normal", !dateRange && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{dateRange?.from ? (dateRange.to ? <>{format(dateRange.from, "dd/MM/y")} - {format(dateRange.to, "dd/MM/y")}</> : format(dateRange.from, "dd/MM/y")) : (<span>Chọn khoảng thời gian quét</span>)}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar initialFocus mode="range" defaultMonth={dateRange?.from} selected={dateRange} onSelect={setDateRange} numberOfMonths={2} /></PopoverContent></Popover>
+              <Button onClick={handleRunScan} disabled={isScanning}>{isScanning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}Chạy quét</Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="border rounded-lg overflow-hidden">
+            <Table><TableHeader><TableRow><TableHead>Nội dung bài viết</TableHead><TableHead>Link</TableHead><TableHead>Từ khóa</TableHead><TableHead>Ngày check</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {results.length > 0 ? results.map(result => (
+                  <TableRow key={result.id}>
+                    <TableCell className="max-w-md"><p className="line-clamp-3 whitespace-pre-wrap">{result.post_content}</p></TableCell>
+                    <TableCell><a href={result.post_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Xem bài viết</a></TableCell>
+                    <TableCell><div className="flex flex-wrap gap-1">{result.found_keywords.map(kw => <Badge key={kw} variant="secondary">{kw}</Badge>)}</div></TableCell>
+                    <TableCell>{format(new Date(result.scanned_at), 'dd/MM/yyyy HH:mm')}</TableCell>
+                  </TableRow>
+                )) : (<TableRow><TableCell colSpan={4} className="text-center h-24">Chưa có kết quả.</TableCell></TableRow>)}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
     </main>
   );
 };
