@@ -47,16 +47,15 @@ serve(async (req) => {
       await supabaseAdmin.from('seeding_tasks').update({ status: 'running', updated_at: new Date().toISOString() }).eq('id', task.id);
     }
 
-    // 3. Find ONE unprocessed post for this task
-    const { data: allPosts, error: postsError } = await supabaseAdmin
+    // 3. Find ONE unprocessed post for this task, prioritizing those not recently checked
+    const { data: post, error: postError } = await supabaseAdmin
       .from('seeding_posts')
       .select('id, links, type')
       .eq('project_id', task.project_id)
-      .eq('status', 'checking');
-    
-    if (postsError) throw postsError;
-
-    const post = allPosts[0]; // Process only the first one found
+      .eq('status', 'checking')
+      .order('last_checked_at', { ascending: true, nullsFirst: true })
+      .limit(1)
+      .single();
 
     if (!post) {
       // No more posts to check, mark task as completed
@@ -68,6 +67,10 @@ serve(async (req) => {
 
     // 4. Process this single post
     try {
+      // Immediately update last_checked_at to "claim" this post for this run,
+      // ensuring it goes to the back of the queue for the next worker run.
+      await supabaseAdmin.from('seeding_posts').update({ last_checked_at: new Date().toISOString() }).eq('id', post.id);
+
       if (post.type === 'comment_check') {
           const { data: fetchData, error: fetchError } = await supabaseAdmin.functions.invoke('get-fb-comments', { body: { fbPostId: post.links } });
           if (fetchError || fetchData.error) throw new Error(fetchError?.message || fetchData?.error);

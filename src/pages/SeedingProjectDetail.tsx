@@ -362,57 +362,64 @@ const SeedingProjectDetail = () => {
 
     return (
       <div className="flex flex-col gap-1 pl-2">
-        {posts.map((post) => (
-          <div
-            key={post.id}
-            onClick={() => editingPostId !== post.id && onSelectPost(post)}
-            className={cn(
-              "group w-full text-left p-2 rounded-md text-sm flex items-center justify-between cursor-pointer",
-              post.status === 'completed' 
-                ? "bg-green-50 text-green-800 hover:bg-green-100" 
-                : selectedPost?.id === post.id && editingPostId !== post.id 
-                  ? "bg-blue-100 text-blue-700 font-semibold hover:bg-blue-100" 
-                  : "hover:bg-slate-100"
-            )}
-          >
-            {editingPostId === post.id ? (
-              <div className="flex-1 flex items-center gap-1">
-                <Input
-                  ref={inputRef}
-                  value={editingName}
-                  onChange={(e) => setEditingName(e.target.value)}
-                  onBlur={handleSaveName}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
-                  className="h-7 text-sm"
-                />
-                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleSaveName}><Check className="h-4 w-4" /></Button>
-              </div>
-            ) : (
-              <>
-                <span className="flex items-center gap-2 truncate flex-1">
-                  {post.status === 'completed' && <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />}
-                  <span className="truncate">{post.name}</span>
-                </span>
-                <div className="flex items-center flex-shrink-0">
-                  {post.total_count > 0 && (
-                    <Badge variant="outline" className="mr-2 font-mono text-xs">
-                      {post.visible_count}/{post.total_count}
-                    </Badge>
-                  )}
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setEditingPostId(post.id); setEditingName(post.name); }}>
-                      <Edit className="h-3 w-3" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); setPostToDelete(post); setIsDeleteDialogOpen(true); }}>
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                  <ChevronRight className={cn("h-4 w-4 text-slate-400", selectedPost?.id === post.id && "text-blue-700")} />
+        {posts.map((post) => {
+          const isRunningInTask = activeTask && post.status === 'checking';
+          return (
+            <div
+              key={post.id}
+              onClick={() => editingPostId !== post.id && onSelectPost(post)}
+              className={cn(
+                "group w-full text-left p-2 rounded-md text-sm flex items-center justify-between cursor-pointer",
+                post.status === 'completed' 
+                  ? "bg-green-50 text-green-800 hover:bg-green-100" 
+                  : selectedPost?.id === post.id && editingPostId !== post.id 
+                    ? "bg-blue-100 text-blue-700 font-semibold hover:bg-blue-100" 
+                    : "hover:bg-slate-100"
+              )}
+            >
+              {editingPostId === post.id ? (
+                <div className="flex-1 flex items-center gap-1">
+                  <Input
+                    ref={inputRef}
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    onBlur={handleSaveName}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
+                    className="h-7 text-sm"
+                  />
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleSaveName}><Check className="h-4 w-4" /></Button>
                 </div>
-              </>
-            )}
-          </div>
-        ))}
+              ) : (
+                <>
+                  <span className="flex items-center gap-2 truncate flex-1">
+                    {isRunningInTask ? (
+                      <Loader2 className="h-4 w-4 text-blue-500 animate-spin flex-shrink-0" />
+                    ) : post.status === 'completed' ? (
+                      <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
+                    ) : null}
+                    <span className="truncate">{post.name}</span>
+                  </span>
+                  <div className="flex items-center flex-shrink-0">
+                    {post.total_count > 0 && (
+                      <Badge variant="outline" className="mr-2 font-mono text-xs">
+                        {post.visible_count}/{post.total_count}
+                      </Badge>
+                    )}
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setEditingPostId(post.id); setEditingName(post.name); }}>
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); setPostToDelete(post); setIsDeleteDialogOpen(true); }}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <ChevronRight className={cn("h-4 w-4 text-slate-400", selectedPost?.id === post.id && "text-blue-700")} />
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        })}
       </div>
     );
   };
