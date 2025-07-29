@@ -118,7 +118,7 @@ const CheckPostScanDetail = () => {
   }, [projectId]);
 
   const filteredResults = useMemo(() => {
-    let tempResults = results;
+    let tempResults = results.filter(result => result.ai_check_result !== 'Có');
 
     if (filterDateRange?.from) {
       const start = startOfDay(filterDateRange.from);
