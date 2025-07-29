@@ -168,7 +168,7 @@ const CheckPostScanDetail = () => {
             </p>
           </div>
         </div>
-        <Button onClick={handleSave} disabled={isSaving} className="bg-slate-900 hover:bg-slate-800 text-white rounded-lg">
+        <Button onClick={handleSave} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
           {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
           Lưu thay đổi
         </Button>
@@ -242,7 +242,7 @@ const CheckPostScanDetail = () => {
             </div>
             <div className="flex items-center gap-2">
               <Popover><PopoverTrigger asChild><Button variant={"outline"} className={cn("w-[280px] justify-start text-left font-normal bg-white", !dateRange && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{dateRange?.from ? (dateRange.to ? <>{format(dateRange.from, "dd/MM/y")} - {format(dateRange.to, "dd/MM/y")}</> : format(dateRange.from, "dd/MM/y")) : (<span>Chọn khoảng thời gian quét</span>)}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar initialFocus mode="range" defaultMonth={dateRange?.from} selected={dateRange} onSelect={setDateRange} numberOfMonths={2} /></PopoverContent></Popover>
-              <Button onClick={handleRunScan} disabled={isScanning} className="bg-slate-900 hover:bg-slate-800 text-white rounded-lg">
+              <Button onClick={handleRunScan} disabled={isScanning} className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
                 {isScanning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
                 Chạy quét
               </Button>
