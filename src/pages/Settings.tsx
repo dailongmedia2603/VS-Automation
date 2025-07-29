@@ -20,6 +20,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FacebookApiReference } from "@/components/FacebookApiReference";
 import { Textarea } from "@/components/ui/textarea";
 
+const geminiModels = [
+  { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+  { value: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite' },
+  { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
+  { value: 'gemini-2.0-flash-preview-image-generation', label: 'Gemini 2.0 Flash Preview Image Generation' },
+  { value: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash-Lite' },
+  { value: 'gemini-pro', label: 'Gemini Pro' },
+];
+
 const Settings = () => {
   // AI API Settings state
   const { settings, setSettings, isLoading: isLoadingApi } = useApiSettings();
@@ -111,6 +121,8 @@ const Settings = () => {
         api_key: localSettings.apiKey,
         embedding_model_name: localSettings.embeddingModelName,
         google_gemini_api_key: localSettings.googleGeminiApiKey,
+        gemini_scan_model: localSettings.geminiScanModel,
+        gemini_content_model: localSettings.geminiContentModel,
       };
       const { error } = await supabase.from('ai_settings').upsert(dataToSave);
       if (error) throw error;
@@ -366,7 +378,7 @@ const Settings = () => {
           <Card className="shadow-sm rounded-2xl bg-white">
             <CardHeader>
               <CardTitle>API AI Check Scan</CardTitle>
-              <CardDescription>Cấu hình API từ Google AI Studio (Gemini) để sử dụng cho tính năng quét nội dung.</CardDescription>
+              <CardDescription>Cấu hình API từ Google AI Studio (Gemini) để sử dụng cho các tính năng AI.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">
@@ -378,6 +390,26 @@ const Settings = () => {
                   onChange={(e) => setLocalSettings({ ...localSettings, googleGeminiApiKey: e.target.value })}
                   className="bg-slate-100 border-none rounded-lg"
                 />
+              </div>
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="scan-model">Model cho Check content post scan</Label>
+                  <Select value={localSettings.geminiScanModel} onValueChange={(value) => setLocalSettings(s => ({...s, geminiScanModel: value}))}>
+                    <SelectTrigger id="scan-model"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {geminiModels.map(model => <SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="content-model">Model cho Content AI</Label>
+                  <Select value={localSettings.geminiContentModel} onValueChange={(value) => setLocalSettings(s => ({...s, geminiContentModel: value}))}>
+                    <SelectTrigger id="content-model"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {geminiModels.map(model => <SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <Button onClick={handleSaveApi} disabled={isSavingApi} className="rounded-lg bg-blue-600 hover:bg-blue-700">
