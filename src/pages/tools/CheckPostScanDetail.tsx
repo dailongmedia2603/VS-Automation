@@ -120,8 +120,8 @@ const CheckPostScanDetail = () => {
   const filteredResults = useMemo(() => {
     let tempResults = results;
 
-    if (project?.is_ai_check_active) {
-      tempResults = tempResults.filter(result => result.ai_check_result === 'Có');
+    if (isAiCheckActive) {
+      tempResults = tempResults.filter(result => result.ai_check_result === 'Không');
     }
 
     if (filterDateRange?.from) {
@@ -147,7 +147,7 @@ const CheckPostScanDetail = () => {
     }
 
     return uniqueResults;
-  }, [results, filterDateRange, project?.is_ai_check_active]);
+  }, [results, filterDateRange, isAiCheckActive]);
 
   const handleSave = async () => {
     if (!project) return;
@@ -340,15 +340,20 @@ const CheckPostScanDetail = () => {
                 <Switch checked={isAiCheckActive} onCheckedChange={setIsAiCheckActive} />
               </div>
               {isAiCheckActive && (
-                <div className="space-y-2">
-                  <Label>Prompt cho AI</Label>
-                  <Textarea
-                    value={aiPrompt}
-                    onChange={e => setAiPrompt(e.target.value)}
-                    className="min-h-[120px] bg-slate-50 border-slate-200 rounded-lg"
-                    placeholder="Ví dụ: Dựa vào nội dung bài viết, hãy xác định xem bài viết này có phải là bài tuyển dụng không. Chỉ trả lời 'Có' hoặc 'Không'."
-                  />
-                </div>
+                <>
+                  <p className="text-xs text-muted-foreground px-1">
+                    Chỉ hiển thị khi kết quả AI phản hồi là: <strong>KHÔNG</strong>
+                  </p>
+                  <div className="space-y-2">
+                    <Label>Prompt cho AI</Label>
+                    <Textarea
+                      value={aiPrompt}
+                      onChange={e => setAiPrompt(e.target.value)}
+                      className="min-h-[120px] bg-slate-50 border-slate-200 rounded-lg"
+                      placeholder="Ví dụ: Dựa vào nội dung bài viết, hãy xác định xem bài viết này có phải là bài tuyển dụng không. Chỉ trả lời 'Có' hoặc 'Không'."
+                    />
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
@@ -466,6 +471,7 @@ const CheckPostScanDetail = () => {
                   <TableHead>Link</TableHead>
                   <TableHead>Từ khóa</TableHead>
                   <TableHead>ID Group</TableHead>
+                  <TableHead>AI Check</TableHead>
                   <TableHead>Ngày check</TableHead>
                 </TableRow>
               </TableHeader>
@@ -488,9 +494,18 @@ const CheckPostScanDetail = () => {
                     <TableCell><a href={result.post_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Xem bài viết</a></TableCell>
                     <TableCell><div className="flex flex-wrap gap-1">{result.found_keywords.map(kw => <Badge key={kw} variant="secondary">{kw}</Badge>)}</div></TableCell>
                     <TableCell>{result.group_id}</TableCell>
+                    <TableCell>
+                      {result.ai_check_result ? (
+                        <Badge variant={result.ai_check_result === 'Có' ? 'default' : 'destructive'}>
+                          {result.ai_check_result}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline">Chưa check</Badge>
+                      )}
+                    </TableCell>
                     <TableCell>{format(new Date(result.scanned_at), 'dd/MM/yyyy HH:mm', { locale: vi })}</TableCell>
                   </TableRow>
-                )) : (<TableRow><TableCell colSpan={6} className="text-center h-24 text-slate-500">Chưa có kết quả.</TableCell></TableRow>)}
+                )) : (<TableRow><TableCell colSpan={7} className="text-center h-24 text-slate-500">Chưa có kết quả.</TableCell></TableRow>)}
               </TableBody>
             </Table>
           </div>
