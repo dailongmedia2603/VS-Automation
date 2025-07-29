@@ -33,7 +33,7 @@ serve(async (req) => {
       .single();
     if (projectError) throw projectError;
 
-    const { data: aiSettings, error: settingsError } = await supabaseAdmin.from('ai_settings').select('api_key, post_scan_ai_prompt').eq('id', 1).single();
+    const { data: aiSettings, error: settingsError } = await supabaseAdmin.from('ai_settings').select('google_gemini_api_key, post_scan_ai_prompt').eq('id', 1).single();
     if (settingsError) throw new Error("Chưa cấu hình AI.");
 
     const keywords = (project.keywords || '').split('\n').map(k => normalizeString(k.trim())).filter(Boolean);
@@ -70,9 +70,9 @@ serve(async (req) => {
         const foundKeywords = keywords.filter(kw => normalizedContent.includes(kw));
         if (foundKeywords.length > 0) {
           let aiResult = null;
-          if (project.is_ai_check_active && aiSettings.api_key && aiSettings.post_scan_ai_prompt) {
+          if (project.is_ai_check_active && aiSettings.google_gemini_api_key && aiSettings.post_scan_ai_prompt) {
             const geminiPrompt = `${aiSettings.post_scan_ai_prompt}\n\nNội dung bài viết:\n${post.message}`;
-            const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${aiSettings.api_key}`, {
+            const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${aiSettings.google_gemini_api_key}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ contents: [{ parts: [{ text: geminiPrompt }] }] }),

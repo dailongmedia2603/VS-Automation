@@ -109,6 +109,7 @@ const Settings = () => {
         api_key: localSettings.apiKey,
         embedding_model_name: localSettings.embeddingModelName,
         post_scan_ai_prompt: localSettings.postScanAiPrompt,
+        google_gemini_api_key: localSettings.googleGeminiApiKey,
       };
       const { error } = await supabase.from('ai_settings').upsert(dataToSave);
       if (error) throw error;
@@ -260,6 +261,7 @@ const Settings = () => {
       <Tabs defaultValue="api-facebook">
         <TabsList className="flex justify-start items-center gap-1 p-0 bg-transparent">
           <TabsTrigger value="api-ai" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Cài đặt API AI</TabsTrigger>
+          <TabsTrigger value="api-ai-scan" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">API AI Check Scan</TabsTrigger>
           <TabsTrigger value="integrations" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Tích hợp</TabsTrigger>
           <TabsTrigger value="api-facebook" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">API Facebook Graph</TabsTrigger>
         </TabsList>
@@ -268,7 +270,7 @@ const Settings = () => {
             <CardHeader>
               <CardTitle>Kết nối API</CardTitle>
               <CardDescription>
-                Quản lý và kiểm tra trạng thái kết nối đến dịch vụ AI của bạn.
+                Quản lý và kiểm tra trạng thái kết nối đến dịch vụ AI của bạn (VD: OpenAI).
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -309,16 +311,6 @@ const Settings = () => {
                   Quan trọng: Chọn model embedding mà nhà cung cấp API của bạn đã cấp quyền.
                 </p>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="post-scan-prompt">Prompt cho AI Scan Post</Label>
-                <Textarea
-                  id="post-scan-prompt"
-                  value={localSettings.postScanAiPrompt}
-                  onChange={(e) => setLocalSettings({ ...localSettings, postScanAiPrompt: e.target.value })}
-                  className="bg-slate-100 border-none rounded-lg min-h-[120px]"
-                  placeholder="Ví dụ: Dựa vào nội dung bài viết, hãy xác định xem bài viết này có phải là bài tuyển dụng không. Chỉ trả lời 'Có' hoặc 'Không'."
-                />
-              </div>
               <Button onClick={handleSaveApi} disabled={isSavingApi} className="rounded-lg bg-blue-600 hover:bg-blue-700">
                 {isSavingApi && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {isSavingApi ? "Đang lưu..." : "Lưu thay đổi"}
@@ -342,6 +334,40 @@ const Settings = () => {
                   </div>
                 )}
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="api-ai-scan" className="mt-4">
+          <Card className="shadow-sm rounded-2xl bg-white">
+            <CardHeader>
+              <CardTitle>API AI Check Scan</CardTitle>
+              <CardDescription>Cấu hình API từ Google AI Studio (Gemini) để sử dụng cho tính năng quét nội dung.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="google-api-key">Google AI Studio API Key</Label>
+                <Input
+                  id="google-api-key"
+                  type="password"
+                  value={localSettings.googleGeminiApiKey}
+                  onChange={(e) => setLocalSettings({ ...localSettings, googleGeminiApiKey: e.target.value })}
+                  className="bg-slate-100 border-none rounded-lg"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="post-scan-prompt">Prompt cho AI Scan Post</Label>
+                <Textarea
+                  id="post-scan-prompt"
+                  value={localSettings.postScanAiPrompt}
+                  onChange={(e) => setLocalSettings({ ...localSettings, postScanAiPrompt: e.target.value })}
+                  className="bg-slate-100 border-none rounded-lg min-h-[120px]"
+                  placeholder="Ví dụ: Dựa vào nội dung bài viết, hãy xác định xem bài viết này có phải là bài tuyển dụng không. Chỉ trả lời 'Có' hoặc 'Không'."
+                />
+              </div>
+              <Button onClick={handleSaveApi} disabled={isSavingApi} className="rounded-lg bg-blue-600 hover:bg-blue-700">
+                {isSavingApi && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isSavingApi ? "Đang lưu..." : "Lưu thay đổi"}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
