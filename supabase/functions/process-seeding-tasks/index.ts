@@ -107,6 +107,17 @@ serve(async (req) => {
     };
     await supabaseAdmin.from('seeding_tasks').update(updateData).eq('id', task.id);
 
+    // 6. If the task is not yet complete, trigger the next run immediately.
+    if (!isCompleted) {
+      // This is a "fire and forget" call. We don't wait for it to finish.
+      supabaseAdmin.functions.invoke('process-seeding-tasks', {
+        // No body is needed as the function finds the task itself
+      }).catch(err => {
+        // Log the error but don't let it fail the current successful run
+        console.error(`Error self-invoking process-seeding-tasks for task ${task.id}:`, err);
+      });
+    }
+
     return new Response(JSON.stringify({ message: `Task ${task.id} processed post ${post.id}.` }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error) {
