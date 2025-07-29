@@ -6,6 +6,7 @@ interface ApiSettings {
   apiUrl: string;
   apiKey: string;
   embeddingModelName: string;
+  postScanAiPrompt: string;
 }
 
 interface ApiSettingsContextType {
@@ -21,6 +22,7 @@ export const ApiSettingsProvider = ({ children }: { children: ReactNode }) => {
     apiUrl: '',
     apiKey: '',
     embeddingModelName: 'text-embedding-3-small',
+    postScanAiPrompt: '',
   });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -30,7 +32,7 @@ export const ApiSettingsProvider = ({ children }: { children: ReactNode }) => {
       try {
         const { data, error } = await supabase
           .from('ai_settings')
-          .select('api_url, api_key, embedding_model_name')
+          .select('api_url, api_key, embedding_model_name, post_scan_ai_prompt')
           .eq('id', 1)
           .single();
 
@@ -43,6 +45,7 @@ export const ApiSettingsProvider = ({ children }: { children: ReactNode }) => {
             apiUrl: data.api_url || '',
             apiKey: data.api_key || '',
             embeddingModelName: data.embedding_model_name || 'text-embedding-3-small',
+            postScanAiPrompt: data.post_scan_ai_prompt || '',
           };
           setSettings(formattedSettings);
         }
