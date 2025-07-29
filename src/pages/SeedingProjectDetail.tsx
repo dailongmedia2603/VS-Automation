@@ -46,6 +46,7 @@ type SeedingTask = {
   status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
   progress_current: number;
   progress_total: number;
+  current_post_id: number | null;
 };
 
 const initialNewPostState = {
@@ -351,7 +352,7 @@ const SeedingProjectDetail = () => {
 
   const commentCount = newPostData.comments.split('\n').filter(line => line.trim() !== '').length;
 
-  const PostList = ({ posts, onSelectPost }: { posts: Post[], onSelectPost: (post: Post) => void }) => {
+  const PostList = ({ posts, onSelectPost, activeTask }: { posts: Post[], onSelectPost: (post: Post) => void, activeTask: SeedingTask | null }) => {
     const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -363,7 +364,9 @@ const SeedingProjectDetail = () => {
     return (
       <div className="flex flex-col gap-1 pl-2">
         {posts.map((post) => {
-          const isRunningInTask = activeTask && post.status === 'checking';
+          const isRunningInTask = activeTask && (activeTask.status === 'running' || activeTask.status === 'pending') && post.status === 'checking';
+          const isCurrentlyProcessing = isRunningInTask && activeTask.current_post_id === post.id;
+
           return (
             <div
               key={post.id}
@@ -392,10 +395,14 @@ const SeedingProjectDetail = () => {
               ) : (
                 <>
                   <span className="flex items-center gap-2 truncate flex-1">
-                    {isRunningInTask ? (
+                    {isCurrentlyProcessing ? (
                       <Loader2 className="h-4 w-4 text-blue-500 animate-spin flex-shrink-0" />
                     ) : post.status === 'completed' ? (
                       <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
+                    ) : isRunningInTask ? (
+                      <div className="h-4 w-4 flex items-center justify-center flex-shrink-0">
+                        <div className="h-2 w-2 rounded-full bg-slate-400 animate-pulse"></div>
+                      </div>
                     ) : null}
                     <span className="truncate">{post.name}</span>
                   </span>
@@ -471,13 +478,13 @@ const SeedingProjectDetail = () => {
                 <AccordionTrigger className="text-base font-semibold hover:no-underline">
                   <div className="flex items-center gap-2"><MessageSquare className="h-5 w-5 text-blue-600" />Check Comment ({commentCheckPosts.length})</div>
                 </AccordionTrigger>
-                <AccordionContent><PostList posts={commentCheckPosts} onSelectPost={setSelectedPost} /></AccordionContent>
+                <AccordionContent><PostList posts={commentCheckPosts} onSelectPost={setSelectedPost} activeTask={activeTask} /></AccordionContent>
               </AccordionItem>
               <AccordionItem value="approve-post">
                 <AccordionTrigger className="text-base font-semibold hover:no-underline">
                   <div className="flex items-center gap-2"><FileCheck2 className="h-5 w-5 text-green-600" />Check duyệt post ({postApprovalPosts.length})</div>
                 </AccordionTrigger>
-                <AccordionContent><PostList posts={postApprovalPosts} onSelectPost={setSelectedPost} /></AccordionContent>
+                <AccordionContent><PostList posts={postApprovalPosts} onSelectPost={setSelectedPost} activeTask={activeTask} /></AccordionContent>
               </AccordionItem>
             </Accordion>
           </div>

@@ -42,12 +42,7 @@ serve(async (req) => {
       });
     }
 
-    // 2. If task was pending, set to running
-    if (task.status === 'pending') {
-      await supabaseAdmin.from('seeding_tasks').update({ status: 'running', updated_at: new Date().toISOString() }).eq('id', task.id);
-    }
-
-    // 3. Find ONE unprocessed post for this task, prioritizing those not recently checked
+    // 2. Find the next post to process
     const { data: post, error: postError } = await supabaseAdmin
       .from('seeding_posts')
       .select('id, links, type')
@@ -59,16 +54,21 @@ serve(async (req) => {
 
     if (!post) {
       // No more posts to check, mark task as completed
-      await supabaseAdmin.from('seeding_tasks').update({ status: 'completed', updated_at: new Date().toISOString() }).eq('id', task.id);
-      return new Response(JSON.stringify({ message: `Task ${task.id} completed. No more posts to process.` }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      await supabaseAdmin.from('seeding_tasks').update({ status: 'completed', current_post_id: null, updated_at: new Date().toISOString() }).eq('id', task.id);
+      return new Response(JSON.stringify({ message: `Task ${task.id} completed.` }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // 4. Process this single post
+    // 3. "Claim" the post by updating the task state BEFORE processing
+    await supabaseAdmin.from('seeding_tasks').update({ status: 'running', current_post_id: post.id, updated_at: new Date().toISOString() }).eq('id', task.id);
+    
+    const { data: currentTaskStatus } = await supabaseAdmin.from('seeding_tasks').select('status').eq('id', task.id).single();
+    if (currentTaskStatus.status === 'cancelled') {
+        await supabaseAdmin.from('seeding_tasks').update({ current_post_id: null, updated_at: new Date().toISOString() }).eq('id', task.id);
+        return new Response(JSON.stringify({ message: `Task ${task.id} was cancelled.` }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // 4. Process the post
     try {
-      // Immediately update last_checked_at to "claim" this post for this run,
-      // ensuring it goes to the back of the queue for the next worker run.
       await supabaseAdmin.from('seeding_posts').update({ last_checked_at: new Date().toISOString() }).eq('id', post.id);
 
       if (post.type === 'comment_check') {
@@ -85,23 +85,23 @@ serve(async (req) => {
           if (processError || (processData && processData.error)) throw new Error(processError?.message || processData?.error);
           await supabaseAdmin.functions.invoke('compare-and-update-duyetpost', { body: { postId: post.id } });
       }
-    } catch (postError) {
-      console.error(`Error processing post ${post.id}:`, postError.message);
-      // Even if a post fails, we increment the progress to avoid getting stuck
+    } catch (postProcessingError) {
+      console.error(`Error processing post ${post.id}:`, postProcessingError.message);
     }
 
-    // 5. Update progress
+    // 5. Update progress and release the "claim"
     const newProgress = task.progress_current + 1;
+    const isCompleted = newProgress >= task.progress_total;
+    
     const updateData = {
       progress_current: newProgress,
+      current_post_id: null,
       updated_at: new Date().toISOString(),
-      status: newProgress >= task.progress_total ? 'completed' : 'running'
+      status: isCompleted ? 'completed' : 'running'
     };
     await supabaseAdmin.from('seeding_tasks').update(updateData).eq('id', task.id);
 
-    return new Response(JSON.stringify({ message: `Task ${task.id} processed post ${post.id}. Progress: ${newProgress}/${task.progress_total}` }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return new Response(JSON.stringify({ message: `Task ${task.id} processed post ${post.id}.` }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error) {
     const { data: runningTask } = await supabaseAdmin.from('seeding_tasks').select('id').eq('status', 'running').limit(1).single();
