@@ -28,7 +28,6 @@ import { NotificationProvider } from "./contexts/NotificationContext";
 import CheckPostScan from "@/pages/tools/CheckPostScan";
 import CheckPostScanDetail from "@/pages/tools/CheckPostScanDetail";
 import { PermissionProvider } from "./contexts/PermissionContext";
-import Roles from "./pages/Roles";
 
 const queryClient = new QueryClient();
 
@@ -63,7 +62,6 @@ const App = () => (
                       <Route path="/tools/check-keyword-comment/:projectId" element={<CheckKeywordCommentDetail />} />
                       <Route path="/tools/check-post-scan" element={<CheckPostScan />} />
                       <Route path="/tools/check-post-scan/:projectId" element={<CheckPostScanDetail />} />
-                      <Route path="/roles" element={<Roles />} />
                     </Route>
                   </Route>
                   <Route path="*" element={<NotFound />} />

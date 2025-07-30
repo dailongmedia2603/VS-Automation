@@ -33,7 +33,7 @@ const featureMapping: Record<string, string> = {
   settings: 'Cài đặt chung',
 };
 
-const Roles = () => {
+const RolesManager = () => {
   const { isSuperAdmin, isLoading: isLoadingPermissions } = usePermissions();
   const [roles, setRoles] = useState<Role[]>([]);
   const [permissions, setPermissions] = useState<Permission[]>([]);
@@ -166,14 +166,14 @@ const Roles = () => {
   }, [permissions]);
 
   if (isLoadingPermissions) {
-    return <main className="flex-1 p-6 sm:p-8"><Skeleton className="h-full w-full" /></main>;
+    return <Skeleton className="h-96 w-full" />;
   }
   if (!isSuperAdmin) {
     return <Navigate to="/" replace />;
   }
 
   return (
-    <main className="flex-1 space-y-6 p-6 sm:p-8">
+    <>
       <Card className="shadow-sm rounded-2xl bg-white">
         <CardHeader>
           <div className="flex justify-between items-center">
@@ -284,8 +284,8 @@ const Roles = () => {
           <AlertDialogFooter><AlertDialogCancel>Hủy</AlertDialogCancel><AlertDialogAction onClick={handleDeleteRole} className="bg-red-600">Xóa</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </main>
+    </>
   );
 };
 
-export default Roles;
+export default RolesManager;

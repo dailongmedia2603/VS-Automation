@@ -55,10 +55,6 @@ const toolsNavItems: NavItem[] = [
     { name: "Công cụ", icon: Wrench, href: "/tools" },
 ];
 
-const adminNavItems: NavItem[] = [
-    { name: "Phân quyền", icon: Shield, href: "/roles" },
-];
-
 const supportNavItems: NavItem[] = [
     { name: "Nhân sự", icon: Users, href: "/staff" },
     { name: "Cài đặt chung", icon: Settings, href: "/settings" },
@@ -286,14 +282,6 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
 
       {/* Admin and Settings at the bottom */}
        <div className="mt-auto">
-         {isSuperAdmin && (
-            <div className="mb-4">
-                <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>Quản trị</p>
-                <nav className="flex flex-col space-y-1">
-                    {adminNavItems.map(renderLink)}
-                </nav>
-            </div>
-         )}
          <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>CÀI ĐẶT CHUNG</p>
          <nav className="flex flex-col space-y-1">
             {supportNavItems.map(renderLink)}
