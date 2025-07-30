@@ -11,7 +11,6 @@ import {
   Sparkles,
   CheckCircle,
   Wrench,
-  Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link, useLocation } from "react-router-dom";
@@ -30,34 +29,48 @@ interface NavItem {
   name: string;
   icon: React.ElementType;
   href: string;
+  permission: string;
 }
 
-const generalNavItems: NavItem[] = [
-  { name: "Dashboard", icon: LayoutDashboard, href: "/" },
-  { name: "Dự án", icon: Briefcase, href: "/projects" },
-  { name: "Báo cáo", icon: BarChart3, href: "/reports" },
+const navSections = [
+  {
+    title: "General",
+    items: [
+      { name: "Dashboard", icon: LayoutDashboard, href: "/", permission: "view_dashboard" },
+      { name: "Dự án", icon: Briefcase, href: "/projects", permission: "view_projects" },
+      { name: "Báo cáo", icon: BarChart3, href: "/reports", permission: "view_reports" },
+    ],
+  },
+  {
+    title: "TÀI LIỆU & HUẤN LUYỆN",
+    items: [
+      { name: "Tài liệu đào tạo", icon: BookCopy, href: "/training-documents", permission: "view_training_documents" },
+      { name: "Training Chatbot", icon: GraduationCap, href: "/training-chatbot", permission: "view_training_chatbot" },
+    ],
+  },
+  {
+    title: "Content",
+    items: [
+      { name: "Content AI", icon: Sparkles, href: "/content-ai", permission: "view_content_ai" },
+    ],
+  },
+  {
+    title: "Seeder",
+    items: [
+      { name: "Check Seeding", icon: CheckCircle, href: "/check-seeding", permission: "view_check_seeding" },
+    ],
+  },
+  {
+    title: "Công cụ",
+    items: [
+      { name: "Công cụ", icon: Wrench, href: "/tools", permission: "view_tools" },
+    ],
+  },
 ];
 
-const documentsNavItems: NavItem[] = [
-    { name: "Tài liệu đào tạo", icon: BookCopy, href: "/training-documents" },
-    { name: "Training Chatbot", icon: GraduationCap, href: "/training-chatbot" },
-];
-
-const contentNavItems: NavItem[] = [
-    { name: "Content AI", icon: Sparkles, href: "/content-ai" },
-];
-
-const seederNavItems: NavItem[] = [
-    { name: "Check Seeding", icon: CheckCircle, href: "/check-seeding" },
-];
-
-const toolsNavItems: NavItem[] = [
-    { name: "Công cụ", icon: Wrench, href: "/tools" },
-];
-
-const supportNavItems: NavItem[] = [
-    { name: "Nhân sự", icon: Users, href: "/staff" },
-    { name: "Cài đặt chung", icon: Settings, href: "/settings" },
+const bottomNavItems: NavItem[] = [
+    { name: "Nhân sự", icon: Users, href: "/staff", permission: "view_staff" },
+    { name: "Cài đặt chung", icon: Settings, href: "/settings", permission: "view_settings" },
 ];
 
 interface SidebarProps {
@@ -75,7 +88,7 @@ interface StaffProfile {
 export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps) {
   const location = useLocation();
   const { user } = useAuth();
-  const { isSuperAdmin } = usePermissions();
+  const { hasPermission } = usePermissions();
   const [profile, setProfile] = useState<StaffProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   useNotification();
@@ -90,22 +103,25 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
 
       setLoadingProfile(true);
       try {
-        const { data: staffData, error: staffError } = await supabase
-          .from('staff')
-          .select('role')
-          .eq('id', user.id)
+        const { data: roleData, error: roleError } = await supabase
+          .from('user_roles')
+          .select('roles(name)')
+          .eq('user_id', user.id)
           .single();
 
-        if (staffError && staffError.code !== 'PGRST116') { // Ignore 'not found' error
-          throw staffError;
+        if (roleError && roleError.code !== 'PGRST116') {
+          throw roleError;
         }
         
         const { data: { user: refreshedUser } } = await supabase.auth.getUser();
 
         if (refreshedUser) {
+            const roles = roleData?.roles as any; // Cast to any to handle potential type mismatch
+            const roleName = Array.isArray(roles) ? roles[0]?.name : roles?.name;
+
             setProfile({
                 name: refreshedUser.user_metadata?.full_name || refreshedUser.email || 'Người dùng',
-                role: staffData?.role || 'Thành viên',
+                role: roleName || 'Thành viên',
                 avatar_url: refreshedUser.user_metadata?.avatar_url
             });
         } else {
@@ -121,7 +137,7 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
     };
   
     fetchProfile();
-  }, [user, location]); // Re-fetch on location change to catch updates
+  }, [user]);
 
   const handleLogout = async () => {
     try {
@@ -183,7 +199,6 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
         className
       )}
     >
-      {/* Collapse Button */}
       <Button
         variant="ghost"
         size="icon"
@@ -193,7 +208,6 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
         <ChevronLeft className={cn("h-4 w-4 transition-transform", isCollapsed && "rotate-180")} />
       </Button>
 
-      {/* Logo */}
       <div className={cn("flex items-center", isCollapsed ? "justify-center h-10" : "")}>
         {isCollapsed ? (
           <div className="bg-blue-600 rounded-lg p-2 flex items-center justify-center">
@@ -204,7 +218,6 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
         )}
       </div>
 
-      {/* User Profile */}
       <div className={cn("flex items-center justify-between rounded-lg bg-white p-2 transition-opacity duration-200 min-h-[60px]", isCollapsed && "opacity-0 hidden")}>
         {loadingProfile ? (
             <div className="flex items-center space-x-3 animate-pulse w-full">
@@ -242,49 +255,25 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
         )}
       </div>
 
-      {/* Navigation */}
       <div className="flex-1 flex flex-col space-y-4 overflow-y-auto">
-        <div>
-            <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>General</p>
-            <nav className="flex flex-col space-y-1">
-                {generalNavItems.map(renderLink)}
-            </nav>
-        </div>
-        
-        <div>
-            <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>TÀI LIỆU & HUẤN LUYỆN</p>
-            <nav className="flex flex-col space-y-1">
-                {documentsNavItems.map(renderLink)}
-            </nav>
-        </div>
-
-        <div>
-            <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>Content</p>
-            <nav className="flex flex-col space-y-1">
-                {contentNavItems.map(renderLink)}
-            </nav>
-        </div>
-
-        <div>
-            <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>Seeder</p>
-            <nav className="flex flex-col space-y-1">
-                {seederNavItems.map(renderLink)}
-            </nav>
-        </div>
-
-        <div>
-            <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>Công cụ</p>
-            <nav className="flex flex-col space-y-1">
-                {toolsNavItems.map(renderLink)}
-            </nav>
-        </div>
+        {navSections.map(section => {
+          const accessibleItems = section.items.filter(item => hasPermission(item.permission));
+          if (accessibleItems.length === 0) return null;
+          return (
+            <div key={section.title}>
+              <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>{section.title}</p>
+              <nav className="flex flex-col space-y-1">
+                  {accessibleItems.map(renderLink)}
+              </nav>
+            </div>
+          );
+        })}
       </div>
 
-      {/* Admin and Settings at the bottom */}
        <div className="mt-auto">
          <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>CÀI ĐẶT CHUNG</p>
          <nav className="flex flex-col space-y-1">
-            {supportNavItems.map(renderLink)}
+            {bottomNavItems.filter(item => hasPermission(item.permission)).map(renderLink)}
          </nav>
        </div>
     </div>

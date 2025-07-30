@@ -30,7 +30,15 @@ serve(async (req) => {
     if (userRolesError) throw userRolesError;
 
     const staffMap = new Map(staffData.map(s => [s.id, s]));
-    const userRolesMap = new Map(userRolesData.map(ur => [ur.user_id, ur.roles.name]));
+    
+    const userRolesMap = new Map();
+    userRolesData.forEach(ur => {
+      const roles = ur.roles;
+      const roleName = Array.isArray(roles) ? roles[0]?.name : roles?.name;
+      if (roleName) {
+        userRolesMap.set(ur.user_id, roleName);
+      }
+    });
 
     const combinedUsers = users.map(user => {
       const staffInfo = staffMap.get(user.id) || {};
