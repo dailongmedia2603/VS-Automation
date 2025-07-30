@@ -274,7 +274,7 @@ const ContentAi = () => {
       <Dialog open={isProjectDialogOpen} onOpenChange={setIsProjectDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>{editingProject ? 'Sửa dự án' : 'Tạo dự án mới'}</DialogTitle>
+            <DialogTitle className="text-xl font-bold">{editingProject ? 'Sửa dự án' : 'Tạo dự án mới'}</DialogTitle>
             <DialogDescription>
               {editingProject ? 'Thay đổi tên cho dự án của bạn.' : 'Nhập tên cho dự án mới của bạn.'}
             </DialogDescription>
@@ -287,11 +287,12 @@ const ContentAi = () => {
               onChange={(e) => setProjectName(e.target.value)}
               placeholder="VD: Chiến dịch Marketing Mùa Hè"
               onKeyDown={(e) => e.key === 'Enter' && handleSaveProject()}
+              className="h-11 bg-slate-100/70 border-slate-200"
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsProjectDialogOpen(false)}>Hủy</Button>
-            <Button onClick={handleSaveProject} disabled={isSaving}>
+            <Button variant="outline" onClick={() => setIsProjectDialogOpen(false)} className="rounded-lg">Hủy</Button>
+            <Button onClick={handleSaveProject} disabled={isSaving} className="rounded-lg bg-blue-600 hover:bg-blue-700">
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Lưu
             </Button>
@@ -308,8 +309,8 @@ const ContentAi = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Hủy</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteProject} className="bg-red-600 hover:bg-red-700">Xóa</AlertDialogAction>
+            <AlertDialogCancel className="rounded-lg">Hủy</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteProject} className="bg-red-600 hover:bg-red-700 rounded-lg">Xóa</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
