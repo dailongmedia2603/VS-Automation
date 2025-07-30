@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { PlusCircle, Edit, Trash2, Search, Loader2, Upload } from 'lucide-react';
 import { showSuccess, showError } from '@/utils/toast';
 import { cn } from '@/lib/utils';
+import { usePermissions } from '@/contexts/PermissionContext';
 
 type StaffMember = {
   id: string; // Now UUID from auth.users
@@ -26,6 +27,7 @@ type StaffMember = {
 };
 
 const Staff = () => {
+  const { hasPermission } = usePermissions();
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -179,10 +181,12 @@ const Staff = () => {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Button onClick={handleAddNew} className="rounded-lg bg-blue-600 hover:bg-blue-700">
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Thêm nhân viên
-            </Button>
+            {hasPermission('create_staff') && (
+              <Button onClick={handleAddNew} className="rounded-lg bg-blue-600 hover:bg-blue-700">
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Thêm nhân viên
+              </Button>
+            )}
           </div>
           <div className="border rounded-lg overflow-hidden">
             <Table>
@@ -226,12 +230,16 @@ const Staff = () => {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" onClick={() => handleEdit(staff)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => { setStaffToDelete(staff); setIsAlertOpen(true); }}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                        {hasPermission('edit_staff') && (
+                          <Button variant="ghost" size="icon" onClick={() => handleEdit(staff)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {hasPermission('delete_staff') && (
+                          <Button variant="ghost" size="icon" onClick={() => { setStaffToDelete(staff); setIsAlertOpen(true); }}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))

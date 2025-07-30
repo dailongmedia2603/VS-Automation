@@ -27,47 +27,52 @@ import CompletionNotification from "./pages/CompletionNotification";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import CheckPostScan from "@/pages/tools/CheckPostScan";
 import CheckPostScanDetail from "@/pages/tools/CheckPostScanDetail";
+import { PermissionProvider } from "./contexts/PermissionContext";
+import Roles from "./pages/Roles";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <BrowserRouter>
     <AuthProvider>
-      <ApiSettingsProvider>
-        <QueryClientProvider client={queryClient}>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <NotificationProvider>
-              <Routes>
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                <Route element={<ProtectedRoute />}>
-                  <Route element={<AppLayout />}>
-                    <Route path="/" element={<Dashboard />} />
-                    <Route path="/projects" element={<Projects />} />
-                    <Route path="/settings" element={<Settings />} />
-                    <Route path="/training-chatbot" element={<TrainingChatbot />} />
-                    <Route path="/training-documents" element={<TrainingDocuments />} />
-                    <Route path="/staff" element={<Staff />} />
-                    <Route path="/content-ai" element={<ContentAi />} />
-                    <Route path="/content-ai/:projectId" element={<ProjectDetail />} />
-                    <Route path="/check-seeding" element={<CheckSeeding />} />
-                    <Route path="/check-seeding/:projectId" element={<SeedingProjectDetail />} />
-                    <Route path="/completion-notification" element={<CompletionNotification />} />
-                    <Route path="/tools" element={<Tools />} />
-                    <Route path="/tools/check-keyword-comment" element={<CheckKeywordComment />} />
-                    <Route path="/tools/check-keyword-comment/:projectId" element={<CheckKeywordCommentDetail />} />
-                    <Route path="/tools/check-post-scan" element={<CheckPostScan />} />
-                    <Route path="/tools/check-post-scan/:projectId" element={<CheckPostScanDetail />} />
+      <PermissionProvider>
+        <ApiSettingsProvider>
+          <QueryClientProvider client={queryClient}>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <NotificationProvider>
+                <Routes>
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/register" element={<Register />} />
+                  <Route element={<ProtectedRoute />}>
+                    <Route element={<AppLayout />}>
+                      <Route path="/" element={<Dashboard />} />
+                      <Route path="/projects" element={<Projects />} />
+                      <Route path="/settings" element={<Settings />} />
+                      <Route path="/training-chatbot" element={<TrainingChatbot />} />
+                      <Route path="/training-documents" element={<TrainingDocuments />} />
+                      <Route path="/staff" element={<Staff />} />
+                      <Route path="/content-ai" element={<ContentAi />} />
+                      <Route path="/content-ai/:projectId" element={<ProjectDetail />} />
+                      <Route path="/check-seeding" element={<CheckSeeding />} />
+                      <Route path="/check-seeding/:projectId" element={<SeedingProjectDetail />} />
+                      <Route path="/completion-notification" element={<CompletionNotification />} />
+                      <Route path="/tools" element={<Tools />} />
+                      <Route path="/tools/check-keyword-comment" element={<CheckKeywordComment />} />
+                      <Route path="/tools/check-keyword-comment/:projectId" element={<CheckKeywordCommentDetail />} />
+                      <Route path="/tools/check-post-scan" element={<CheckPostScan />} />
+                      <Route path="/tools/check-post-scan/:projectId" element={<CheckPostScanDetail />} />
+                      <Route path="/roles" element={<Roles />} />
+                    </Route>
                   </Route>
-                </Route>
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </NotificationProvider>
-          </TooltipProvider>
-        </QueryClientProvider>
-      </ApiSettingsProvider>
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </NotificationProvider>
+            </TooltipProvider>
+          </QueryClientProvider>
+        </ApiSettingsProvider>
+      </PermissionProvider>
     </AuthProvider>
   </BrowserRouter>
 );

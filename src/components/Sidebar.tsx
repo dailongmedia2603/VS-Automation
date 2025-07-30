@@ -11,6 +11,7 @@ import {
   Sparkles,
   CheckCircle,
   Wrench,
+  Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link, useLocation } from "react-router-dom";
@@ -23,6 +24,7 @@ import hexaLogo from "@/assets/images/dailongmedia.png";
 import { useAuth } from "@/contexts/AuthContext";
 import { showSuccess, showError } from "@/utils/toast";
 import { useNotification } from "@/contexts/NotificationContext";
+import { usePermissions } from "@/contexts/PermissionContext";
 
 interface NavItem {
   name: string;
@@ -53,6 +55,10 @@ const toolsNavItems: NavItem[] = [
     { name: "Công cụ", icon: Wrench, href: "/tools" },
 ];
 
+const adminNavItems: NavItem[] = [
+    { name: "Phân quyền", icon: Shield, href: "/roles" },
+];
+
 const supportNavItems: NavItem[] = [
     { name: "Nhân sự", icon: Users, href: "/staff" },
     { name: "Cài đặt chung", icon: Settings, href: "/settings" },
@@ -73,6 +79,7 @@ interface StaffProfile {
 export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps) {
   const location = useLocation();
   const { user } = useAuth();
+  const { isSuperAdmin } = usePermissions();
   const [profile, setProfile] = useState<StaffProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   useNotification();
@@ -277,8 +284,16 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
         </div>
       </div>
 
-      {/* Support/Settings at the bottom */}
+      {/* Admin and Settings at the bottom */}
        <div className="mt-auto">
+         {isSuperAdmin && (
+            <div className="mb-4">
+                <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>Quản trị</p>
+                <nav className="flex flex-col space-y-1">
+                    {adminNavItems.map(renderLink)}
+                </nav>
+            </div>
+         )}
          <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>CÀI ĐẶT CHUNG</p>
          <nav className="flex flex-col space-y-1">
             {supportNavItems.map(renderLink)}
