@@ -35,7 +35,7 @@ export const PermissionProvider = ({ children }: { children: ReactNode }) => {
       if (permissionsRes.error) throw permissionsRes.error;
       if (superAdminRes.error) throw superAdminRes.error;
 
-      setPermissions(permissionsRes.data?.map(p => p.permission_action) || []);
+      setPermissions(permissionsRes.data?.map((p: { permission_action: string }) => p.permission_action) || []);
       setIsSuperAdmin(superAdminRes.data || false);
     } catch (error: any) {
       console.error("Failed to fetch user permissions:", error.message);
