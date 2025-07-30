@@ -96,6 +96,18 @@ const RolesManager = () => {
       return newSet;
     });
   };
+  
+  const handleSelectAllForGroup = (groupPermissions: Permission[], checked: boolean) => {
+    setSelectedPermissions(prev => {
+      const newSet = new Set(prev);
+      if (checked) {
+        groupPermissions.forEach(p => newSet.add(p.id));
+      } else {
+        groupPermissions.forEach(p => newSet.delete(p.id));
+      }
+      return newSet;
+    });
+  };
 
   const handleSaveRole = async () => {
     if (!editingRole || !editingRole.name?.trim()) {
@@ -240,51 +252,65 @@ const RolesManager = () => {
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
-            <DialogTitle>{editingRole?.id ? 'Sửa vai trò' : 'Thêm vai trò mới'}</DialogTitle>
-            <DialogDescription>Điền thông tin và chọn các quyền hạn cho vai trò này.</DialogDescription>
+            <DialogTitle className="text-xl font-bold">{editingRole?.id ? 'Sửa vai trò' : 'Thêm vai trò mới'}</DialogTitle>
+            <DialogDescription>Điền thông tin và chọn các quyền hạn chi tiết cho vai trò này.</DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-3 gap-6 py-4">
-            <div className="col-span-1 space-y-4">
-              <div className="space-y-2"><Label>Tên vai trò</Label><Input value={editingRole?.name || ''} onChange={(e) => setEditingRole(r => ({...r, name: e.target.value}))} /></div>
-              <div className="space-y-2"><Label>Mô tả</Label><Input value={editingRole?.description || ''} onChange={(e) => setEditingRole(r => ({...r, description: e.target.value}))} /></div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-4">
+            <div className="md:col-span-1 space-y-6">
+              <Card className="shadow-none border">
+                <CardHeader><CardTitle className="text-lg">Thông tin vai trò</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2"><Label htmlFor="role-name">Tên vai trò</Label><Input id="role-name" value={editingRole?.name || ''} onChange={(e) => setEditingRole(r => ({...r, name: e.target.value}))} /></div>
+                  <div className="space-y-2"><Label htmlFor="role-desc">Mô tả</Label><Input id="role-desc" value={editingRole?.description || ''} onChange={(e) => setEditingRole(r => ({...r, description: e.target.value}))} /></div>
+                </CardContent>
+              </Card>
             </div>
-            <div className="col-span-2">
-              <Label>Quyền hạn</Label>
-              <ScrollArea className="h-64 border rounded-md p-2 mt-2">
-                <Accordion type="multiple" className="w-full">
-                  {Object.entries(groupedPermissions).map(([key, perms]) => (
-                    <AccordionItem value={key} key={key}>
-                      <AccordionTrigger className="px-2 py-2 text-sm font-semibold">{featureMapping[key] || key}</AccordionTrigger>
-                      <AccordionContent className="px-2 pt-2">
-                        <div className="space-y-2">
-                          {perms.map(p => (
-                            <div key={p.id} className="flex items-center space-x-2">
-                              <Checkbox id={`perm-${p.id}`} checked={selectedPermissions.has(p.id)} onCheckedChange={(checked) => handlePermissionChange(p.id, !!checked)} />
-                              <Label htmlFor={`perm-${p.id}`} className="font-normal capitalize">{p.action.split('_').join(' ')}</Label>
-                            </div>
-                          ))}
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              </ScrollArea>
+            <div className="md:col-span-2">
+              <Card className="shadow-none border">
+                <CardHeader><CardTitle className="text-lg">Quyền hạn</CardTitle></CardHeader>
+                <CardContent>
+                  <ScrollArea className="h-80 pr-4">
+                    <Accordion type="multiple" className="w-full space-y-2">
+                      {Object.entries(groupedPermissions).map(([key, perms]) => {
+                        const allInGroupSelected = perms.every(p => selectedPermissions.has(p.id));
+                        return (
+                          <AccordionItem value={key} key={key} className="border rounded-lg px-4 bg-slate-50/50">
+                            <AccordionTrigger className="hover:no-underline py-3">
+                              <div className="flex items-center gap-3 w-full" onClick={(e) => e.stopPropagation()}>
+                                <Checkbox id={`select-all-${key}`} checked={allInGroupSelected} onCheckedChange={(checked) => handleSelectAllForGroup(perms, !!checked)} aria-label={`Select all for ${featureMapping[key]}`} />
+                                <Label htmlFor={`select-all-${key}`} className="font-semibold text-slate-800 cursor-pointer">{featureMapping[key] || key}</Label>
+                              </div>
+                            </AccordionTrigger>
+                            <AccordionContent className="pt-2 pb-4">
+                              <div className="grid grid-cols-2 gap-x-4 gap-y-3 pl-8">
+                                {perms.map(p => (
+                                  <div key={p.id} className="flex items-center space-x-2">
+                                    <Checkbox id={`perm-${p.id}`} checked={selectedPermissions.has(p.id)} onCheckedChange={(checked) => handlePermissionChange(p.id, !!checked)} />
+                                    <Label htmlFor={`perm-${p.id}`} className="font-normal capitalize text-slate-600 cursor-pointer">{p.action.split('_').join(' ')}</Label>
+                                  </div>
+                                ))}
+                              </div>
+                            </AccordionContent>
+                          </AccordionItem>
+                        );
+                      })}
+                    </Accordion>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Hủy</Button>
-            <Button onClick={handleSaveRole} disabled={isSaving}>{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Lưu</Button>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="rounded-lg">Hủy</Button>
+            <Button onClick={handleSaveRole} disabled={isSaving} className="rounded-lg bg-blue-600 hover:bg-blue-700">{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Lưu</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <AlertDialog open={!!roleToDelete} onOpenChange={() => setRoleToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Bạn có chắc chắn?</AlertDialogTitle><AlertDialogDescription>Hành động này sẽ xóa vai trò "{roleToDelete?.name}".</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>Hủy</AlertDialogCancel><AlertDialogAction onClick={handleDeleteRole} className="bg-red-600">Xóa</AlertDialogAction></AlertDialogFooter>
-        </AlertDialogContent>
+        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Bạn có chắc chắn?</AlertDialogTitle><AlertDialogDescription>Hành động này sẽ xóa vai trò "{roleToDelete?.name}".</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Hủy</AlertDialogCancel><AlertDialogAction onClick={handleDeleteRole} className="bg-red-600">Xóa</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
     </>
   );
