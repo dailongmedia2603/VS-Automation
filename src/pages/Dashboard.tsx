@@ -4,8 +4,34 @@ import { StatCard } from "@/components/dashboard/StatCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Heart, ShoppingBag, Volume2 } from "lucide-react";
+import { usePermissions } from "@/contexts/PermissionContext";
+import Welcome from "./Welcome";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const Dashboard = () => {
+  const { hasPermission, isLoading } = usePermissions();
+
+  if (isLoading) {
+    return (
+        <main className="flex-1 space-y-6 p-6 sm:p-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 space-y-6">
+                    <Skeleton className="h-48 w-full rounded-2xl" />
+                    <Skeleton className="h-80 w-full rounded-2xl" />
+                </div>
+                <div className="space-y-6">
+                    <Skeleton className="h-64 w-full rounded-2xl" />
+                    <Skeleton className="h-64 w-full rounded-2xl" />
+                </div>
+            </div>
+        </main>
+    );
+  }
+
+  if (!hasPermission('view_dashboard')) {
+    return <Welcome />;
+  }
+
   return (
     <main className="flex-1 space-y-6 p-6 sm:p-8">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
