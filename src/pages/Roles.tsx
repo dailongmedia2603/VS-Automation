@@ -10,14 +10,28 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, Edit, Trash2, Loader2, Users, ShieldCheck } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Loader2 } from 'lucide-react';
 import { showSuccess, showError } from '@/utils/toast';
 import { usePermissions } from '@/contexts/PermissionContext';
 import { Navigate } from 'react-router-dom';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 type Role = { id: number; name: string; description: string | null; };
 type Permission = { id: number; action: string; description: string | null; };
 type RolePermission = { role_id: number; permission_id: number; };
+
+const featureMapping: Record<string, string> = {
+  dashboard: 'Dashboard',
+  projects: 'Dự án',
+  reports: 'Báo cáo',
+  training_documents: 'Tài liệu đào tạo',
+  training_chatbot: 'Training Chatbot',
+  content_ai: 'Content AI',
+  check_seeding: 'Check Seeding',
+  tools: 'Công cụ',
+  staff: 'Nhân sự',
+  settings: 'Cài đặt chung',
+};
 
 const Roles = () => {
   const { isSuperAdmin, isLoading: isLoadingPermissions } = usePermissions();
@@ -38,7 +52,7 @@ const Roles = () => {
     try {
       const [rolesRes, permissionsRes, rolePermissionsRes] = await Promise.all([
         supabase.from('roles').select('*'),
-        supabase.from('permissions').select('*'),
+        supabase.from('permissions').select('*').order('action'),
         supabase.from('role_permissions').select('*')
       ]);
       if (rolesRes.error) throw rolesRes.error;
@@ -98,7 +112,6 @@ const Roles = () => {
         roleId = data.id;
       }
 
-      // Sync permissions
       await supabase.from('role_permissions').delete().eq('role_id', roleId);
       const permissionsToInsert = Array.from(selectedPermissions).map(pid => ({ role_id: roleId!, permission_id: pid }));
       if (permissionsToInsert.length > 0) {
@@ -138,6 +151,19 @@ const Roles = () => {
     });
     return map;
   }, [roles, permissions, rolePermissions]);
+
+  const groupedPermissions = useMemo(() => {
+    return permissions.reduce((acc, p) => {
+      const featureKey = Object.keys(featureMapping).find(key => p.action.includes(key));
+      if (featureKey) {
+        if (!acc[featureKey]) {
+          acc[featureKey] = [];
+        }
+        acc[featureKey].push(p);
+      }
+      return acc;
+    }, {} as Record<string, Permission[]>);
+  }, [permissions]);
 
   if (isLoadingPermissions) {
     return <main className="flex-1 p-6 sm:p-8"><Skeleton className="h-full w-full" /></main>;
@@ -224,15 +250,24 @@ const Roles = () => {
             </div>
             <div className="col-span-2">
               <Label>Quyền hạn</Label>
-              <ScrollArea className="h-64 border rounded-md p-4 mt-2">
-                <div className="space-y-2">
-                  {permissions.map(p => (
-                    <div key={p.id} className="flex items-center space-x-2">
-                      <Checkbox id={`perm-${p.id}`} checked={selectedPermissions.has(p.id)} onCheckedChange={(checked) => handlePermissionChange(p.id, !!checked)} />
-                      <Label htmlFor={`perm-${p.id}`} className="font-normal">{p.action}</Label>
-                    </div>
+              <ScrollArea className="h-64 border rounded-md p-2 mt-2">
+                <Accordion type="multiple" className="w-full">
+                  {Object.entries(groupedPermissions).map(([key, perms]) => (
+                    <AccordionItem value={key} key={key}>
+                      <AccordionTrigger className="px-2 py-2 text-sm font-semibold">{featureMapping[key] || key}</AccordionTrigger>
+                      <AccordionContent className="px-2 pt-2">
+                        <div className="space-y-2">
+                          {perms.map(p => (
+                            <div key={p.id} className="flex items-center space-x-2">
+                              <Checkbox id={`perm-${p.id}`} checked={selectedPermissions.has(p.id)} onCheckedChange={(checked) => handlePermissionChange(p.id, !!checked)} />
+                              <Label htmlFor={`perm-${p.id}`} className="font-normal capitalize">{p.action.split('_').join(' ')}</Label>
+                            </div>
+                          ))}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
                   ))}
-                </div>
+                </Accordion>
               </ScrollArea>
             </div>
           </div>
