@@ -28,7 +28,9 @@ const featureMapping: Record<string, string> = {
   training_chatbot: 'Training Chatbot',
   content_ai: 'Content AI',
   check_seeding: 'Check Seeding',
-  tools: 'Công cụ',
+  tools: 'Công cụ chung',
+  keyword_check: 'Công cụ - Keyword Check',
+  post_scan: 'Công cụ - Post Scan',
   staff: 'Nhân sự',
   settings: 'Cài đặt chung',
 };
