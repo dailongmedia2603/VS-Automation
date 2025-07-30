@@ -21,19 +21,26 @@ serve(async (req) => {
     const { data: { users }, error: usersError } = await supabaseAdmin.auth.admin.listUsers();
     if (usersError) throw usersError;
 
-    const { data: staffData, error: staffError } = await supabaseAdmin.from('staff').select('*');
+    const { data: staffData, error: staffError } = await supabaseAdmin.from('staff').select('id, status');
     if (staffError) throw staffError;
 
-    const staffMap = new Map(staffData ? staffData.map(s => [s.id, s]) : []);
+    const { data: userRolesData, error: userRolesError } = await supabaseAdmin
+      .from('user_roles')
+      .select('user_id, roles(name)');
+    if (userRolesError) throw userRolesError;
+
+    const staffMap = new Map(staffData.map(s => [s.id, s]));
+    const userRolesMap = new Map(userRolesData.map(ur => [ur.user_id, ur.roles.name]));
 
     const combinedUsers = users.map(user => {
       const staffInfo = staffMap.get(user.id) || {};
+      const roleName = userRolesMap.get(user.id) || 'Chưa có vai trò';
       return {
         id: user.id,
         email: user.email,
         name: user.user_metadata?.full_name || user.email,
         avatar_url: user.user_metadata?.avatar_url,
-        role: staffInfo.role || 'Chưa có chức vụ',
+        role: roleName,
         status: staffInfo.status || 'active',
       };
     });

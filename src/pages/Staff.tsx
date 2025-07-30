@@ -28,9 +28,12 @@ type StaffMember = {
   password?: string;
 };
 
+type Role = { id: number; name: string; };
+
 const StaffList = () => {
   const { hasPermission } = usePermissions();
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -42,25 +45,32 @@ const StaffList = () => {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchStaff = async () => {
+  const fetchData = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('list-users');
-      if (error) throw error;
-      setStaffList(data as StaffMember[] || []);
+      const [staffRes, rolesRes] = await Promise.all([
+        supabase.functions.invoke('list-users'),
+        supabase.from('roles').select('id, name')
+      ]);
+      
+      if (staffRes.error) throw staffRes.error;
+      if (rolesRes.error) throw rolesRes.error;
+
+      setStaffList(staffRes.data as StaffMember[] || []);
+      setRoles(rolesRes.data || []);
     } catch (error: any) {
-      showError("Không thể tải danh sách nhân sự: " + error.message);
+      showError("Không thể tải dữ liệu: " + error.message);
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchStaff();
+    fetchData();
   }, []);
 
   const handleAddNew = () => {
-    setSelectedStaff({ name: '', role: '', email: '', status: 'active', avatar_url: '', password: '' });
+    setSelectedStaff({ name: '', role: 'Member', email: '', status: 'active', avatar_url: '', password: '' });
     setAvatarFile(null);
     setAvatarPreview(null);
     setIsDialogOpen(true);
@@ -136,7 +146,7 @@ const StaffList = () => {
       }
       
       setIsDialogOpen(false);
-      fetchStaff();
+      fetchData();
     } catch (error: any) {
       showError("Lưu thông tin thất bại: " + error.message);
     } finally {
@@ -184,7 +194,7 @@ const StaffList = () => {
           </div>
         </CardContent>
       </Card>
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}><DialogContent className="sm:max-w-[425px]"><DialogHeader><DialogTitle>{selectedStaff?.id ? 'Sửa thông tin nhân sự' : 'Thêm nhân sự mới'}</DialogTitle><DialogDescription>Điền thông tin chi tiết cho nhân viên.</DialogDescription></DialogHeader><div className="space-y-4 py-4"><div className="flex flex-col items-center gap-4"><Avatar className="h-24 w-24"><AvatarImage src={avatarPreview ?? undefined} /><AvatarFallback className="text-3xl">{selectedStaff?.name?.charAt(0) || '?'}</AvatarFallback></Avatar><input type="file" accept="image/*" ref={avatarInputRef} onChange={handleAvatarChange} className="hidden" /><Button type="button" variant="outline" onClick={() => avatarInputRef.current?.click()}><Upload className="mr-2 h-4 w-4" />Tải ảnh lên</Button></div><div className="space-y-2"><Label htmlFor="name">Tên nhân viên</Label><Input id="name" value={selectedStaff?.name || ''} onChange={(e) => setSelectedStaff({ ...selectedStaff, name: e.target.value })} className="bg-slate-100 border-none rounded-lg" /></div><div className="space-y-2"><Label htmlFor="email">Email</Label><Input id="email" type="email" value={selectedStaff?.email || ''} onChange={(e) => setSelectedStaff({ ...selectedStaff, email: e.target.value })} className="bg-slate-100 border-none rounded-lg" disabled={!!selectedStaff?.id} /></div>{!selectedStaff?.id && (<div className="space-y-2"><Label htmlFor="password">Mật khẩu</Label><Input id="password" type="password" value={selectedStaff?.password || ''} onChange={(e) => setSelectedStaff({ ...selectedStaff, password: e.target.value })} className="bg-slate-100 border-none rounded-lg" /></div>)}<div className="space-y-2"><Label htmlFor="role">Chức vụ</Label><Input id="role" value={selectedStaff?.role || ''} onChange={(e) => setSelectedStaff({ ...selectedStaff, role: e.target.value })} className="bg-slate-100 border-none rounded-lg" /></div><div className="space-y-2"><Label htmlFor="status">Trạng thái</Label><Select value={selectedStaff?.status || 'active'} onValueChange={(value) => setSelectedStaff({ ...selectedStaff, status: value as 'active' | 'inactive' })}><SelectTrigger className="bg-slate-100 border-none rounded-lg"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Hoạt động</SelectItem><SelectItem value="inactive">Tạm nghỉ</SelectItem></SelectContent></Select></div></div><DialogFooter><Button variant="outline" onClick={() => setIsDialogOpen(false)} className="rounded-lg">Hủy</Button><Button onClick={handleSave} disabled={isSaving} className="rounded-lg bg-blue-600 hover:bg-blue-700">{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Lưu</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}><DialogContent className="sm:max-w-[425px]"><DialogHeader><DialogTitle>{selectedStaff?.id ? 'Sửa thông tin nhân sự' : 'Thêm nhân sự mới'}</DialogTitle><DialogDescription>Điền thông tin chi tiết cho nhân viên.</DialogDescription></DialogHeader><div className="space-y-4 py-4"><div className="flex flex-col items-center gap-4"><Avatar className="h-24 w-24"><AvatarImage src={avatarPreview ?? undefined} /><AvatarFallback className="text-3xl">{selectedStaff?.name?.charAt(0) || '?'}</AvatarFallback></Avatar><input type="file" accept="image/*" ref={avatarInputRef} onChange={handleAvatarChange} className="hidden" /><Button type="button" variant="outline" onClick={() => avatarInputRef.current?.click()}><Upload className="mr-2 h-4 w-4" />Tải ảnh lên</Button></div><div className="space-y-2"><Label htmlFor="name">Tên nhân viên</Label><Input id="name" value={selectedStaff?.name || ''} onChange={(e) => setSelectedStaff({ ...selectedStaff, name: e.target.value })} className="bg-slate-100 border-none rounded-lg" /></div><div className="space-y-2"><Label htmlFor="email">Email</Label><Input id="email" type="email" value={selectedStaff?.email || ''} onChange={(e) => setSelectedStaff({ ...selectedStaff, email: e.target.value })} className="bg-slate-100 border-none rounded-lg" disabled={!!selectedStaff?.id} /></div>{!selectedStaff?.id && (<div className="space-y-2"><Label htmlFor="password">Mật khẩu</Label><Input id="password" type="password" value={selectedStaff?.password || ''} onChange={(e) => setSelectedStaff({ ...selectedStaff, password: e.target.value })} className="bg-slate-100 border-none rounded-lg" /></div>)}<div className="space-y-2"><Label htmlFor="role">Chức vụ</Label><Select value={selectedStaff?.role || ''} onValueChange={(value) => setSelectedStaff({ ...selectedStaff, role: value })}><SelectTrigger className="bg-slate-100 border-none rounded-lg"><SelectValue /></SelectTrigger><SelectContent>{roles.map(role => <SelectItem key={role.id} value={role.name}>{role.name}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><Label htmlFor="status">Trạng thái</Label><Select value={selectedStaff?.status || 'active'} onValueChange={(value) => setSelectedStaff({ ...selectedStaff, status: value as 'active' | 'inactive' })}><SelectTrigger className="bg-slate-100 border-none rounded-lg"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Hoạt động</SelectItem><SelectItem value="inactive">Tạm nghỉ</SelectItem></SelectContent></Select></div></div><DialogFooter><Button variant="outline" onClick={() => setIsDialogOpen(false)} className="rounded-lg">Hủy</Button><Button onClick={handleSave} disabled={isSaving} className="rounded-lg bg-blue-600 hover:bg-blue-700">{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Lưu</Button></DialogFooter></DialogContent></Dialog>
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Bạn có chắc chắn muốn xóa?</AlertDialogTitle><AlertDialogDescription>Hành động này không thể hoàn tác. Nhân sự "{staffToDelete?.name}" sẽ bị xóa vĩnh viễn khỏi hệ thống.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setStaffToDelete(null)} className="rounded-lg">Hủy</AlertDialogCancel><AlertDialogAction onClick={handleDelete} disabled={isSaving} className="rounded-lg bg-red-600 hover:bg-red-700">{isSaving ? 'Đang xóa...' : 'Xóa'}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     </>
   );

@@ -41,14 +41,31 @@ serve(async (req) => {
       .from('staff')
       .insert({
         id: user.id,
-        role: 'Thành viên',
         status: 'active'
       });
 
     if (staffError) {
-      // If creating the staff profile fails, delete the auth user to keep data consistent
       await supabaseAdmin.auth.admin.deleteUser(user.id);
       throw staffError;
+    }
+
+    // Assign the default 'Member' role
+    const { data: memberRole, error: roleError } = await supabaseAdmin
+        .from('roles')
+        .select('id')
+        .eq('name', 'Member')
+        .single();
+    
+    if (roleError) {
+        console.error("Default 'Member' role not found. New user will not have a role assigned.");
+    } else {
+        const { error: userRoleError } = await supabaseAdmin
+            .from('user_roles')
+            .insert({ user_id: user.id, role_id: memberRole.id });
+        
+        if (userRoleError) {
+            console.error(`Failed to assign default role to user ${user.id}:`, userRoleError.message);
+        }
     }
 
     return new Response(JSON.stringify(user), {

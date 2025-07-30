@@ -22,7 +22,6 @@ serve(async (req) => {
     );
 
     // Step 1: Update user metadata in auth.users
-    // CORRECTED: The key should be 'user_metadata', not 'data'.
     const authUpdateData = {
       user_metadata: {
         full_name: name,
@@ -32,17 +31,30 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabaseAdmin.auth.admin.updateUserById(userId, authUpdateData);
     if (authError) throw authError;
 
-    // Step 2: Upsert role and status in public.staff
-    const staffUpsertData = {
-        id: userId,
-        role: role,
-        status: status,
-    };
+    // Step 2: Update status in public.staff
     const { error: staffError } = await supabaseAdmin
         .from('staff')
-        .upsert(staffUpsertData);
-        
+        .update({ status: status })
+        .eq('id', userId);
     if (staffError) throw staffError;
+
+    // Step 3: Update user's role in user_roles
+    if (role) {
+        const { data: roleData, error: roleError } = await supabaseAdmin
+            .from('roles')
+            .select('id')
+            .eq('name', role)
+            .single();
+        
+        if (roleError) throw new Error(`Role '${role}' not found.`);
+
+        await supabaseAdmin.from('user_roles').delete().eq('user_id', userId);
+
+        const { error: insertRoleError } = await supabaseAdmin
+            .from('user_roles')
+            .insert({ user_id: userId, role_id: roleData.id });
+        if (insertRoleError) throw insertRoleError;
+    }
 
     return new Response(JSON.stringify(user), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
