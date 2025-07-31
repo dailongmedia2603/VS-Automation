@@ -156,6 +156,15 @@ const ProjectDetail = () => {
     setCommentRatios(commentRatios.map(r => r.id === id ? { ...r, [field]: value } : r));
   };
 
+  const handleItemUpdate = (updatedItem: ProjectItem) => {
+    setItems(prevItems => 
+        prevItems.map(item => item.id === updatedItem.id ? updatedItem : item)
+    );
+    if (selectedView && typeof selectedView === 'object' && selectedView.id === updatedItem.id) {
+        setSelectedView(updatedItem);
+    }
+  };
+
   const articles = items.filter(item => item.type === 'article');
   const comments = items.filter(item => item.type === 'comment');
 
@@ -229,7 +238,7 @@ const ProjectDetail = () => {
               {selectedView === 'documents' && projectId && <ProjectDocumentsManager projectId={projectId} />}
               
               {selectedView && typeof selectedView === 'object' && selectedView.type === 'comment' && (
-                <CommentGenerationDetail project={project} item={selectedView} promptLibraries={promptLibraries} onSave={fetchProjectData} />
+                <CommentGenerationDetail project={project} item={selectedView} promptLibraries={promptLibraries} onSave={handleItemUpdate} />
               )}
 
               {selectedView && typeof selectedView === 'object' && selectedView.type === 'article' && (

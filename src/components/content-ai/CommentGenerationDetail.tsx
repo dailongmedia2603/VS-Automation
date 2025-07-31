@@ -28,7 +28,7 @@ interface CommentGenerationDetailProps {
   project: Project;
   item: ProjectItem;
   promptLibraries: PromptLibrary[];
-  onSave: () => void;
+  onSave: (updatedItem: ProjectItem) => void;
 }
 
 export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave }: CommentGenerationDetailProps) => {
@@ -80,15 +80,16 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
     setIsSaving(true);
     const { data, error } = await supabase
       .from('content_ai_items')
-      .update({ config })
+      .update({ config, updated_at: new Date().toISOString() })
       .eq('id', item.id)
-      .select();
+      .select()
+      .single();
 
     if (error) {
       showError("Lưu cấu hình thất bại: " + error.message);
-    } else if (data && data.length > 0) {
+    } else if (data) {
       showSuccess("Đã lưu cấu hình thành công!");
-      onSave();
+      onSave(data as ProjectItem);
     } else {
       showError("Lưu thất bại. Không tìm thấy mục để cập nhật hoặc bạn không có quyền.");
     }
