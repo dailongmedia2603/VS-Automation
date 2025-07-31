@@ -78,12 +78,19 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
 
   const handleSaveConfig = async () => {
     setIsSaving(true);
-    const { error } = await supabase.from('content_ai_items').update({ config }).eq('id', item.id);
+    const { data, error } = await supabase
+      .from('content_ai_items')
+      .update({ config })
+      .eq('id', item.id)
+      .select();
+
     if (error) {
       showError("Lưu cấu hình thất bại: " + error.message);
-    } else {
+    } else if (data && data.length > 0) {
       showSuccess("Đã lưu cấu hình thành công!");
       onSave();
+    } else {
+      showError("Lưu thất bại. Không tìm thấy mục để cập nhật hoặc bạn không có quyền.");
     }
     setIsSaving(false);
   };
