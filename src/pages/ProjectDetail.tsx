@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, MessageSquare, FileText, PlusCircle, UploadCloud, ChevronRight, Loader2, BookOpen, Trash2 } from 'lucide-react';
+import { ArrowLeft, MessageSquare, FileText, PlusCircle, UploadCloud, ChevronRight, Loader2, BookOpen } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -11,9 +11,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { ProjectDocumentsManager } from '@/components/content-ai/ProjectDocumentsManager';
+import { CommentGenerationDetail } from '@/components/content-ai/CommentGenerationDetail';
 
 type Project = {
   id: number;
@@ -25,17 +25,12 @@ type ProjectItem = {
   name: string;
   type: 'article' | 'comment';
   content: string | null;
+  config: any;
 };
 
 type PromptLibrary = {
   id: number;
   name: string;
-};
-
-type CommentRatio = {
-  id: string;
-  percentage: number;
-  content: string;
 };
 
 const ProjectDetail = () => {
@@ -48,11 +43,6 @@ const ProjectDetail = () => {
   const [newItem, setNewItem] = useState({ name: '', type: 'article' as 'article' | 'comment' });
   const [isSaving, setIsSaving] = useState(false);
   const [promptLibraries, setPromptLibraries] = useState<PromptLibrary[]>([]);
-  const [commentRatios, setCommentRatios] = useState<CommentRatio[]>([{ id: crypto.randomUUID(), percentage: 100, content: '' }]);
-
-  const totalPercentage = useMemo(() => {
-    return commentRatios.reduce((sum, ratio) => sum + (Number(ratio.percentage) || 0), 0);
-  }, [commentRatios]);
 
   const fetchProjectData = async () => {
     if (!projectId) return;
@@ -93,8 +83,6 @@ const ProjectDetail = () => {
     }
     setIsSaving(true);
     try {
-      // Here you would gather the config data from the form state
-      // For now, we just insert the basic item
       const { error } = await supabase.from('content_ai_items').insert({ ...newItem, project_id: projectId });
       if (error) throw error;
       showSuccess("Đã thêm mục mới thành công!");
@@ -106,20 +94,6 @@ const ProjectDetail = () => {
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const handleAddRatio = () => {
-    setCommentRatios([...commentRatios, { id: crypto.randomUUID(), percentage: 0, content: '' }]);
-  };
-
-  const handleRemoveRatio = (id: string) => {
-    if (commentRatios.length > 1) {
-      setCommentRatios(commentRatios.filter(r => r.id !== id));
-    }
-  };
-
-  const handleRatioChange = (id: string, field: 'percentage' | 'content', value: string | number) => {
-    setCommentRatios(commentRatios.map(r => r.id === id ? { ...r, [field]: value } : r));
   };
 
   const articles = items.filter(item => item.type === 'article');
@@ -191,14 +165,20 @@ const ProjectDetail = () => {
           </ResizablePanel>
           <ResizableHandle withHandle />
           <ResizablePanel defaultSize={75}>
-            <div className="h-full p-6">
+            <div className="h-full p-6 overflow-y-auto">
               {selectedView === 'documents' && projectId && <ProjectDocumentsManager projectId={projectId} />}
-              {selectedView && typeof selectedView === 'object' && (
+              
+              {selectedView && typeof selectedView === 'object' && selectedView.type === 'comment' && (
+                <CommentGenerationDetail project={project} item={selectedView} promptLibraries={promptLibraries} onSave={fetchProjectData} />
+              )}
+
+              {selectedView && typeof selectedView === 'object' && selectedView.type === 'article' && (
                 <div>
                   <h2 className="text-xl font-bold">{selectedView.name}</h2>
                   <p className="mt-4 text-slate-600 whitespace-pre-wrap">{selectedView.content || "Chưa có nội dung."}</p>
                 </div>
               )}
+
               {!selectedView && (
                 <div className="h-full flex items-center justify-center text-center text-slate-500">
                   <div>
@@ -213,125 +193,13 @@ const ProjectDetail = () => {
       </main>
 
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Thêm mục mới</DialogTitle>
-            <DialogDescription>Điền các thông tin cần thiết để AI tạo nội dung.</DialogDescription>
-          </DialogHeader>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Thêm mục mới</DialogTitle><DialogDescription>Chọn loại và đặt tên cho mục mới của bạn.</DialogDescription></DialogHeader>
           <div className="py-4 space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="post-name">Tên bài viết</Label>
-              <Input id="post-name" value={newItem.name} onChange={(e) => setNewItem(d => ({...d, name: e.target.value}))} placeholder="VD: Bài viết về sản phẩm A" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="post-type">Loại</Label>
-              <Select value={newItem.type} onValueChange={(v) => setNewItem(d => ({...d, type: v as any}))}>
-                <SelectTrigger id="post-type"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="article">Viết bài viết</SelectItem>
-                  <SelectItem value="comment">Viết comment</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {newItem.type === 'article' && (
-              <div className="space-y-4 p-4 border rounded-lg bg-slate-50">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Ngành</Label>
-                    <Select>
-                      <SelectTrigger><SelectValue placeholder="Chọn thư viện prompt" /></SelectTrigger>
-                      <SelectContent>
-                        {promptLibraries.map(lib => (
-                          <SelectItem key={lib.id} value={String(lib.id)}>{lib.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Dạng bài</Label>
-                    <Select>
-                      <SelectTrigger><SelectValue placeholder="Chọn dạng bài" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="question">Đặt câu hỏi / thảo luận</SelectItem>
-                        <SelectItem value="review">Review</SelectItem>
-                        <SelectItem value="sharing">Chia sẻ</SelectItem>
-                        <SelectItem value="comparison">So sánh</SelectItem>
-                        <SelectItem value="storytelling">Story telling</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Định hướng nội dung</Label>
-                  <Textarea placeholder="Nhập định hướng chi tiết cho AI..." className="min-h-[100px]" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Số lượng</Label>
-                  <Input type="number" defaultValue={1} />
-                  <p className="text-xs text-muted-foreground">NÊN CHỌN 1 (Số lượng bài nhiều hơn 1 có thể ảnh hưởng đến chất lượng của bài viết)</p>
-                </div>
-              </div>
-            )}
-
-            {newItem.type === 'comment' && (
-              <div className="space-y-4 p-4 border rounded-lg bg-slate-50">
-                <div className="space-y-2">
-                  <Label>Ngành</Label>
-                  <Select>
-                    <SelectTrigger><SelectValue placeholder="Chọn thư viện prompt" /></SelectTrigger>
-                    <SelectContent>
-                      {promptLibraries.map(lib => (
-                        <SelectItem key={lib.id} value={String(lib.id)}>{lib.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Nội dung Post</Label>
-                  <Textarea placeholder="Dán nội dung bài viết cần bình luận vào đây..." className="min-h-[100px]" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Định hướng comment</Label>
-                  <Textarea placeholder="Nhập định hướng chi tiết cho các bình luận..." className="min-h-[80px]" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Tỉ lệ comment</Label>
-                  <div className="space-y-2">
-                    {commentRatios.map((ratio, index) => (
-                      <div key={ratio.id} className="flex items-center gap-2">
-                        <div className="relative w-24">
-                          <Input type="number" value={ratio.percentage} onChange={(e) => handleRatioChange(ratio.id, 'percentage', e.target.value)} className="pr-6" />
-                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
-                        </div>
-                        <Input placeholder="Nội dung định hướng" value={ratio.content} onChange={(e) => handleRatioChange(ratio.id, 'content', e.target.value)} />
-                        <Button variant="ghost" size="icon" onClick={() => handleRemoveRatio(ratio.id)} disabled={commentRatios.length <= 1}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex items-center justify-between mt-2">
-                    <Button variant="outline" size="sm" onClick={handleAddRatio}>
-                      <PlusCircle className="h-4 w-4 mr-2" />
-                      Thêm tỉ lệ
-                    </Button>
-                    {totalPercentage > 100 && (
-                      <p className="text-sm text-destructive font-medium">Tổng tỉ lệ vượt quá 100%!</p>
-                    )}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Số lượng comment</Label>
-                  <Input type="number" defaultValue={10} />
-                </div>
-              </div>
-            )}
+            <div className="space-y-2"><Label>Loại</Label><Select value={newItem.type} onValueChange={(v) => setNewItem(d => ({...d, type: v as any}))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="article">Viết bài viết</SelectItem><SelectItem value="comment">Viết comment</SelectItem></SelectContent></Select></div>
+            <div className="space-y-2"><Label>Tên</Label><Input value={newItem.name} onChange={(e) => setNewItem(d => ({...d, name: e.target.value}))} placeholder="VD: Bài viết về sản phẩm A" /></div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Hủy</Button>
-            <Button onClick={handleAddItem} disabled={isSaving}>{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Thêm</Button>
-          </DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Hủy</Button><Button onClick={handleAddItem} disabled={isSaving}>{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Thêm</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </>
