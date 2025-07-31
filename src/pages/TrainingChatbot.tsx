@@ -67,7 +67,7 @@ const TrainingChatbot = () => {
       setIsLoading(true);
       try {
         const { data, error } = await supabase
-          .from('auto_reply_settings')
+          .from('content_ai_prompts')
           .select('config')
           .eq('id', 1)
           .single();
@@ -94,7 +94,7 @@ const TrainingChatbot = () => {
 
     try {
         const { error } = await supabase
-            .from('auto_reply_settings')
+            .from('content_ai_prompts')
             .upsert({ id: 1, config: config });
 
         if (error) {
