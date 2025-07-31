@@ -9,9 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, Search, Trash2, Loader2, Edit, FileText, User, Calendar, MessageSquare, Bot, Cpu } from 'lucide-react';
+import { PlusCircle, Search, Trash2, Loader2, Edit, FileText, User } from 'lucide-react';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
-import { format } from 'date-fns';
 import { type User as SupabaseUser } from '@supabase/supabase-js';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -74,15 +73,6 @@ const DocumentDialog = ({ isOpen, onOpenChange, onSave, document, user }: { isOp
           <div className="space-y-2">
             <Label htmlFor="content">Nội dung</Label>
             <Textarea id="content" value={currentDoc.content || ''} onChange={e => setCurrentDoc(d => ({ ...d, content: e.target.value }))} className="bg-slate-100 border-none rounded-lg min-h-[120px]" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="example_customer_message">Ví dụ tin nhắn KH</Label>
-            <Textarea id="example_customer_message" value={currentDoc.example_customer_message || ''} onChange={e => setCurrentDoc(d => ({ ...d, example_customer_message: e.target.value }))} className="bg-slate-100 border-none rounded-lg" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="example_agent_reply">Ví dụ tin nhắn trả lời</Label>
-            <Textarea id="example_agent_reply" value={currentDoc.example_agent_reply || ''} onChange={e => setCurrentDoc(d => ({ ...d, example_agent_reply: e.target.value }))} className="bg-slate-100 border-none rounded-lg" />
-            <p className="text-xs text-muted-foreground">Dựa theo nội dung tài liệu để trả lời.</p>
           </div>
         </div>
         <DialogFooter>

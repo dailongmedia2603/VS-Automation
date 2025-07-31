@@ -76,15 +76,6 @@ const DocumentDialog = ({ isOpen, onOpenChange, onSave, document, user }: { isOp
             <Label htmlFor="content">Nội dung</Label>
             <Textarea id="content" value={currentDoc.content || ''} onChange={e => setCurrentDoc(d => ({ ...d, content: e.target.value }))} className="bg-slate-100 border-none rounded-lg min-h-[120px]" />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="example_customer_message">Ví dụ tin nhắn KH</Label>
-            <Textarea id="example_customer_message" value={currentDoc.example_customer_message || ''} onChange={e => setCurrentDoc(d => ({ ...d, example_customer_message: e.target.value }))} className="bg-slate-100 border-none rounded-lg" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="example_agent_reply">Ví dụ tin nhắn trả lời</Label>
-            <Textarea id="example_agent_reply" value={currentDoc.example_agent_reply || ''} onChange={e => setCurrentDoc(d => ({ ...d, example_agent_reply: e.target.value }))} className="bg-slate-100 border-none rounded-lg" />
-            <p className="text-xs text-muted-foreground">Dựa theo nội dung tài liệu để trả lời.</p>
-          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-lg">Hủy</Button>
@@ -147,10 +138,6 @@ const DocumentDetailDialog = ({ isOpen, onOpenChange, document }: { isOpen: bool
         <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-4">
           <DetailSection title="Mục đích" content={document.purpose} />
           <DetailSection title="Nội dung chính" content={document.content} />
-          <div className="grid grid-cols-2 gap-4">
-            <DetailSection title="Ví dụ tin nhắn khách hàng" content={document.example_customer_message} icon={MessageSquare} />
-            <DetailSection title="Ví dụ AI trả lời" content={document.example_agent_reply} icon={Bot} />
-          </div>
           <DetailSection title="Vector Embedding (xác nhận)" content={embeddingSnippet} icon={Cpu} />
         </div>
         <DialogFooter>
@@ -241,8 +228,6 @@ export const DocumentTrainer = () => {
         Tiêu đề: ${doc.title || ''}
         Mục đích: ${doc.purpose || ''}
         Nội dung: ${doc.content || ''}
-        Ví dụ câu hỏi của khách: ${doc.example_customer_message || ''}
-        Ví dụ câu trả lời của AI: ${doc.example_agent_reply || ''}
       `.trim();
       const { data: embeddingData, error: functionError } = await supabase.functions.invoke('embed-document', { body: { textToEmbed } });
 
