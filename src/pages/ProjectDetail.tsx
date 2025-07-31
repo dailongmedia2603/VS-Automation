@@ -44,6 +44,7 @@ type Task = {
   id: number;
   status: 'pending' | 'running' | 'completed' | 'failed';
   error_message: string | null;
+  progress_step: string | null;
 };
 
 const ProjectDetail = () => {

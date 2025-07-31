@@ -25,7 +25,7 @@ type PromptLibrary = { id: number; name: string; };
 type CommentRatio = { id: string; percentage: number; content: string; };
 type GeneratedComment = { id: string; content: string; status: 'Đạt' | 'Không đạt'; metConditionIds: string[]; };
 type Log = { id: number; created_at: string; prompt: string; response: any; };
-type Task = { id: number; status: 'pending' | 'running' | 'completed' | 'failed'; error_message: string | null; };
+type Task = { id: number; status: 'pending' | 'running' | 'completed' | 'failed'; error_message: string | null; progress_step: string | null; };
 type MandatoryCondition = { id: string; content: string; };
 
 interface CommentGenerationDetailProps {
@@ -257,15 +257,21 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
   };
 
   const isGenerating = !!activeTask;
+  const progressStep = activeTask?.progress_step;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-slate-900">{item.name}</h2>
-        <Button onClick={handleGenerateComments} disabled={isGenerating} className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg">
-          {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-          {isGenerating ? 'Đang tạo...' : 'Tạo comment'}
-        </Button>
+        <div className="flex items-center gap-4">
+          {isGenerating && progressStep && (
+            <p className="text-sm text-slate-500 animate-pulse">{progressStep}</p>
+          )}
+          <Button onClick={handleGenerateComments} disabled={isGenerating} className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg">
+            {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+            {isGenerating ? 'Đang tạo...' : 'Tạo comment'}
+          </Button>
+        </div>
       </div>
       
       <Accordion type="single" collapsible defaultValue="item-1" className="w-full">

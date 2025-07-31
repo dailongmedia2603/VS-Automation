@@ -88,7 +88,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ message: "No pending tasks." }), { status: 200 });
     }
 
-    await supabaseAdmin.from('ai_generation_tasks').update({ status: 'running' }).eq('id', task.id);
+    await supabaseAdmin.from('ai_generation_tasks').update({ status: 'running', progress_step: 'Đang chuẩn bị prompt...' }).eq('id', task.id);
 
     try {
       const { libraryId } = task.config;
@@ -103,6 +103,8 @@ serve(async (req) => {
       const basePrompt = buildBasePrompt(library.config);
       const finalPrompt = buildFinalPrompt(basePrompt, task.config);
 
+      await supabaseAdmin.from('ai_generation_tasks').update({ progress_step: 'Đang gửi yêu cầu đến AI...' }).eq('id', task.id);
+
       const modelToUse = aiSettings.gemini_content_model || 'gemini-pro';
       const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${aiSettings.google_gemini_api_key}`, {
           method: 'POST',
@@ -112,6 +114,8 @@ serve(async (req) => {
 
       const geminiData = await geminiRes.json();
       if (!geminiRes.ok) throw new Error(geminiData?.error?.message || 'Lỗi gọi API Gemini.');
+
+      await supabaseAdmin.from('ai_generation_tasks').update({ progress_step: 'Đang xử lý và lưu kết quả...' }).eq('id', task.id);
 
       const rawContent = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
       
@@ -133,12 +137,12 @@ serve(async (req) => {
 
       await supabaseAdmin.from('content_ai_items').update({ content: JSON.stringify(updatedComments) }).eq('id', task.item_id);
       
-      await supabaseAdmin.from('ai_generation_tasks').update({ status: 'completed', result: { newCommentsCount: newComments.length } }).eq('id', task.id);
+      await supabaseAdmin.from('ai_generation_tasks').update({ status: 'completed', result: { newCommentsCount: newComments.length }, progress_step: null }).eq('id', task.id);
 
       await supabaseAdmin.from('content_ai_logs').insert({ item_id: task.item_id, creator_id: task.creator_id, prompt: finalPrompt, response: geminiData });
 
     } catch (executionError) {
-      await supabaseAdmin.from('ai_generation_tasks').update({ status: 'failed', error_message: executionError.message }).eq('id', task.id);
+      await supabaseAdmin.from('ai_generation_tasks').update({ status: 'failed', error_message: executionError.message, progress_step: 'Thất bại' }).eq('id', task.id);
       throw executionError;
     }
 
