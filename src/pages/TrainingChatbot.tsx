@@ -137,7 +137,7 @@ const TrainingChatbot = () => {
   return (
     <main className="flex-1 space-y-8 p-6 sm:p-8 bg-slate-50">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">Training Chatbot</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900">Setup Prompt</h1>
         <p className="text-muted-foreground mt-2 max-w-2xl">
           Dạy cho AI cách trả lời và tương tác trong các tình huống cụ thể. Cung cấp càng nhiều thông tin chi tiết, AI sẽ càng hoạt động hiệu quả và phù hợp với doanh nghiệp của bạn.
         </p>

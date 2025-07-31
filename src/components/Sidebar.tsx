@@ -45,13 +45,13 @@ const navSections = [
     title: "TÀI LIỆU & HUẤN LUYỆN",
     items: [
       { name: "Tài liệu đào tạo", icon: BookCopy, href: "/training-documents", permission: "view_training_documents" },
-      { name: "Training Chatbot", icon: GraduationCap, href: "/training-chatbot", permission: "view_training_chatbot" },
     ],
   },
   {
     title: "Content",
     items: [
       { name: "Content AI", icon: Sparkles, href: "/content-ai", permission: "view_content_ai" },
+      { name: "Setup Prompt", icon: GraduationCap, href: "/training-chatbot", permission: "view_training_chatbot" },
     ],
   },
   {
