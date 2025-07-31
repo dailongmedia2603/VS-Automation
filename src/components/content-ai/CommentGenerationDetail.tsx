@@ -354,9 +354,22 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
           <AccordionContent className="px-6 pb-6 space-y-4">
             <div className="space-y-2">
               {mandatoryConditions.map((cond) => (
-                <div key={cond.id} className="flex items-center gap-2">
-                  <Textarea value={cond.content} onChange={(e) => handleConditionChange(cond.id, e.target.value)} placeholder="VD: Không được nhắc đến giá sản phẩm" className="bg-slate-50" />
-                  <Button variant="ghost" size="icon" onClick={() => handleRemoveCondition(cond.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                <div key={cond.id} className="flex items-center gap-2 p-2 border rounded-lg bg-slate-50/50">
+                  <ShieldCheck className="h-5 w-5 text-red-500 flex-shrink-0" />
+                  <Input 
+                    value={cond.content} 
+                    onChange={(e) => handleConditionChange(cond.id, e.target.value)} 
+                    placeholder="VD: Không được nhắc đến giá sản phẩm" 
+                    className="bg-white flex-1 border-none focus-visible:ring-0 focus-visible:ring-offset-0" 
+                  />
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => handleRemoveCondition(cond.id)}
+                    className="flex-shrink-0"
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
                 </div>
               ))}
             </div>
