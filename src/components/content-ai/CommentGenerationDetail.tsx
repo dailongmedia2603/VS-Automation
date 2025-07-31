@@ -182,6 +182,40 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
     return results.filter(r => r.content.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [results, searchTerm]);
 
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(filteredResults.map(r => r.id));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelectRow = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleDeleteSelected = async () => {
+    const newResults = results.filter(r => !selectedIds.includes(r.id));
+    setResults(newResults);
+    setSelectedIds([]);
+    
+    const { error } = await supabase
+      .from('content_ai_items')
+      .update({ content: JSON.stringify(newResults), updated_at: new Date().toISOString() })
+      .eq('id', item.id);
+
+    if (error) {
+      showError("Xóa thất bại: " + error.message);
+      setResults(results); // Revert on error
+    } else {
+      showSuccess("Đã xóa thành công!");
+      onSave({ ...item, content: JSON.stringify(newResults) });
+    }
+    setIsDeleteAlertOpen(false);
+  };
+
   const handleExportExcel = () => {
     const dataToExport = filteredResults.map(r => ({
       'Nội dung Comment': r.content,
@@ -246,11 +280,11 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
         <CardContent>
           <div className="border rounded-lg overflow-hidden">
             <Table>
-              <TableHeader><TableRow><TableHead className="w-12"><Checkbox /></TableHead><TableHead>STT</TableHead><TableHead>Nội dung comment</TableHead><TableHead>Lọc chất lượng</TableHead><TableHead className="text-right">Thao tác</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead className="w-12"><Checkbox checked={selectedIds.length === filteredResults.length && filteredResults.length > 0} onCheckedChange={(checked) => handleSelectAll(!!checked)} /></TableHead><TableHead>STT</TableHead><TableHead>Nội dung comment</TableHead><TableHead>Lọc chất lượng</TableHead><TableHead className="text-right">Thao tác</TableHead></TableRow></TableHeader>
               <TableBody>
                 {filteredResults.length > 0 ? filteredResults.map((result, index) => (
                   <TableRow key={result.id}>
-                    <TableCell><Checkbox /></TableCell>
+                    <TableCell><Checkbox checked={selectedIds.includes(result.id)} onCheckedChange={() => handleSelectRow(result.id)} /></TableCell>
                     <TableCell>{index + 1}</TableCell>
                     <TableCell className="max-w-md break-words">{result.content}</TableCell>
                     <TableCell><Badge variant={result.status === 'Đạt' ? 'default' : 'destructive'} className={cn(result.status === 'Đạt' && 'bg-green-100 text-green-800')}>{result.status}</Badge></TableCell>
@@ -264,6 +298,21 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
       </Card>
 
       <GenerationLogDialog isOpen={isLogOpen} onOpenChange={setIsLogOpen} logs={logs} isLoading={isLoadingLogs} />
+
+      <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Bạn có chắc chắn muốn xóa?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Hành động này sẽ xóa vĩnh viễn {selectedIds.length} bình luận đã chọn.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Hủy</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteSelected} className="bg-red-600 hover:bg-red-700">Xóa</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
