@@ -294,8 +294,8 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
           <AccordionTrigger className="px-6 py-4 text-lg font-semibold hover:no-underline">
             <div className="flex items-center gap-3"><Settings className="h-5 w-5 text-blue-600" /><span>Cấu hình & Tùy chọn</span></div>
           </AccordionTrigger>
-          <AccordionContent className="px-6 pb-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <AccordionContent className="px-6 pb-6 bg-slate-50/50 rounded-b-2xl">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
               <div className="space-y-4">
                 <div className="space-y-2"><Label>Ngành</Label><Select value={config.libraryId} onValueChange={v => handleConfigChange('libraryId', v)}><SelectTrigger><SelectValue placeholder="Chọn thư viện prompt" /></SelectTrigger><SelectContent>{promptLibraries.map(lib => (<SelectItem key={lib.id} value={String(lib.id)}>{lib.name}</SelectItem>))}</SelectContent></Select></div>
                 <div className="space-y-2"><Label>Nội dung Post</Label><Textarea value={config.postContent} onChange={e => handleConfigChange('postContent', e.target.value)} placeholder="Dán nội dung bài viết cần bình luận..." className="min-h-[120px]" /></div>
@@ -306,19 +306,19 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                   <Label>Tỉ lệ comment</Label>
                   <div className="space-y-2">
                     { (config.ratios || []).map((ratio: CommentRatio) => (
-                      <div key={ratio.id} className="flex items-center gap-2 p-2 border rounded-lg bg-slate-50/50">
+                      <div key={ratio.id} className="flex items-center gap-2 p-2 border rounded-lg bg-white">
                         <Input 
                           placeholder="Loại comment" 
                           value={ratio.type} 
                           onChange={(e) => handleRatioChange(ratio.id, 'type', e.target.value)} 
-                          className="w-40 bg-white" 
+                          className="w-40" 
                         />
                         <div className="flex items-center w-28 flex-shrink-0">
                           <Input 
                             type="number" 
                             value={ratio.percentage} 
                             onChange={(e) => handleRatioChange(ratio.id, 'percentage', e.target.value)} 
-                            className="rounded-r-none border-r-0 text-right bg-white focus-visible:ring-offset-0 focus-visible:ring-0" 
+                            className="rounded-r-none border-r-0 text-right focus-visible:ring-offset-0 focus-visible:ring-0" 
                           />
                           <div className="flex h-10 items-center rounded-r-md border border-l-0 border-input bg-slate-100 px-3 text-sm text-muted-foreground">
                             %
@@ -328,7 +328,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                           placeholder="Nội dung định hướng" 
                           value={ratio.content} 
                           onChange={(e) => handleRatioChange(ratio.id, 'content', e.target.value)} 
-                          className="flex-1 bg-white" 
+                          className="flex-1" 
                         />
                         <Button 
                           variant="ghost" 
@@ -350,7 +350,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                 <div className="space-y-2"><Label>Số lượng comment</Label><Input type="number" value={config.quantity} onChange={e => handleConfigChange('quantity', e.target.value)} defaultValue={10} /></div>
               </div>
             </div>
-            <div className="flex justify-end mt-6">
+            <div className="flex justify-end mt-6 px-6">
               <Button onClick={() => handleSaveConfig(config)} disabled={isSaving}>
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                 Lưu cấu hình
@@ -365,16 +365,16 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
           <AccordionTrigger className="px-6 py-4 text-lg font-semibold hover:no-underline">
             <div className="flex items-center gap-3"><ShieldCheck className="h-5 w-5 text-red-600" /><span>Điều kiện bắt buộc</span></div>
           </AccordionTrigger>
-          <AccordionContent className="px-6 pb-6 space-y-4">
-            <div className="space-y-2">
+          <AccordionContent className="px-6 pb-6 space-y-4 bg-slate-50/50 rounded-b-2xl">
+            <div className="space-y-2 pt-4">
               {mandatoryConditions.map((cond) => (
-                <div key={cond.id} className="flex items-center gap-2 p-2 border rounded-lg bg-slate-50/50">
+                <div key={cond.id} className="flex items-center gap-2 p-2 border rounded-lg bg-white">
                   <ShieldCheck className="h-5 w-5 text-red-500 flex-shrink-0" />
                   <Input 
                     value={cond.content} 
                     onChange={(e) => handleConditionChange(cond.id, e.target.value)} 
                     placeholder="VD: Không được nhắc đến giá sản phẩm" 
-                    className="bg-white flex-1 border-none focus-visible:ring-0 focus-visible:ring-offset-0" 
+                    className="bg-transparent flex-1 border-none focus-visible:ring-0 focus-visible:ring-offset-0" 
                   />
                   <Button 
                     variant="ghost" 
