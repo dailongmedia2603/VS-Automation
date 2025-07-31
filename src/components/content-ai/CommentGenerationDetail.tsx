@@ -12,7 +12,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Settings, Save, Loader2, Search, Trash2, Download, FileText, PlusCircle, MoreHorizontal, Edit, Sparkles, Bot } from 'lucide-react';
+import { Settings, Save, Loader2, Search, Trash2, Download, FileText, PlusCircle, MoreHorizontal, Edit, Sparkles, Bot, ShieldCheck } from 'lucide-react';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
@@ -22,9 +22,10 @@ type Project = { id: number; name: string; };
 type ProjectItem = { id: number; name: string; type: 'article' | 'comment'; content: string | null; config: any; };
 type PromptLibrary = { id: number; name: string; };
 type CommentRatio = { id: string; percentage: number; content: string; };
-type GeneratedComment = { id: string; content: string; status: 'Đạt' | 'Không đạt'; };
+type GeneratedComment = { id: string; content: string; status: 'Đạt' | 'Không đạt'; conditionsStatus: 'Đạt' | 'Không đạt'; };
 type Log = { id: number; created_at: string; prompt: string; response: any; };
 type Task = { id: number; status: 'pending' | 'running' | 'completed' | 'failed'; error_message: string | null; };
+type MandatoryCondition = { id: string; content: string; };
 
 interface CommentGenerationDetailProps {
   project: Project;
@@ -37,8 +38,10 @@ interface CommentGenerationDetailProps {
 
 export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave, activeTask, setActiveTask }: CommentGenerationDetailProps) => {
   const [config, setConfig] = useState<any>({});
+  const [mandatoryConditions, setMandatoryConditions] = useState<MandatoryCondition[]>([]);
   const [results, setResults] = useState<GeneratedComment[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingConditions, setIsSavingConditions] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isLogOpen, setIsLogOpen] = useState(false);
@@ -47,7 +50,9 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
 
   useEffect(() => {
-    setConfig(item.config || {});
+    const itemConfig = item.config || {};
+    setConfig(itemConfig);
+    setMandatoryConditions(itemConfig.mandatoryConditions || []);
     try {
       const parsedContent = JSON.parse(item.content || '[]');
       setResults(Array.isArray(parsedContent) ? parsedContent : []);
@@ -90,11 +95,11 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
     return (config.ratios || []).reduce((sum: number, ratio: CommentRatio) => sum + (Number(ratio.percentage) || 0), 0);
   }, [config.ratios]);
 
-  const handleSaveConfig = async () => {
+  const handleSaveConfig = async (updatedConfig: any) => {
     setIsSaving(true);
     const { data, error } = await supabase
       .from('content_ai_items')
-      .update({ config, updated_at: new Date().toISOString() })
+      .update({ config: updatedConfig, updated_at: new Date().toISOString() })
       .eq('id', item.id)
       .select()
       .single();
@@ -104,10 +109,14 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
     } else if (data) {
       showSuccess("Đã lưu cấu hình thành công!");
       onSave(data as ProjectItem);
-    } else {
-      showError("Lưu thất bại. Không tìm thấy mục để cập nhật hoặc bạn không có quyền.");
     }
     setIsSaving(false);
+  };
+
+  const handleSaveConditions = async () => {
+    setIsSavingConditions(true);
+    await handleSaveConfig({ ...config, mandatoryConditions });
+    setIsSavingConditions(false);
   };
 
   const handleGenerateComments = async () => {
@@ -117,7 +126,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
     const toastId = showLoading("Đang gửi yêu cầu...");
     try {
       const { data: newTask, error } = await supabase.functions.invoke('create-ai-generation-task', {
-        body: { itemId: item.id, config }
+        body: { itemId: item.id, config: { ...config, mandatoryConditions } }
       });
       if (error) {
         const errorBody = await error.context.json();
@@ -164,11 +173,36 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
   };
 
   const handleExportExcel = () => {
-    const dataToExport = filteredResults.map(r => ({ 'Nội dung Comment': r.content, 'Chất lượng': r.status }));
+    const dataToExport = filteredResults.map(r => ({ 'Nội dung Comment': r.content, 'Chất lượng': r.status, 'Điều kiện': r.conditionsStatus }));
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Comments");
     XLSX.writeFile(workbook, `${project.name} - ${item.name} - Comments.xlsx`);
+  };
+
+  const handleConditionChange = (id: string, content: string) => {
+    setMandatoryConditions(prev => prev.map(c => c.id === id ? { ...c, content } : c));
+  };
+
+  const handleAddCondition = () => {
+    setMandatoryConditions(prev => [...prev, { id: crypto.randomUUID(), content: '' }]);
+  };
+
+  const handleRemoveCondition = (id: string) => {
+    setMandatoryConditions(prev => prev.filter(c => c.id !== id));
+  };
+
+  const handleUpdateResultStatus = async (resultId: string, field: 'status' | 'conditionsStatus', newStatus: 'Đạt' | 'Không đạt') => {
+    const newResults = results.map(r => r.id === resultId ? { ...r, [field]: newStatus } : r);
+    setResults(newResults);
+    const { error } = await supabase.from('content_ai_items').update({ content: JSON.stringify(newResults) }).eq('id', item.id);
+    if (error) {
+      showError("Cập nhật trạng thái thất bại.");
+      setResults(results); // Revert on error
+    } else {
+      showSuccess("Đã cập nhật trạng thái.");
+      onSave({ ...item, content: JSON.stringify(newResults) });
+    }
   };
 
   const isGenerating = !!activeTask;
@@ -201,9 +235,34 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
               </div>
             </div>
             <div className="flex justify-end mt-6">
-              <Button onClick={handleSaveConfig} disabled={isSaving}>
+              <Button onClick={() => handleSaveConfig(config)} disabled={isSaving}>
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                 Lưu cấu hình
+              </Button>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+
+      <Accordion type="single" collapsible className="w-full">
+        <AccordionItem value="item-1" className="border rounded-2xl bg-white shadow-sm">
+          <AccordionTrigger className="px-6 py-4 text-lg font-semibold hover:no-underline">
+            <div className="flex items-center gap-3"><ShieldCheck className="h-5 w-5 text-red-600" /><span>Điều kiện bắt buộc</span></div>
+          </AccordionTrigger>
+          <AccordionContent className="px-6 pb-6 space-y-4">
+            <div className="space-y-2">
+              {mandatoryConditions.map((cond) => (
+                <div key={cond.id} className="flex items-center gap-2">
+                  <Textarea value={cond.content} onChange={(e) => handleConditionChange(cond.id, e.target.value)} placeholder="VD: Không được nhắc đến giá sản phẩm" className="bg-slate-50" />
+                  <Button variant="ghost" size="icon" onClick={() => handleRemoveCondition(cond.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-between items-center">
+              <Button variant="outline" size="sm" onClick={handleAddCondition}><PlusCircle className="h-4 w-4 mr-2" />Thêm điều kiện</Button>
+              <Button onClick={handleSaveConditions} disabled={isSavingConditions}>
+                {isSavingConditions ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                Lưu điều kiện
               </Button>
             </div>
           </AccordionContent>
@@ -226,11 +285,11 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
         <CardContent>
           <div className="border rounded-lg overflow-hidden">
             <Table>
-              <TableHeader><TableRow><TableHead className="w-12"><Checkbox checked={selectedIds.length === filteredResults.length && filteredResults.length > 0} onCheckedChange={(checked) => handleSelectAll(!!checked)} /></TableHead><TableHead>STT</TableHead><TableHead>Nội dung comment</TableHead><TableHead>Lọc chất lượng</TableHead><TableHead className="text-right">Thao tác</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead className="w-12"><Checkbox checked={selectedIds.length === filteredResults.length && filteredResults.length > 0} onCheckedChange={(checked) => handleSelectAll(!!checked)} /></TableHead><TableHead>STT</TableHead><TableHead>Nội dung comment</TableHead><TableHead>Chất lượng</TableHead><TableHead>Điều kiện</TableHead><TableHead className="text-right">Thao tác</TableHead></TableRow></TableHeader>
               <TableBody>
                 {isGenerating && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center p-4">
+                    <TableCell colSpan={6} className="text-center p-4">
                       <div className="flex items-center justify-center gap-3 text-slate-500">
                         <Bot className="h-5 w-5 animate-bounce" />
                         <span className="font-medium">AI đang làm việc... Tác vụ đang chạy trong nền.</span>
@@ -244,9 +303,10 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                     <TableCell>{index + 1}</TableCell>
                     <TableCell className="max-w-md break-words">{result.content}</TableCell>
                     <TableCell><Badge variant={result.status === 'Đạt' ? 'default' : 'destructive'} className={cn(result.status === 'Đạt' && 'bg-green-100 text-green-800')}>{result.status}</Badge></TableCell>
-                    <TableCell className="text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuItem><Edit className="mr-2 h-4 w-4" />Sửa</DropdownMenuItem><DropdownMenuItem className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell>
+                    <TableCell><Badge variant={result.conditionsStatus === 'Đạt' ? 'default' : 'destructive'} className={cn(result.conditionsStatus === 'Đạt' && 'bg-green-100 text-green-800')}>{result.conditionsStatus}</Badge></TableCell>
+                    <TableCell className="text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuItem><Edit className="mr-2 h-4 w-4" />Sửa</DropdownMenuItem><DropdownMenuItem onClick={() => handleUpdateResultStatus(result.id, 'status', result.status === 'Đạt' ? 'Không đạt' : 'Đạt')}>Đổi trạng thái Chất lượng</DropdownMenuItem><DropdownMenuItem onClick={() => handleUpdateResultStatus(result.id, 'conditionsStatus', result.conditionsStatus === 'Đạt' ? 'Không đạt' : 'Đạt')}>Đổi trạng thái Điều kiện</DropdownMenuItem><DropdownMenuItem className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell>
                   </TableRow>
-                )) : !isGenerating && (<TableRow><TableCell colSpan={5} className="text-center h-24">Chưa có kết quả nào.</TableCell></TableRow>)}
+                )) : !isGenerating && (<TableRow><TableCell colSpan={6} className="text-center h-24">Chưa có kết quả nào.</TableCell></TableRow>)}
               </TableBody>
             </Table>
           </div>

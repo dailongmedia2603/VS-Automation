@@ -39,6 +39,10 @@ const buildFinalPrompt = (basePrompt, config) => {
     .map(r => `- ${r.percentage}%: ${r.content}`)
     .join('\n');
 
+  const conditionsText = (config.mandatoryConditions || [])
+    .map(c => `- ${c.content}`)
+    .join('\n');
+
   const finalPrompt = `
     ${basePrompt}
 
@@ -53,6 +57,10 @@ const buildFinalPrompt = (basePrompt, config) => {
 
     **Tỉ lệ và loại bình luận cần tạo:**
     ${ratiosText || 'Không có'}
+    ---
+    **ĐIỀU KIỆN BẮT BUỘC (QUAN TRỌNG NHẤT):**
+    AI phải tuân thủ TUYỆT ĐỐI tất cả các điều kiện sau đây cho MỌI bình luận được tạo ra:
+    ${conditionsText || 'Không có điều kiện nào.'}
     ---
 
     **YÊU CẦU:** Dựa vào TOÀN BỘ thông tin trên, hãy tạo ra chính xác ${config.quantity || 10} bình luận. Mỗi bình luận trên một dòng, không có đánh số hay gạch đầu dòng.
@@ -106,7 +114,12 @@ serve(async (req) => {
       if (!geminiRes.ok) throw new Error(geminiData?.error?.message || 'Lỗi gọi API Gemini.');
 
       const rawContent = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      const newComments = rawContent.split('\n').map(c => ({ id: crypto.randomUUID(), content: c.trim(), status: 'Đạt' })).filter(c => c.content);
+      const newComments = rawContent.split('\n').map(c => ({ 
+        id: crypto.randomUUID(), 
+        content: c.trim(), 
+        status: 'Đạt',
+        conditionsStatus: 'Đạt'
+      })).filter(c => c.content);
 
       const { data: currentItem, error: itemError } = await supabaseAdmin.from('content_ai_items').select('content').eq('id', task.item_id).single();
       if (itemError) throw itemError;
