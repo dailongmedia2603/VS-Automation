@@ -12,7 +12,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Settings, Save, Loader2, Search, Trash2, Download, FileText, PlusCircle, MoreHorizontal, Edit, Sparkles, Bot, ShieldCheck } from 'lucide-react';
+import { Settings, Save, Loader2, Search, Trash2, Download, FileText, PlusCircle, MoreHorizontal, Edit, Sparkles, Bot, ShieldCheck, ChevronDown, Copy } from 'lucide-react';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
@@ -171,6 +171,20 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
 
   const handleSelectRow = (id: string) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const handleBulkCopy = () => {
+    if (selectedIds.length === 0) return;
+    const contentToCopy = results
+      .filter(r => selectedIds.includes(r.id))
+      .map(r => r.content)
+      .join('\n');
+    
+    navigator.clipboard.writeText(contentToCopy).then(() => {
+      showSuccess(`Đã sao chép ${selectedIds.length} bình luận!`);
+    }).catch(err => {
+      showError("Sao chép thất bại: " + err.message);
+    });
   };
 
   const handleDeleteSelected = async () => {
@@ -332,7 +346,26 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
             <div><CardTitle>Kết quả</CardTitle></div>
             <div className="flex items-center gap-2">
               <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Tìm kiếm..." className="pl-9" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
-              {selectedIds.length > 0 && (<Button variant="destructive" size="sm" onClick={() => setIsDeleteAlertOpen(true)}><Trash2 className="mr-2 h-4 w-4" />Xóa ({selectedIds.length})</Button>)}
+              {selectedIds.length > 0 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      Thao tác ({selectedIds.length})
+                      <ChevronDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onSelect={handleBulkCopy}>
+                      <Copy className="mr-2 h-4 w-4" />
+                      Sao chép nội dung
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setIsDeleteAlertOpen(true)} className="text-destructive">
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Xóa
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
               <Button variant="outline" onClick={handleExportExcel}><Download className="mr-2 h-4 w-4" />Xuất Excel</Button>
               <Button variant="outline" onClick={() => setIsLogOpen(true)}><FileText className="mr-2 h-4 w-4" />Log</Button>
               <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleGenerateComments} disabled={isGenerating}><PlusCircle className="mr-2 h-4 w-4" />Tạo thêm comment</Button>
