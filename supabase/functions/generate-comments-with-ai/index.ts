@@ -7,6 +7,39 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const formatList = (items) => (items && items.length > 0 ? items.map(p => `- ${p.value}`).join('\n') : '(Chưa có thông tin)');
+const formatNumberedList = (items) => (items && items.length > 0 ? items.map((s, i) => `${i + 1}. ${s.value}`).join('\n') : '(Chưa có quy trình)');
+
+const buildBasePrompt = (libraryConfig) => {
+  const config = libraryConfig || {};
+  const dataMap = {
+    '{{industry}}': config.industry || '(Chưa cung cấp)',
+    '{{role}}': config.role || '(Chưa cung cấp)',
+    '{{products}}': formatList(config.products),
+    '{{style}}': config.style || '(Chưa cung cấp)',
+    '{{tone}}': config.tone || '(Chưa cung cấp)',
+    '{{language}}': config.language || '(Chưa cung cấp)',
+    '{{pronouns}}': config.pronouns || '(Chưa cung cấp)',
+    '{{customerPronouns}}': config.customerPronouns || '(Chưa cung cấp)',
+    '{{goal}}': config.goal || '(Chưa cung cấp)',
+    '{{processSteps}}': formatNumberedList(config.processSteps),
+    '{{conditions}}': formatList(config.conditions),
+    '{{conversation_history}}': '(Lịch sử trò chuyện không áp dụng cho tác vụ này)',
+    '{{document_context}}': '(Tài liệu nội bộ không áp dụng cho tác vụ này)',
+  };
+
+  const promptTemplate = config.promptTemplate || [];
+  
+  return promptTemplate.map(block => {
+    let content = block.content;
+    for (const [key, value] of Object.entries(dataMap)) {
+      content = content.replace(new RegExp(key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g'), String(value));
+    }
+    return `### ${block.title.toUpperCase()}\n\n${content}`;
+  }).join('\n\n---\n\n');
+};
+
+
 const buildFinalPrompt = (basePrompt, config) => {
   const ratiosText = (config.ratios || [])
     .map(r => `- ${r.percentage}%: ${r.content}`)
@@ -67,10 +100,7 @@ serve(async (req) => {
         throw new Error("Không thể tải thư viện prompt hoặc thư viện chưa được cấu hình.");
     }
     
-    const basePrompt = (library.config.promptTemplate || [])
-      .map(block => `### ${block.title.toUpperCase()}\n\n${block.content}`)
-      .join('\n\n---\n\n');
-
+    const basePrompt = buildBasePrompt(library.config);
     const finalPrompt = buildFinalPrompt(basePrompt, config);
 
     const modelToUse = aiSettings.gemini_content_model || 'gemini-pro';

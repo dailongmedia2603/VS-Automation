@@ -141,7 +141,18 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
         }
 
     } catch (err: any) {
-        showError(`Tạo comment thất bại: ${err.message}`);
+        let errorMessage = err.message;
+        if (err.context && err.context.json) {
+            try {
+                const errorBody = await err.context.json();
+                if (errorBody.error) {
+                    errorMessage = errorBody.error;
+                }
+            } catch (e) {
+                // Ignore if response is not JSON
+            }
+        }
+        showError(`Tạo comment thất bại: ${errorMessage}`);
     } finally {
         dismissToast(toastId);
         setIsGenerating(false);
