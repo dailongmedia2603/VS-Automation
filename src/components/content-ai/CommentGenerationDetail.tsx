@@ -267,7 +267,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
       <Card className="shadow-sm rounded-2xl bg-white">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <div><CardTitle>Kết quả</CardTitle><CardDescription>Danh sách các bình luận được tạo bởi AI.</CardDescription></div>
+            <div><CardTitle>Kết quả</CardTitle></div>
             <div className="flex items-center gap-2">
               <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Tìm kiếm..." className="pl-9" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
               {selectedIds.length > 0 && (<Button variant="destructive" size="sm" onClick={() => setIsDeleteAlertOpen(true)}><Trash2 className="mr-2 h-4 w-4" />Xóa ({selectedIds.length})</Button>)}
