@@ -19,6 +19,7 @@ import * as XLSX from 'xlsx';
 import { GenerationLogDialog } from './GenerationLogDialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 type Project = { id: number; name: string; };
 type ProjectItem = { id: number; name: string; type: 'article' | 'comment'; content: string | null; config: any; };
@@ -49,7 +50,11 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
   const [isLogOpen, setIsLogOpen] = useState(false);
   const [logs, setLogs] = useState<Log[]>([]);
   const [isLoadingLogs, setIsLoadingLogs] = useState(true);
-  const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
+  const [isBulkDeleteAlertOpen, setIsBulkDeleteAlertOpen] = useState(false);
+  
+  const [editingComment, setEditingComment] = useState<GeneratedComment | null>(null);
+  const [editedContent, setEditedContent] = useState('');
+  const [commentToDelete, setCommentToDelete] = useState<GeneratedComment | null>(null);
 
   useEffect(() => {
     const itemConfig = item.config || {};
@@ -186,7 +191,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
     });
   };
 
-  const handleDeleteSelected = async () => {
+  const handleConfirmBulkDelete = async () => {
     const newResults = results.filter(r => !selectedIds.includes(r.id));
     setResults(newResults);
     setSelectedIds([]);
@@ -199,7 +204,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
       showSuccess("Đã xóa thành công!");
       onSave({ ...item, content: JSON.stringify(newResults) });
     }
-    setIsDeleteAlertOpen(false);
+    setIsBulkDeleteAlertOpen(false);
   };
 
   const handleExportExcel = () => {
@@ -225,6 +230,45 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
 
   const handleRemoveCondition = (id: string) => {
     setMandatoryConditions(prev => prev.filter(c => c.id !== id));
+  };
+
+  const handleOpenEditDialog = (comment: GeneratedComment) => {
+    setEditingComment(comment);
+    setEditedContent(comment.content);
+  };
+
+  const handleUpdateComment = async () => {
+    if (!editingComment) return;
+    const newResults = results.map(r => r.id === editingComment.id ? { ...r, content: editedContent } : r);
+    
+    setResults(newResults);
+    setEditingComment(null);
+
+    const { error } = await supabase.from('content_ai_items').update({ content: JSON.stringify(newResults) }).eq('id', item.id);
+    if (error) {
+      showError("Cập nhật thất bại: " + error.message);
+      setResults(results);
+    } else {
+      showSuccess("Đã cập nhật bình luận!");
+      onSave({ ...item, content: JSON.stringify(newResults) });
+    }
+  };
+
+  const handleConfirmDeleteComment = async () => {
+    if (!commentToDelete) return;
+    const newResults = results.filter(r => r.id !== commentToDelete.id);
+
+    setResults(newResults);
+    setCommentToDelete(null);
+
+    const { error } = await supabase.from('content_ai_items').update({ content: JSON.stringify(newResults) }).eq('id', item.id);
+    if (error) {
+      showError("Xóa thất bại: " + error.message);
+      setResults(results);
+    } else {
+      showSuccess("Đã xóa bình luận!");
+      onSave({ ...item, content: JSON.stringify(newResults) });
+    }
   };
 
   const isGenerating = !!activeTask;
@@ -373,7 +417,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                       <Copy className="mr-2 h-4 w-4" />
                       Sao chép nội dung
                     </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => setIsDeleteAlertOpen(true)} className="text-destructive">
+                    <DropdownMenuItem onSelect={() => setIsBulkDeleteAlertOpen(true)} className="text-destructive">
                       <Trash2 className="mr-2 h-4 w-4" />
                       Xóa
                     </DropdownMenuItem>
@@ -436,12 +480,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                         <Popover>
                           <PopoverTrigger asChild>
                             <button disabled={totalConditions === 0} className="disabled:cursor-not-allowed">
-                              <Badge variant={allConditionsMet ? 'default' : 'secondary'} className={cn(
-                                'hover:bg-opacity-100',
-                                allConditionsMet 
-                                    ? 'bg-green-100 text-green-800 hover:bg-green-100' 
-                                    : 'hover:bg-secondary'
-                              )}>
+                              <Badge variant={allConditionsMet ? 'default' : 'secondary'} className={cn(allConditionsMet && 'bg-green-100 text-green-800', 'hover:bg-slate-200')}>
                                 {totalConditions === 0 ? '-' : allConditionsMet ? 'Đạt' : `${metCount}/${totalConditions}`}
                               </Badge>
                             </button>
@@ -461,7 +500,21 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                           </PopoverContent>
                         </Popover>
                       </TableCell>
-                      <TableCell className="text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuItem><Edit className="mr-2 h-4 w-4" />Sửa</DropdownMenuItem><DropdownMenuItem className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent>
+                            <DropdownMenuItem onSelect={() => handleOpenEditDialog(result)}>
+                              <Edit className="mr-2 h-4 w-4" />Sửa
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => setCommentToDelete(result)} className="text-destructive">
+                              <Trash2 className="mr-2 h-4 w-4" />Xóa
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
                     </TableRow>
                   )
                 }) : !isGenerating && (<TableRow><TableCell colSpan={6} className="text-center h-24">Chưa có kết quả nào.</TableCell></TableRow>)}
@@ -473,7 +526,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
 
       <GenerationLogDialog isOpen={isLogOpen} onOpenChange={setIsLogOpen} logs={logs} isLoading={isLoadingLogs} />
 
-      <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
+      <AlertDialog open={isBulkDeleteAlertOpen} onOpenChange={setIsBulkDeleteAlertOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Bạn có chắc chắn muốn xóa?</AlertDialogTitle>
@@ -483,9 +536,43 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Hủy</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteSelected} className="bg-red-600 hover:bg-red-700">Xóa</AlertDialogAction>
+            <AlertDialogAction onClick={handleConfirmBulkDelete} className="bg-red-600 hover:bg-red-700">Xóa</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={!!editingComment} onOpenChange={(isOpen) => !isOpen && setEditingComment(null)}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Sửa bình luận</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+                <Textarea 
+                    value={editedContent} 
+                    onChange={(e) => setEditedContent(e.target.value)} 
+                    className="min-h-[120px]"
+                />
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setEditingComment(null)}>Hủy</Button>
+                <Button onClick={handleUpdateComment}>Lưu</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!commentToDelete} onOpenChange={(isOpen) => !isOpen && setCommentToDelete(null)}>
+          <AlertDialogContent>
+              <AlertDialogHeader>
+                  <AlertDialogTitle>Bạn có chắc chắn muốn xóa?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                      Hành động này sẽ xóa vĩnh viễn bình luận: "{commentToDelete?.content}"
+                  </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                  <AlertDialogCancel>Hủy</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleConfirmDeleteComment} className="bg-red-600 hover:bg-red-700">Xóa</AlertDialogAction>
+              </AlertDialogFooter>
+          </AlertDialogContent>
       </AlertDialog>
     </div>
   );
