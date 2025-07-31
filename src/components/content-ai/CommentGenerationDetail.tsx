@@ -61,10 +61,10 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
       if (Array.isArray(parsedContent)) {
         const allConditionIds = (itemConfig.mandatoryConditions || []).map((c: MandatoryCondition) => c.id);
         parsedContent = parsedContent.map(comment => {
-          if (comment.conditionsStatus) {
+          if (comment.conditionsStatus) { // Migrate from old format
             return { ...comment, metConditionIds: comment.conditionsStatus === 'Đạt' ? allConditionIds : [], conditionsStatus: undefined };
           }
-          if (!comment.metConditionIds) {
+          if (!comment.metConditionIds) { // Ensure new field exists
             return { ...comment, metConditionIds: allConditionIds };
           }
           return comment;
@@ -292,14 +292,39 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                   <Label>Tỉ lệ comment</Label>
                   <div className="space-y-2">
                     { (config.ratios || []).map((ratio: CommentRatio) => (
-                      <div key={ratio.id} className="flex items-center gap-2">
-                        <Input placeholder="Loại comment" value={ratio.type} onChange={(e) => handleRatioChange(ratio.id, 'type', e.target.value)} className="w-32" />
-                        <div className="relative w-24">
-                          <Input type="number" value={ratio.percentage} onChange={(e) => handleRatioChange(ratio.id, 'percentage', e.target.value)} className="pr-6" />
-                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
+                      <div key={ratio.id} className="flex items-center gap-2 p-2 border rounded-lg bg-slate-50/50">
+                        <Input 
+                          placeholder="Loại comment" 
+                          value={ratio.type} 
+                          onChange={(e) => handleRatioChange(ratio.id, 'type', e.target.value)} 
+                          className="w-40 bg-white" 
+                        />
+                        <div className="flex items-center w-28 flex-shrink-0">
+                          <Input 
+                            type="number" 
+                            value={ratio.percentage} 
+                            onChange={(e) => handleRatioChange(ratio.id, 'percentage', e.target.value)} 
+                            className="rounded-r-none border-r-0 text-right bg-white focus-visible:ring-offset-0 focus-visible:ring-0" 
+                          />
+                          <div className="flex h-10 items-center rounded-r-md border border-l-0 border-input bg-slate-100 px-3 text-sm text-muted-foreground">
+                            %
+                          </div>
                         </div>
-                        <Input placeholder="Nội dung định hướng" value={ratio.content} onChange={(e) => handleRatioChange(ratio.id, 'content', e.target.value)} />
-                        <Button variant="ghost" size="icon" onClick={() => handleRemoveRatio(ratio.id)} disabled={config.ratios?.length <= 1}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                        <Input 
+                          placeholder="Nội dung định hướng" 
+                          value={ratio.content} 
+                          onChange={(e) => handleRatioChange(ratio.id, 'content', e.target.value)} 
+                          className="flex-1 bg-white" 
+                        />
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => handleRemoveRatio(ratio.id)} 
+                          disabled={config.ratios?.length <= 1}
+                          className="flex-shrink-0"
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
                       </div>
                     )) }
                   </div>
