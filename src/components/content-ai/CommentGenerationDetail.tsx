@@ -22,8 +22,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 type Project = { id: number; name: string; };
 type ProjectItem = { id: number; name: string; type: 'article' | 'comment'; content: string | null; config: any; };
 type PromptLibrary = { id: number; name: string; };
-type CommentRatio = { id: string; percentage: number; content: string; };
-type GeneratedComment = { id: string; content: string; status: 'Đạt' | 'Không đạt'; metConditionIds: string[]; };
+type CommentRatio = { id: string; type: string; percentage: number; content: string; };
+type GeneratedComment = { id: string; content: string; type: string; metConditionIds: string[]; };
 type Log = { id: number; created_at: string; prompt: string; response: any; };
 type Task = { id: number; status: 'pending' | 'running' | 'completed' | 'failed'; error_message: string | null; progress_step: string | null; };
 type MandatoryCondition = { id: string; content: string; };
@@ -61,10 +61,10 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
       if (Array.isArray(parsedContent)) {
         const allConditionIds = (itemConfig.mandatoryConditions || []).map((c: MandatoryCondition) => c.id);
         parsedContent = parsedContent.map(comment => {
-          if (comment.conditionsStatus) { // Migrate from old format
+          if (comment.conditionsStatus) {
             return { ...comment, metConditionIds: comment.conditionsStatus === 'Đạt' ? allConditionIds : [], conditionsStatus: undefined };
           }
-          if (!comment.metConditionIds) { // Ensure new field exists
+          if (!comment.metConditionIds) {
             return { ...comment, metConditionIds: allConditionIds };
           }
           return comment;
@@ -91,13 +91,13 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
     setConfig(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleRatioChange = (id: string, field: 'percentage' | 'content', value: string | number) => {
+  const handleRatioChange = (id: string, field: 'type' | 'percentage' | 'content', value: string | number) => {
     const newRatios = (config.ratios || []).map((r: CommentRatio) => r.id === id ? { ...r, [field]: value } : r);
     handleConfigChange('ratios', newRatios);
   };
 
   const handleAddRatio = () => {
-    const newRatios = [...(config.ratios || []), { id: crypto.randomUUID(), percentage: 0, content: '' }];
+    const newRatios = [...(config.ratios || []), { id: crypto.randomUUID(), type: '', percentage: 0, content: '' }];
     handleConfigChange('ratios', newRatios);
   };
 
@@ -208,7 +208,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
       const total = mandatoryConditions.length;
       const met = r.metConditionIds?.length ?? total;
       const conditionDisplay = total > 0 ? (met === total ? 'Đạt' : `${met}/${total}`) : 'N/A';
-      return { 'Nội dung Comment': r.content, 'Chất lượng': r.status, 'Điều kiện': conditionDisplay };
+      return { 'Nội dung Comment': r.content, 'Loại comment': r.type, 'Điều kiện': conditionDisplay };
     });
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
@@ -226,19 +226,6 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
 
   const handleRemoveCondition = (id: string) => {
     setMandatoryConditions(prev => prev.filter(c => c.id !== id));
-  };
-
-  const handleUpdateResultStatus = async (resultId: string, newStatus: 'Đạt' | 'Không đạt') => {
-    const newResults = results.map(r => r.id === resultId ? { ...r, status: newStatus } : r);
-    setResults(newResults);
-    const { error } = await supabase.from('content_ai_items').update({ content: JSON.stringify(newResults) }).eq('id', item.id);
-    if (error) {
-      showError("Cập nhật trạng thái thất bại.");
-      setResults(results);
-    } else {
-      showSuccess("Đã cập nhật trạng thái.");
-      onSave({ ...item, content: JSON.stringify(newResults) });
-    }
   };
 
   const handleOpenConditionEditor = (result: GeneratedComment) => {
@@ -301,7 +288,26 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                 <div className="space-y-2"><Label>Định hướng comment</Label><Textarea value={config.commentDirection} onChange={e => handleConfigChange('commentDirection', e.target.value)} placeholder="Nhập định hướng chi tiết..." className="min-h-[80px]" /></div>
               </div>
               <div className="space-y-4">
-                <div className="space-y-2"><Label>Tỉ lệ comment</Label><div className="space-y-2">{ (config.ratios || []).map((ratio: CommentRatio) => (<div key={ratio.id} className="flex items-center gap-2"><div className="relative w-24"><Input type="number" value={ratio.percentage} onChange={(e) => handleRatioChange(ratio.id, 'percentage', e.target.value)} className="pr-6" /><span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span></div><Input placeholder="Nội dung định hướng" value={ratio.content} onChange={(e) => handleRatioChange(ratio.id, 'content', e.target.value)} /><Button variant="ghost" size="icon" onClick={() => handleRemoveRatio(ratio.id)} disabled={config.ratios?.length <= 1}><Trash2 className="h-4 w-4 text-destructive" /></Button></div>)) }</div><div className="flex items-center justify-between mt-2"><Button variant="outline" size="sm" onClick={handleAddRatio}><PlusCircle className="h-4 w-4 mr-2" />Thêm tỉ lệ</Button>{totalPercentage > 100 && (<p className="text-sm text-destructive font-medium">Tổng tỉ lệ vượt quá 100%!</p>)}</div></div>
+                <div className="space-y-2">
+                  <Label>Tỉ lệ comment</Label>
+                  <div className="space-y-2">
+                    { (config.ratios || []).map((ratio: CommentRatio) => (
+                      <div key={ratio.id} className="flex items-center gap-2">
+                        <Input placeholder="Loại comment" value={ratio.type} onChange={(e) => handleRatioChange(ratio.id, 'type', e.target.value)} className="w-32" />
+                        <div className="relative w-24">
+                          <Input type="number" value={ratio.percentage} onChange={(e) => handleRatioChange(ratio.id, 'percentage', e.target.value)} className="pr-6" />
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
+                        </div>
+                        <Input placeholder="Nội dung định hướng" value={ratio.content} onChange={(e) => handleRatioChange(ratio.id, 'content', e.target.value)} />
+                        <Button variant="ghost" size="icon" onClick={() => handleRemoveRatio(ratio.id)} disabled={config.ratios?.length <= 1}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      </div>
+                    )) }
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <Button variant="outline" size="sm" onClick={handleAddRatio}><PlusCircle className="h-4 w-4 mr-2" />Thêm tỉ lệ</Button>
+                    {totalPercentage > 100 && (<p className="text-sm text-destructive font-medium">Tổng tỉ lệ vượt quá 100%!</p>)}
+                  </div>
+                </div>
                 <div className="space-y-2"><Label>Số lượng comment</Label><Input type="number" value={config.quantity} onChange={e => handleConfigChange('quantity', e.target.value)} defaultValue={10} /></div>
               </div>
             </div>
@@ -375,7 +381,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
         <CardContent>
           <div className="border rounded-lg overflow-hidden">
             <Table>
-              <TableHeader><TableRow><TableHead className="w-12"><Checkbox checked={selectedIds.length === filteredResults.length && filteredResults.length > 0} onCheckedChange={(checked) => handleSelectAll(!!checked)} /></TableHead><TableHead>STT</TableHead><TableHead>Nội dung comment</TableHead><TableHead>Chất lượng</TableHead><TableHead>Điều kiện</TableHead><TableHead className="text-right">Thao tác</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead className="w-12"><Checkbox checked={selectedIds.length === filteredResults.length && filteredResults.length > 0} onCheckedChange={(checked) => handleSelectAll(!!checked)} /></TableHead><TableHead>STT</TableHead><TableHead>Nội dung comment</TableHead><TableHead>Loại comment</TableHead><TableHead>Điều kiện</TableHead><TableHead className="text-right">Thao tác</TableHead></TableRow></TableHeader>
               <TableBody>
                 {isGenerating && (
                   <TableRow>
@@ -397,7 +403,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                       <TableCell><Checkbox checked={selectedIds.includes(result.id)} onCheckedChange={() => handleSelectRow(result.id)} /></TableCell>
                       <TableCell>{index + 1}</TableCell>
                       <TableCell className="max-w-md break-words">{result.content}</TableCell>
-                      <TableCell><Badge variant={result.status === 'Đạt' ? 'default' : 'destructive'} className={cn(result.status === 'Đạt' && 'bg-green-100 text-green-800')}>{result.status}</Badge></TableCell>
+                      <TableCell><Badge variant="outline">{result.type}</Badge></TableCell>
                       <TableCell>
                         <Popover open={editingConditionsFor?.id === result.id} onOpenChange={(isOpen) => !isOpen && setEditingConditionsFor(null)}>
                           <PopoverTrigger asChild>
@@ -423,7 +429,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                           </PopoverContent>
                         </Popover>
                       </TableCell>
-                      <TableCell className="text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuItem><Edit className="mr-2 h-4 w-4" />Sửa</DropdownMenuItem><DropdownMenuItem onClick={() => handleUpdateResultStatus(result.id, result.status === 'Đạt' ? 'Không đạt' : 'Đạt')}>Đổi trạng thái Chất lượng</DropdownMenuItem><DropdownMenuItem className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell>
+                      <TableCell className="text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuItem><Edit className="mr-2 h-4 w-4" />Sửa</DropdownMenuItem><DropdownMenuItem className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell>
                     </TableRow>
                   )
                 }) : !isGenerating && (<TableRow><TableCell colSpan={6} className="text-center h-24">Chưa có kết quả nào.</TableCell></TableRow>)}
