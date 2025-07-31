@@ -1,9 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, MessageSquare, FileText, PlusCircle, UploadCloud, ChevronRight, Loader2, BookOpen, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { showError, showSuccess } from '@/utils/toast';
+import { showError, showSuccess, showLoading } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -40,6 +40,12 @@ type CommentRatio = {
   content: string;
 };
 
+type Task = {
+  id: number;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  error_message: string | null;
+};
+
 const ProjectDetail = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const [project, setProject] = useState<Project | null>(null);
@@ -49,8 +55,8 @@ const ProjectDetail = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [promptLibraries, setPromptLibraries] = useState<PromptLibrary[]>([]);
+  const [activeTask, setActiveTask] = useState<Task | null>(null);
 
-  // State for the "Add New" dialog
   const [newItem, setNewItem] = useState({ name: '', type: 'article' as 'article' | 'comment' });
   const [newItemConfig, setNewItemConfig] = useState<any>({ quantity: 1 });
   const [commentRatios, setCommentRatios] = useState<CommentRatio[]>([{ id: crypto.randomUUID(), percentage: 100, content: '' }]);
@@ -59,7 +65,7 @@ const ProjectDetail = () => {
     return commentRatios.reduce((sum, ratio) => sum + (Number(ratio.percentage) || 0), 0);
   }, [commentRatios]);
 
-  const fetchProjectData = async () => {
+  const fetchProjectData = useCallback(async () => {
     if (!projectId) return;
     setIsLoading(true);
     try {
@@ -85,11 +91,78 @@ const ProjectDetail = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [projectId]);
 
   useEffect(() => {
     fetchProjectData();
+  }, [fetchProjectData]);
+
+  useEffect(() => {
+    if (!projectId) return;
+
+    const itemsChannel = supabase
+      .channel(`project-items-${projectId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'content_ai_items', filter: `project_id=eq.${projectId}` },
+        (payload) => {
+          const updatedItem = payload.new as ProjectItem;
+          setItems((currentItems) => currentItems.map((item) => item.id === updatedItem.id ? updatedItem : item));
+          setSelectedView(currentView => {
+            if (currentView && typeof currentView === 'object' && currentView.id === updatedItem.id) {
+              return updatedItem;
+            }
+            return currentView;
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(itemsChannel);
+    };
   }, [projectId]);
+
+  useEffect(() => {
+    if (!selectedView || typeof selectedView !== 'object') {
+      setActiveTask(null);
+      return;
+    }
+
+    const itemId = selectedView.id;
+
+    const fetchCurrentTask = async () => {
+      const { data, error } = await supabase.from('ai_generation_tasks').select('*').eq('item_id', itemId).in('status', ['pending', 'running']).maybeSingle();
+      if (error) console.error("Lỗi khi lấy trạng thái tác vụ ban đầu:", error);
+      else setActiveTask(data);
+    };
+    fetchCurrentTask();
+
+    const tasksChannel = supabase
+      .channel(`task-status-${itemId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'ai_generation_tasks', filter: `item_id=eq.${itemId}` },
+        (payload) => {
+          const updatedTask = payload.new as Task;
+          if (updatedTask.status === 'completed' || updatedTask.status === 'failed') {
+            setActiveTask(null);
+            if (updatedTask.status === 'completed') {
+              showSuccess("Tạo comment thành công!");
+            } else {
+              showError(`Tạo comment thất bại: ${updatedTask.error_message}`);
+            }
+          } else {
+            setActiveTask(updatedTask);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(tasksChannel);
+    };
+  }, [selectedView]);
 
   const handleOpenAddDialog = () => {
     setNewItem({ name: '', type: 'article' });
@@ -238,7 +311,14 @@ const ProjectDetail = () => {
               {selectedView === 'documents' && projectId && <ProjectDocumentsManager projectId={projectId} />}
               
               {selectedView && typeof selectedView === 'object' && selectedView.type === 'comment' && (
-                <CommentGenerationDetail project={project} item={selectedView} promptLibraries={promptLibraries} onSave={handleItemUpdate} />
+                <CommentGenerationDetail 
+                  project={project} 
+                  item={selectedView} 
+                  promptLibraries={promptLibraries} 
+                  onSave={handleItemUpdate}
+                  activeTask={activeTask}
+                  setActiveTask={setActiveTask}
+                />
               )}
 
               {selectedView && typeof selectedView === 'object' && selectedView.type === 'article' && (

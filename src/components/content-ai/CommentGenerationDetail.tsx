@@ -31,13 +31,14 @@ interface CommentGenerationDetailProps {
   item: ProjectItem;
   promptLibraries: PromptLibrary[];
   onSave: (updatedItem: ProjectItem) => void;
+  activeTask: Task | null;
+  setActiveTask: (task: Task | null) => void;
 }
 
-export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave }: CommentGenerationDetailProps) => {
+export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave, activeTask, setActiveTask }: CommentGenerationDetailProps) => {
   const [config, setConfig] = useState<any>({});
   const [results, setResults] = useState<GeneratedComment[]>([]);
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isLogOpen, setIsLogOpen] = useState(false);
@@ -62,40 +63,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
         setIsLoadingLogs(false);
     };
     fetchLogs();
-
-    const fetchActiveTask = async () => {
-      const { data, error } = await supabase.from('ai_generation_tasks').select('*').eq('item_id', item.id).in('status', ['pending', 'running']).maybeSingle();
-      if (error) console.error("Lỗi kiểm tra tác vụ:", error);
-      else setActiveTask(data);
-    };
-    fetchActiveTask();
   }, [item]);
-
-  useEffect(() => {
-    if (activeTask && (activeTask.status === 'pending' || activeTask.status === 'running')) {
-      const interval = setInterval(async () => {
-        const { data: updatedTask, error } = await supabase.from('ai_generation_tasks').select('*').eq('id', activeTask.id).single();
-        if (error) {
-          console.error("Lỗi polling tác vụ:", error);
-          clearInterval(interval);
-        } else if (updatedTask.status === 'completed' || updatedTask.status === 'failed') {
-          clearInterval(interval);
-          setActiveTask(null);
-          if (updatedTask.status === 'completed') {
-            showSuccess("Tạo comment thành công!");
-          } else {
-            showError(`Tạo comment thất bại: ${updatedTask.error_message}`);
-          }
-          // Trigger a full refresh from parent
-          const { data: updatedItem, error: itemError } = await supabase.from('content_ai_items').select('*').eq('id', item.id).single();
-          if (!itemError && updatedItem) {
-            onSave(updatedItem);
-          }
-        }
-      }, 5000);
-      return () => clearInterval(interval);
-    }
-  }, [activeTask, item.id, onSave]);
 
   const handleConfigChange = (field: string, value: any) => {
     setConfig(prev => ({ ...prev, [field]: value }));
