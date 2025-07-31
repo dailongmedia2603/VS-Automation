@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { ProjectDocumentsManager } from '@/components/content-ai/ProjectDocumentsManager';
 
@@ -26,6 +27,11 @@ type ProjectItem = {
   content: string | null;
 };
 
+type PromptLibrary = {
+  id: number;
+  name: string;
+};
+
 const ProjectDetail = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const [project, setProject] = useState<Project | null>(null);
@@ -35,6 +41,7 @@ const ProjectDetail = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newItem, setNewItem] = useState({ name: '', type: 'article' as 'article' | 'comment' });
   const [isSaving, setIsSaving] = useState(false);
+  const [promptLibraries, setPromptLibraries] = useState<PromptLibrary[]>([]);
 
   const fetchProjectData = async () => {
     if (!projectId) return;
@@ -42,11 +49,21 @@ const ProjectDetail = () => {
     try {
       const projectPromise = supabase.from('content_ai_ds_du_an').select('id, name').eq('id', projectId).single();
       const itemsPromise = supabase.from('content_ai_items').select('*').eq('project_id', projectId).order('created_at', { ascending: false });
-      const [{ data: projectData, error: projectError }, { data: itemsData, error: itemsError }] = await Promise.all([projectPromise, itemsPromise]);
+      const librariesPromise = supabase.from('prompt_libraries').select('id, name');
+      
+      const [
+        { data: projectData, error: projectError }, 
+        { data: itemsData, error: itemsError },
+        { data: librariesData, error: librariesError }
+      ] = await Promise.all([projectPromise, itemsPromise, librariesPromise]);
+
       if (projectError) throw projectError;
       if (itemsError) throw itemsError;
+      if (librariesError) throw librariesError;
+
       setProject(projectData);
       setItems(itemsData || []);
+      setPromptLibraries(librariesData || []);
     } catch (error: any) {
       showError("Không thể tải dữ liệu dự án: " + error.message);
     } finally {
@@ -169,13 +186,71 @@ const ProjectDetail = () => {
       </main>
 
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Thêm mục mới</DialogTitle><DialogDescription>Chọn loại và đặt tên cho mục mới của bạn.</DialogDescription></DialogHeader>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Thêm mục mới</DialogTitle>
+            <DialogDescription>Điền các thông tin cần thiết để AI tạo nội dung.</DialogDescription>
+          </DialogHeader>
           <div className="py-4 space-y-4">
-            <div className="space-y-2"><Label>Loại</Label><Select value={newItem.type} onValueChange={(v) => setNewItem(d => ({...d, type: v as any}))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="article">Viết bài viết</SelectItem><SelectItem value="comment">Viết comment</SelectItem></SelectContent></Select></div>
-            <div className="space-y-2"><Label>Tên</Label><Input value={newItem.name} onChange={(e) => setNewItem(d => ({...d, name: e.target.value}))} placeholder="VD: Bài viết về sản phẩm A" /></div>
+            <div className="space-y-2">
+              <Label htmlFor="post-name">Tên bài viết</Label>
+              <Input id="post-name" value={newItem.name} onChange={(e) => setNewItem(d => ({...d, name: e.target.value}))} placeholder="VD: Bài viết về sản phẩm A" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="post-type">Loại</Label>
+              <Select value={newItem.type} onValueChange={(v) => setNewItem(d => ({...d, type: v as any}))}>
+                <SelectTrigger id="post-type"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="article">Viết bài viết</SelectItem>
+                  <SelectItem value="comment">Viết comment</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {newItem.type === 'article' && (
+              <div className="space-y-4 p-4 border rounded-lg bg-slate-50">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Ngành</Label>
+                    <Select>
+                      <SelectTrigger><SelectValue placeholder="Chọn thư viện prompt" /></SelectTrigger>
+                      <SelectContent>
+                        {promptLibraries.map(lib => (
+                          <SelectItem key={lib.id} value={String(lib.id)}>{lib.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Dạng bài</Label>
+                    <Select>
+                      <SelectTrigger><SelectValue placeholder="Chọn dạng bài" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="question">Đặt câu hỏi / thảo luận</SelectItem>
+                        <SelectItem value="review">Review</SelectItem>
+                        <SelectItem value="sharing">Chia sẻ</SelectItem>
+                        <SelectItem value="comparison">So sánh</SelectItem>
+                        <SelectItem value="storytelling">Story telling</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Định hướng nội dung</Label>
+                  <Textarea placeholder="Nhập định hướng chi tiết cho AI..." className="min-h-[100px]" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Số lượng</Label>
+                  <Input type="number" defaultValue={1} />
+                  <p className="text-xs text-muted-foreground">NÊN CHỌN 1 (Số lượng bài nhiều hơn 1 có thể ảnh hưởng đến chất lượng của bài viết)</p>
+                </div>
+              </div>
+            )}
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Hủy</Button><Button onClick={handleAddItem} disabled={isSaving}>{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Thêm</Button></DialogFooter>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Hủy</Button>
+            <Button onClick={handleAddItem} disabled={isSaving}>{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Thêm</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
