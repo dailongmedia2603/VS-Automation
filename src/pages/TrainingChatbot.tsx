@@ -58,30 +58,29 @@ const TrainingModule = ({ config, setConfig, onSave, isSaving }: { config: Train
 };
 
 const TrainingChatbot = () => {
-  const [autoReplyConfig, setAutoReplyConfig] = useState<TrainingConfig>(initialConfig);
-  const [careScriptConfig, setCareScriptConfig] = useState<TrainingConfig>(initialConfig);
+  const [config, setConfig] = useState<TrainingConfig>(initialConfig);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState<Record<string, boolean>>({});
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     const fetchPrompts = async () => {
       setIsLoading(true);
       try {
-        const [autoReplyRes, careScriptRes] = await Promise.all([
-          supabase.from('auto_reply_settings').select('config').eq('id', 1).single(),
-          supabase.from('care_script_settings').select('config').eq('id', 1).single()
-        ]);
+        const { data, error } = await supabase
+          .from('auto_reply_settings')
+          .select('config')
+          .eq('id', 1)
+          .single();
 
-        if (autoReplyRes.data?.config && typeof autoReplyRes.data.config === 'object') {
-          setAutoReplyConfig({ ...initialConfig, ...autoReplyRes.data.config });
+        if (error && error.code !== 'PGRST116') {
+          throw error;
         }
-        if (careScriptRes.data?.config && typeof careScriptRes.data.config === 'object') {
-          setCareScriptConfig({ ...initialConfig, ...careScriptRes.data.config });
+
+        if (data?.config && typeof data.config === 'object') {
+          setConfig({ ...initialConfig, ...data.config });
         }
       } catch (error: any) {
-        if (error.code !== 'PGRST116') {
-          showError("Không thể tải dữ liệu huấn luyện: " + error.message);
-        }
+        showError("Không thể tải dữ liệu huấn luyện: " + error.message);
       } finally {
         setIsLoading(false);
       }
@@ -89,24 +88,20 @@ const TrainingChatbot = () => {
     fetchPrompts();
   }, []);
 
-  const handleSave = async (name: 'auto_reply' | 'care_script_suggestion') => {
-    const configToSave = name === 'auto_reply' ? autoReplyConfig : careScriptConfig;
-    const setConfig = name === 'auto_reply' ? setAutoReplyConfig : setCareScriptConfig;
-    const tableName = name === 'auto_reply' ? 'auto_reply_settings' : 'care_script_settings';
-
-    setIsSaving(prev => ({ ...prev, [name]: true }));
+  const handleSave = async () => {
+    setIsSaving(true);
     const toastId = showLoading("Đang lưu cấu hình...");
 
     try {
         const { error } = await supabase
-            .from(tableName)
-            .upsert({ id: 1, config: configToSave });
+            .from('auto_reply_settings')
+            .upsert({ id: 1, config: config });
 
         if (error) {
             throw new Error(`Lưu cấu hình thất bại: ${error.message}`);
         }
 
-        setConfig(configToSave);
+        setConfig(config);
 
         dismissToast(toastId);
         showSuccess("Đã lưu thay đổi thành công!");
@@ -114,7 +109,7 @@ const TrainingChatbot = () => {
         dismissToast(toastId);
         showError(error.message);
     } finally {
-        setIsSaving(prev => ({ ...prev, [name]: false }));
+        setIsSaving(false);
     }
   };
 
@@ -142,28 +137,12 @@ const TrainingChatbot = () => {
           Dạy cho AI cách trả lời và tương tác trong các tình huống cụ thể. Cung cấp càng nhiều thông tin chi tiết, AI sẽ càng hoạt động hiệu quả và phù hợp với doanh nghiệp của bạn.
         </p>
       </div>
-      <Tabs defaultValue="auto_reply" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 max-w-md bg-slate-200/75 p-1.5 rounded-xl h-12">
-          <TabsTrigger value="auto_reply" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-blue-600 text-slate-600 font-semibold text-base transition-all duration-300">Tự động trả lời</TabsTrigger>
-          <TabsTrigger value="care_script_suggestion" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-blue-600 text-slate-600 font-semibold text-base transition-all duration-300">Kịch bản chăm sóc</TabsTrigger>
-        </TabsList>
-        <TabsContent value="auto_reply">
-          <TrainingModule
-            config={autoReplyConfig}
-            setConfig={setAutoReplyConfig}
-            isSaving={!!isSaving['auto_reply']}
-            onSave={() => handleSave('auto_reply')}
-          />
-        </TabsContent>
-        <TabsContent value="care_script_suggestion">
-          <TrainingModule
-            config={careScriptConfig}
-            setConfig={setCareScriptConfig}
-            isSaving={!!isSaving['care_script_suggestion']}
-            onSave={() => handleSave('care_script_suggestion')}
-          />
-        </TabsContent>
-      </Tabs>
+      <TrainingModule
+        config={config}
+        setConfig={setConfig}
+        isSaving={isSaving}
+        onSave={handleSave}
+      />
     </main>
   );
 };
