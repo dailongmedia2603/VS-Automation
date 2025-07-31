@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -13,8 +13,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Settings, Save, Loader2, Search, Trash2, Download, FileText, PlusCircle, MoreHorizontal, Edit } from 'lucide-react';
-import { showSuccess, showError } from '@/utils/toast';
+import { Settings, Save, Loader2, Search, Trash2, Download, FileText, PlusCircle, MoreHorizontal, Edit, Sparkles } from 'lucide-react';
+import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 
@@ -39,6 +39,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isLogOpen, setIsLogOpen] = useState(false);
+  const [generationLog, setGenerationLog] = useState<any>(null);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
 
   useEffect(() => {
@@ -96,6 +97,57 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
     setIsSaving(false);
   };
 
+  const handleGenerateComments = async () => {
+    if (!config.libraryId) {
+        showError("Vui lòng chọn một 'Ngành' (thư viện prompt) để bắt đầu.");
+        return;
+    }
+    if (!config.postContent) {
+        showError("Vui lòng nhập 'Nội dung Post'.");
+        return;
+    }
+
+    setIsGenerating(true);
+    const toastId = showLoading("AI đang sáng tạo, vui lòng chờ...");
+
+    try {
+        const { data, error } = await supabase.functions.invoke('generate-comments-with-ai', {
+            body: { libraryId: config.libraryId, config: config }
+        });
+
+        if (error) throw error;
+        if (data.error) throw new Error(data.error);
+
+        const newComments: GeneratedComment[] = data.comments.map((content: string) => ({
+            id: crypto.randomUUID(),
+            content,
+            status: 'Đạt'
+        }));
+
+        const updatedResults = [...results, ...newComments];
+        setResults(updatedResults);
+        setGenerationLog(data.log);
+
+        const { error: saveError } = await supabase
+            .from('content_ai_items')
+            .update({ content: JSON.stringify(updatedResults), updated_at: new Date().toISOString() })
+            .eq('id', item.id);
+        
+        if (saveError) {
+            showError("Tạo comment thành công nhưng lưu kết quả thất bại: " + saveError.message);
+        } else {
+            showSuccess(`Đã tạo thành công ${newComments.length} bình luận mới!`);
+            onSave({ ...item, content: JSON.stringify(updatedResults) });
+        }
+
+    } catch (err: any) {
+        showError(`Tạo comment thất bại: ${err.message}`);
+    } finally {
+        dismissToast(toastId);
+        setIsGenerating(false);
+    }
+  };
+
   const filteredResults = useMemo(() => {
     return results.filter(r => r.content.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [results, searchTerm]);
@@ -113,7 +165,13 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-slate-900">{item.name}</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-slate-900">{item.name}</h2>
+        <Button onClick={handleGenerateComments} disabled={isGenerating} className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg">
+          {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+          Tạo comment
+        </Button>
+      </div>
       
       <Accordion type="single" collapsible defaultValue="item-1" className="w-full">
         <AccordionItem value="item-1" className="border rounded-2xl bg-white shadow-sm">
@@ -151,7 +209,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
               {selectedIds.length > 0 && (<Button variant="destructive" size="sm" onClick={() => setIsDeleteAlertOpen(true)}><Trash2 className="mr-2 h-4 w-4" />Xóa ({selectedIds.length})</Button>)}
               <Button variant="outline" onClick={handleExportExcel}><Download className="mr-2 h-4 w-4" />Xuất Excel</Button>
               <Button variant="outline" onClick={() => setIsLogOpen(true)}><FileText className="mr-2 h-4 w-4" />Log</Button>
-              <Button className="bg-blue-600 hover:bg-blue-700"><PlusCircle className="mr-2 h-4 w-4" />Tạo thêm comment</Button>
+              <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleGenerateComments} disabled={isGenerating}><PlusCircle className="mr-2 h-4 w-4" />Tạo thêm comment</Button>
             </div>
           </div>
         </CardHeader>
@@ -174,6 +232,40 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={isLogOpen} onOpenChange={setIsLogOpen}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Nhật ký AI</DialogTitle>
+            <DialogDescription>
+                Chi tiết prompt đã gửi và phản hồi thô từ AI trong lần tạo gần nhất.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-4">
+            {generationLog ? (
+                <>
+                    <div>
+                        <h4 className="font-semibold mb-2 text-sm">Prompt đã gửi:</h4>
+                        <div className="p-3 bg-slate-100 rounded-md text-slate-900 font-mono text-xs whitespace-pre-wrap">
+                            {generationLog.prompt}
+                        </div>
+                    </div>
+                    <div>
+                        <h4 className="font-semibold mb-2 text-sm">Phản hồi thô từ AI:</h4>
+                        <pre className="p-3 bg-slate-100 rounded-md text-slate-900 font-mono text-xs whitespace-pre-wrap overflow-auto">
+                            {JSON.stringify(generationLog.response, null, 2)}
+                        </pre>
+                    </div>
+                </>
+            ) : (
+                <p className="text-sm text-slate-500 text-center py-8">Chưa có log nào được ghi lại. Hãy thử tạo comment trước.</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setIsLogOpen(false)}>Đóng</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
