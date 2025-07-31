@@ -29,6 +29,7 @@ import { NotificationProvider } from "./contexts/NotificationContext";
 import CheckPostScan from "@/pages/tools/CheckPostScan";
 import CheckPostScanDetail from "@/pages/tools/CheckPostScanDetail";
 import { PermissionProvider } from "./contexts/PermissionContext";
+import Reports from "./pages/Reports";
 
 const queryClient = new QueryClient();
 
@@ -49,6 +50,7 @@ const App = () => (
                     <Route element={<AppLayout />}>
                       <Route path="/" element={<Dashboard />} />
                       <Route path="/projects" element={<Projects />} />
+                      <Route path="/reports" element={<Reports />} />
                       <Route path="/settings" element={<Settings />} />
                       <Route path="/training-chatbot" element={<PromptLibrary />} />
                       <Route path="/training-chatbot/:libraryId" element={<PromptLibraryDetail />} />

@@ -2,6 +2,11 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
 const formatList = (items) => (items && items.length > 0 ? items.map(p => `- ${p.value}`).join('\n') : '(Chưa có thông tin)');
 const formatNumberedList = (items) => (items && items.length > 0 ? items.map((s, i) => `${i + 1}. ${s.value}`).join('\n') : '(Chưa có quy trình)');
 
@@ -115,6 +120,8 @@ serve(async (req) => {
 
       const geminiData = await geminiRes.json();
       if (!geminiRes.ok) throw new Error(geminiData?.error?.message || 'Lỗi gọi API Gemini.');
+      
+      geminiData.model_used = modelToUse;
 
       await supabaseAdmin.from('ai_generation_tasks').update({ progress_step: 'Đang xử lý và lưu kết quả...' }).eq('id', task.id);
 
