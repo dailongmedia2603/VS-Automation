@@ -12,7 +12,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Settings, Save, Loader2, Search, Trash2, Download, FileText, PlusCircle, MoreHorizontal, Edit, Sparkles } from 'lucide-react';
+import { Settings, Save, Loader2, Search, Trash2, Download, FileText, PlusCircle, MoreHorizontal, Edit, Sparkles, Bot } from 'lucide-react';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
@@ -24,6 +24,7 @@ type PromptLibrary = { id: number; name: string; };
 type CommentRatio = { id: string; percentage: number; content: string; };
 type GeneratedComment = { id: string; content: string; status: 'Đạt' | 'Không đạt'; };
 type Log = { id: number; created_at: string; prompt: string; response: any; };
+type Task = { id: number; status: 'pending' | 'running' | 'completed' | 'failed'; error_message: string | null; };
 
 interface CommentGenerationDetailProps {
   project: Project;
@@ -36,7 +37,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
   const [config, setConfig] = useState<any>({});
   const [results, setResults] = useState<GeneratedComment[]>([]);
   const [isSaving, setIsSaving] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isLogOpen, setIsLogOpen] = useState(false);
@@ -55,20 +56,46 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
 
     const fetchLogs = async () => {
         setIsLoadingLogs(true);
-        const { data, error } = await supabase
-            .from('content_ai_logs')
-            .select('*')
-            .eq('item_id', item.id)
-            .order('created_at', { ascending: false });
-        if (error) {
-            showError("Không thể tải lịch sử log: " + error.message);
-        } else {
-            setLogs(data || []);
-        }
+        const { data, error } = await supabase.from('content_ai_logs').select('*').eq('item_id', item.id).order('created_at', { ascending: false });
+        if (error) showError("Không thể tải lịch sử log: " + error.message);
+        else setLogs(data || []);
         setIsLoadingLogs(false);
     };
     fetchLogs();
+
+    const fetchActiveTask = async () => {
+      const { data, error } = await supabase.from('ai_generation_tasks').select('*').eq('item_id', item.id).in('status', ['pending', 'running']).maybeSingle();
+      if (error) console.error("Lỗi kiểm tra tác vụ:", error);
+      else setActiveTask(data);
+    };
+    fetchActiveTask();
   }, [item]);
+
+  useEffect(() => {
+    if (activeTask && (activeTask.status === 'pending' || activeTask.status === 'running')) {
+      const interval = setInterval(async () => {
+        const { data: updatedTask, error } = await supabase.from('ai_generation_tasks').select('*').eq('id', activeTask.id).single();
+        if (error) {
+          console.error("Lỗi polling tác vụ:", error);
+          clearInterval(interval);
+        } else if (updatedTask.status === 'completed' || updatedTask.status === 'failed') {
+          clearInterval(interval);
+          setActiveTask(null);
+          if (updatedTask.status === 'completed') {
+            showSuccess("Tạo comment thành công!");
+          } else {
+            showError(`Tạo comment thất bại: ${updatedTask.error_message}`);
+          }
+          // Trigger a full refresh from parent
+          const { data: updatedItem, error: itemError } = await supabase.from('content_ai_items').select('*').eq('id', item.id).single();
+          if (!itemError && updatedItem) {
+            onSave(updatedItem);
+          }
+        }
+      }, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [activeTask, item.id, onSave]);
 
   const handleConfigChange = (field: string, value: any) => {
     setConfig(prev => ({ ...prev, [field]: value }));
@@ -116,65 +143,23 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
   };
 
   const handleGenerateComments = async () => {
-    if (!config.libraryId) {
-        showError("Vui lòng chọn một 'Ngành' (thư viện prompt) để bắt đầu.");
-        return;
-    }
-    if (!config.postContent) {
-        showError("Vui lòng nhập 'Nội dung Post'.");
-        return;
-    }
+    if (!config.libraryId) { showError("Vui lòng chọn một 'Ngành' (thư viện prompt) để bắt đầu."); return; }
+    if (!config.postContent) { showError("Vui lòng nhập 'Nội dung Post'."); return; }
 
-    setIsGenerating(true);
-    const toastId = showLoading("AI đang sáng tạo, vui lòng chờ...");
-
+    const toastId = showLoading("Đang gửi yêu cầu...");
     try {
-        const { data, error } = await supabase.functions.invoke('generate-comments-with-ai', {
-            body: { libraryId: config.libraryId, config: config, itemId: item.id }
-        });
-
-        if (error) throw error;
-        if (data.error) throw new Error(data.error);
-
-        const newComments: GeneratedComment[] = data.comments.map((content: string) => ({
-            id: crypto.randomUUID(),
-            content,
-            status: 'Đạt'
-        }));
-
-        const updatedResults = [...results, ...newComments];
-        setResults(updatedResults);
-
-        const { error: saveError } = await supabase
-            .from('content_ai_items')
-            .update({ content: JSON.stringify(updatedResults), updated_at: new Date().toISOString() })
-            .eq('id', item.id);
-        
-        if (saveError) {
-            showError("Tạo comment thành công nhưng lưu kết quả thất bại: " + saveError.message);
-        } else {
-            showSuccess(`Đã tạo thành công ${newComments.length} bình luận mới!`);
-            onSave({ ...item, content: JSON.stringify(updatedResults) });
-            const { data: newLogs, error: logError } = await supabase.from('content_ai_logs').select('*').eq('item_id', item.id).order('created_at', { ascending: false });
-            if (!logError) setLogs(newLogs || []);
-        }
-
+      const { data: newTask, error } = await supabase.functions.invoke('create-ai-generation-task', {
+        body: { itemId: item.id, config }
+      });
+      if (error) throw error;
+      if (newTask.error) throw new Error(newTask.error);
+      
+      setActiveTask(newTask);
+      dismissToast(toastId);
+      showSuccess("Đã gửi yêu cầu! AI đang xử lý trong nền.");
     } catch (err: any) {
-        let errorMessage = err.message;
-        if (err.context && err.context.json) {
-            try {
-                const errorBody = await err.context.json();
-                if (errorBody.error) {
-                    errorMessage = errorBody.error;
-                }
-            } catch (e) {
-                // Ignore if response is not JSON
-            }
-        }
-        showError(`Tạo comment thất bại: ${errorMessage}`);
-    } finally {
-        dismissToast(toastId);
-        setIsGenerating(false);
+      dismissToast(toastId);
+      showError(`Không thể bắt đầu: ${err.message}`);
     }
   };
 
@@ -183,17 +168,12 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
   }, [results, searchTerm]);
 
   const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedIds(filteredResults.map(r => r.id));
-    } else {
-      setSelectedIds([]);
-    }
+    if (checked) setSelectedIds(filteredResults.map(r => r.id));
+    else setSelectedIds([]);
   };
 
   const handleSelectRow = (id: string) => {
-    setSelectedIds(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-    );
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
 
   const handleDeleteSelected = async () => {
@@ -201,14 +181,10 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
     setResults(newResults);
     setSelectedIds([]);
     
-    const { error } = await supabase
-      .from('content_ai_items')
-      .update({ content: JSON.stringify(newResults), updated_at: new Date().toISOString() })
-      .eq('id', item.id);
-
+    const { error } = await supabase.from('content_ai_items').update({ content: JSON.stringify(newResults), updated_at: new Date().toISOString() }).eq('id', item.id);
     if (error) {
       showError("Xóa thất bại: " + error.message);
-      setResults(results); // Revert on error
+      setResults(results);
     } else {
       showSuccess("Đã xóa thành công!");
       onSave({ ...item, content: JSON.stringify(newResults) });
@@ -217,15 +193,14 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
   };
 
   const handleExportExcel = () => {
-    const dataToExport = filteredResults.map(r => ({
-      'Nội dung Comment': r.content,
-      'Chất lượng': r.status,
-    }));
+    const dataToExport = filteredResults.map(r => ({ 'Nội dung Comment': r.content, 'Chất lượng': r.status }));
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Comments");
     XLSX.writeFile(workbook, `${project.name} - ${item.name} - Comments.xlsx`);
   };
+
+  const isGenerating = !!activeTask;
 
   return (
     <div className="space-y-6">
@@ -233,7 +208,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
         <h2 className="text-2xl font-bold text-slate-900">{item.name}</h2>
         <Button onClick={handleGenerateComments} disabled={isGenerating} className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg">
           {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-          Tạo comment
+          {isGenerating ? 'Đang tạo...' : 'Tạo comment'}
         </Button>
       </div>
       
@@ -282,6 +257,16 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
             <Table>
               <TableHeader><TableRow><TableHead className="w-12"><Checkbox checked={selectedIds.length === filteredResults.length && filteredResults.length > 0} onCheckedChange={(checked) => handleSelectAll(!!checked)} /></TableHead><TableHead>STT</TableHead><TableHead>Nội dung comment</TableHead><TableHead>Lọc chất lượng</TableHead><TableHead className="text-right">Thao tác</TableHead></TableRow></TableHeader>
               <TableBody>
+                {isGenerating && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center p-4">
+                      <div className="flex items-center justify-center gap-3 text-slate-500">
+                        <Bot className="h-5 w-5 animate-bounce" />
+                        <span className="font-medium">AI đang làm việc... Tác vụ đang chạy trong nền.</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
                 {filteredResults.length > 0 ? filteredResults.map((result, index) => (
                   <TableRow key={result.id}>
                     <TableCell><Checkbox checked={selectedIds.includes(result.id)} onCheckedChange={() => handleSelectRow(result.id)} /></TableCell>
@@ -290,7 +275,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                     <TableCell><Badge variant={result.status === 'Đạt' ? 'default' : 'destructive'} className={cn(result.status === 'Đạt' && 'bg-green-100 text-green-800')}>{result.status}</Badge></TableCell>
                     <TableCell className="text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuItem><Edit className="mr-2 h-4 w-4" />Sửa</DropdownMenuItem><DropdownMenuItem className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell>
                   </TableRow>
-                )) : (<TableRow><TableCell colSpan={5} className="text-center h-24">Chưa có kết quả nào.</TableCell></TableRow>)}
+                )) : !isGenerating && (<TableRow><TableCell colSpan={5} className="text-center h-24">Chưa có kết quả nào.</TableCell></TableRow>)}
               </TableBody>
             </Table>
           </div>
