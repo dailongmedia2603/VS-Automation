@@ -96,7 +96,7 @@ serve(async (req) => {
         .select('config')
         .eq('id', libraryId)
         .single();
-    if (libraryError || !library.config) {
+    if (libraryError || !library || !library.config) {
         throw new Error("Không thể tải thư viện prompt hoặc thư viện chưa được cấu hình.");
     }
     

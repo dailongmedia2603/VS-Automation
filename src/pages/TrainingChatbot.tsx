@@ -17,6 +17,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
+import { initialConfig } from '@/components/TrainingForm';
 
 type Library = {
   id: number;
@@ -97,7 +98,7 @@ const PromptLibrary = () => {
         const randomColor = getRandomColor();
         const { data: newLibrary, error } = await supabase
           .from('prompt_libraries')
-          .insert({ name: libraryName.trim(), creator_id: user.id, color: randomColor })
+          .insert({ name: libraryName.trim(), creator_id: user.id, color: randomColor, config: initialConfig })
           .select().single();
         if (error) throw error;
         showSuccess("Đã tạo thư viện thành công!");
