@@ -28,7 +28,7 @@ const buildBasePrompt = (libraryConfig) => {
     '{{document_context}}': '(Tài liệu nội bộ không áp dụng cho tác vụ này)',
   };
 
-  const promptTemplate = config.promptTemplate || [];
+  const promptTemplate = libraryConfig.promptTemplate || [];
   
   return promptTemplate.map(block => {
     let content = block.content;
