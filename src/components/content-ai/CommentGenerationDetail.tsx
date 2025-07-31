@@ -50,8 +50,6 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
   const [logs, setLogs] = useState<Log[]>([]);
   const [isLoadingLogs, setIsLoadingLogs] = useState(true);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
-  const [editingConditionsFor, setEditingConditionsFor] = useState<GeneratedComment | null>(null);
-  const [tempMetConditionIds, setTempMetConditionIds] = useState<string[]>([]);
 
   useEffect(() => {
     const itemConfig = item.config || {};
@@ -438,7 +436,12 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                         <Popover>
                           <PopoverTrigger asChild>
                             <button disabled={totalConditions === 0} className="disabled:cursor-not-allowed">
-                              <Badge variant={allConditionsMet ? 'default' : 'secondary'} className={cn(allConditionsMet && 'bg-green-100 text-green-800', 'hover:bg-slate-200')}>
+                              <Badge variant={allConditionsMet ? 'default' : 'secondary'} className={cn(
+                                'hover:bg-opacity-100',
+                                allConditionsMet 
+                                    ? 'bg-green-100 text-green-800 hover:bg-green-100' 
+                                    : 'hover:bg-secondary'
+                              )}>
                                 {totalConditions === 0 ? '-' : allConditionsMet ? 'Đạt' : `${metCount}/${totalConditions}`}
                               </Badge>
                             </button>
