@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { GenerationLogDialog } from './GenerationLogDialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 type Project = { id: number; name: string; };
 type ProjectItem = { id: number; name: string; type: 'article' | 'comment'; content: string | null; config: any; };
@@ -49,6 +50,8 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
   const [logs, setLogs] = useState<Log[]>([]);
   const [isLoadingLogs, setIsLoadingLogs] = useState(true);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
+  const [editingConditionsFor, setEditingConditionsFor] = useState<GeneratedComment | null>(null);
+  const [tempMetConditionIds, setTempMetConditionIds] = useState<string[]>([]);
 
   useEffect(() => {
     const itemConfig = item.config || {};
@@ -379,8 +382,28 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
-              <Button variant="outline" onClick={handleExportExcel}><Download className="mr-2 h-4 w-4" />Xuất Excel</Button>
-              <Button variant="outline" onClick={() => setIsLogOpen(true)}><FileText className="mr-2 h-4 w-4" />Log</Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" onClick={handleExportExcel}>
+                    <Download className="h-4 w-4" />
+                    <span className="sr-only">Xuất Excel</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Xuất Excel</p>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" onClick={() => setIsLogOpen(true)}>
+                    <FileText className="h-4 w-4" />
+                    <span className="sr-only">Log</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Log</p>
+                </TooltipContent>
+              </Tooltip>
               <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleGenerateComments} disabled={isGenerating}><PlusCircle className="mr-2 h-4 w-4" />Tạo thêm comment</Button>
             </div>
           </div>
@@ -415,7 +438,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                         <Popover>
                           <PopoverTrigger asChild>
                             <button disabled={totalConditions === 0} className="disabled:cursor-not-allowed">
-                              <Badge variant={allConditionsMet ? 'default' : 'secondary'} className={cn(allConditionsMet && 'bg-green-100 text-green-800')}>
+                              <Badge variant={allConditionsMet ? 'default' : 'secondary'} className={cn(allConditionsMet && 'bg-green-100 text-green-800', 'hover:bg-slate-200')}>
                                 {totalConditions === 0 ? '-' : allConditionsMet ? 'Đạt' : `${metCount}/${totalConditions}`}
                               </Badge>
                             </button>
