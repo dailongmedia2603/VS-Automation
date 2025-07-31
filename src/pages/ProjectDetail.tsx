@@ -99,32 +99,6 @@ const ProjectDetail = () => {
   }, [fetchProjectData]);
 
   useEffect(() => {
-    if (!projectId) return;
-
-    const itemsChannel = supabase
-      .channel(`project-items-${projectId}`)
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'content_ai_items', filter: `project_id=eq.${projectId}` },
-        (payload) => {
-          const updatedItem = payload.new as ProjectItem;
-          setItems((currentItems) => currentItems.map((item) => item.id === updatedItem.id ? updatedItem : item));
-          setSelectedView(currentView => {
-            if (currentView && typeof currentView === 'object' && currentView.id === updatedItem.id) {
-              return updatedItem;
-            }
-            return currentView;
-          });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(itemsChannel);
-    };
-  }, [projectId]);
-
-  useEffect(() => {
     if (!selectedView || typeof selectedView !== 'object') {
       setActiveTask(null);
       return;
@@ -144,12 +118,22 @@ const ProjectDetail = () => {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'ai_generation_tasks', filter: `item_id=eq.${itemId}` },
-        (payload) => {
+        async (payload) => {
           const updatedTask = payload.new as Task;
           if (updatedTask.status === 'completed' || updatedTask.status === 'failed') {
             setActiveTask(null);
             if (updatedTask.status === 'completed') {
               showSuccess("Tạo comment thành công!");
+              const { data: updatedItem, error: itemError } = await supabase
+                .from('content_ai_items')
+                .select('*')
+                .eq('id', itemId)
+                .single();
+              
+              if (!itemError && updatedItem) {
+                setItems((currentItems) => currentItems.map((item) => item.id === updatedItem.id ? updatedItem : item));
+                setSelectedView(updatedItem);
+              }
             } else {
               showError(`Tạo comment thất bại: ${updatedTask.error_message}`);
             }
