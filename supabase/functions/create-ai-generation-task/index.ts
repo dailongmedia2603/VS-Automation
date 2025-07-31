@@ -57,6 +57,9 @@ serve(async (req) => {
 
     if (insertError) throw insertError;
 
+    // Fire and forget to kickstart the process immediately
+    supabaseAdmin.functions.invoke('process-ai-generation-tasks').catch(console.error);
+
     return new Response(JSON.stringify(newTask), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 201,
