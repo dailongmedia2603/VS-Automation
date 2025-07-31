@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -17,12 +16,14 @@ import { Settings, Save, Loader2, Search, Trash2, Download, FileText, PlusCircle
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
+import { GenerationLogDialog } from './GenerationLogDialog';
 
 type Project = { id: number; name: string; };
 type ProjectItem = { id: number; name: string; type: 'article' | 'comment'; content: string | null; config: any; };
 type PromptLibrary = { id: number; name: string; };
 type CommentRatio = { id: string; percentage: number; content: string; };
 type GeneratedComment = { id: string; content: string; status: 'Đạt' | 'Không đạt'; };
+type Log = { id: number; created_at: string; prompt: string; response: any; };
 
 interface CommentGenerationDetailProps {
   project: Project;
@@ -39,7 +40,8 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isLogOpen, setIsLogOpen] = useState(false);
-  const [generationLog, setGenerationLog] = useState<any>(null);
+  const [logs, setLogs] = useState<Log[]>([]);
+  const [isLoadingLogs, setIsLoadingLogs] = useState(true);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
 
   useEffect(() => {
@@ -50,6 +52,22 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
     } catch {
       setResults([]);
     }
+
+    const fetchLogs = async () => {
+        setIsLoadingLogs(true);
+        const { data, error } = await supabase
+            .from('content_ai_logs')
+            .select('*')
+            .eq('item_id', item.id)
+            .order('created_at', { ascending: false });
+        if (error) {
+            showError("Không thể tải lịch sử log: " + error.message);
+        } else {
+            setLogs(data || []);
+        }
+        setIsLoadingLogs(false);
+    };
+    fetchLogs();
   }, [item]);
 
   const handleConfigChange = (field: string, value: any) => {
@@ -112,7 +130,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
 
     try {
         const { data, error } = await supabase.functions.invoke('generate-comments-with-ai', {
-            body: { libraryId: config.libraryId, config: config }
+            body: { libraryId: config.libraryId, config: config, itemId: item.id }
         });
 
         if (error) throw error;
@@ -126,7 +144,6 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
 
         const updatedResults = [...results, ...newComments];
         setResults(updatedResults);
-        setGenerationLog(data.log);
 
         const { error: saveError } = await supabase
             .from('content_ai_items')
@@ -138,6 +155,8 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
         } else {
             showSuccess(`Đã tạo thành công ${newComments.length} bình luận mới!`);
             onSave({ ...item, content: JSON.stringify(updatedResults) });
+            const { data: newLogs, error: logError } = await supabase.from('content_ai_logs').select('*').eq('item_id', item.id).order('created_at', { ascending: false });
+            if (!logError) setLogs(newLogs || []);
         }
 
     } catch (err: any) {
@@ -244,39 +263,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
         </CardContent>
       </Card>
 
-      <Dialog open={isLogOpen} onOpenChange={setIsLogOpen}>
-        <DialogContent className="sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Nhật ký AI</DialogTitle>
-            <DialogDescription>
-                Chi tiết prompt đã gửi và phản hồi thô từ AI trong lần tạo gần nhất.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-4">
-            {generationLog ? (
-                <>
-                    <div>
-                        <h4 className="font-semibold mb-2 text-sm">Prompt đã gửi:</h4>
-                        <div className="p-3 bg-slate-100 rounded-md text-slate-900 font-mono text-xs whitespace-pre-wrap">
-                            {generationLog.prompt}
-                        </div>
-                    </div>
-                    <div>
-                        <h4 className="font-semibold mb-2 text-sm">Phản hồi thô từ AI:</h4>
-                        <pre className="p-3 bg-slate-100 rounded-md text-slate-900 font-mono text-xs whitespace-pre-wrap overflow-auto">
-                            {JSON.stringify(generationLog.response, null, 2)}
-                        </pre>
-                    </div>
-                </>
-            ) : (
-                <p className="text-sm text-slate-500 text-center py-8">Chưa có log nào được ghi lại. Hãy thử tạo comment trước.</p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button onClick={() => setIsLogOpen(false)}>Đóng</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <GenerationLogDialog isOpen={isLogOpen} onOpenChange={setIsLogOpen} logs={logs} isLoading={isLoadingLogs} />
     </div>
   );
 };

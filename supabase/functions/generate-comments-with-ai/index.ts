@@ -28,7 +28,7 @@ const buildBasePrompt = (libraryConfig) => {
     '{{document_context}}': '(Tài liệu nội bộ không áp dụng cho tác vụ này)',
   };
 
-  const promptTemplate = libraryConfig.promptTemplate || [];
+  const promptTemplate = config.promptTemplate || [];
   
   return promptTemplate.map(block => {
     let content = block.content;
@@ -72,15 +72,25 @@ serve(async (req) => {
   }
 
   try {
-    const { libraryId, config } = await req.json();
-    if (!libraryId || !config) {
-      throw new Error("Thiếu ID thư viện prompt hoặc cấu hình.");
+    const { libraryId, config, itemId } = await req.json();
+    if (!libraryId || !config || !itemId) {
+      throw new Error("Thiếu ID thư viện, cấu hình, hoặc ID mục.");
     }
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
+    
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) throw new Error("Missing Authorization header");
+    const jwt = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: userError } = await createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+        { global: { headers: { Authorization: authHeader } } }
+    ).auth.getUser(jwt);
+    if (userError) throw userError;
 
     const { data: aiSettings, error: settingsError } = await supabaseAdmin
         .from('ai_settings')
@@ -119,7 +129,20 @@ serve(async (req) => {
     const rawContent = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
     const comments = rawContent.split('\n').map(c => c.trim()).filter(Boolean);
 
-    return new Response(JSON.stringify({ comments, log: { prompt: finalPrompt, response: geminiData } }), {
+    const { error: logError } = await supabaseAdmin
+      .from('content_ai_logs')
+      .insert({
+        item_id: itemId,
+        creator_id: user.id,
+        prompt: finalPrompt,
+        response: geminiData
+      });
+
+    if (logError) {
+      console.error(`Failed to save AI log for item ${itemId}:`, logError.message);
+    }
+
+    return new Response(JSON.stringify({ comments }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
