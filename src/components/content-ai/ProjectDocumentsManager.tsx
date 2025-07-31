@@ -9,7 +9,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PlusCircle, Search, Trash2, Loader2, Edit, FileText, User, Calendar, MessageSquare, Bot, Cpu } from 'lucide-react';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { format } from 'date-fns';
@@ -100,7 +99,7 @@ const DocumentDialog = ({ isOpen, onOpenChange, onSave, document, user }: { isOp
 
 const DocumentCard = ({ document, onSelect, isSelected, onEdit, onDelete, onView }: { document: Document, onSelect: (id: number, checked: boolean) => void, isSelected: boolean, onEdit: () => void, onDelete: () => void, onView: () => void }) => {
   return (
-    <Card className="flex flex-col transition-all hover:shadow-md hover:-translate-y-1">
+    <Card className="group flex flex-col transition-all hover:shadow-md hover:-translate-y-1 rounded-2xl">
       <CardHeader className="flex flex-row items-start gap-4 space-y-0 p-4">
         <Checkbox checked={isSelected} onCheckedChange={(checked) => onSelect(document.id, !!checked)} className="mt-1" />
         <div className="flex-1 cursor-pointer" onClick={onView}>
@@ -111,7 +110,7 @@ const DocumentCard = ({ document, onSelect, isSelected, onEdit, onDelete, onView
       <CardContent className="p-4 pt-0 mt-auto">
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <div className="flex items-center gap-1.5"><User className="h-3 w-3" /><span>{document.creator_name || 'Không rõ'}</span></div>
-          <div className="flex items-center">
+          <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit}><Edit className="h-4 w-4" /></Button>
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onDelete}><Trash2 className="h-4 w-4 text-destructive" /></Button>
           </div>
@@ -207,14 +206,14 @@ export const ProjectDocumentsManager = ({ projectId }: { projectId: string }) =>
 
   return (
     <div className="space-y-6 h-full flex flex-col">
-      <Card className="flex-shrink-0">
+      <Card className="flex-shrink-0 shadow-sm rounded-2xl bg-white">
         <CardHeader>
           <div className="flex items-center justify-between gap-4">
             <div className="relative flex-grow">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Tìm kiếm tài liệu..." className="pl-9" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+              <Input placeholder="Tìm kiếm tài liệu..." className="pl-9 rounded-lg bg-slate-100 border-none" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
             </div>
-            <Button onClick={() => { setEditingDocument(null); setIsAddEditDialogOpen(true); }}>
+            <Button onClick={() => { setEditingDocument(null); setIsAddEditDialogOpen(true); }} className="bg-blue-600 hover:bg-blue-700 rounded-lg">
               <PlusCircle className="mr-2 h-4 w-4" />
               Thêm tài liệu
             </Button>
@@ -224,7 +223,7 @@ export const ProjectDocumentsManager = ({ projectId }: { projectId: string }) =>
           <CardContent className="pt-0">
             <div className="flex items-center justify-between bg-slate-50 p-2 rounded-lg">
               <span className="text-sm font-medium">{selectedIds.length} đã chọn</span>
-              <Button variant="destructive" size="sm" onClick={() => setIsBulkDeleteAlertOpen(true)}>
+              <Button variant="destructive" size="sm" onClick={() => setIsBulkDeleteAlertOpen(true)} className="rounded-lg">
                 <Trash2 className="mr-2 h-4 w-4" />
                 Xóa hàng loạt
               </Button>
@@ -234,11 +233,11 @@ export const ProjectDocumentsManager = ({ projectId }: { projectId: string }) =>
       </Card>
       <div className="flex-1 overflow-y-auto">
         {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-48 w-full" />)}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-48 w-full rounded-2xl" />)}
           </div>
         ) : filteredDocuments.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredDocuments.map(doc => (
               <DocumentCard
                 key={doc.id}
