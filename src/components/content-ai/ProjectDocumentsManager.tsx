@@ -9,12 +9,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PlusCircle, Search, Trash2, Loader2, Edit, FileText, User, Calendar, MessageSquare, Bot, Cpu } from 'lucide-react';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { format } from 'date-fns';
 import { type User as SupabaseUser } from '@supabase/supabase-js';
+import { useAuth } from '@/contexts/AuthContext';
 
 type Document = {
   id: number;
@@ -98,69 +98,6 @@ const DocumentDialog = ({ isOpen, onOpenChange, onSave, document, user }: { isOp
   );
 };
 
-const DocumentDetailDialog = ({ isOpen, onOpenChange, document }: { isOpen: boolean, onOpenChange: (open: boolean) => void, document: Document | null }) => {
-  if (!document) return null;
-
-  const DetailSection = ({ title, content, icon }: { title: string, content: string | null | undefined, icon?: React.ElementType }) => {
-    const Icon = icon;
-    return content ? (
-      <div className="space-y-2">
-        <h4 className="text-sm font-semibold text-slate-500 flex items-center gap-2">
-          {Icon && <Icon className="h-4 w-4" />}
-          {title}
-        </h4>
-        <div className="p-3 bg-slate-50 rounded-md text-sm text-slate-700 whitespace-pre-wrap break-all">{content}</div>
-      </div>
-    ) : null;
-  };
-
-  let embeddingArray: number[] | null = null;
-  if (document.embedding) {
-    if (typeof document.embedding === 'string') {
-      try {
-        embeddingArray = JSON.parse(document.embedding);
-      } catch (e) {
-        console.error("Failed to parse embedding string:", document.embedding);
-      }
-    } else if (Array.isArray(document.embedding)) {
-      embeddingArray = document.embedding;
-    }
-  }
-
-  const embeddingSnippet = embeddingArray
-    ? `[${embeddingArray.slice(0, 4).join(', ')}, ..., ${embeddingArray.slice(-4).join(', ')}] (${embeddingArray.length} chiều)`
-    : (document.embedding ? 'Dữ liệu embedding không hợp lệ' : 'Chưa có');
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="text-xl">{document.title}</DialogTitle>
-          <DialogDescription>
-            <div className="flex items-center gap-4 text-xs text-muted-foreground mt-1">
-              <div className="flex items-center gap-1.5"><User className="h-3 w-3" /><span>{document.creator_name || 'Không rõ'}</span></div>
-              <div className="flex items-center gap-1.5"><Calendar className="h-3 w-3" /><span>{format(new Date(document.created_at), 'dd/MM/yyyy')}</span></div>
-              <div className="flex items-center gap-1.5"><FileText className="h-3 w-3" /><span>{document.document_type || 'Chung'}</span></div>
-            </div>
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-4">
-          <DetailSection title="Mục đích" content={document.purpose} />
-          <DetailSection title="Nội dung chính" content={document.content} />
-          <div className="grid grid-cols-2 gap-4">
-            <DetailSection title="Ví dụ tin nhắn khách hàng" content={document.example_customer_message} icon={MessageSquare} />
-            <DetailSection title="Ví dụ AI trả lời" content={document.example_agent_reply} icon={Bot} />
-          </div>
-          <DetailSection title="Vector Embedding (xác nhận)" content={embeddingSnippet} icon={Cpu} />
-        </div>
-        <DialogFooter>
-          <Button onClick={() => onOpenChange(false)} className="rounded-lg">Đóng</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-};
-
 const DocumentCard = ({ document, onSelect, isSelected, onEdit, onDelete, onView }: { document: Document, onSelect: (id: number, checked: boolean) => void, isSelected: boolean, onEdit: () => void, onDelete: () => void, onView: () => void }) => {
   return (
     <Card className="flex flex-col transition-all hover:shadow-md hover:-translate-y-1">
@@ -184,116 +121,64 @@ const DocumentCard = ({ document, onSelect, isSelected, onEdit, onDelete, onView
   );
 };
 
-export const DocumentTrainer = () => {
+export const ProjectDocumentsManager = ({ projectId }: { projectId: string }) => {
+  const { user } = useAuth();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
-  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [editingDocument, setEditingDocument] = useState<Partial<Document> | null>(null);
-  const [viewingDocument, setViewingDocument] = useState<Document | null>(null);
   const [docToDelete, setDocToDelete] = useState<Document | null>(null);
   const [isBulkDeleteAlertOpen, setIsBulkDeleteAlertOpen] = useState(false);
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 20 });
-  const [user, setUser] = useState<SupabaseUser | null>(null);
 
   const fetchDocuments = useCallback(async () => {
     setIsLoading(true);
-    const { data, error } = await supabase.from('documents').select('*').is('project_id', null).order('created_at', { ascending: false });
+    const { data, error } = await supabase.from('documents').select('*').eq('project_id', projectId).order('created_at', { ascending: false });
     if (error) {
       showError("Không thể tải tài liệu: " + error.message);
     } else {
       setDocuments(data as Document[]);
     }
     setIsLoading(false);
-  }, []);
+  }, [projectId]);
 
   useEffect(() => {
     fetchDocuments();
-    supabase.auth.getUser().then(({ data: { user } }) => setUser(user));
   }, [fetchDocuments]);
 
   const filteredDocuments = useMemo(() => {
     return documents.filter(doc => {
       const query = searchQuery.toLowerCase();
-      const titleMatch = doc.title ? doc.title.toLowerCase().includes(query) : false;
-      const contentMatch = doc.content ? doc.content.toLowerCase().includes(query) : false;
-      return titleMatch || contentMatch;
+      return (doc.title?.toLowerCase().includes(query) || doc.content?.toLowerCase().includes(query));
     });
   }, [documents, searchQuery]);
-
-  const pageCount = useMemo(() => {
-    return pagination.pageSize > 0 ? Math.ceil(filteredDocuments.length / pagination.pageSize) : 1;
-  }, [filteredDocuments.length, pagination.pageSize]);
-
-  const paginatedDocuments = useMemo(() => {
-    if (pagination.pageSize === 0) return filteredDocuments;
-    const start = pagination.pageIndex * pagination.pageSize;
-    const end = start + pagination.pageSize;
-    return filteredDocuments.slice(start, end);
-  }, [filteredDocuments, pagination]);
 
   const handleSave = async (doc: Partial<Document>) => {
     const toastId = showLoading("Đang xử lý và nhúng dữ liệu...");
     try {
-      const textToEmbed = `
-        Tiêu đề: ${doc.title || ''}
-        Mục đích: ${doc.purpose || ''}
-        Nội dung: ${doc.content || ''}
-        Ví dụ câu hỏi của khách: ${doc.example_customer_message || ''}
-        Ví dụ câu trả lời của AI: ${doc.example_agent_reply || ''}
-      `.trim();
+      const textToEmbed = `Tiêu đề: ${doc.title || ''}\nMục đích: ${doc.purpose || ''}\nNội dung: ${doc.content || ''}`.trim();
       const { data: embeddingData, error: functionError } = await supabase.functions.invoke('embed-document', { body: { textToEmbed } });
 
-      if (functionError) {
-        let errorMessage = functionError.message;
-        if (functionError.context && typeof functionError.context.json === 'function') {
-          try {
-            const errorBody = await functionError.context.json();
-            if (errorBody.error) {
-              errorMessage = errorBody.error;
-            }
-          } catch (e) {
-            // Bỏ qua lỗi phân tích JSON
-          }
-        }
-        throw new Error(errorMessage);
-      }
-      if (embeddingData.error) throw new Error(embeddingData.error);
-      if (!embeddingData.embedding) throw new Error("Không nhận được vector embedding từ server.");
+      if (functionError || embeddingData.error) throw new Error(functionError?.message || embeddingData.error);
+      if (!embeddingData.embedding) throw new Error("Không nhận được vector embedding.");
 
-      const documentToSave = { ...doc, embedding: embeddingData.embedding };
+      const documentToSave = { ...doc, embedding: embeddingData.embedding, project_id: projectId };
       
-      let savedDocument;
       if (documentToSave.id) {
-        const { data, error } = await supabase.from('documents').update(documentToSave).eq('id', documentToSave.id).select().single();
+        const { error } = await supabase.from('documents').update(documentToSave).eq('id', documentToSave.id);
         if (error) throw error;
-        savedDocument = data;
       } else {
         const { id, ...docWithoutId } = documentToSave;
-        const { data, error } = await supabase.from('documents').insert(docWithoutId).select().single();
+        const { error } = await supabase.from('documents').insert(docWithoutId);
         if (error) throw error;
-        savedDocument = data;
       }
-
-      if (!savedDocument) throw new Error("Lưu tài liệu thất bại.");
 
       dismissToast(toastId);
       showSuccess("Đã lưu tài liệu thành công!");
       setIsAddEditDialogOpen(false);
       setEditingDocument(null);
-
-      setDocuments(prevDocs => {
-        const docIndex = prevDocs.findIndex(d => d.id === savedDocument.id);
-        if (docIndex > -1) {
-          const newDocs = [...prevDocs];
-          newDocs[docIndex] = savedDocument;
-          return newDocs;
-        } else {
-          return [savedDocument, ...prevDocs];
-        }
-      });
+      fetchDocuments();
 
     } catch (err: any) {
       dismissToast(toastId);
@@ -321,94 +206,60 @@ export const DocumentTrainer = () => {
   };
 
   return (
-    <>
-      <div className="space-y-6 mt-6">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between gap-4">
-              <div className="relative flex-grow">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Tìm kiếm tài liệu..." className="pl-9" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
-              </div>
-              <Button onClick={() => { setEditingDocument(null); setIsAddEditDialogOpen(true); }}>
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Thêm tài liệu
+    <div className="space-y-6 h-full flex flex-col">
+      <Card className="flex-shrink-0">
+        <CardHeader>
+          <div className="flex items-center justify-between gap-4">
+            <div className="relative flex-grow">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Tìm kiếm tài liệu..." className="pl-9" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+            </div>
+            <Button onClick={() => { setEditingDocument(null); setIsAddEditDialogOpen(true); }}>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Thêm tài liệu
+            </Button>
+          </div>
+        </CardHeader>
+        {selectedIds.length > 0 && (
+          <CardContent className="pt-0">
+            <div className="flex items-center justify-between bg-slate-50 p-2 rounded-lg">
+              <span className="text-sm font-medium">{selectedIds.length} đã chọn</span>
+              <Button variant="destructive" size="sm" onClick={() => setIsBulkDeleteAlertOpen(true)}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Xóa hàng loạt
               </Button>
             </div>
-          </CardHeader>
-          <CardContent>
-            {selectedIds.length > 0 && (
-              <div className="mb-4 flex items-center justify-between bg-slate-50 p-2 rounded-lg">
-                <span className="text-sm font-medium">{selectedIds.length} đã chọn</span>
-                <Button variant="destructive" size="sm" onClick={() => setIsBulkDeleteAlertOpen(true)}>
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Xóa hàng loạt
-                </Button>
-              </div>
-            )}
-            {isLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-48 w-full" />)}
-              </div>
-            ) : paginatedDocuments.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {paginatedDocuments.map(doc => (
-                  <DocumentCard
-                    key={doc.id}
-                    document={doc}
-                    isSelected={selectedIds.includes(doc.id)}
-                    onSelect={handleSelect}
-                    onView={() => { setViewingDocument(doc); setIsDetailDialogOpen(true); }}
-                    onEdit={() => { setEditingDocument(doc); setIsAddEditDialogOpen(true); }}
-                    onDelete={() => setDocToDelete(doc)}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-16 text-muted-foreground">
-                <FileText className="mx-auto h-12 w-12" />
-                <h3 className="mt-4 text-lg font-semibold">Không có tài liệu nào</h3>
-                <p className="mt-1 text-sm">Hãy bắt đầu bằng cách thêm tài liệu huấn luyện mới.</p>
-              </div>
-            )}
           </CardContent>
-        </Card>
-        {pageCount > 1 && (
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-muted-foreground">
-              Đã chọn {selectedIds.length} trên {documents.length} tài liệu.
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-medium">Hiển thị</p>
-                <Select value={String(pagination.pageSize)} onValueChange={value => setPagination(p => ({ ...p, pageSize: Number(value) }))}>
-                  <SelectTrigger className="w-[80px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="20">20</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="0">Tất cả</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <Pagination>
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious href="#" onClick={() => setPagination(p => ({ ...p, pageIndex: Math.max(0, p.pageIndex - 1) }))} />
-                  </PaginationItem>
-                  <PaginationItem><PaginationLink>{pagination.pageIndex + 1}</PaginationLink></PaginationItem>
-                  <PaginationItem>
-                    <PaginationNext href="#" onClick={() => setPagination(p => ({ ...p, pageIndex: Math.min(pageCount - 1, p.pageIndex + 1) }))} />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            </div>
+        )}
+      </Card>
+      <div className="flex-1 overflow-y-auto">
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-48 w-full" />)}
+          </div>
+        ) : filteredDocuments.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredDocuments.map(doc => (
+              <DocumentCard
+                key={doc.id}
+                document={doc}
+                isSelected={selectedIds.includes(doc.id)}
+                onSelect={handleSelect}
+                onView={() => { /* Implement view if needed */ }}
+                onEdit={() => { setEditingDocument(doc); setIsAddEditDialogOpen(true); }}
+                onDelete={() => setDocToDelete(doc)}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-16 text-muted-foreground">
+            <FileText className="mx-auto h-12 w-12" />
+            <h3 className="mt-4 text-lg font-semibold">Chưa có tài liệu nào</h3>
+            <p className="mt-1 text-sm">Hãy bắt đầu bằng cách thêm tài liệu cho dự án này.</p>
           </div>
         )}
       </div>
       <DocumentDialog isOpen={isAddEditDialogOpen} onOpenChange={setIsAddEditDialogOpen} onSave={handleSave} document={editingDocument} user={user} />
-      <DocumentDetailDialog isOpen={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen} document={viewingDocument} />
       <AlertDialog open={!!docToDelete} onOpenChange={() => setDocToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>Bạn có chắc chắn?</AlertDialogTitle><AlertDialogDescription>Hành động này sẽ xóa vĩnh viễn tài liệu "{docToDelete?.title}".</AlertDialogDescription></AlertDialogHeader>
@@ -427,6 +278,6 @@ export const DocumentTrainer = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   );
 };

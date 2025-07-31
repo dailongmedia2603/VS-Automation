@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, MessageSquare, FileText, PlusCircle, UploadCloud, ChevronRight, Loader2 } from 'lucide-react';
+import { ArrowLeft, MessageSquare, FileText, PlusCircle, UploadCloud, ChevronRight, Loader2, BookOpen } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from '@/lib/utils';
+import { ProjectDocumentsManager } from '@/components/content-ai/ProjectDocumentsManager';
 
 type Project = {
   id: number;
@@ -29,7 +30,7 @@ const ProjectDetail = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const [project, setProject] = useState<Project | null>(null);
   const [items, setItems] = useState<ProjectItem[]>([]);
-  const [selectedItem, setSelectedItem] = useState<ProjectItem | null>(null);
+  const [selectedView, setSelectedView] = useState<'documents' | ProjectItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newItem, setNewItem] = useState({ name: '', type: 'article' as 'article' | 'comment' });
@@ -118,22 +119,50 @@ const ProjectDetail = () => {
         <ResizablePanelGroup direction="horizontal" className="flex-1 rounded-2xl border bg-white shadow-sm overflow-hidden">
           <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
             <div className="flex flex-col h-full p-4">
+              <div className="p-2">
+                <button
+                  onClick={() => setSelectedView('documents')}
+                  className={cn(
+                    "w-full text-left p-3 rounded-lg text-base font-semibold flex items-center gap-3 transition-colors",
+                    selectedView === 'documents'
+                      ? "bg-blue-100 text-blue-700"
+                      : "text-slate-700 hover:bg-slate-100"
+                  )}
+                >
+                  <BookOpen className="h-5 w-5" />
+                  Tài liệu
+                </button>
+              </div>
               <Accordion type="multiple" defaultValue={['articles', 'comments']} className="w-full">
                 <AccordionItem value="articles">
                   <AccordionTrigger className="text-base font-semibold hover:no-underline"><div className="flex items-center gap-2"><FileText className="h-5 w-5 text-blue-600" /><span>Viết bài viết ({articles.length})</span></div></AccordionTrigger>
-                  <AccordionContent><div className="flex flex-col gap-1 pl-2">{articles.map(item => (<button key={item.id} onClick={() => setSelectedItem(item)} className={cn("w-full text-left p-2 rounded-md text-sm flex items-center justify-between hover:bg-slate-100", selectedItem?.id === item.id && "bg-blue-100 text-blue-700 font-semibold")}><span>{item.name}</span><ChevronRight className="h-4 w-4 text-slate-400" /></button>))}</div></AccordionContent>
+                  <AccordionContent><div className="flex flex-col gap-1 pl-2">{articles.map(item => (<button key={item.id} onClick={() => setSelectedView(item)} className={cn("w-full text-left p-2 rounded-md text-sm flex items-center justify-between hover:bg-slate-100", selectedView && typeof selectedView === 'object' && selectedView.id === item.id && "bg-blue-100 text-blue-700 font-semibold")}><span>{item.name}</span><ChevronRight className="h-4 w-4 text-slate-400" /></button>))}</div></AccordionContent>
                 </AccordionItem>
                 <AccordionItem value="comments">
                   <AccordionTrigger className="text-base font-semibold hover:no-underline"><div className="flex items-center gap-2"><MessageSquare className="h-5 w-5 text-green-600" /><span>Viết comment ({comments.length})</span></div></AccordionTrigger>
-                  <AccordionContent><div className="flex flex-col gap-1 pl-2">{comments.map(item => (<button key={item.id} onClick={() => setSelectedItem(item)} className={cn("w-full text-left p-2 rounded-md text-sm flex items-center justify-between hover:bg-slate-100", selectedItem?.id === item.id && "bg-blue-100 text-blue-700 font-semibold")}><span>{item.name}</span><ChevronRight className="h-4 w-4 text-slate-400" /></button>))}</div></AccordionContent>
+                  <AccordionContent><div className="flex flex-col gap-1 pl-2">{comments.map(item => (<button key={item.id} onClick={() => setSelectedView(item)} className={cn("w-full text-left p-2 rounded-md text-sm flex items-center justify-between hover:bg-slate-100", selectedView && typeof selectedView === 'object' && selectedView.id === item.id && "bg-blue-100 text-blue-700 font-semibold")}><span>{item.name}</span><ChevronRight className="h-4 w-4 text-slate-400" /></button>))}</div></AccordionContent>
                 </AccordionItem>
               </Accordion>
             </div>
           </ResizablePanel>
           <ResizableHandle withHandle />
           <ResizablePanel defaultSize={75}>
-            <div className="h-full p-6 flex items-center justify-center">
-              {selectedItem ? (<div><h2 className="text-xl font-bold">{selectedItem.name}</h2><p className="mt-4 text-slate-600 whitespace-pre-wrap">{selectedItem.content || "Chưa có nội dung."}</p></div>) : (<div className="text-center text-slate-500"><h3 className="text-lg font-semibold">Chọn một mục để xem chi tiết</h3><p className="mt-1 text-sm">Nội dung chi tiết sẽ được hiển thị ở đây.</p></div>)}
+            <div className="h-full p-6">
+              {selectedView === 'documents' && projectId && <ProjectDocumentsManager projectId={projectId} />}
+              {selectedView && typeof selectedView === 'object' && (
+                <div>
+                  <h2 className="text-xl font-bold">{selectedView.name}</h2>
+                  <p className="mt-4 text-slate-600 whitespace-pre-wrap">{selectedView.content || "Chưa có nội dung."}</p>
+                </div>
+              )}
+              {!selectedView && (
+                <div className="h-full flex items-center justify-center text-center text-slate-500">
+                  <div>
+                    <h3 className="text-lg font-semibold">Chọn một mục để xem chi tiết</h3>
+                    <p className="mt-1 text-sm">Nội dung chi tiết sẽ được hiển thị ở đây.</p>
+                  </div>
+                </div>
+              )}
             </div>
           </ResizablePanel>
         </ResizablePanelGroup>
