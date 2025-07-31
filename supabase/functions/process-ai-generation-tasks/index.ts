@@ -114,11 +114,15 @@ serve(async (req) => {
       if (!geminiRes.ok) throw new Error(geminiData?.error?.message || 'Lỗi gọi API Gemini.');
 
       const rawContent = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      
+      const mandatoryConditions = task.config.mandatoryConditions || [];
+      const allConditionIds = mandatoryConditions.map((c) => c.id);
+
       const newComments = rawContent.split('\n').map(c => ({ 
         id: crypto.randomUUID(), 
         content: c.trim(), 
         status: 'Đạt',
-        conditionsStatus: 'Đạt'
+        metConditionIds: allConditionIds
       })).filter(c => c.content);
 
       const { data: currentItem, error: itemError } = await supabaseAdmin.from('content_ai_items').select('content').eq('id', task.item_id).single();
