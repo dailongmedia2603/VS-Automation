@@ -49,8 +49,6 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
   const [logs, setLogs] = useState<Log[]>([]);
   const [isLoadingLogs, setIsLoadingLogs] = useState(true);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
-  const [editingConditionsFor, setEditingConditionsFor] = useState<GeneratedComment | null>(null);
-  const [tempMetConditionIds, setTempMetConditionIds] = useState<string[]>([]);
 
   useEffect(() => {
     const itemConfig = item.config || {};
@@ -226,35 +224,6 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
 
   const handleRemoveCondition = (id: string) => {
     setMandatoryConditions(prev => prev.filter(c => c.id !== id));
-  };
-
-  const handleOpenConditionEditor = (result: GeneratedComment) => {
-    setEditingConditionsFor(result);
-    setTempMetConditionIds(result.metConditionIds || []);
-  };
-
-  const handleTempConditionChange = (conditionId: string, checked: boolean) => {
-    setTempMetConditionIds(prev => {
-      const newSet = new Set(prev);
-      if (checked) newSet.add(conditionId);
-      else newSet.delete(conditionId);
-      return Array.from(newSet);
-    });
-  };
-
-  const handleSaveConditionStatus = async () => {
-    if (!editingConditionsFor) return;
-    const newResults = results.map(r => r.id === editingConditionsFor.id ? { ...r, metConditionIds: tempMetConditionIds } : r);
-    setResults(newResults);
-    setEditingConditionsFor(null);
-    const { error } = await supabase.from('content_ai_items').update({ content: JSON.stringify(newResults) }).eq('id', item.id);
-    if (error) {
-      showError("Cập nhật thất bại.");
-      setResults(results);
-    } else {
-      showSuccess("Đã cập nhật trạng thái điều kiện.");
-      onSave({ ...item, content: JSON.stringify(newResults) });
-    }
   };
 
   const isGenerating = !!activeTask;
@@ -443,9 +412,9 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                       <TableCell className="max-w-md break-words">{result.content}</TableCell>
                       <TableCell><Badge variant="outline">{result.type}</Badge></TableCell>
                       <TableCell>
-                        <Popover open={editingConditionsFor?.id === result.id} onOpenChange={(isOpen) => !isOpen && setEditingConditionsFor(null)}>
+                        <Popover>
                           <PopoverTrigger asChild>
-                            <button onClick={() => handleOpenConditionEditor(result)} disabled={totalConditions === 0}>
+                            <button disabled={totalConditions === 0} className="disabled:cursor-not-allowed">
                               <Badge variant={allConditionsMet ? 'default' : 'secondary'} className={cn(allConditionsMet && 'bg-green-100 text-green-800')}>
                                 {totalConditions === 0 ? '-' : allConditionsMet ? 'Đạt' : `${metCount}/${totalConditions}`}
                               </Badge>
@@ -453,16 +422,15 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                           </PopoverTrigger>
                           <PopoverContent className="w-80">
                             <div className="space-y-4">
-                              <div className="space-y-1"><p className="font-medium text-sm">Checklist Điều kiện</p><p className="text-xs text-muted-foreground">Đánh dấu các điều kiện đã được đáp ứng.</p></div>
+                              <div className="space-y-1"><p className="font-medium text-sm">Checklist Điều kiện</p><p className="text-xs text-muted-foreground">Đây là danh sách các điều kiện đã được đáp ứng.</p></div>
                               <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
                                 {mandatoryConditions.map(cond => (
                                   <div key={cond.id} className="flex items-start space-x-2">
-                                    <Checkbox id={`cond-${result.id}-${cond.id}`} checked={tempMetConditionIds.includes(cond.id)} onCheckedChange={(checked) => handleTempConditionChange(cond.id, !!checked)} />
-                                    <Label htmlFor={`cond-${result.id}-${cond.id}`} className="font-normal text-sm leading-snug">{cond.content}</Label>
+                                    <Checkbox id={`cond-view-${result.id}-${cond.id}`} checked={result.metConditionIds.includes(cond.id)} disabled />
+                                    <Label htmlFor={`cond-view-${result.id}-${cond.id}`} className="font-normal text-sm leading-snug">{cond.content}</Label>
                                   </div>
                                 ))}
                               </div>
-                              <Button onClick={handleSaveConditionStatus} size="sm" className="w-full">Lưu</Button>
                             </div>
                           </PopoverContent>
                         </Popover>
