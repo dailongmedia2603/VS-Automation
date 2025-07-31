@@ -151,7 +151,10 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
       const { data: newTask, error } = await supabase.functions.invoke('create-ai-generation-task', {
         body: { itemId: item.id, config }
       });
-      if (error) throw error;
+      if (error) {
+        const errorBody = await error.context.json();
+        throw new Error(errorBody.error || error.message);
+      }
       if (newTask.error) throw new Error(newTask.error);
       
       setActiveTask(newTask);
