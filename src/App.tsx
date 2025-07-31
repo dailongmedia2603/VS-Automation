@@ -6,7 +6,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import Projects from "./pages/Projects";
 import Settings from "./pages/Settings";
-import TrainingChatbot from "./pages/TrainingChatbot";
+import PromptLibrary from "./pages/TrainingChatbot";
+import PromptLibraryDetail from "./pages/PromptLibraryDetail";
 import Staff from "./pages/Staff";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
@@ -49,7 +50,8 @@ const App = () => (
                       <Route path="/" element={<Dashboard />} />
                       <Route path="/projects" element={<Projects />} />
                       <Route path="/settings" element={<Settings />} />
-                      <Route path="/training-chatbot" element={<TrainingChatbot />} />
+                      <Route path="/training-chatbot" element={<PromptLibrary />} />
+                      <Route path="/training-chatbot/:libraryId" element={<PromptLibraryDetail />} />
                       <Route path="/training-documents" element={<TrainingDocuments />} />
                       <Route path="/staff" element={<Staff />} />
                       <Route path="/content-ai" element={<ContentAi />} />
