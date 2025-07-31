@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, MessageSquare, FileText, PlusCircle, UploadCloud, ChevronRight, Loader2, BookOpen } from 'lucide-react';
+import { ArrowLeft, MessageSquare, FileText, PlusCircle, UploadCloud, ChevronRight, Loader2, BookOpen, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -32,6 +32,12 @@ type PromptLibrary = {
   name: string;
 };
 
+type CommentRatio = {
+  id: string;
+  percentage: number;
+  content: string;
+};
+
 const ProjectDetail = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const [project, setProject] = useState<Project | null>(null);
@@ -42,6 +48,11 @@ const ProjectDetail = () => {
   const [newItem, setNewItem] = useState({ name: '', type: 'article' as 'article' | 'comment' });
   const [isSaving, setIsSaving] = useState(false);
   const [promptLibraries, setPromptLibraries] = useState<PromptLibrary[]>([]);
+  const [commentRatios, setCommentRatios] = useState<CommentRatio[]>([{ id: crypto.randomUUID(), percentage: 100, content: '' }]);
+
+  const totalPercentage = useMemo(() => {
+    return commentRatios.reduce((sum, ratio) => sum + (Number(ratio.percentage) || 0), 0);
+  }, [commentRatios]);
 
   const fetchProjectData = async () => {
     if (!projectId) return;
@@ -82,6 +93,8 @@ const ProjectDetail = () => {
     }
     setIsSaving(true);
     try {
+      // Here you would gather the config data from the form state
+      // For now, we just insert the basic item
       const { error } = await supabase.from('content_ai_items').insert({ ...newItem, project_id: projectId });
       if (error) throw error;
       showSuccess("Đã thêm mục mới thành công!");
@@ -93,6 +106,20 @@ const ProjectDetail = () => {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleAddRatio = () => {
+    setCommentRatios([...commentRatios, { id: crypto.randomUUID(), percentage: 0, content: '' }]);
+  };
+
+  const handleRemoveRatio = (id: string) => {
+    if (commentRatios.length > 1) {
+      setCommentRatios(commentRatios.filter(r => r.id !== id));
+    }
+  };
+
+  const handleRatioChange = (id: string, field: 'percentage' | 'content', value: string | number) => {
+    setCommentRatios(commentRatios.map(r => r.id === id ? { ...r, [field]: value } : r));
   };
 
   const articles = items.filter(item => item.type === 'article');
@@ -243,6 +270,60 @@ const ProjectDetail = () => {
                   <Label>Số lượng</Label>
                   <Input type="number" defaultValue={1} />
                   <p className="text-xs text-muted-foreground">NÊN CHỌN 1 (Số lượng bài nhiều hơn 1 có thể ảnh hưởng đến chất lượng của bài viết)</p>
+                </div>
+              </div>
+            )}
+
+            {newItem.type === 'comment' && (
+              <div className="space-y-4 p-4 border rounded-lg bg-slate-50">
+                <div className="space-y-2">
+                  <Label>Ngành</Label>
+                  <Select>
+                    <SelectTrigger><SelectValue placeholder="Chọn thư viện prompt" /></SelectTrigger>
+                    <SelectContent>
+                      {promptLibraries.map(lib => (
+                        <SelectItem key={lib.id} value={String(lib.id)}>{lib.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Nội dung Post</Label>
+                  <Textarea placeholder="Dán nội dung bài viết cần bình luận vào đây..." className="min-h-[100px]" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Định hướng comment</Label>
+                  <Textarea placeholder="Nhập định hướng chi tiết cho các bình luận..." className="min-h-[80px]" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Tỉ lệ comment</Label>
+                  <div className="space-y-2">
+                    {commentRatios.map((ratio, index) => (
+                      <div key={ratio.id} className="flex items-center gap-2">
+                        <div className="relative w-24">
+                          <Input type="number" value={ratio.percentage} onChange={(e) => handleRatioChange(ratio.id, 'percentage', e.target.value)} className="pr-6" />
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
+                        </div>
+                        <Input placeholder="Nội dung định hướng" value={ratio.content} onChange={(e) => handleRatioChange(ratio.id, 'content', e.target.value)} />
+                        <Button variant="ghost" size="icon" onClick={() => handleRemoveRatio(ratio.id)} disabled={commentRatios.length <= 1}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <Button variant="outline" size="sm" onClick={handleAddRatio}>
+                      <PlusCircle className="h-4 w-4 mr-2" />
+                      Thêm tỉ lệ
+                    </Button>
+                    {totalPercentage > 100 && (
+                      <p className="text-sm text-destructive font-medium">Tổng tỉ lệ vượt quá 100%!</p>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Số lượng comment</Label>
+                  <Input type="number" defaultValue={10} />
                 </div>
               </div>
             )}
