@@ -57,12 +57,30 @@ serve(async (req) => {
 
     if (insertError) throw insertError;
 
-    // Fire and forget to kickstart the process immediately
-    supabaseAdmin.functions.invoke('process-ai-generation-tasks').catch(console.error);
+    // Invoke and wait for the processor to finish
+    const { error: processError } = await supabaseAdmin.functions.invoke('process-ai-generation-tasks');
+    if (processError) {
+        // Try to get a more specific error message from the context
+        let detailedError = processError.message;
+        try {
+            const context = await processError.context.json();
+            if (context.error) detailedError = context.error;
+        } catch(e) { /* ignore json parsing error */ }
+        throw new Error(detailedError);
+    }
 
-    return new Response(JSON.stringify(newTask), {
+    // Fetch the updated item to return to the client
+    const { data: updatedItem, error: fetchError } = await supabaseAdmin
+        .from('content_ai_items')
+        .select('*')
+        .eq('id', itemId)
+        .single();
+    
+    if (fetchError) throw fetchError;
+
+    return new Response(JSON.stringify(updatedItem), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 201,
+      status: 200, // Return 200 instead of 201 as we are returning the final resource
     });
 
   } catch (error) {

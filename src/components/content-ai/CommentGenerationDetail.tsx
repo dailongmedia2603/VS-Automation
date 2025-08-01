@@ -45,6 +45,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
   const [results, setResults] = useState<GeneratedComment[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingConditions, setIsSavingConditions] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isLogOpen, setIsLogOpen] = useState(false);
@@ -144,23 +145,27 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
     if (!config.libraryId) { showError("Vui lòng chọn một 'Ngành' (thư viện prompt) để bắt đầu."); return; }
     if (!config.postContent) { showError("Vui lòng nhập 'Nội dung Post'."); return; }
 
-    const toastId = showLoading("Đang gửi yêu cầu...");
+    setIsGenerating(true);
+    const toastId = showLoading("AI đang xử lý, vui lòng chờ...");
     try {
-      const { data: newTask, error } = await supabase.functions.invoke('create-ai-generation-task', {
+      const { data: updatedItem, error } = await supabase.functions.invoke('create-ai-generation-task', {
         body: { itemId: item.id, config: { ...config, mandatoryConditions } }
       });
+      
       if (error) {
         const errorBody = await error.context.json();
         throw new Error(errorBody.error || error.message);
       }
-      if (newTask.error) throw new Error(newTask.error);
+      if (updatedItem.error) throw new Error(updatedItem.error);
       
-      setActiveTask(newTask);
+      onSave(updatedItem);
       dismissToast(toastId);
-      showSuccess("Đã gửi yêu cầu! AI đang xử lý trong nền.");
+      showSuccess("Đã tạo comment thành công!");
     } catch (err: any) {
       dismissToast(toastId);
       showError(`Không thể bắt đầu: ${err.message}`);
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -271,17 +276,11 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
     }
   };
 
-  const isGenerating = !!activeTask;
-  const progressStep = activeTask?.progress_step;
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-slate-900">{item.name}</h2>
         <div className="flex items-center gap-4">
-          {isGenerating && progressStep && (
-            <p className="text-sm text-slate-500 animate-pulse">{progressStep}</p>
-          )}
           <Button onClick={handleGenerateComments} disabled={isGenerating} className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg">
             {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
             {isGenerating ? 'Đang tạo...' : 'Tạo comment'}
