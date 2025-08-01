@@ -37,7 +37,6 @@ const navSections = [
     title: "General",
     items: [
       { name: "Dashboard", icon: LayoutDashboard, href: "/", permission: "view_dashboard" },
-      { name: "Dự án", icon: Briefcase, href: "/projects", permission: "view_projects" },
       { name: "Báo cáo", icon: BarChart3, href: "/reports", permission: "view_reports" },
     ],
   },
