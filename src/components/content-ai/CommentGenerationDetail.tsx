@@ -422,7 +422,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
               </div>
             </div>
             <div className="flex justify-end mt-6 px-6">
-              <Button onClick={() => handleSaveConfig(config)} disabled={isSaving}>
+              <Button onClick={() => handleSaveConfig(config)} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700">
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                 Lưu cấu hình
               </Button>
@@ -466,7 +466,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
             </div>
             <div className="flex justify-between items-center">
               <Button variant="outline" size="sm" onClick={handleAddCondition}><PlusCircle className="h-4 w-4 mr-2" />Thêm điều kiện</Button>
-              <Button onClick={handleSaveConditions} disabled={isSavingConditions}>
+              <Button onClick={handleSaveConditions} disabled={isSavingConditions} className="bg-amber-500 hover:bg-amber-600">
                 {isSavingConditions ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                 Lưu điều kiện
               </Button>
