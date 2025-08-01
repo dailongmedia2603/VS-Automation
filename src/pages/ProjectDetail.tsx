@@ -1,13 +1,14 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, MessageSquare, FileText, PlusCircle, UploadCloud, ChevronRight, Loader2, BookOpen, Trash2 } from 'lucide-react';
+import { ArrowLeft, MessageSquare, FileText, PlusCircle, UploadCloud, ChevronRight, Loader2, BookOpen, Trash2, Edit, Check } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess, showLoading } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -53,6 +54,11 @@ const ProjectDetail = () => {
   const [newItem, setNewItem] = useState({ name: '', type: 'article' as 'article' | 'comment' });
   const [newItemConfig, setNewItemConfig] = useState<any>({ quantity: 1 });
   const [commentRatios, setCommentRatios] = useState<CommentRatio[]>([{ id: crypto.randomUUID(), percentage: 100, content: '' }]);
+
+  const [editingItemId, setEditingItemId] = useState<number | null>(null);
+  const [editingName, setEditingName] = useState('');
+  const [itemToDelete, setItemToDelete] = useState<ProjectItem | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const totalPercentage = useMemo(() => {
     return commentRatios.reduce((sum, ratio) => sum + (Number(ratio.percentage) || 0), 0);
@@ -195,8 +201,111 @@ const ProjectDetail = () => {
     }
   };
 
+  const handleSaveName = async () => {
+    if (!editingItemId || !editingName.trim()) {
+        setEditingItemId(null);
+        return;
+    }
+    const { error } = await supabase
+        .from('content_ai_items')
+        .update({ name: editingName.trim() })
+        .eq('id', editingItemId);
+    
+    if (error) {
+        showError("Cập nhật tên thất bại: " + error.message);
+    } else {
+        showSuccess("Đã cập nhật tên!");
+        fetchProjectData();
+    }
+    setEditingItemId(null);
+  };
+
+  const handleDeleteItem = (item: ProjectItem) => {
+      setItemToDelete(item);
+      setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+      if (!itemToDelete) return;
+      const { error } = await supabase
+          .from('content_ai_items')
+          .delete()
+          .eq('id', itemToDelete.id);
+      
+      if (error) {
+          showError("Xóa thất bại: " + error.message);
+      } else {
+          showSuccess("Đã xóa mục thành công!");
+          if (selectedView && typeof selectedView === 'object' && selectedView.id === itemToDelete.id) {
+              setSelectedView(null);
+          }
+          fetchProjectData();
+      }
+      setIsDeleteDialogOpen(false);
+      setItemToDelete(null);
+  };
+
   const articles = items.filter(item => item.type === 'article');
   const comments = items.filter(item => item.type === 'comment');
+
+  const ItemList = ({ items }: { items: ProjectItem[] }) => {
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (editingItemId && inputRef.current) {
+            inputRef.current.focus();
+        }
+    }, [editingItemId]);
+
+    return (
+        <div className="flex flex-col gap-1 pl-2">
+            {items.map(item => (
+                <div
+                    key={item.id}
+                    onClick={() => editingItemId !== item.id && setSelectedView(item)}
+                    className={cn(
+                        "group w-full text-left p-2 rounded-md text-sm flex items-center justify-between cursor-pointer",
+                        selectedView && typeof selectedView === 'object' && selectedView.id === item.id && editingItemId !== item.id
+                            ? "bg-blue-100 text-blue-700 font-semibold"
+                            : "hover:bg-slate-100"
+                    )}
+                >
+                    {editingItemId === item.id ? (
+                        <div className="flex-1 flex items-center gap-1">
+                            <Input
+                                ref={inputRef}
+                                value={editingName}
+                                onChange={(e) => setEditingName(e.target.value)}
+                                onBlur={handleSaveName}
+                                onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
+                                className="h-7 text-sm"
+                                onClick={(e) => e.stopPropagation()}
+                            />
+                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleSaveName}>
+                                <Check className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    ) : (
+                        <>
+                            <span className="truncate">{item.name}</span>
+                            <div className="flex items-center flex-shrink-0">
+                                <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setEditingItemId(item.id); setEditingName(item.name); }}>
+                                        <Edit className="h-3 w-3" />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteItem(item); }}>
+                                        <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                </div>
+                                <ChevronRight className={cn("h-4 w-4 text-slate-400", selectedView && typeof selectedView === 'object' && selectedView.id === item.id && "text-blue-700")} />
+                            </div>
+                        </>
+                    )}
+                </div>
+            ))}
+        </div>
+    );
+  };
 
   if (isLoading) {
     return (
@@ -253,11 +362,11 @@ const ProjectDetail = () => {
               <Accordion type="multiple" defaultValue={['articles', 'comments']} className="w-full">
                 <AccordionItem value="articles">
                   <AccordionTrigger className="text-base font-semibold hover:no-underline"><div className="flex items-center gap-2"><FileText className="h-5 w-5 text-blue-600" /><span>Viết bài viết ({articles.length})</span></div></AccordionTrigger>
-                  <AccordionContent><div className="flex flex-col gap-1 pl-2">{articles.map(item => (<button key={item.id} onClick={() => setSelectedView(item)} className={cn("w-full text-left p-2 rounded-md text-sm flex items-center justify-between hover:bg-slate-100", selectedView && typeof selectedView === 'object' && selectedView.id === item.id && "bg-blue-100 text-blue-700 font-semibold")}><span>{item.name}</span><ChevronRight className="h-4 w-4 text-slate-400" /></button>))}</div></AccordionContent>
+                  <AccordionContent><ItemList items={articles} /></AccordionContent>
                 </AccordionItem>
                 <AccordionItem value="comments">
                   <AccordionTrigger className="text-base font-semibold hover:no-underline"><div className="flex items-center gap-2"><MessageSquare className="h-5 w-5 text-green-600" /><span>Viết comment ({comments.length})</span></div></AccordionTrigger>
-                  <AccordionContent><div className="flex flex-col gap-1 pl-2">{comments.map(item => (<button key={item.id} onClick={() => setSelectedView(item)} className={cn("w-full text-left p-2 rounded-md text-sm flex items-center justify-between hover:bg-slate-100", selectedView && typeof selectedView === 'object' && selectedView.id === item.id && "bg-blue-100 text-blue-700 font-semibold")}><span>{item.name}</span><ChevronRight className="h-4 w-4 text-slate-400" /></button>))}</div></AccordionContent>
+                  <AccordionContent><ItemList items={comments} /></AccordionContent>
                 </AccordionItem>
               </Accordion>
             </div>
@@ -418,6 +527,21 @@ const ProjectDetail = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Bạn có chắc chắn?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Hành động này sẽ xóa vĩnh viễn mục "{itemToDelete?.name}".
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Hủy</AlertDialogCancel>
+                <AlertDialogAction onClick={handleConfirmDelete} className="bg-red-600 hover:bg-red-700">Xóa</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };
