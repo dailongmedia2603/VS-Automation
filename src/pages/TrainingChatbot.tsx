@@ -182,9 +182,9 @@ const TrainingChatbot = () => {
         </div>
       </div>
       <Tabs defaultValue="prompts" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 max-w-sm">
-          <TabsTrigger value="prompts">Thư viện Prompt</TabsTrigger>
-          <TabsTrigger value="conditions">Thư viện Điều kiện</TabsTrigger>
+        <TabsList className="flex justify-start items-center gap-1 p-0 bg-transparent">
+          <TabsTrigger value="prompts" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Thư viện Prompt</TabsTrigger>
+          <TabsTrigger value="conditions" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Thư viện Điều kiện</TabsTrigger>
         </TabsList>
         <TabsContent value="prompts" className="mt-6">
           <LibraryManager type="prompt" />
