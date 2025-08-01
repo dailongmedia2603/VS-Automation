@@ -178,7 +178,7 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
     const contentToCopy = results
       .filter(r => selectedIds.includes(r.id))
       .map(r => r.content)
-      .join('\n\n');
+      .join('\n');
     
     navigator.clipboard.writeText(contentToCopy).then(() => {
       showSuccess(`Đã sao chép ${selectedIds.length} bài viết!`);
