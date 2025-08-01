@@ -7,7 +7,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Settings, Save, Loader2, Trash2, FileText, Sparkles, Bot, ShieldCheck, MessageSquarePlus, PlusCircle, Copy, ChevronDown } from 'lucide-react';
+import { Settings, Save, Loader2, Trash2, FileText, Sparkles, Bot, ShieldCheck, MessageSquarePlus, PlusCircle, Copy, ChevronDown, Search, Download, MoreHorizontal, Edit } from 'lucide-react';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { GenerationLogDialog } from './GenerationLogDialog';
 import ReactMarkdown from 'react-markdown';
@@ -16,6 +16,9 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogD
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import * as XLSX from 'xlsx';
 
 type Project = { id: number; name: string; };
 type ProjectItem = { id: number; name: string; type: 'article' | 'comment'; content: string | null; config: any; };
@@ -45,6 +48,7 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
   const [feedbackText, setFeedbackText] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkDeleteAlertOpen, setIsBulkDeleteAlertOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     const itemConfig = item.config || {};
@@ -156,8 +160,12 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
     }
   };
 
+  const filteredResults = useMemo(() => {
+    return results.filter(r => r.content.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [results, searchTerm]);
+
   const handleSelectAll = (checked: boolean) => {
-    if (checked) setSelectedIds(results.map(r => r.id));
+    if (checked) setSelectedIds(filteredResults.map(r => r.id));
     else setSelectedIds([]);
   };
 
@@ -193,6 +201,17 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
       onSave({ ...item, content: JSON.stringify(newResults) });
     }
     setIsBulkDeleteAlertOpen(false);
+  };
+
+  const handleExportExcel = () => {
+    const dataToExport = filteredResults.map(r => ({
+      'Nội dung Bài viết': r.content,
+      'Dạng bài': r.type,
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Articles");
+    XLSX.writeFile(workbook, `${project.name} - ${item.name} - Articles.xlsx`);
   };
 
   return (
@@ -267,12 +286,13 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
       <Card className="shadow-sm rounded-2xl bg-white">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <CardTitle>Kết quả</CardTitle>
+            <CardTitle>Kết quả</CardTitle>
+            <div className="flex items-center gap-2">
+              <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Tìm kiếm..." className="pl-9" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
               {selectedIds.length > 0 && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline">
                       Thao tác ({selectedIds.length})
                       <ChevronDown className="ml-2 h-4 w-4" />
                     </Button>
@@ -289,8 +309,7 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
-            </div>
-            <div className="flex items-center gap-2">
+              <Button variant="outline" size="icon" onClick={handleExportExcel}><Download className="h-4 w-4" /></Button>
               <Button variant="outline" size="icon" onClick={() => setIsLogOpen(true)}><FileText className="h-4 w-4" /></Button>
               <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setIsFeedbackDialogOpen(true)} disabled={isGenerating || results.length === 0}>
                 <MessageSquarePlus className="mr-2 h-4 w-4" />
@@ -300,30 +319,58 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
           </div>
         </CardHeader>
         <CardContent>
-          {isGenerating && (
-            <div className="text-center p-4 flex items-center justify-center gap-3 text-slate-500">
-              <Bot className="h-5 w-5 animate-bounce" />
-              <span className="font-medium">AI đang làm việc... Tác vụ đang chạy trong nền.</span>
-            </div>
-          )}
-          {results.length > 0 ? (
-            <div className="space-y-4">
-              {results.map(result => (
-                <Card key={result.id} className="bg-slate-50 relative group">
-                  <Checkbox
-                    checked={selectedIds.includes(result.id)}
-                    onCheckedChange={() => handleSelectRow(result.id)}
-                    className="absolute top-3 left-3 z-10 bg-white opacity-0 group-hover:opacity-100 transition-opacity"
-                  />
-                  <CardContent className="p-4 prose prose-sm max-w-none prose-slate">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.content}</ReactMarkdown>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : !isGenerating && (
-            <div className="text-center h-24 flex items-center justify-center">Chưa có kết quả nào.</div>
-          )}
+          <div className="border rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12"><Checkbox checked={selectedIds.length > 0 && selectedIds.length === filteredResults.length && filteredResults.length > 0} onCheckedChange={(checked) => handleSelectAll(!!checked)} /></TableHead>
+                  <TableHead>STT</TableHead>
+                  <TableHead>Nội dung bài viết</TableHead>
+                  <TableHead>Dạng bài</TableHead>
+                  <TableHead className="text-right">Thao tác</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isGenerating && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center p-4">
+                      <div className="flex items-center justify-center gap-3 text-slate-500">
+                        <Bot className="h-5 w-5 animate-bounce" />
+                        <span className="font-medium">AI đang làm việc... Tác vụ đang chạy trong nền.</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+                {filteredResults.length > 0 ? filteredResults.map((result, index) => (
+                  <TableRow key={result.id}>
+                    <TableCell><Checkbox checked={selectedIds.includes(result.id)} onCheckedChange={() => handleSelectRow(result.id)} /></TableCell>
+                    <TableCell>{index + 1}</TableCell>
+                    <TableCell className="max-w-2xl">
+                      <div className="prose prose-sm max-w-none prose-slate">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.content}</ReactMarkdown>
+                      </div>
+                    </TableCell>
+                    <TableCell><Badge variant="outline">{result.type}</Badge></TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          <DropdownMenuItem>
+                            <Edit className="mr-2 h-4 w-4" />Sửa
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive">
+                            <Trash2 className="mr-2 h-4 w-4" />Xóa
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                )) : !isGenerating && (<TableRow><TableCell colSpan={5} className="text-center h-24">Chưa có kết quả nào.</TableCell></TableRow>)}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
