@@ -27,6 +27,7 @@ type PromptLibrary = { id: number; name: string; };
 type CommentRatio = { id: string; type: string; percentage: number; content: string; };
 type GeneratedComment = { id: string; content: string; type: string; metConditionIds: string[]; };
 type Log = { id: number; created_at: string; prompt: string; response: any; };
+type Task = { id: number; status: 'pending' | 'running' | 'completed' | 'failed'; error_message: string | null; progress_step: string | null; };
 type MandatoryCondition = { id: string; content: string; };
 
 interface CommentGenerationDetailProps {
@@ -289,11 +290,11 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
       </div>
       
       <Accordion type="single" collapsible defaultValue="item-1" className="w-full">
-        <AccordionItem value="item-1" className="border rounded-2xl bg-white shadow-sm">
+        <AccordionItem value="item-1" className="border rounded-2xl bg-blue-50 shadow-sm">
           <AccordionTrigger className="px-6 py-4 text-lg font-semibold hover:no-underline">
             <div className="flex items-center gap-3"><Settings className="h-5 w-5 text-blue-600" /><span>Cấu hình & Tùy chọn</span></div>
           </AccordionTrigger>
-          <AccordionContent className="px-6 pb-6 bg-slate-50/50 rounded-b-2xl">
+          <AccordionContent className="px-6 pb-6 bg-white rounded-b-2xl">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
               <div className="space-y-4">
                 <div className="space-y-2"><Label>Ngành</Label><Select value={config.libraryId} onValueChange={v => handleConfigChange('libraryId', v)}><SelectTrigger><SelectValue placeholder="Chọn thư viện prompt" /></SelectTrigger><SelectContent>{promptLibraries.map(lib => (<SelectItem key={lib.id} value={String(lib.id)}>{lib.name}</SelectItem>))}</SelectContent></Select></div>
@@ -360,11 +361,11 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
       </Accordion>
 
       <Accordion type="single" collapsible className="w-full">
-        <AccordionItem value="item-1" className="border rounded-2xl bg-white shadow-sm">
+        <AccordionItem value="item-1" className="border rounded-2xl bg-yellow-50 shadow-sm">
           <AccordionTrigger className="px-6 py-4 text-lg font-semibold hover:no-underline">
             <div className="flex items-center gap-3"><ShieldCheck className="h-5 w-5 text-red-600" /><span>Điều kiện bắt buộc</span></div>
           </AccordionTrigger>
-          <AccordionContent className="px-6 pb-6 space-y-4 bg-slate-50/50 rounded-b-2xl">
+          <AccordionContent className="px-6 pb-6 space-y-4 bg-white rounded-b-2xl">
             <div className="space-y-2 pt-4">
               {mandatoryConditions.map((cond) => (
                 <div key={cond.id} className="flex items-center gap-2 p-2 border rounded-lg bg-white">
@@ -454,6 +455,16 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
             <Table>
               <TableHeader><TableRow><TableHead className="w-12"><Checkbox checked={selectedIds.length === filteredResults.length && filteredResults.length > 0} onCheckedChange={(checked) => handleSelectAll(!!checked)} /></TableHead><TableHead>STT</TableHead><TableHead>Nội dung comment</TableHead><TableHead>Loại comment</TableHead><TableHead>Điều kiện</TableHead><TableHead className="text-right">Thao tác</TableHead></TableRow></TableHeader>
               <TableBody>
+                {isGenerating && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center p-4">
+                      <div className="flex items-center justify-center gap-3 text-slate-500">
+                        <Bot className="h-5 w-5 animate-bounce" />
+                        <span className="font-medium">AI đang làm việc... Tác vụ đang chạy trong nền.</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
                 {filteredResults.length > 0 ? filteredResults.map((result, index) => {
                   const totalConditions = mandatoryConditions.length;
                   const metCount = result.metConditionIds?.length ?? totalConditions;
@@ -506,7 +517,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                       </TableCell>
                     </TableRow>
                   )
-                }) : (<TableRow><TableCell colSpan={6} className="text-center h-24">Chưa có kết quả nào.</TableCell></TableRow>)}
+                }) : !isGenerating && (<TableRow><TableCell colSpan={6} className="text-center h-24">Chưa có kết quả nào.</TableCell></TableRow>)}
               </TableBody>
             </Table>
           </div>
