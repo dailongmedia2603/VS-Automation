@@ -12,7 +12,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Settings, Save, Loader2, Search, Trash2, Download, FileText, PlusCircle, MoreHorizontal, Edit, Sparkles, Bot, ShieldCheck, ChevronDown, Copy } from 'lucide-react';
+import { Settings, Save, Loader2, Search, Trash2, Download, FileText, PlusCircle, MoreHorizontal, Edit, Sparkles, Bot, ShieldCheck, ChevronDown, Copy, MessageSquarePlus } from 'lucide-react';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
@@ -53,6 +53,9 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
   const [editingComment, setEditingComment] = useState<GeneratedComment | null>(null);
   const [editedContent, setEditedContent] = useState('');
   const [commentToDelete, setCommentToDelete] = useState<GeneratedComment | null>(null);
+
+  const [isFeedbackDialogOpen, setIsFeedbackDialogOpen] = useState(false);
+  const [feedbackText, setFeedbackText] = useState('');
 
   useEffect(() => {
     const itemConfig = item.config || {};
@@ -161,6 +164,41 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
     } catch (err: any) {
       dismissToast(toastId);
       showError(`Không thể bắt đầu: ${err.message}`);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleRegenerateWithFeedback = async () => {
+    if (!feedbackText.trim()) {
+      showError("Vui lòng nhập nội dung feedback.");
+      return;
+    }
+    setIsGenerating(true);
+    setIsFeedbackDialogOpen(false);
+    const toastId = showLoading("AI đang tiếp nhận feedback và tạo lại...");
+    try {
+      const { data: updatedItem, error } = await supabase.functions.invoke('regenerate-ai-comments', {
+        body: {
+          itemId: item.id,
+          feedback: feedbackText,
+          existingComments: results
+        }
+      });
+
+      if (error) {
+        const errorBody = await error.context.json();
+        throw new Error(errorBody.error || error.message);
+      }
+      if (updatedItem.error) throw new Error(updatedItem.error);
+
+      onSave(updatedItem);
+      dismissToast(toastId);
+      showSuccess("Đã tạo lại comment theo feedback!");
+      setFeedbackText('');
+    } catch (err: any) {
+      dismissToast(toastId);
+      showError(`Tạo lại thất bại: ${err.message}`);
     } finally {
       setIsGenerating(false);
     }
@@ -461,7 +499,10 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                   <p>Log</p>
                 </TooltipContent>
               </Tooltip>
-              <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleGenerateComments} disabled={isGenerating}><PlusCircle className="mr-2 h-4 w-4" />Tạo thêm comment</Button>
+              <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setIsFeedbackDialogOpen(true)} disabled={isGenerating || results.length === 0}>
+                <MessageSquarePlus className="mr-2 h-4 w-4" />
+                Feedback & Tạo lại
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -589,6 +630,32 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
               </AlertDialogFooter>
           </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={isFeedbackDialogOpen} onOpenChange={setIsFeedbackDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Feedback & Tạo lại</DialogTitle>
+            <DialogDescription>
+              Nhập feedback của bạn để AI có thể tạo lại danh sách comment tốt hơn. AI sẽ xem xét các comment hiện tại và feedback của bạn để cải thiện.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Textarea
+              placeholder="Ví dụ: Các comment cần tự nhiên hơn, thêm một vài bình luận hỏi về giá..."
+              value={feedbackText}
+              onChange={(e) => setFeedbackText(e.target.value)}
+              className="min-h-[120px]"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsFeedbackDialogOpen(false)}>Hủy</Button>
+            <Button onClick={handleRegenerateWithFeedback} disabled={isGenerating} className="bg-blue-600 hover:bg-blue-700">
+              {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+              Gửi Feedback & Tạo lại
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
