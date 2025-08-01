@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, MessageSquare, FileText, PlusCircle, UploadCloud, ChevronRight, Loader2, BookOpen, Trash2, Edit, Check } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { showError, showSuccess, showLoading } from '@/utils/toast';
+import { showError, showSuccess } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -136,7 +136,7 @@ const ProjectDetail = () => {
   };
 
   const handleTypeChange = (type: 'article' | 'comment') => {
-    setNewItem(d => ({ ...d, type }));
+    setNewItem((d: any) => ({ ...d, type }));
     if (type === 'article') {
       setNewItemConfig({ quantity: 1 });
     } else {

@@ -74,7 +74,7 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
   }, [item]);
 
   const handleConfigChange = (field: string, value: any) => {
-    setConfig(prev => ({ ...prev, [field]: value }));
+    setConfig((prev: any) => ({ ...prev, [field]: value }));
   };
 
   const handleSaveConfig = async (updatedConfig: any) => {
