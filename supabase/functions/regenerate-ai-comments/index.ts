@@ -10,7 +10,7 @@ const corsHeaders = {
 const formatList = (items) => (items && items.length > 0 ? items.map(p => `- ${p.value}`).join('\n') : '(Chưa có thông tin)');
 const formatNumberedList = (items) => (items && items.length > 0 ? items.map((s, i) => `${i + 1}. ${s.value}`).join('\n') : '(Chưa có quy trình)');
 
-const buildBasePrompt = (libraryConfig) => {
+const buildBasePrompt = (libraryConfig, documentContext) => {
   const config = libraryConfig || {};
   const dataMap = {
     '{{industry}}': config.industry || '(Chưa cung cấp)',
@@ -25,7 +25,7 @@ const buildBasePrompt = (libraryConfig) => {
     '{{processSteps}}': formatNumberedList(config.processSteps),
     '{{conditions}}': formatList(config.conditions),
     '{{conversation_history}}': '(Lịch sử trò chuyện không áp dụng cho tác vụ này)',
-    '{{document_context}}': '(Tài liệu nội bộ không áp dụng cho tác vụ này)',
+    '{{document_context}}': documentContext || '(Không có tài liệu tham khảo liên quan)',
   };
 
   const promptTemplate = libraryConfig.promptTemplate || [];
@@ -115,7 +115,7 @@ serve(async (req) => {
     if (!item) throw new Error("Không tìm thấy mục tương ứng.");
 
     const { config } = item;
-    const { libraryId } = config;
+    const { libraryId, postContent } = config;
     if (!libraryId) throw new Error("Config is missing libraryId.");
 
     const { data: aiSettings, error: settingsError } = await supabaseAdmin.from('ai_settings').select('google_gemini_api_key, gemini_content_model').eq('id', 1).single();
@@ -124,7 +124,29 @@ serve(async (req) => {
     const { data: library, error: libraryError } = await supabaseAdmin.from('prompt_libraries').select('config').eq('id', libraryId).single();
     if (libraryError || !library || !library.config) throw new Error("Không thể tải thư viện prompt hoặc thư viện chưa được cấu hình.");
     
-    const basePrompt = buildBasePrompt(library.config);
+    // --- Start: Document Context Retrieval ---
+    let documentContext = '';
+    if (postContent) {
+      const { data: embeddingData, error: embedError } = await supabaseAdmin.functions.invoke('embed-document', { body: { textToEmbed: postContent } });
+      if (embedError || embeddingData.error) {
+        console.warn("Could not get embedding for context search:", embedError?.message || embeddingData.error);
+      } else {
+        const { data: matchedDocs, error: matchError } = await supabaseAdmin.rpc('match_project_documents', {
+          p_project_id: config.projectId,
+          p_query_embedding: embeddingData.embedding,
+          p_match_threshold: 0.7,
+          p_match_count: 3
+        });
+        if (matchError) {
+          console.warn("Could not match documents:", matchError.message);
+        } else if (matchedDocs && matchedDocs.length > 0) {
+          documentContext = matchedDocs.map(doc => `--- TÀI LIỆU: ${doc.title} ---\n${doc.content}`).join('\n\n');
+        }
+      }
+    }
+    // --- End: Document Context Retrieval ---
+
+    const basePrompt = buildBasePrompt(library.config, documentContext);
     const finalPrompt = buildRegenerationPrompt(basePrompt, config, existingComments, feedback);
 
     const modelToUse = aiSettings.gemini_content_model || 'gemini-pro';
