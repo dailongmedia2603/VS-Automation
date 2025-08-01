@@ -156,6 +156,10 @@ const LibraryManager = ({ type }: { type: 'prompt' | 'condition' }) => {
               <Button size="icon" variant={viewMode === 'grid' ? 'default' : 'ghost'} onClick={() => setViewMode('grid')} className={viewMode === 'grid' ? 'bg-white text-blue-600 shadow-sm rounded-md' : 'text-slate-600'}><LayoutGrid className="h-4 w-4" /></Button>
               <Button size="icon" variant={viewMode === 'list' ? 'default' : 'ghost'} onClick={() => setViewMode('list')} className={viewMode === 'list' ? 'bg-white text-blue-600 shadow-sm rounded-md' : 'text-slate-600'}><List className="h-4 w-4" /></Button>
             </div>
+            <Button onClick={() => handleOpenDialog()} className="bg-blue-600 hover:bg-blue-700">
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Thêm mới
+            </Button>
           </div>
         </div>
         {renderProjectView()}
@@ -176,7 +180,6 @@ const TrainingChatbot = () => {
             Quản lý các bộ prompt và bộ điều kiện để huấn luyện AI cho các mục đích khác nhau.
           </p>
         </div>
-        {/* The "Create New" button is now inside each LibraryManager */}
       </div>
       <Tabs defaultValue="prompts" className="w-full">
         <TabsList className="grid w-full grid-cols-2 max-w-sm">
