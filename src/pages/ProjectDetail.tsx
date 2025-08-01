@@ -141,18 +141,26 @@ const ProjectDetail = () => {
 
   // Effect for real-time content updates
   useEffect(() => {
-    if (!selectedView || typeof selectedView !== 'object') return;
-    const itemId = selectedView.id;
+    if (!projectId) return;
 
     const itemsChannel = supabase
-      .channel(`item-update-${itemId}`)
+      .channel(`project-items-update-${projectId}`)
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'content_ai_items', filter: `id=eq.${itemId}` },
+        { event: 'UPDATE', schema: 'public', table: 'content_ai_items', filter: `project_id=eq.${projectId}` },
         (payload) => {
           const updatedItem = payload.new as ProjectItem;
-          setItems((currentItems) => currentItems.map((item) => (item.id === updatedItem.id ? updatedItem : item)));
-          setSelectedView(updatedItem);
+          
+          setItems((currentItems) => 
+            currentItems.map((item) => (item.id === updatedItem.id ? updatedItem : item))
+          );
+
+          setSelectedView(currentView => {
+            if (currentView && typeof currentView === 'object' && currentView.id === updatedItem.id) {
+              return updatedItem;
+            }
+            return currentView;
+          });
         }
       )
       .subscribe();
@@ -160,7 +168,7 @@ const ProjectDetail = () => {
     return () => {
       supabase.removeChannel(itemsChannel);
     };
-  }, [selectedView]);
+  }, [projectId]);
 
   const handleOpenAddDialog = () => {
     setNewItem({ name: '', type: 'article' });
