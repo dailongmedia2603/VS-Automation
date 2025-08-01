@@ -12,7 +12,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Settings, Save, Loader2, Search, Trash2, Download, FileText, PlusCircle, MoreHorizontal, Edit, Sparkles, Bot, ShieldCheck, ChevronDown, Copy, MessageSquarePlus } from 'lucide-react';
+import { Settings, Save, Loader2, Search, Trash2, Download, FileText, PlusCircle, MoreHorizontal, Edit, Sparkles, Bot, ShieldCheck, ChevronDown, Copy, MessageSquarePlus, Library } from 'lucide-react';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
@@ -20,6 +20,7 @@ import { GenerationLogDialog } from './GenerationLogDialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { ConditionLibraryDialog } from './ConditionLibraryDialog';
 
 type Project = { id: number; name: string; };
 type ProjectItem = { id: number; name: string; type: 'article' | 'comment'; content: string | null; config: any; };
@@ -56,6 +57,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
 
   const [isFeedbackDialogOpen, setIsFeedbackDialogOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
+  const [isLibraryDialogOpen, setIsLibraryDialogOpen] = useState(false);
 
   useEffect(() => {
     const itemConfig = item.config || {};
@@ -333,6 +335,16 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
     }
   };
 
+  const handleAddConditionsFromLibrary = (conditionsFromLib: MandatoryCondition[]) => {
+    const newConditions = conditionsFromLib.map(c => ({ ...c, id: crypto.randomUUID() }));
+    
+    const existingContents = new Set(mandatoryConditions.map(c => c.content.trim()));
+    const uniqueNewConditions = newConditions.filter(c => !existingContents.has(c.content.trim()));
+
+    setMandatoryConditions(prev => [...prev, ...uniqueNewConditions]);
+    showSuccess(`Đã thêm ${uniqueNewConditions.length} điều kiện từ thư viện.`);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -422,7 +434,13 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
       <Accordion type="single" collapsible className="w-full">
         <AccordionItem value="item-1" className="border rounded-2xl bg-yellow-50 shadow-sm">
           <AccordionTrigger className="px-6 py-4 text-lg font-semibold hover:no-underline">
-            <div className="flex items-center gap-3"><ShieldCheck className="h-5 w-5 text-red-600" /><span>Điều kiện bắt buộc</span></div>
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center gap-3"><ShieldCheck className="h-5 w-5 text-red-600" /><span>Điều kiện bắt buộc</span></div>
+              <Button variant="outline" size="sm" className="bg-white mr-4" onClick={(e) => { e.stopPropagation(); setIsLibraryDialogOpen(true); }}>
+                <Library className="mr-2 h-4 w-4" />
+                Xem thư viện
+              </Button>
+            </div>
           </AccordionTrigger>
           <AccordionContent className="px-6 pb-6 space-y-4 bg-white rounded-b-2xl">
             <div className="space-y-2 pt-4">
@@ -662,6 +680,12 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConditionLibraryDialog 
+        isOpen={isLibraryDialogOpen} 
+        onOpenChange={setIsLibraryDialogOpen} 
+        onSelect={handleAddConditionsFromLibrary} 
+      />
     </div>
   );
 };
