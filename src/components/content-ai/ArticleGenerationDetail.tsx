@@ -175,6 +175,11 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
               <div className="space-y-4">
                 <div className="space-y-2"><Label>Ngành</Label><Select value={config.libraryId} onValueChange={v => handleConfigChange('libraryId', v)}><SelectTrigger><SelectValue placeholder="Chọn thư viện prompt" /></SelectTrigger><SelectContent>{promptLibraries.map(lib => (<SelectItem key={lib.id} value={String(lib.id)}>{lib.name}</SelectItem>))}</SelectContent></Select></div>
                 <div className="space-y-2"><Label>Dạng bài</Label><Select value={config.format} onValueChange={v => handleConfigChange('format', v)}><SelectTrigger><SelectValue placeholder="Chọn dạng bài" /></SelectTrigger><SelectContent><SelectItem value="question">Đặt câu hỏi / thảo luận</SelectItem><SelectItem value="review">Review</SelectItem><SelectItem value="sharing">Chia sẻ</SelectItem><SelectItem value="comparison">So sánh</SelectItem><SelectItem value="storytelling">Story telling</SelectItem></SelectContent></Select></div>
+                <div className="space-y-2">
+                  <Label>Số lượng</Label>
+                  <Input type="number" value={config.quantity} onChange={e => handleConfigChange('quantity', e.target.value)} />
+                  <p className="text-xs text-muted-foreground">NÊN CHỌN 1 (Số lượng bài nhiều hơn 1 có thể ảnh hưởng đến chất lượng của bài viết)</p>
+                </div>
               </div>
               <div className="space-y-4">
                 <div className="space-y-2"><Label>Định hướng nội dung</Label><Textarea value={config.direction} onChange={e => handleConfigChange('direction', e.target.value)} placeholder="Nhập định hướng chi tiết cho bài viết..." className="min-h-[120px]" /></div>
