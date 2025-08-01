@@ -40,13 +40,6 @@ type CommentRatio = {
   content: string;
 };
 
-type Task = {
-  id: number;
-  status: 'pending' | 'running' | 'completed' | 'failed';
-  error_message: string | null;
-  progress_step: string | null;
-};
-
 const ProjectDetail = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const [project, setProject] = useState<Project | null>(null);
@@ -56,7 +49,6 @@ const ProjectDetail = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [promptLibraries, setPromptLibraries] = useState<PromptLibrary[]>([]);
-  const [activeTask, setActiveTask] = useState<Task | null>(null);
 
   const [newItem, setNewItem] = useState({ name: '', type: 'article' as 'article' | 'comment' });
   const [newItemConfig, setNewItemConfig] = useState<any>({ quantity: 1 });
@@ -97,47 +89,6 @@ const ProjectDetail = () => {
   useEffect(() => {
     fetchProjectData();
   }, [fetchProjectData]);
-
-  // Effect for real-time task status updates
-  useEffect(() => {
-    if (!selectedView || typeof selectedView !== 'object') {
-      setActiveTask(null);
-      return;
-    }
-    const itemId = selectedView.id;
-
-    const fetchCurrentTask = async () => {
-      const { data, error } = await supabase.from('ai_generation_tasks').select('*').eq('item_id', itemId).in('status', ['pending', 'running']).maybeSingle();
-      if (error) console.error("Lỗi khi lấy trạng thái tác vụ ban đầu:", error);
-      else setActiveTask(data);
-    };
-    fetchCurrentTask();
-
-    const tasksChannel = supabase
-      .channel(`task-status-${itemId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'ai_generation_tasks', filter: `item_id=eq.${itemId}` },
-        (payload) => {
-          const updatedTask = payload.new as Task;
-          if (updatedTask.status === 'completed' || updatedTask.status === 'failed') {
-            setActiveTask(null);
-            if (updatedTask.status === 'completed') {
-              showSuccess("Tạo comment thành công!");
-            } else {
-              showError(`Tạo comment thất bại: ${updatedTask.error_message}`);
-            }
-          } else {
-            setActiveTask(updatedTask);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(tasksChannel);
-    };
-  }, [selectedView]);
 
   // Effect for real-time content updates
   useEffect(() => {
@@ -322,8 +273,6 @@ const ProjectDetail = () => {
                   item={selectedView} 
                   promptLibraries={promptLibraries} 
                   onSave={handleItemUpdate}
-                  activeTask={activeTask}
-                  setActiveTask={setActiveTask}
                 />
               )}
 

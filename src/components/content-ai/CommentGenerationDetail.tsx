@@ -27,7 +27,6 @@ type PromptLibrary = { id: number; name: string; };
 type CommentRatio = { id: string; type: string; percentage: number; content: string; };
 type GeneratedComment = { id: string; content: string; type: string; metConditionIds: string[]; };
 type Log = { id: number; created_at: string; prompt: string; response: any; };
-type Task = { id: number; status: 'pending' | 'running' | 'completed' | 'failed'; error_message: string | null; progress_step: string | null; };
 type MandatoryCondition = { id: string; content: string; };
 
 interface CommentGenerationDetailProps {
@@ -35,11 +34,9 @@ interface CommentGenerationDetailProps {
   item: ProjectItem;
   promptLibraries: PromptLibrary[];
   onSave: (updatedItem: ProjectItem) => void;
-  activeTask: Task | null;
-  setActiveTask: (task: Task | null) => void;
 }
 
-export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave, activeTask, setActiveTask }: CommentGenerationDetailProps) => {
+export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave }: CommentGenerationDetailProps) => {
   const [config, setConfig] = useState<any>({});
   const [mandatoryConditions, setMandatoryConditions] = useState<MandatoryCondition[]>([]);
   const [results, setResults] = useState<GeneratedComment[]>([]);
@@ -281,6 +278,9 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-slate-900">{item.name}</h2>
         <div className="flex items-center gap-4">
+          {isGenerating && (
+            <p className="text-sm text-slate-500 animate-pulse">AI đang xử lý...</p>
+          )}
           <Button onClick={handleGenerateComments} disabled={isGenerating} className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg">
             {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
             {isGenerating ? 'Đang tạo...' : 'Tạo comment'}
@@ -454,16 +454,6 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
             <Table>
               <TableHeader><TableRow><TableHead className="w-12"><Checkbox checked={selectedIds.length === filteredResults.length && filteredResults.length > 0} onCheckedChange={(checked) => handleSelectAll(!!checked)} /></TableHead><TableHead>STT</TableHead><TableHead>Nội dung comment</TableHead><TableHead>Loại comment</TableHead><TableHead>Điều kiện</TableHead><TableHead className="text-right">Thao tác</TableHead></TableRow></TableHeader>
               <TableBody>
-                {isGenerating && (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center p-4">
-                      <div className="flex items-center justify-center gap-3 text-slate-500">
-                        <Bot className="h-5 w-5 animate-bounce" />
-                        <span className="font-medium">AI đang làm việc... Tác vụ đang chạy trong nền.</span>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )}
                 {filteredResults.length > 0 ? filteredResults.map((result, index) => {
                   const totalConditions = mandatoryConditions.length;
                   const metCount = result.metConditionIds?.length ?? totalConditions;
@@ -516,7 +506,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                       </TableCell>
                     </TableRow>
                   )
-                }) : !isGenerating && (<TableRow><TableCell colSpan={6} className="text-center h-24">Chưa có kết quả nào.</TableCell></TableRow>)}
+                }) : (<TableRow><TableCell colSpan={6} className="text-center h-24">Chưa có kết quả nào.</TableCell></TableRow>)}
               </TableBody>
             </Table>
           </div>
