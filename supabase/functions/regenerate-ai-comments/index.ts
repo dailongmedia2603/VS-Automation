@@ -78,7 +78,7 @@ const buildRegenerationPrompt = (basePrompt, config, existingComments, feedback)
     ---
 
     **YÊU CẦU MỚI:** Dựa vào **FEEDBACK TỪ NGƯỜI DÙNG** và toàn bộ thông tin trên, hãy **VIẾT LẠI TOÀN BỘ** danh sách gồm ${config.quantity || 10} bình luận mới tốt hơn. Mỗi bình luận trên một dòng.
-    **QUAN TRỌNG:** Mỗi bình luận PHẢI bắt đầu bằng tên loại trong dấu ngoặc vuông, ví dụ: "[Tên Loại] Nội dung bình luận."
+    **CỰC KỲ QUAN TRỌNG:** Mỗi bình luận PHẢI bắt đầu bằng tên loại trong dấu ngoặc vuông, ví dụ: "[Tên Loại] Nội dung bình luận.". Chỉ trả về danh sách các bình luận, KHÔNG thêm bất kỳ lời chào, câu giới thiệu, hay dòng phân cách nào.
   `;
   return finalPrompt;
 };
@@ -144,19 +144,21 @@ serve(async (req) => {
     const mandatoryConditions = config.mandatoryConditions || [];
     const allConditionIds = mandatoryConditions.map((c) => c.id);
 
-    const newComments = rawContent.split('\n').map(line => {
-      const trimmedLine = line.trim();
-      const match = trimmedLine.match(/^\[(.*?)\]\s*(.*)$/);
-      const type = match ? match[1] : 'Chưa phân loại';
-      const content = match ? match[2] : trimmedLine;
-      
-      return { 
-        id: crypto.randomUUID(), 
-        content: content, 
-        type: type,
-        metConditionIds: allConditionIds
-      };
-    }).filter(c => c.content);
+    const newComments = rawContent.split('\n')
+      .map(line => line.trim())
+      .filter(line => line.startsWith('[') && line.includes(']'))
+      .map(line => {
+        const match = line.match(/^\[(.*?)\]\s*(.*)$/);
+        const type = match ? match[1] : 'Chưa phân loại';
+        const content = match ? match[2] : line;
+        
+        return { 
+          id: crypto.randomUUID(), 
+          content: content, 
+          type: type,
+          metConditionIds: allConditionIds
+        };
+      });
 
     const { data: updatedItem, error: updateError } = await supabaseAdmin
       .from('content_ai_items')
