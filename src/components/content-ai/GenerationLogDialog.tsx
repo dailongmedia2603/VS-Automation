@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -5,6 +6,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Trash2, Loader2 } from 'lucide-react';
 
 type Log = {
   id: number;
@@ -18,9 +21,18 @@ interface GenerationLogDialogProps {
     onOpenChange: (open: boolean) => void;
     logs: Log[];
     isLoading: boolean;
+    onClearLogs: () => Promise<void>;
 }
 
-export const GenerationLogDialog = ({ isOpen, onOpenChange, logs, isLoading }: GenerationLogDialogProps) => {
+export const GenerationLogDialog = ({ isOpen, onOpenChange, logs, isLoading, onClearLogs }: GenerationLogDialogProps) => {
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const handleConfirmClear = async () => {
+        setIsDeleting(true);
+        await onClearLogs();
+        setIsDeleting(false);
+    };
+
     return (
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-3xl">
@@ -65,7 +77,30 @@ export const GenerationLogDialog = ({ isOpen, onOpenChange, logs, isLoading }: G
               <p className="text-center text-sm text-slate-500 py-8">Chưa có log nào được ghi lại.</p>
             )}
           </ScrollArea>
-          <DialogFooter>
+          <DialogFooter className="justify-between">
+            <AlertDialog>
+                <AlertDialogTrigger asChild>
+                    <Button variant="destructive" disabled={logs.length === 0 || isLoading || isDeleting}>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Xoá tất cả
+                    </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Bạn có chắc chắn?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Hành động này sẽ xóa vĩnh viễn toàn bộ lịch sử nhật ký AI cho mục này.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Hủy</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleConfirmClear} disabled={isDeleting}>
+                            {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Xóa
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
             <Button onClick={() => onOpenChange(false)}>Đóng</Button>
           </DialogFooter>
         </DialogContent>

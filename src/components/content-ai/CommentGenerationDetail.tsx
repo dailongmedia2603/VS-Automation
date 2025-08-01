@@ -27,7 +27,6 @@ type PromptLibrary = { id: number; name: string; };
 type CommentRatio = { id: string; type: string; percentage: number; content: string; };
 type GeneratedComment = { id: string; content: string; type: string; metConditionIds: string[]; };
 type Log = { id: number; created_at: string; prompt: string; response: any; };
-type Task = { id: number; status: 'pending' | 'running' | 'completed' | 'failed'; error_message: string | null; progress_step: string | null; };
 type MandatoryCondition = { id: string; content: string; };
 
 interface CommentGenerationDetailProps {
@@ -271,6 +270,22 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
     } else {
       showSuccess("Đã xóa bình luận!");
       onSave({ ...item, content: JSON.stringify(newResults) });
+    }
+  };
+
+  const handleClearLogs = async () => {
+    const toastId = showLoading("Đang xóa tất cả log...");
+    const { error } = await supabase
+        .from('content_ai_logs')
+        .delete()
+        .eq('item_id', item.id);
+    
+    dismissToast(toastId);
+    if (error) {
+        showError("Xóa log thất bại: " + error.message);
+    } else {
+        showSuccess("Đã xóa toàn bộ lịch sử log!");
+        setLogs([]);
     }
   };
 
@@ -524,7 +539,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
         </CardContent>
       </Card>
 
-      <GenerationLogDialog isOpen={isLogOpen} onOpenChange={setIsLogOpen} logs={logs} isLoading={isLoadingLogs} />
+      <GenerationLogDialog isOpen={isLogOpen} onOpenChange={setIsLogOpen} logs={logs} isLoading={isLoadingLogs} onClearLogs={handleClearLogs} />
 
       <AlertDialog open={isBulkDeleteAlertOpen} onOpenChange={setIsBulkDeleteAlertOpen}>
         <AlertDialogContent>
