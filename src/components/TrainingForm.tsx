@@ -23,38 +23,29 @@ export type PromptTemplateItem = {
 };
 export type TrainingConfig = {
   industry: string;
-  products: TrainingItem[];
   role: string;
   style: string;
   language: string;
   tone: string;
-  pronouns: string;
-  customerPronouns: string;
   goal: string;
   processSteps: TrainingItem[];
-  conditions: TrainingItem[];
   documents: TrainingDocument[];
   promptTemplate: PromptTemplateItem[];
 };
 
 export const initialConfig: TrainingConfig = {
   industry: '',
-  products: [],
   role: '',
   style: '',
   language: 'Tiếng Việt',
   tone: '',
-  pronouns: '',
-  customerPronouns: '',
   goal: '',
   processSteps: [],
-  conditions: [],
   documents: [],
   promptTemplate: [
     { id: crypto.randomUUID(), title: 'YÊU CẦU TƯ VẤN CHO FANPAGE', content: 'Bạn là một trợ lý AI cho fanpage. Hãy dựa vào các thông tin dưới đây để tư vấn cho khách hàng.' },
-    { id: crypto.randomUUID(), title: 'THÔNG TIN HUẤN LUYỆN CHUNG', content: '- **Vai trò của bạn:** {{role}}\n- **Lĩnh vực kinh doanh:** {{industry}}\n- **Sản phẩm/Dịch vụ:**\n{{products}}\n- **Phong cách:** {{style}}\n- **Tông giọng:** {{tone}}\n- **Ngôn ngữ:** {{language}}\n- **Cách xưng hô (Bạn xưng là):** "{{pronouns}}"\n- **Cách xưng hô (Khách hàng là):** "{{customerPronouns}}"\n- **Mục tiêu cuộc trò chuyện:** {{goal}}' },
+    { id: crypto.randomUUID(), title: 'THÔNG TIN HUẤN LUYỆN CHUNG', content: '- **Vai trò của bạn:** {{role}}\n- **Lĩnh vực kinh doanh:** {{industry}}\n- **Phong cách:** {{style}}\n- **Tông giọng:** {{tone}}\n- **Ngôn ngữ:** {{language}}\n- **Mục tiêu cuộc trò chuyện:** {{goal}}' },
     { id: crypto.randomUUID(), title: 'QUY TRÌNH TƯ VẤN', content: '{{processSteps}}' },
-    { id: crypto.randomUUID(), title: 'ĐIỀU KIỆN BẮT BUỘC', content: '{{conditions}}' },
     { id: crypto.randomUUID(), title: 'LỊCH SỬ CUỘC TRÒ CHUYỆN', content: 'Dưới đây là toàn bộ lịch sử trò chuyện. Hãy phân tích để hiểu ngữ cảnh và trả lời tin nhắn cuối cùng của khách hàng.\n---\n{{conversation_history}}\n---' },
     { id: crypto.randomUUID(), title: 'TÀI LIỆU NỘI BỘ THAM KHẢO', content: '{{document_context}}' },
     { id: crypto.randomUUID(), title: 'HÀNH ĐỘNG', content: 'Dựa vào TOÀN BỘ thông tin trên, hãy tạo một câu trả lời duy nhất cho tin nhắn cuối cùng của khách hàng.\n**QUAN TRỌNG:** Chỉ trả lời với nội dung tin nhắn, không thêm bất kỳ tiền tố nào như "AI:", "Trả lời:", hay lời chào nào nếu không cần thiết theo ngữ cảnh.' },
@@ -65,32 +56,6 @@ interface TrainingFormProps {
   config: TrainingConfig;
   setConfig: React.Dispatch<React.SetStateAction<TrainingConfig>>;
 }
-
-const DynamicList = ({ title, items, setItems, placeholder, buttonText }: { title: string, items: TrainingItem[], setItems: (items: TrainingItem[]) => void, placeholder: string, buttonText: string }) => {
-  const handleAddItem = () => setItems([...items, { id: crypto.randomUUID(), value: '' }]);
-  const handleItemChange = (id: string, value: string) => setItems(items.map(item => item.id === id ? { ...item, value } : item));
-  const handleRemoveItem = (id: string) => setItems(items.filter(item => item.id !== id));
-
-  return (
-    <div className="space-y-3">
-      <Label className="text-sm font-medium text-slate-800">{title}</Label>
-      <div className="space-y-2">
-        {items.map((item) => (
-          <div key={item.id} className="flex items-center gap-2">
-            <Input placeholder={placeholder} value={item.value} onChange={(e) => handleItemChange(item.id, e.target.value)} className="bg-slate-100/70 border-slate-200" />
-            <Button variant="ghost" size="icon" className="flex-shrink-0 text-slate-500 hover:text-destructive hover:bg-destructive/10" onClick={() => handleRemoveItem(item.id)}>
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
-        ))}
-      </div>
-      <Button variant="outline" size="sm" onClick={handleAddItem} className="mt-2 text-slate-600 border-slate-300 hover:bg-slate-100">
-        <PlusCircle className="h-4 w-4 mr-2" />
-        {buttonText}
-      </Button>
-    </div>
-  );
-};
 
 const DynamicPrefixedList = ({ title, description, items, setItems, prefix, buttonText }: { title: string, description?: string, items: TrainingItem[], setItems: (items: TrainingItem[]) => void, prefix: string, buttonText: string }) => {
     const handleAddItem = () => setItems([...items, { id: crypto.randomUUID(), value: '' }]);
@@ -123,11 +88,11 @@ const DynamicPrefixedList = ({ title, description, items, setItems, prefix, butt
   };
 
 export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig }) => {
-  const handleFieldChange = (field: keyof Omit<TrainingConfig, 'products' | 'processSteps' | 'conditions' | 'documents' | 'promptTemplate'>, value: string) => {
+  const handleFieldChange = (field: keyof Omit<TrainingConfig, 'processSteps' | 'documents' | 'promptTemplate'>, value: string) => {
     setConfig(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleDynamicListChange = (field: 'products' | 'processSteps' | 'conditions', items: TrainingItem[]) => {
+  const handleDynamicListChange = (field: 'processSteps', items: TrainingItem[]) => {
     setConfig(prev => ({ ...prev, [field]: items }));
   };
 
@@ -151,20 +116,13 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig })
                   <Input id="role" placeholder="VD: Chuyên viên tư vấn" value={config.role} onChange={(e) => handleFieldChange('role', e.target.value)} className="bg-slate-100/70 border-slate-200" />
                 </div>
               </div>
-              <DynamicList
-                title="Danh sách sản phẩm / dịch vụ"
-                items={config.products}
-                setItems={(items) => handleDynamicListChange('products', items)}
-                placeholder="VD: Gói chụp ảnh cưới"
-                buttonText="Thêm sản phẩm / dịch vụ"
-              />
             </CardContent>
           </Card>
 
           <Card className="bg-white rounded-2xl shadow-lg shadow-slate-200/30 border border-slate-200/80">
             <CardHeader className="p-6">
-              <CardTitle className="text-xl font-bold text-slate-900">Quy trình và Điều kiện</CardTitle>
-              <CardDescription className="text-sm text-slate-500 pt-1">Hướng dẫn AI cách tư vấn và các quy tắc cần tuân thủ.</CardDescription>
+              <CardTitle className="text-xl font-bold text-slate-900">Quy trình</CardTitle>
+              <CardDescription className="text-sm text-slate-500 pt-1">Hướng dẫn AI cách tư vấn.</CardDescription>
             </CardHeader>
             <CardContent className="p-6 pt-0 space-y-6">
               <DynamicPrefixedList
@@ -174,14 +132,6 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig })
                 setItems={(items) => handleDynamicListChange('processSteps', items)}
                 prefix="Bước"
                 buttonText="Thêm bước"
-              />
-              <div className="border-t border-slate-200/80 -mx-6 my-6"></div>
-              <DynamicPrefixedList
-                title="Điều kiện bắt buộc AI tuân thủ"
-                items={config.conditions}
-                setItems={(items) => handleDynamicListChange('conditions', items)}
-                prefix="Điều kiện"
-                buttonText="Thêm điều kiện"
               />
             </CardContent>
           </Card>
@@ -204,14 +154,6 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig })
               <div className="space-y-2">
                 <Label htmlFor="language" className="text-sm font-medium text-slate-800">Ngôn ngữ trả lời</Label>
                 <Input id="language" value={config.language} onChange={(e) => handleFieldChange('language', e.target.value)} className="bg-slate-100/70 border-slate-200" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="pronouns" className="text-sm font-medium text-slate-800">Page xưng hô là:</Label>
-                <Input id="pronouns" placeholder="VD: Shop, mình" value={config.pronouns} onChange={(e) => handleFieldChange('pronouns', e.target.value)} className="bg-slate-100/70 border-slate-200" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="customerPronouns" className="text-sm font-medium text-slate-800">KH xưng hô là:</Label>
-                <Input id="customerPronouns" placeholder="VD: bạn, anh, chị" value={config.customerPronouns} onChange={(e) => handleFieldChange('customerPronouns', e.target.value)} className="bg-slate-100/70 border-slate-200" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="goal" className="text-sm font-medium text-slate-800">Mục tiêu trò chuyện</Label>

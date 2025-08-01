@@ -9,7 +9,6 @@ interface TrainingPreviewProps {
 
 const TrainingPreview: React.FC<TrainingPreviewProps> = ({ config }) => {
   const generatePreviewPrompt = () => {
-    const formatList = (items: any[]) => items && items.length > 0 ? items.map(p => `- ${p.value}`).join('\n') : '(Chưa có thông tin)';
     const formatNumberedList = (items: any[]) => items && items.length > 0 ? items.map((s, i) => `${i + 1}. ${s.value}`).join('\n') : '(Chưa có quy trình)';
 
     const formatDocumentContext = () => {
@@ -19,15 +18,11 @@ const TrainingPreview: React.FC<TrainingPreviewProps> = ({ config }) => {
     const dataMap = {
       '{{industry}}': config.industry || '(Chưa cung cấp)',
       '{{role}}': config.role || '(Chưa cung cấp)',
-      '{{products}}': formatList(config.products),
       '{{style}}': config.style || '(Chưa cung cấp)',
       '{{tone}}': config.tone || '(Chưa cung cấp)',
       '{{language}}': config.language || '(Chưa cung cấp)',
-      '{{pronouns}}': config.pronouns || '(Chưa cung cấp)',
-      '{{customerPronouns}}': config.customerPronouns || '(Chưa cung cấp)',
       '{{goal}}': config.goal || '(Chưa cung cấp)',
       '{{processSteps}}': formatNumberedList(config.processSteps),
-      '{{conditions}}': formatList(config.conditions),
       '{{conversation_history}}': `(Đây là nơi lịch sử trò chuyện với khách hàng sẽ được chèn vào. Ví dụ:)\n\n[10:30:00] User: giá bên em như thế nào?`,
       '{{document_context}}': formatDocumentContext(),
     };

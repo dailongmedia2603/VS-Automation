@@ -15,15 +15,11 @@ const buildBasePrompt = (libraryConfig, documentContext) => {
   const dataMap = {
     '{{industry}}': config.industry || '(Chưa cung cấp)',
     '{{role}}': config.role || '(Chưa cung cấp)',
-    '{{products}}': formatList(config.products),
     '{{style}}': config.style || '(Chưa cung cấp)',
     '{{tone}}': config.tone || '(Chưa cung cấp)',
     '{{language}}': config.language || '(Chưa cung cấp)',
-    '{{pronouns}}': config.pronouns || '(Chưa cung cấp)',
-    '{{customerPronouns}}': config.customerPronouns || '(Chưa cung cấp)',
     '{{goal}}': config.goal || '(Chưa cung cấp)',
     '{{processSteps}}': formatNumberedList(config.processSteps),
-    '{{conditions}}': formatList(config.conditions),
     '{{conversation_history}}': '(Lịch sử trò chuyện không áp dụng cho tác vụ này)',
     '{{document_context}}': documentContext || '(Không có tài liệu tham khảo liên quan)',
   };

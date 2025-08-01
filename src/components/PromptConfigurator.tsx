@@ -17,15 +17,11 @@ interface PromptConfiguratorProps {
 const dataFields = [
   { key: '{{industry}}', label: 'Lĩnh vực / Ngành nghề' },
   { key: '{{role}}', label: 'Vai trò của AI' },
-  { key: '{{products}}', label: 'Danh sách sản phẩm / dịch vụ' },
   { key: '{{style}}', label: 'Phong cách trả lời' },
   { key: '{{tone}}', label: 'Tông giọng trả lời' },
   { key: '{{language}}', label: 'Ngôn ngữ trả lời' },
-  { key: '{{pronouns}}', label: 'Page xưng hô' },
-  { key: '{{customerPronouns}}', label: 'KH xưng hô' },
   { key: '{{goal}}', label: 'Mục tiêu trò chuyện' },
   { key: '{{processSteps}}', label: 'Quy trình tư vấn' },
-  { key: '{{conditions}}', label: 'Điều kiện bắt buộc' },
   { key: '{{conversation_history}}', label: 'Lịch sử trò chuyện (Động)' },
   { key: '{{document_context}}', label: 'Tài liệu nội bộ (Động)' },
 ];
