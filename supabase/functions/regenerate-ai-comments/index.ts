@@ -99,11 +99,22 @@ serve(async (req) => {
       throw new Error("Thiếu thông tin cần thiết (itemId, feedback, existingComments).");
     }
 
-    const { data: item, error: itemError } = await supabaseAdmin.from('content_ai_items').select('config, creator_id').eq('id', itemId).single();
+    // Get user from Authorization header to find the creator_id
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) throw new Error("Missing Authorization header");
+    const jwt = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: userError } = await createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    ).auth.getUser(jwt);
+    if (userError) throw userError;
+    if (!user) throw new Error("User not authenticated.");
+
+    const { data: item, error: itemError } = await supabaseAdmin.from('content_ai_items').select('config').eq('id', itemId).single();
     if (itemError) throw itemError;
     if (!item) throw new Error("Không tìm thấy mục tương ứng.");
 
-    const { config, creator_id } = item;
+    const { config } = item;
     const { libraryId } = config;
     if (!libraryId) throw new Error("Config is missing libraryId.");
 
@@ -156,7 +167,7 @@ serve(async (req) => {
     
     if (updateError) throw updateError;
 
-    await supabaseAdmin.from('content_ai_logs').insert({ item_id: itemId, creator_id: creator_id, prompt: finalPrompt, response: geminiData });
+    await supabaseAdmin.from('content_ai_logs').insert({ item_id: itemId, creator_id: user.id, prompt: finalPrompt, response: geminiData });
 
     return new Response(JSON.stringify(updatedItem), { 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
