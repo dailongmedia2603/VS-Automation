@@ -7,13 +7,15 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Settings, Save, Loader2, Trash2, FileText, Sparkles, Bot, ShieldCheck, MessageSquarePlus, PlusCircle } from 'lucide-react';
+import { Settings, Save, Loader2, Trash2, FileText, Sparkles, Bot, ShieldCheck, MessageSquarePlus, PlusCircle, Copy, ChevronDown } from 'lucide-react';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { GenerationLogDialog } from './GenerationLogDialog';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 type Project = { id: number; name: string; };
 type ProjectItem = { id: number; name: string; type: 'article' | 'comment'; content: string | null; config: any; };
@@ -41,6 +43,8 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
   const [isLoadingLogs, setIsLoadingLogs] = useState(true);
   const [isFeedbackDialogOpen, setIsFeedbackDialogOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isBulkDeleteAlertOpen, setIsBulkDeleteAlertOpen] = useState(false);
 
   useEffect(() => {
     const itemConfig = item.config || {};
@@ -120,44 +124,8 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
   };
 
   const handleRegenerateWithFeedback = async () => {
-    if (!feedbackText.trim()) {
-      showError("Vui lòng nhập nội dung feedback.");
-      return;
-    }
-    setIsGenerating(true);
-    setIsFeedbackDialogOpen(false);
-    const toastId = showLoading("AI đang tiếp nhận feedback và tạo lại...");
-    try {
-      const { data: updatedItem, error } = await supabase.functions.invoke('regenerate-ai-articles', {
-        body: {
-          itemId: item.id,
-          feedback: feedbackText,
-          existingArticles: results
-        }
-      });
-
-      if (error) {
-        let errorMessage = error.message;
-        if (error.context && typeof error.context.json === 'function') {
-          try {
-            const errorBody = await error.context.json();
-            if (errorBody.error) errorMessage = errorBody.error;
-          } catch (e) { /* Ignore parsing error */ }
-        }
-        throw new Error(errorMessage);
-      }
-      if (updatedItem.error) throw new Error(updatedItem.error);
-
-      onSave(updatedItem);
-      dismissToast(toastId);
-      showSuccess("Đã tạo lại bài viết theo feedback!");
-      setFeedbackText('');
-    } catch (err: any) {
-      dismissToast(toastId);
-      showError(`Tạo lại thất bại: ${err.message}`);
-    } finally {
-      setIsGenerating(false);
-    }
+    // This function will need a new edge function `regenerate-ai-articles`
+    showError("Tính năng này đang được phát triển!");
   };
 
   const handleConditionChange = (id: string, content: string) => {
@@ -186,6 +154,45 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
         showSuccess("Đã xóa toàn bộ lịch sử log!");
         setLogs([]);
     }
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) setSelectedIds(results.map(r => r.id));
+    else setSelectedIds([]);
+  };
+
+  const handleSelectRow = (id: string) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const handleBulkCopy = () => {
+    if (selectedIds.length === 0) return;
+    const contentToCopy = results
+      .filter(r => selectedIds.includes(r.id))
+      .map(r => r.content)
+      .join('\n\n--- ARTICLE SEPARATOR ---\n\n');
+    
+    navigator.clipboard.writeText(contentToCopy).then(() => {
+      showSuccess(`Đã sao chép ${selectedIds.length} bài viết!`);
+    }).catch(err => {
+      showError("Sao chép thất bại: " + err.message);
+    });
+  };
+
+  const handleConfirmBulkDelete = async () => {
+    const newResults = results.filter(r => !selectedIds.includes(r.id));
+    setResults(newResults);
+    setSelectedIds([]);
+    
+    const { error } = await supabase.from('content_ai_items').update({ content: JSON.stringify(newResults), updated_at: new Date().toISOString() }).eq('id', item.id);
+    if (error) {
+      showError("Xóa thất bại: " + error.message);
+      setResults(results);
+    } else {
+      showSuccess("Đã xóa thành công!");
+      onSave({ ...item, content: JSON.stringify(newResults) });
+    }
+    setIsBulkDeleteAlertOpen(false);
   };
 
   return (
@@ -260,7 +267,29 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
       <Card className="shadow-sm rounded-2xl bg-white">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <div><CardTitle>Kết quả</CardTitle></div>
+            <div className="flex items-center gap-4">
+              <CardTitle>Kết quả</CardTitle>
+              {selectedIds.length > 0 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      Thao tác ({selectedIds.length})
+                      <ChevronDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onSelect={handleBulkCopy}>
+                      <Copy className="mr-2 h-4 w-4" />
+                      Sao chép nội dung
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setIsBulkDeleteAlertOpen(true)} className="text-destructive">
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Xóa
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="icon" onClick={() => setIsLogOpen(true)}><FileText className="h-4 w-4" /></Button>
               <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setIsFeedbackDialogOpen(true)} disabled={isGenerating || results.length === 0}>
@@ -280,7 +309,12 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
           {results.length > 0 ? (
             <div className="space-y-4">
               {results.map(result => (
-                <Card key={result.id} className="bg-slate-50">
+                <Card key={result.id} className="bg-slate-50 relative group">
+                  <Checkbox
+                    checked={selectedIds.includes(result.id)}
+                    onCheckedChange={() => handleSelectRow(result.id)}
+                    className="absolute top-3 left-3 z-10 bg-white opacity-0 group-hover:opacity-100 transition-opacity"
+                  />
                   <CardContent className="p-4 prose prose-sm max-w-none prose-slate">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.content}</ReactMarkdown>
                   </CardContent>
@@ -313,6 +347,21 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={isBulkDeleteAlertOpen} onOpenChange={setIsBulkDeleteAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Bạn có chắc chắn muốn xóa?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Hành động này sẽ xóa vĩnh viễn {selectedIds.length} bài viết đã chọn.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Hủy</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmBulkDelete} className="bg-red-600 hover:bg-red-700">Xóa</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
