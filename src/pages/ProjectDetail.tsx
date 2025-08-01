@@ -146,7 +146,7 @@ const ProjectDetail = () => {
   };
 
   const handleConfigChange = (field: string, value: any) => {
-    setNewItemConfig(prev => ({ ...prev, [field]: value }));
+    setNewItemConfig((prev: any) => ({ ...prev, [field]: value }));
   };
 
   const handleAddItem = async () => {
