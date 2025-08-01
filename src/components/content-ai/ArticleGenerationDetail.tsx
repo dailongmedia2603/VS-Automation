@@ -120,8 +120,44 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
   };
 
   const handleRegenerateWithFeedback = async () => {
-    // This function will need a new edge function `regenerate-ai-articles`
-    showError("Tính năng này đang được phát triển!");
+    if (!feedbackText.trim()) {
+      showError("Vui lòng nhập nội dung feedback.");
+      return;
+    }
+    setIsGenerating(true);
+    setIsFeedbackDialogOpen(false);
+    const toastId = showLoading("AI đang tiếp nhận feedback và tạo lại...");
+    try {
+      const { data: updatedItem, error } = await supabase.functions.invoke('regenerate-ai-articles', {
+        body: {
+          itemId: item.id,
+          feedback: feedbackText,
+          existingArticles: results
+        }
+      });
+
+      if (error) {
+        let errorMessage = error.message;
+        if (error.context && typeof error.context.json === 'function') {
+          try {
+            const errorBody = await error.context.json();
+            if (errorBody.error) errorMessage = errorBody.error;
+          } catch (e) { /* Ignore parsing error */ }
+        }
+        throw new Error(errorMessage);
+      }
+      if (updatedItem.error) throw new Error(updatedItem.error);
+
+      onSave(updatedItem);
+      dismissToast(toastId);
+      showSuccess("Đã tạo lại bài viết theo feedback!");
+      setFeedbackText('');
+    } catch (err: any) {
+      dismissToast(toastId);
+      showError(`Tạo lại thất bại: ${err.message}`);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleConditionChange = (id: string, content: string) => {

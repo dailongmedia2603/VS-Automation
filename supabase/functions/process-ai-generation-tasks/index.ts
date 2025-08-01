@@ -39,7 +39,7 @@ const buildBasePrompt = (libraryConfig, documentContext) => {
   }).join('\n\n---\n\n');
 };
 
-const buildFinalPrompt = (basePrompt, config) => {
+const buildCommentPrompt = (basePrompt, config) => {
   const ratiosText = (config.ratios || [])
     .map(r => `- Loại: ${r.type || 'Chung'}, Tỉ lệ: ${r.percentage}%, Định hướng: ${r.content}`)
     .join('\n');
@@ -74,6 +74,34 @@ const buildFinalPrompt = (basePrompt, config) => {
   return finalPrompt;
 };
 
+const buildArticlePrompt = (basePrompt, config) => {
+  const conditionsText = (config.mandatoryConditions || [])
+    .map(c => `- ${c.content}`)
+    .join('\n');
+
+  const finalPrompt = `
+    ${basePrompt}
+
+    ---
+    **THÔNG TIN CHI TIẾT BÀI VIẾT:**
+
+    **Dạng bài:**
+    ${config.format || 'Không có'}
+
+    **Định hướng nội dung chi tiết:**
+    ${config.direction || 'Không có'}
+    ---
+    **ĐIỀU KIỆN BẮT BUỘC (QUAN TRỌNG NHẤT):**
+    AI phải tuân thủ TUYỆT ĐỐI tất cả các điều kiện sau đây cho MỌI bài viết được tạo ra:
+    ${conditionsText || 'Không có điều kiện nào.'}
+    ---
+
+    **YÊU CẦU:** Dựa vào TOÀN BỘ thông tin trên, hãy tạo ra chính xác ${config.quantity || 1} bài viết hoàn chỉnh.
+    **CỰC KỲ QUAN TRỌNG:** Nếu tạo nhiều hơn 1 bài viết, hãy phân cách mỗi bài viết bằng một dòng duy nhất chứa chính xác: "--- ARTICLE SEPARATOR ---". Chỉ trả về nội dung bài viết, KHÔNG thêm bất kỳ lời chào, câu giới thiệu, hay tiêu đề không cần thiết nào.
+  `;
+  return finalPrompt;
+};
+
 serve(async (req) => {
   const supabaseAdmin = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
@@ -97,7 +125,10 @@ serve(async (req) => {
     await supabaseAdmin.from('ai_generation_tasks').update({ status: 'running', progress_step: 'Đang chuẩn bị prompt...' }).eq('id', task.id);
 
     try {
-      const { libraryId, postContent } = task.config;
+      const { data: item, error: itemError } = await supabaseAdmin.from('content_ai_items').select('type, content').eq('id', task.item_id).single();
+      if (itemError) throw itemError;
+
+      const { libraryId, postContent, direction } = task.config;
       if (!libraryId) throw new Error("Config is missing libraryId.");
 
       const { data: aiSettings, error: settingsError } = await supabaseAdmin.from('ai_settings').select('*').eq('id', 1).single();
@@ -106,11 +137,11 @@ serve(async (req) => {
       const { data: library, error: libraryError } = await supabaseAdmin.from('prompt_libraries').select('config').eq('id', libraryId).single();
       if (libraryError || !library || !library.config) throw new Error("Không thể tải thư viện prompt hoặc thư viện chưa được cấu hình.");
       
-      // --- Start: Document Context Retrieval ---
       let documentContext = '';
-      if (postContent) {
+      const contextSource = item.type === 'article' ? direction : postContent;
+      if (contextSource) {
         await supabaseAdmin.from('ai_generation_tasks').update({ progress_step: 'Đang tìm tài liệu liên quan...' }).eq('id', task.id);
-        const { data: embeddingData, error: embedError } = await supabaseAdmin.functions.invoke('embed-document', { body: { textToEmbed: postContent } });
+        const { data: embeddingData, error: embedError } = await supabaseAdmin.functions.invoke('embed-document', { body: { textToEmbed: contextSource } });
         if (embedError || embeddingData.error) {
           console.warn("Could not get embedding for context search:", embedError?.message || embeddingData.error);
         } else {
@@ -127,10 +158,15 @@ serve(async (req) => {
           }
         }
       }
-      // --- End: Document Context Retrieval ---
 
       const basePrompt = buildBasePrompt(library.config, documentContext);
-      const finalPrompt = buildFinalPrompt(basePrompt, task.config);
+      
+      let finalPrompt;
+      if (item.type === 'article') {
+        finalPrompt = buildArticlePrompt(basePrompt, task.config);
+      } else {
+        finalPrompt = buildCommentPrompt(basePrompt, task.config);
+      }
 
       await supabaseAdmin.from('ai_generation_tasks').update({ progress_step: 'Đang gửi yêu cầu đến AI...' }).eq('id', task.id);
 
@@ -150,34 +186,41 @@ serve(async (req) => {
 
       const rawContent = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
       
-      const mandatoryConditions = task.config.mandatoryConditions || [];
-      const allConditionIds = mandatoryConditions.map((c) => c.id);
+      let newContent = [];
+      if (item.type === 'article') {
+        newContent = rawContent.split('--- ARTICLE SEPARATOR ---')
+            .map(content => content.trim())
+            .filter(content => content)
+            .map(content => ({
+                id: crypto.randomUUID(),
+                content: content,
+                type: task.config.format || 'Bài viết'
+            }));
+      } else {
+        const mandatoryConditions = task.config.mandatoryConditions || [];
+        const allConditionIds = mandatoryConditions.map((c) => c.id);
+        newContent = rawContent.split('\n')
+          .map(line => line.trim())
+          .filter(line => line.startsWith('[') && line.includes(']'))
+          .map(line => {
+            const match = line.match(/^\[(.*?)\]\s*(.*)$/);
+            const type = match ? match[1] : 'Chưa phân loại';
+            const content = match ? match[2] : line;
+            return { 
+              id: crypto.randomUUID(), 
+              content: content, 
+              type: type,
+              metConditionIds: allConditionIds
+            };
+          });
+      }
 
-      const newComments = rawContent.split('\n')
-        .map(line => line.trim())
-        .filter(line => line.startsWith('[') && line.includes(']'))
-        .map(line => {
-          const match = line.match(/^\[(.*?)\]\s*(.*)$/);
-          const type = match ? match[1] : 'Chưa phân loại';
-          const content = match ? match[2] : line;
-          
-          return { 
-            id: crypto.randomUUID(), 
-            content: content, 
-            type: type,
-            metConditionIds: allConditionIds
-          };
-        });
+      const existingContent = JSON.parse(item.content || '[]');
+      const updatedContent = [...existingContent, ...newContent];
 
-      const { data: currentItem, error: itemError } = await supabaseAdmin.from('content_ai_items').select('content').eq('id', task.item_id).single();
-      if (itemError) throw itemError;
-
-      const existingComments = JSON.parse(currentItem.content || '[]');
-      const updatedComments = [...existingComments, ...newComments];
-
-      await supabaseAdmin.from('content_ai_items').update({ content: JSON.stringify(updatedComments) }).eq('id', task.item_id);
+      await supabaseAdmin.from('content_ai_items').update({ content: JSON.stringify(updatedContent) }).eq('id', task.item_id);
       
-      await supabaseAdmin.from('ai_generation_tasks').update({ status: 'completed', result: { newCommentsCount: newComments.length }, progress_step: null }).eq('id', task.id);
+      await supabaseAdmin.from('ai_generation_tasks').update({ status: 'completed', result: { newContentCount: newContent.length }, progress_step: null }).eq('id', task.id);
 
       await supabaseAdmin.from('content_ai_logs').insert({ item_id: task.item_id, creator_id: task.creator_id, prompt: finalPrompt, response: geminiData });
 
