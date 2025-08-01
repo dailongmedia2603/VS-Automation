@@ -154,10 +154,16 @@ serve(async (req) => {
 
     await supabaseAdmin.from('content_ai_logs').insert({ item_id: itemId, creator_id: creator_id, prompt: finalPrompt, response: geminiData });
 
-    return new Response(JSON.stringify(updatedItem), { status: 200 });
+    return new Response(JSON.stringify(updatedItem), { 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200 
+    });
 
   } catch (error) {
-    console.error("Error in regeneration function:", error.message);
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+    console.error("Error in regeneration function:", error.message, error.stack);
+    return new Response(JSON.stringify({ error: error.message }), { 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500 
+    });
   }
 });
