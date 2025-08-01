@@ -16,6 +16,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { ProjectDocumentsManager } from '@/components/content-ai/ProjectDocumentsManager';
 import { CommentGenerationDetail } from '@/components/content-ai/CommentGenerationDetail';
+import { ArticleGenerationDetail } from '@/components/content-ai/ArticleGenerationDetail';
 
 type Project = {
   id: number;
@@ -386,10 +387,12 @@ const ProjectDetail = () => {
               )}
 
               {selectedView && typeof selectedView === 'object' && selectedView.type === 'article' && (
-                <div>
-                  <h2 className="text-xl font-bold">{selectedView.name}</h2>
-                  <p className="mt-4 text-slate-600 whitespace-pre-wrap">{selectedView.content || "Chưa có nội dung."}</p>
-                </div>
+                <ArticleGenerationDetail
+                  project={project}
+                  item={selectedView}
+                  promptLibraries={promptLibraries}
+                  onSave={handleItemUpdate}
+                />
               )}
 
               {!selectedView && (
