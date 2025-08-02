@@ -32,6 +32,8 @@ const ArticleStructureLibraryDetail = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newStructureName, setNewStructureName] = useState('');
   const [structureToDelete, setStructureToDelete] = useState<Structure | null>(null);
+  const [editingStructureId, setEditingStructureId] = useState<number | null>(null);
+  const [editingStructureName, setEditingStructureName] = useState('');
 
   useEffect(() => {
     const fetchLibraryData = async () => {
@@ -82,6 +84,25 @@ const ArticleStructureLibraryDetail = () => {
     else showSuccess("Đã lưu thay đổi!");
   };
 
+  const handleSaveName = async () => {
+    if (!editingStructureId || !editingStructureName.trim()) {
+        setEditingStructureId(null);
+        return;
+    }
+    const { error } = await supabase
+        .from('article_structures')
+        .update({ name: editingStructureName.trim() })
+        .eq('id', editingStructureId);
+    
+    if (error) {
+        showError("Cập nhật tên thất bại: " + error.message);
+    } else {
+        showSuccess("Đã cập nhật tên cấu trúc!");
+        setStructures(prev => prev.map(s => s.id === editingStructureId ? { ...s, name: editingStructureName.trim() } : s));
+    }
+    setEditingStructureId(null);
+  };
+
   const handleDeleteStructure = async () => {
     if (!structureToDelete) return;
     const { error } = await supabase.from('article_structures').delete().eq('id', structureToDelete.id);
@@ -125,9 +146,25 @@ const ArticleStructureLibraryDetail = () => {
                 <AccordionItem key={structure.id} value={`item-${structure.id}`} className="border rounded-xl bg-slate-50/50">
                   <AccordionTrigger className="px-4 py-3 hover:no-underline rounded-t-xl">
                     <div className="flex items-center justify-between w-full pr-4">
-                      <div className="flex items-center gap-3"><LayoutTemplate className="h-5 w-5 text-slate-600" /><span className="font-semibold text-slate-800">{structure.name}</span></div>
+                      <div className="flex items-center gap-3">
+                        <LayoutTemplate className="h-5 w-5 text-slate-600" />
+                        {editingStructureId === structure.id ? (
+                          <Input
+                            value={editingStructureName}
+                            onChange={(e) => setEditingStructureName(e.target.value)}
+                            onBlur={handleSaveName}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
+                            onClick={(e) => e.stopPropagation()}
+                            className="h-8"
+                          />
+                        ) : (
+                          <span className="font-semibold text-slate-800">{structure.name}</span>
+                        )}
+                      </div>
                       <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                        <Button variant="ghost" size="icon" className="h-8 w-8"><Edit className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingStructureId(structure.id); setEditingStructureName(structure.name); }}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setStructureToDelete(structure)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                       </div>
                     </div>
