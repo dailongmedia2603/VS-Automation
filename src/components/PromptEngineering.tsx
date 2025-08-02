@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
-import { PlusCircle, Trash2, Bot, Send, BrainCircuit, Loader2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { PlusCircle, Trash2, Bot, Send, BrainCircuit, Loader2, Sparkles } from 'lucide-react';
+import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 
 type Example = { id: string; input: string; output: string };
 
@@ -29,6 +30,10 @@ const PromptEngineering = () => {
 
   const [aiResponse, setAiResponse] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+
+  const [isSuggestDialogOpen, setIsSuggestDialogOpen] = useState(false);
+  const [suggestionRequest, setSuggestionRequest] = useState('');
+  const [isSuggesting, setIsSuggesting] = useState(false);
 
   const handleAddExample = () => setExamples([...examples, { id: crypto.randomUUID(), input: '', output: '' }]);
   const handleRemoveExample = (id: string) => setExamples(examples.filter(ex => ex.id !== id));
@@ -68,64 +73,151 @@ const PromptEngineering = () => {
     }, 1500);
   };
 
+  const handleGenerateSuggestion = async () => {
+    if (!suggestionRequest.trim()) {
+      showError("Vui lòng nhập yêu cầu của bạn.");
+      return;
+    }
+    setIsSuggesting(true);
+    const toastId = showLoading("AI đang phân tích yêu cầu...");
+
+    // Simulate AI call
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    try {
+      // This is a simulated response. In a real scenario, you would call an API.
+      const aiSuggestedData = {
+        systemPrompt: "Bạn là một trợ lý AI chuyên nghiệp, có khả năng phân tích yêu cầu và xây dựng các prompt chi tiết. Luôn trả về kết quả dưới định dạng JSON.",
+        rolePrompt: `Đóng vai một chuyên gia về chủ đề: "${suggestionRequest}".`,
+        contextualPrompt: `Bối cảnh: Phân tích và xử lý yêu cầu liên quan đến "${suggestionRequest}".`,
+        specificInstructions: `Dựa trên yêu cầu, hãy thực hiện các bước sau:\n1. Phân tích yêu cầu chính.\n2. Đề xuất các bước thực hiện.\n3. Trả về kết quả theo định dạng yêu cầu.`,
+        examples: [
+          { id: crypto.randomUUID(), input: `Ví dụ input cho "${suggestionRequest}"`, output: `{ "result": "Ví dụ output cho '${suggestionRequest}'" }` }
+        ],
+        userQuery: `Thực hiện nhiệm vụ sau: ${suggestionRequest}`
+      };
+
+      setSystemPrompt(aiSuggestedData.systemPrompt);
+      setRolePrompt(aiSuggestedData.rolePrompt);
+      setContext(aiSuggestedData.contextualPrompt);
+      setInstructions(aiSuggestedData.specificInstructions);
+      setExamples(aiSuggestedData.examples);
+      setUserQuery(aiSuggestedData.userQuery);
+
+      dismissToast(toastId);
+      showSuccess("AI đã đề xuất và điền vào các trường!");
+      setIsSuggestDialogOpen(false);
+      setSuggestionRequest('');
+    } catch (error: any) {
+      dismissToast(toastId);
+      showError("AI đề xuất thất bại: " + error.message);
+    } finally {
+      setIsSuggesting(false);
+    }
+  };
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-6">
-      {/* Left Column: Builder */}
-      <ScrollArea className="h-[calc(100vh-20rem)] pr-4">
-        <div className="space-y-6">
-          <Card><CardHeader><CardTitle>I. Các Thành Phần Cơ Bản</CardTitle><CardDescription>Nền tảng của mọi prompt, thiết lập bối cảnh và hướng dẫn cơ bản.</CardDescription></CardHeader><CardContent className="space-y-4">
-            <div><Label>1. System Prompting</Label><Textarea placeholder="VD: Bạn là một trợ lý AI chuyên tạo nội dung marketing..." value={systemPrompt} onChange={e => setSystemPrompt(e.target.value)} /></div>
-            <div><Label>2. Role Prompting</Label><Textarea placeholder="VD: Đóng vai một nhà phân tích tài chính thận trọng." value={rolePrompt} onChange={e => setRolePrompt(e.target.value)} /></div>
-            <div><Label>3. Contextual Prompting</Label><Textarea placeholder="VD: Người dùng đã thêm các mặt hàng sau vào giỏ hàng: [Sản phẩm A, Sản phẩm B]." value={context} onChange={e => setContext(e.target.value)} /></div>
-            <div><Label>4. Specific Instructions</Label><Textarea placeholder="VD: Tạo một bài đăng blog dài 3 đoạn. Chỉ thảo luận về..." value={instructions} onChange={e => setInstructions(e.target.value)} /></div>
-            <div><Label>5. Examples (Few-shot)</Label><div className="space-y-2">{examples.map(ex => (<div key={ex.id} className="flex items-start gap-2"><div className="flex-1 space-y-1"><Textarea placeholder="Input Example" value={ex.input} onChange={e => handleExampleChange(ex.id, 'input', e.target.value)} className="text-xs" /><Textarea placeholder="Output Example (JSON, text,...)" value={ex.output} onChange={e => handleExampleChange(ex.id, 'output', e.target.value)} className="text-xs" /></div><Button variant="ghost" size="icon" onClick={() => handleRemoveExample(ex.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button></div>))}<Button variant="outline" size="sm" onClick={handleAddExample}><PlusCircle className="mr-2 h-4 w-4" />Thêm ví dụ</Button></div></div>
-            <div><Label>6. User Query/Task</Label><Textarea placeholder="VD: Phân loại đánh giá phim này: 'Bộ phim thật kinh khủng...'" value={userQuery} onChange={e => setUserQuery(e.target.value)} /></div>
-          </CardContent></Card>
-          
-          <Card><CardHeader><CardTitle>II. Tham Số Cấu Hình Đầu Ra</CardTitle><CardDescription>Kiểm soát cách LLM tạo ra phản hồi. Các tham số này được gửi cùng với yêu cầu API.</CardDescription></CardHeader><CardContent className="space-y-6">
-            <div><Label className="flex justify-between"><span>Temperature:</span><span>{temperature}</span></Label><Slider value={[temperature]} onValueChange={([val]) => setTemperature(val)} max={1} step={0.05} /><p className="text-xs text-muted-foreground">Thấp: Chính xác, cao: Sáng tạo.</p></div>
-            <div><Label className="flex justify-between"><span>Top-K:</span><span>{topK}</span></Label><Slider value={[topK]} onValueChange={([val]) => setTopK(val)} max={100} step={1} /><p className="text-xs text-muted-foreground">Giới hạn số lượng token được xem xét.</p></div>
-            <div><Label className="flex justify-between"><span>Top-P:</span><span>{topP}</span></Label><Slider value={[topP]} onValueChange={([val]) => setTopP(val)} max={1} step={0.01} /><p className="text-xs text-muted-foreground">Chọn token dựa trên tổng xác suất.</p></div>
-            <div><Label>Max Tokens</Label><Input type="number" value={maxTokens} onChange={e => setMaxTokens(Number(e.target.value))} /><p className="text-xs text-muted-foreground">Giới hạn độ dài tối đa của phản hồi.</p></div>
-          </CardContent></Card>
-
-          <Card><CardHeader><CardTitle>III. Kỹ Thuật Nâng Cao</CardTitle><CardDescription>Áp dụng các kỹ thuật để cải thiện khả năng suy luận của mô hình.</CardDescription></CardHeader><CardContent className="space-y-4">
-            <div className="flex items-center justify-between p-3 border rounded-lg"><div className="flex items-center gap-3"><BrainCircuit className="h-5 w-5 text-blue-600" /><div><Label htmlFor="cot-switch">Chain of Thought (CoT)</Label><p className="text-xs text-muted-foreground">Thêm "Let's think step by step." để AI suy luận logic hơn.</p></div></div><Switch id="cot-switch" checked={useCoT} onCheckedChange={setUseCoT} /></div>
-          </CardContent></Card>
-        </div>
-      </ScrollArea>
-
-      {/* Right Column: Preview & Test */}
-      <div className="space-y-6">
-        <Card className="h-full flex flex-col">
-          <CardHeader><CardTitle>Prompt cuối cùng</CardTitle><CardDescription>Đây là chuỗi prompt hoàn chỉnh sẽ được gửi đến API.</CardDescription></CardHeader>
-          <CardContent className="flex-1 flex flex-col">
-            <ScrollArea className="flex-1 bg-slate-50 rounded-md p-4 border">
-              <pre className="text-xs whitespace-pre-wrap">{finalPrompt || "Điền thông tin để xem prompt..."}</pre>
-            </ScrollArea>
-            <Button onClick={handleRunTest} disabled={isGenerating} className="w-full mt-4 bg-green-600 hover:bg-green-700">
-              {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-              Chạy thử nghiệm
-            </Button>
-          </CardContent>
-        </Card>
-        <Card className="h-full flex flex-col">
-          <CardHeader><CardTitle>Phản hồi từ AI</CardTitle><CardDescription>Kết quả trả về từ mô hình sau khi chạy thử nghiệm.</CardDescription></CardHeader>
-          <CardContent className="flex-1">
-            <ScrollArea className="h-full bg-slate-900 text-white rounded-md p-4">
-              {isGenerating ? (
-                <div className="flex items-center gap-3 text-slate-400">
-                  <Bot className="h-5 w-5 animate-pulse" />
-                  <span>AI đang suy nghĩ...</span>
+    <>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-6">
+        {/* Left Column: Builder */}
+        <ScrollArea className="h-[calc(100vh-20rem)] pr-4">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle>I. Các Thành Phần Cơ Bản</CardTitle>
+                    <CardDescription>Nền tảng của mọi prompt, thiết lập bối cảnh và hướng dẫn cơ bản.</CardDescription>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => setIsSuggestDialogOpen(true)}>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    AI đề xuất
+                  </Button>
                 </div>
-              ) : (
-                <pre className="text-xs whitespace-pre-wrap">{aiResponse || "Chưa có phản hồi."}</pre>
-              )}
-            </ScrollArea>
-          </CardContent>
-        </Card>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div><Label>1. System Prompting</Label><Textarea placeholder="VD: Bạn là một trợ lý AI chuyên tạo nội dung marketing..." value={systemPrompt} onChange={e => setSystemPrompt(e.target.value)} /></div>
+                <div><Label>2. Role Prompting</Label><Textarea placeholder="VD: Đóng vai một nhà phân tích tài chính thận trọng." value={rolePrompt} onChange={e => setRolePrompt(e.target.value)} /></div>
+                <div><Label>3. Contextual Prompting</Label><Textarea placeholder="VD: Người dùng đã thêm các mặt hàng sau vào giỏ hàng: [Sản phẩm A, Sản phẩm B]." value={context} onChange={e => setContext(e.target.value)} /></div>
+                <div><Label>4. Specific Instructions</Label><Textarea placeholder="VD: Tạo một bài đăng blog dài 3 đoạn. Chỉ thảo luận về..." value={instructions} onChange={e => setInstructions(e.target.value)} /></div>
+                <div><Label>5. Examples (Few-shot)</Label><div className="space-y-2">{examples.map(ex => (<div key={ex.id} className="flex items-start gap-2"><div className="flex-1 space-y-1"><Textarea placeholder="Input Example" value={ex.input} onChange={e => handleExampleChange(ex.id, 'input', e.target.value)} className="text-xs" /><Textarea placeholder="Output Example (JSON, text,...)" value={ex.output} onChange={e => handleExampleChange(ex.id, 'output', e.target.value)} className="text-xs" /></div><Button variant="ghost" size="icon" onClick={() => handleRemoveExample(ex.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button></div>))}<Button variant="outline" size="sm" onClick={handleAddExample}><PlusCircle className="mr-2 h-4 w-4" />Thêm ví dụ</Button></div></div>
+                <div><Label>6. User Query/Task</Label><Textarea placeholder="VD: Phân loại đánh giá phim này: 'Bộ phim thật kinh khủng...'" value={userQuery} onChange={e => setUserQuery(e.target.value)} /></div>
+              </CardContent>
+            </Card>
+            
+            <Card><CardHeader><CardTitle>II. Tham Số Cấu Hình Đầu Ra</CardTitle><CardDescription>Kiểm soát cách LLM tạo ra phản hồi. Các tham số này được gửi cùng với yêu cầu API.</CardDescription></CardHeader><CardContent className="space-y-6">
+              <div><Label className="flex justify-between"><span>Temperature:</span><span>{temperature}</span></Label><Slider value={[temperature]} onValueChange={([val]) => setTemperature(val)} max={1} step={0.05} /><p className="text-xs text-muted-foreground">Thấp: Chính xác, cao: Sáng tạo.</p></div>
+              <div><Label className="flex justify-between"><span>Top-K:</span><span>{topK}</span></Label><Slider value={[topK]} onValueChange={([val]) => setTopK(val)} max={100} step={1} /><p className="text-xs text-muted-foreground">Giới hạn số lượng token được xem xét.</p></div>
+              <div><Label className="flex justify-between"><span>Top-P:</span><span>{topP}</span></Label><Slider value={[topP]} onValueChange={([val]) => setTopP(val)} max={1} step={0.01} /><p className="text-xs text-muted-foreground">Chọn token dựa trên tổng xác suất.</p></div>
+              <div><Label>Max Tokens</Label><Input type="number" value={maxTokens} onChange={e => setMaxTokens(Number(e.target.value))} /><p className="text-xs text-muted-foreground">Giới hạn độ dài tối đa của phản hồi.</p></div>
+            </CardContent></Card>
+
+            <Card><CardHeader><CardTitle>III. Kỹ Thuật Nâng Cao</CardTitle><CardDescription>Áp dụng các kỹ thuật để cải thiện khả năng suy luận của mô hình.</CardDescription></CardHeader><CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-3 border rounded-lg"><div className="flex items-center gap-3"><BrainCircuit className="h-5 w-5 text-blue-600" /><div><Label htmlFor="cot-switch">Chain of Thought (CoT)</Label><p className="text-xs text-muted-foreground">Thêm "Let's think step by step." để AI suy luận logic hơn.</p></div></div><Switch id="cot-switch" checked={useCoT} onCheckedChange={setUseCoT} /></div>
+            </CardContent></Card>
+          </div>
+        </ScrollArea>
+
+        {/* Right Column: Preview & Test */}
+        <div className="space-y-6">
+          <Card className="h-full flex flex-col">
+            <CardHeader><CardTitle>Prompt cuối cùng</CardTitle><CardDescription>Đây là chuỗi prompt hoàn chỉnh sẽ được gửi đến API.</CardDescription></CardHeader>
+            <CardContent className="flex-1 flex flex-col">
+              <ScrollArea className="flex-1 bg-slate-50 rounded-md p-4 border">
+                <pre className="text-xs whitespace-pre-wrap">{finalPrompt || "Điền thông tin để xem prompt..."}</pre>
+              </ScrollArea>
+              <Button onClick={handleRunTest} disabled={isGenerating} className="w-full mt-4 bg-green-600 hover:bg-green-700">
+                {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                Chạy thử nghiệm
+              </Button>
+            </CardContent>
+          </Card>
+          <Card className="h-full flex flex-col">
+            <CardHeader><CardTitle>Phản hồi từ AI</CardTitle><CardDescription>Kết quả trả về từ mô hình sau khi chạy thử nghiệm.</CardDescription></CardHeader>
+            <CardContent className="flex-1">
+              <ScrollArea className="h-full bg-slate-900 text-white rounded-md p-4">
+                {isGenerating ? (
+                  <div className="flex items-center gap-3 text-slate-400">
+                    <Bot className="h-5 w-5 animate-pulse" />
+                    <span>AI đang suy nghĩ...</span>
+                  </div>
+                ) : (
+                  <pre className="text-xs whitespace-pre-wrap">{aiResponse || "Chưa có phản hồi."}</pre>
+                )}
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </div>
       </div>
-    </div>
+
+      <Dialog open={isSuggestDialogOpen} onOpenChange={setIsSuggestDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>AI Đề xuất Prompt</DialogTitle>
+            <DialogDescription>
+              Nhập yêu cầu của bạn, AI sẽ phân tích và đề xuất nội dung chi tiết cho các thành phần cơ bản của prompt.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="suggestion-request">Yêu cầu của bạn</Label>
+            <Textarea
+              id="suggestion-request"
+              placeholder="VD: Tạo một prompt để phân tích cảm xúc của khách hàng về sản phẩm X"
+              value={suggestionRequest}
+              onChange={(e) => setSuggestionRequest(e.target.value)}
+              className="min-h-[100px] mt-2"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsSuggestDialogOpen(false)}>Hủy</Button>
+            <Button onClick={handleGenerateSuggestion} disabled={isSuggesting}>
+              {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+              Tạo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 
