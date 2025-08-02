@@ -5,38 +5,18 @@ import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast
 import { TrainingForm, TrainingConfig, initialConfig } from '@/components/TrainingForm';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Eye, Loader2, ArrowLeft } from 'lucide-react';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import TrainingPreview from '@/components/TrainingPreview';
+import { Loader2, ArrowLeft } from 'lucide-react';
 
 const TrainingModule = ({ config, setConfig, onSave, isSaving }: { config: TrainingConfig, setConfig: React.Dispatch<React.SetStateAction<TrainingConfig>>, onSave: () => void, isSaving: boolean }) => {
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-
   return (
     <>
       <TrainingForm config={config} setConfig={setConfig} />
       <div className="flex justify-end pt-8 gap-3">
-        <Button variant="outline" onClick={() => setIsPreviewOpen(true)} className="font-semibold rounded-lg border-slate-300 text-slate-700 hover:bg-slate-100">
-          <Eye className="h-4 w-4 mr-2" />
-          Preview
-        </Button>
         <Button onClick={onSave} disabled={isSaving} size="lg" className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold">
           {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Lưu thay đổi
         </Button>
       </div>
-      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-        <DialogContent className="sm:max-w-2xl p-6 rounded-xl">
-          <DialogHeader className="text-left">
-            <DialogTitle className="text-xl font-bold text-slate-900">Xem trước cấu hình huấn luyện</DialogTitle>
-            <DialogDescription className="text-slate-500 pt-1">Đây là tổng quan dữ liệu bạn đã cấu hình. Dữ liệu này sẽ được sử dụng để huấn luyện AI.</DialogDescription>
-          </DialogHeader>
-          <div className="py-4"><TrainingPreview config={config} /></div>
-          <DialogFooter>
-            <Button onClick={() => setIsPreviewOpen(false)} className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-5">Đóng</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
 };
