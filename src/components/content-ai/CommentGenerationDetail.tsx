@@ -12,7 +12,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Settings, Save, Loader2, Search, Trash2, Download, FileText, PlusCircle, MoreHorizontal, Edit, Sparkles, Bot, ShieldCheck, ChevronDown, Copy, MessageSquarePlus, Library, FileInput, ListOrdered, Percent } from 'lucide-react';
+import { Settings, Save, Loader2, Search, Trash2, Download, FileText, PlusCircle, MoreHorizontal, Edit, Sparkles, Bot, ShieldCheck, ChevronDown, Copy, MessageSquarePlus, Library, FileInput, ListOrdered, Percent, Compass } from 'lucide-react';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
@@ -379,7 +379,21 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                   <CardContent className="space-y-4">
                     <div className="space-y-2"><Label>Ngành</Label><Select value={config.libraryId} onValueChange={v => handleConfigChange('libraryId', v)}><SelectTrigger><SelectValue placeholder="Chọn thư viện prompt" /></SelectTrigger><SelectContent>{promptLibraries.map(lib => (<SelectItem key={lib.id} value={String(lib.id)}>{lib.name}</SelectItem>))}</SelectContent></Select></div>
                     <div className="space-y-2"><Label>Nội dung Post</Label><Textarea value={config.postContent} onChange={e => handleConfigChange('postContent', e.target.value)} placeholder="Dán nội dung bài viết cần bình luận..." className="min-h-[120px]" /></div>
-                    <div className="space-y-2"><Label>Định hướng comment</Label><Textarea value={config.commentDirection} onChange={e => handleConfigChange('commentDirection', e.target.value)} placeholder="Nhập định hướng chi tiết..." className="min-h-[80px]" /></div>
+                  </CardContent>
+                </Card>
+                <Card className="shadow-none border rounded-xl">
+                  <CardHeader className="flex flex-row items-center gap-4">
+                    <div className="flex-shrink-0 bg-yellow-100 p-3 rounded-lg"><Compass className="h-6 w-6 text-yellow-600" /></div>
+                    <div>
+                      <CardTitle className="text-lg font-bold text-slate-900">Định hướng</CardTitle>
+                      <CardDescription className="text-sm text-slate-500 pt-1">Cung cấp chỉ dẫn chi tiết và ví dụ cho AI.</CardDescription>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label>Định hướng comment</Label>
+                      <Textarea value={config.commentDirection} onChange={e => handleConfigChange('commentDirection', e.target.value)} placeholder="Nhập định hướng chi tiết..." className="min-h-[150px]" />
+                    </div>
                     <div className="space-y-2">
                       <Label htmlFor="reference-example">Ví dụ tham khảo</Label>
                       <Textarea id="reference-example" value={config.referenceExample || ''} onChange={e => handleConfigChange('referenceExample', e.target.value)} placeholder="Dán một bài viết hoặc đoạn văn mẫu vào đây..." className="min-h-[150px]" />
