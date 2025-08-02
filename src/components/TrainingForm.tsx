@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { PlusCircle, Trash2, BrainCircuit, Info, Palette, SlidersHorizontal } from 'lucide-react';
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 
 // Type definitions
 export type TrainingItem = { id: string; value: string };
@@ -207,11 +208,12 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig })
                     <Label className="text-sm font-medium">Các yếu tố cần suy nghĩ</Label>
                     {(config.cotFactors || []).map(factor => (
                       <div key={factor.id} className="flex items-center gap-2">
-                        <Input
+                        <Textarea
                           value={factor.value}
                           onChange={(e) => handleCotFactorChange(factor.id, e.target.value)}
                           placeholder="VD: Phân tích cảm xúc của khách hàng"
                           className="bg-white"
+                          rows={2}
                         />
                         <Button variant="ghost" size="icon" onClick={() => handleRemoveCotFactor(factor.id)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
