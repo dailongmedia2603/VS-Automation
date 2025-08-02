@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -180,6 +180,13 @@ const LibraryManager = ({ type }: { type: 'prompt' | 'condition' | 'structure' }
 };
 
 const TrainingChatbot = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'prompts';
+
+  const handleTabChange = (tab: string) => {
+    setSearchParams({ tab });
+  };
+
   return (
     <main className="flex-1 space-y-8 p-6 sm:p-8 bg-slate-50">
       <div className="flex items-center justify-between">
@@ -190,7 +197,7 @@ const TrainingChatbot = () => {
           </p>
         </div>
       </div>
-      <Tabs defaultValue="prompts" className="w-full">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="flex justify-start items-center gap-1 p-0 bg-transparent">
           <TabsTrigger value="prompts" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Thư viện Prompt</TabsTrigger>
           <TabsTrigger value="conditions" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Thư viện Điều kiện</TabsTrigger>
