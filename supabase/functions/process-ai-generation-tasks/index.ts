@@ -82,6 +82,16 @@ const buildArticlePrompt = (basePrompt, config) => {
     `;
   }
 
+  let wordCountText = '';
+  if (config.wordCount && Number(config.wordCount) > 0) {
+    wordCountText = `
+    ---
+    **ĐỘ DÀI BÀI VIẾT:**
+    Bài viết phải có độ dài khoảng ${config.wordCount} từ. Cho phép chênh lệch trong khoảng +/- 10%.
+    ---
+    `;
+  }
+
   const finalPrompt = `
     ${basePrompt}
 
@@ -94,6 +104,7 @@ const buildArticlePrompt = (basePrompt, config) => {
     **Định hướng nội dung chi tiết:**
     ${config.direction || 'Không có'}
     ${structureText}
+    ${wordCountText}
     ---
     **ĐIỀU KIỆN BẮT BUỘC (QUAN TRỌNG NHẤT):**
     AI phải tuân thủ TUYỆT ĐỐI tất cả các điều kiện sau đây cho MỌI bài viết được tạo ra:

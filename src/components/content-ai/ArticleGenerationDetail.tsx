@@ -354,6 +354,11 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
                       <Input type="number" value={config.quantity} onChange={e => handleConfigChange('quantity', e.target.value)} />
                       <p className="text-xs text-muted-foreground">NÊN CHỌN 1 (Số lượng bài nhiều hơn 1 có thể ảnh hưởng đến chất lượng của bài viết)</p>
                     </div>
+                    <div className="space-y-2">
+                      <Label>Số từ / bài (ước tính)</Label>
+                      <Input type="number" placeholder="VD: 800" value={config.wordCount || ''} onChange={e => handleConfigChange('wordCount', e.target.value)} />
+                      <p className="text-xs text-muted-foreground">AI sẽ cố gắng viết trong khoảng +/- 10% số từ bạn yêu cầu.</p>
+                    </div>
                   </CardContent>
                 </Card>
               </div>
