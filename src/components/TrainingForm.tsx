@@ -97,7 +97,6 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig })
   return (
     <div className="space-y-8 mt-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-        
         <div className="space-y-8">
           <Card className="bg-white rounded-2xl shadow-sm border border-slate-200/80">
             <CardHeader className="p-6 flex flex-row items-center gap-4">
@@ -117,6 +116,35 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig })
               <div className="space-y-2">
                 <Label htmlFor="role" className="text-sm font-medium text-slate-800">Vai trò của AI</Label>
                 <Input id="role" placeholder="VD: Chuyên viên tư vấn" value={config.role} onChange={(e) => handleFieldChange('role', e.target.value)} className="bg-slate-100/70 border-slate-200 rounded-lg h-11" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white rounded-2xl shadow-sm border border-slate-200/80">
+            <CardHeader className="p-6 flex flex-row items-center gap-4">
+              <div className="flex-shrink-0 bg-purple-100 p-3 rounded-lg">
+                <SlidersHorizontal className="h-6 w-6 text-purple-600" />
+              </div>
+              <div>
+                <CardTitle className="text-xl font-bold text-slate-900">Tham Số Cấu Hình Đầu Ra</CardTitle>
+                <CardDescription className="text-sm text-slate-500 pt-1">Kiểm soát cách LLM tạo ra phản hồi.</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 pt-0 space-y-6">
+              <div>
+                <Label className="flex justify-between text-sm font-medium text-slate-800"><span>Temperature:</span><span>{config.temperature}</span></Label>
+                <Slider value={[config.temperature]} onValueChange={(val) => handleSliderChange('temperature', val)} max={1} step={0.05} />
+                <p className="text-xs text-slate-500">Thấp: Chính xác, cao: Sáng tạo.</p>
+              </div>
+              <div>
+                <Label className="flex justify-between text-sm font-medium text-slate-800"><span>Top-P:</span><span>{config.topP}</span></Label>
+                <Slider value={[config.topP]} onValueChange={(val) => handleSliderChange('topP', val)} max={1} step={0.01} />
+                <p className="text-xs text-slate-500">Chọn token dựa trên tổng xác suất.</p>
+              </div>
+              <div>
+                <Label htmlFor="max-tokens" className="text-sm font-medium text-slate-800">Max Tokens</Label>
+                <Input id="max-tokens" type="number" value={config.maxTokens} onChange={e => handleNumericFieldChange('maxTokens', e.target.value)} className="bg-slate-100/70 border-slate-200 rounded-lg h-11" />
+                <p className="text-xs text-slate-500">Giới hạn độ dài tối đa của phản hồi.</p>
               </div>
             </CardContent>
           </Card>
@@ -149,35 +177,6 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig })
               <div className="space-y-2">
                 <Label htmlFor="goal" className="text-sm font-medium text-slate-800">Mục tiêu trò chuyện</Label>
                 <Input id="goal" placeholder="VD: Bán hàng, giải đáp" value={config.goal} onChange={(e) => handleFieldChange('goal', e.target.value)} className="bg-slate-100/70 border-slate-200 rounded-lg h-11" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white rounded-2xl shadow-sm border border-slate-200/80">
-            <CardHeader className="p-6 flex flex-row items-center gap-4">
-              <div className="flex-shrink-0 bg-purple-100 p-3 rounded-lg">
-                <SlidersHorizontal className="h-6 w-6 text-purple-600" />
-              </div>
-              <div>
-                <CardTitle className="text-xl font-bold text-slate-900">Tham Số Cấu Hình Đầu Ra</CardTitle>
-                <CardDescription className="text-sm text-slate-500 pt-1">Kiểm soát cách LLM tạo ra phản hồi.</CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent className="p-6 pt-0 space-y-6">
-              <div>
-                <Label className="flex justify-between text-sm font-medium text-slate-800"><span>Temperature:</span><span>{config.temperature}</span></Label>
-                <Slider value={[config.temperature]} onValueChange={(val) => handleSliderChange('temperature', val)} max={1} step={0.05} />
-                <p className="text-xs text-slate-500">Thấp: Chính xác, cao: Sáng tạo.</p>
-              </div>
-              <div>
-                <Label className="flex justify-between text-sm font-medium text-slate-800"><span>Top-P:</span><span>{config.topP}</span></Label>
-                <Slider value={[config.topP]} onValueChange={(val) => handleSliderChange('topP', val)} max={1} step={0.01} />
-                <p className="text-xs text-slate-500">Chọn token dựa trên tổng xác suất.</p>
-              </div>
-              <div>
-                <Label htmlFor="max-tokens" className="text-sm font-medium text-slate-800">Max Tokens</Label>
-                <Input id="max-tokens" type="number" value={config.maxTokens} onChange={e => handleNumericFieldChange('maxTokens', e.target.value)} className="bg-slate-100/70 border-slate-200 rounded-lg h-11" />
-                <p className="text-xs text-slate-500">Giới hạn độ dài tối đa của phản hồi.</p>
               </div>
             </CardContent>
           </Card>
