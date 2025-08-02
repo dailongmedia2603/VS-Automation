@@ -344,7 +344,7 @@ const ProjectDetail = () => {
         </div>
 
         <ResizablePanelGroup direction="horizontal" className="flex-1 rounded-2xl border bg-white shadow-sm overflow-hidden">
-          <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
+          <ResizablePanel defaultSize={20} minSize={20} maxSize={40}>
             <div className="flex flex-col h-full p-4">
               <div className="p-2">
                 <button
@@ -373,7 +373,7 @@ const ProjectDetail = () => {
             </div>
           </ResizablePanel>
           <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={75}>
+          <ResizablePanel defaultSize={80}>
             <div className="h-full p-6 overflow-y-auto">
               {selectedView === 'documents' && projectId && <ProjectDocumentsManager projectId={projectId} />}
               
