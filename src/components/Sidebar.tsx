@@ -6,7 +6,6 @@ import {
   GraduationCap,
   LayoutDashboard,
   ChevronLeft,
-  BookCopy,
   LogOut,
   Sparkles,
   CheckCircle,
@@ -38,12 +37,6 @@ const navSections = [
     items: [
       { name: "Dashboard", icon: LayoutDashboard, href: "/", permission: "view_dashboard" },
       { name: "Báo cáo", icon: BarChart3, href: "/reports", permission: "view_reports" },
-    ],
-  },
-  {
-    title: "TÀI LIỆU & HUẤN LUYỆN",
-    items: [
-      { name: "Tài liệu đào tạo", icon: BookCopy, href: "/training-documents", permission: "view_training_documents" },
     ],
   },
   {

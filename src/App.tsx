@@ -17,7 +17,6 @@ import { AppLayout } from "./components/AppLayout";
 import { ApiSettingsProvider } from "@/contexts/ApiSettingsContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
-import TrainingDocuments from "./pages/TrainingDocuments";
 import ContentAi from "./pages/ContentAi";
 import ProjectDetail from "./pages/ProjectDetail";
 import CheckSeeding from "./pages/CheckSeeding";
@@ -56,7 +55,6 @@ const App = () => (
                       <Route path="/training-chatbot/prompts/:libraryId" element={<PromptLibraryDetail />} />
                       <Route path="/training-chatbot/conditions/:libraryId" element={<ConditionLibraryDetail />} />
                       <Route path="/training-chatbot/structures/:libraryId" element={<ArticleStructureLibraryDetail />} />
-                      <Route path="/training-documents" element={<TrainingDocuments />} />
                       <Route path="/staff" element={<Staff />} />
                       <Route path="/content-ai" element={<ContentAi />} />
                       <Route path="/content-ai/:projectId" element={<ProjectDetail />} />
