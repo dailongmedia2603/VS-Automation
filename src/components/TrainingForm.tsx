@@ -30,7 +30,6 @@ export type TrainingConfig = {
   language: string;
   tone: string;
   goal: string;
-  processSteps: TrainingItem[];
   documents: TrainingDocument[];
   promptTemplate: PromptTemplateItem[];
   temperature: number;
@@ -47,12 +46,10 @@ export const initialConfig: TrainingConfig = {
   language: 'Tiếng Việt',
   tone: '',
   goal: '',
-  processSteps: [],
   documents: [],
   promptTemplate: [
     { id: crypto.randomUUID(), title: 'YÊU CẦU TƯ VẤN CHO FANPAGE', content: 'Bạn là một trợ lý AI cho fanpage. Hãy dựa vào các thông tin dưới đây để tư vấn cho khách hàng.' },
     { id: crypto.randomUUID(), title: 'THÔNG TIN HUẤN LUYỆN CHUNG', content: '- **Vai trò của bạn:** {{role}}\n- **Lĩnh vực kinh doanh:** {{industry}}\n- **Phong cách:** {{style}}\n- **Tông giọng:** {{tone}}\n- **Ngôn ngữ:** {{language}}\n- **Mục tiêu cuộc trò chuyện:** {{goal}}' },
-    { id: crypto.randomUUID(), title: 'QUY TRÌNH TƯ VẤN', content: '{{processSteps}}' },
     { id: crypto.randomUUID(), title: 'LỊCH SỬ CUỘC TRÒ CHUYỆN', content: 'Dưới đây là toàn bộ lịch sử trò chuyện. Hãy phân tích để hiểu ngữ cảnh và trả lời tin nhắn cuối cùng của khách hàng.\n---\n{{conversation_history}}\n---' },
     { id: crypto.randomUUID(), title: 'TÀI LIỆU NỘI BỘ THAM KHẢO', content: '{{document_context}}' },
     { id: crypto.randomUUID(), title: 'HÀNH ĐỘNG', content: 'Dựa vào TOÀN BỘ thông tin trên, hãy tạo một câu trả lời duy nhất cho tin nhắn cuối cùng của khách hàng.\n**QUAN TRỌNG:** Chỉ trả lời với nội dung tin nhắn, không thêm bất kỳ tiền tố nào như "AI:", "Trả lời:", hay lời chào nào nếu không cần thiết theo ngữ cảnh.' },
@@ -69,38 +66,8 @@ interface TrainingFormProps {
   setConfig: React.Dispatch<React.SetStateAction<TrainingConfig>>;
 }
 
-const DynamicPrefixedList = ({ title, description, items, setItems, prefix, buttonText }: { title: string, description?: string, items: TrainingItem[], setItems: (items: TrainingItem[]) => void, prefix: string, buttonText: string }) => {
-    const handleAddItem = () => setItems([...items, { id: crypto.randomUUID(), value: '' }]);
-    const handleItemChange = (id: string, value: string) => setItems(items.map(item => item.id === id ? { ...item, value } : item));
-    const handleRemoveItem = (id: string) => setItems(items.filter(item => item.id !== id));
-  
-    return (
-      <div className="space-y-3">
-        <Label className="text-sm font-medium text-slate-800">{title}</Label>
-        {description && <p className="text-xs text-slate-500">{description}</p>}
-        <div className="space-y-2 mt-2">
-          {items.map((item, index) => (
-            <div key={item.id} className="flex items-center gap-2">
-              <div className="flex items-center gap-3 flex-grow">
-                <span className="font-semibold text-slate-500 whitespace-nowrap">{prefix} {index + 1}</span>
-                <Input value={item.value} onChange={(e) => handleItemChange(item.id, e.target.value)} className="bg-slate-100/70 border-slate-200" />
-              </div>
-              <Button variant="ghost" size="icon" className="flex-shrink-0 text-slate-500 hover:text-destructive hover:bg-destructive/10" onClick={() => handleRemoveItem(item.id)}>
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          ))}
-        </div>
-        <Button variant="outline" size="sm" onClick={handleAddItem} className="mt-2 text-slate-600 border-slate-300 hover:bg-slate-100">
-          <PlusCircle className="h-4 w-4 mr-2" />
-          {buttonText}
-        </Button>
-      </div>
-    );
-  };
-
 export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig }) => {
-  const handleFieldChange = (field: keyof Omit<TrainingConfig, 'processSteps' | 'documents' | 'promptTemplate' | 'temperature' | 'topP' | 'maxTokens' | 'useCoT' | 'cotFactors'>, value: string) => {
+  const handleFieldChange = (field: keyof Omit<TrainingConfig, 'documents' | 'promptTemplate' | 'temperature' | 'topP' | 'maxTokens' | 'useCoT' | 'cotFactors'>, value: string) => {
     setConfig(prev => ({ ...prev, [field]: value }));
   };
 
@@ -119,7 +86,7 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig })
     setConfig(prev => ({ ...prev, [field]: checked }));
   };
 
-  const handleDynamicListChange = (field: 'processSteps' | 'cotFactors', items: TrainingItem[]) => {
+  const handleDynamicListChange = (field: 'cotFactors', items: TrainingItem[]) => {
     setConfig(prev => ({ ...prev, [field]: items }));
   };
 
@@ -147,23 +114,6 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig })
                   <Input id="role" placeholder="VD: Chuyên viên tư vấn" value={config.role} onChange={(e) => handleFieldChange('role', e.target.value)} className="bg-slate-100/70 border-slate-200" />
                 </div>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white rounded-2xl shadow-lg shadow-slate-200/30 border border-slate-200/80">
-            <CardHeader className="p-6">
-              <CardTitle className="text-xl font-bold text-slate-900">Quy trình</CardTitle>
-              <CardDescription className="text-sm text-slate-500 pt-1">Hướng dẫn AI cách tư vấn.</CardDescription>
-            </CardHeader>
-            <CardContent className="p-6 pt-0 space-y-6">
-              <DynamicPrefixedList
-                title="Quy trình tư vấn"
-                description="Đưa ra quy trình tư vấn từng bước để AI hiểu được nên tư vấn từng bước như nào."
-                items={config.processSteps}
-                setItems={(items) => handleDynamicListChange('processSteps', items)}
-                prefix="Bước"
-                buttonText="Thêm bước"
-              />
             </CardContent>
           </Card>
         </div>

@@ -7,9 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const formatList = (items) => (items && items.length > 0 ? items.map(p => `- ${p.value}`).join('\n') : '(Chưa có thông tin)');
-const formatNumberedList = (items) => (items && items.length > 0 ? items.map((s, i) => `${i + 1}. ${s.value}`).join('\n') : '(Chưa có quy trình)');
-
 const buildBasePrompt = (libraryConfig, documentContext) => {
   const config = libraryConfig || {};
   const dataMap = {
@@ -19,7 +16,6 @@ const buildBasePrompt = (libraryConfig, documentContext) => {
     '{{tone}}': config.tone || '(Chưa cung cấp)',
     '{{language}}': config.language || '(Chưa cung cấp)',
     '{{goal}}': config.goal || '(Chưa cung cấp)',
-    '{{processSteps}}': formatNumberedList(config.processSteps),
     '{{conversation_history}}': '(Lịch sử trò chuyện không áp dụng cho tác vụ này)',
     '{{document_context}}': documentContext || '(Không có tài liệu tham khảo liên quan)',
   };
