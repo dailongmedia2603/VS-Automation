@@ -69,6 +69,8 @@ interface SidebarProps {
   className?: string;
   isCollapsed: boolean;
   toggleSidebar: () => void;
+  onLinkClick?: () => void;
+  hideToggleButton?: boolean;
 }
 
 interface StaffProfile {
@@ -77,7 +79,7 @@ interface StaffProfile {
   avatar_url: string | null;
 }
 
-export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps) {
+export function Sidebar({ className, isCollapsed, toggleSidebar, onLinkClick, hideToggleButton = false }: SidebarProps) {
   const location = useLocation();
   const { user } = useAuth();
   const { hasPermission } = usePermissions();
@@ -154,6 +156,7 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
     const linkContent = (
       <Link
         to={item.href}
+        onClick={onLinkClick}
         className={cn(
           "flex items-center rounded-lg py-2 text-sm font-medium text-gray-500 hover:bg-blue-50 hover:text-blue-600",
           location.pathname === item.href && "bg-blue-600 text-white hover:bg-blue-600 hover:text-white",
@@ -191,14 +194,16 @@ export function Sidebar({ className, isCollapsed, toggleSidebar }: SidebarProps)
         className
       )}
     >
-      <Button
-        variant="ghost"
-        size="icon"
-        className="absolute -right-4 top-8 h-8 w-8 rounded-full bg-white border border-slate-200 hover:bg-slate-100 z-10"
-        onClick={toggleSidebar}
-      >
-        <ChevronLeft className={cn("h-4 w-4 transition-transform", isCollapsed && "rotate-180")} />
-      </Button>
+      {!hideToggleButton && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute -right-4 top-8 h-8 w-8 rounded-full bg-white border border-slate-200 hover:bg-slate-100 z-10"
+          onClick={toggleSidebar}
+        >
+          <ChevronLeft className={cn("h-4 w-4 transition-transform", isCollapsed && "rotate-180")} />
+        </Button>
+      )}
 
       <div className={cn("flex items-center", isCollapsed ? "justify-center h-10" : "")}>
         {isCollapsed ? (
