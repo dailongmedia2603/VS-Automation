@@ -56,7 +56,6 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
 
   const [structureLibraries, setStructureLibraries] = useState<StructureLibrary[]>([]);
   const [structures, setStructures] = useState<ArticleStructure[]>([]);
-  const [isLoadingStructures, setIsLoadingStructures] = useState(true);
 
   useEffect(() => {
     const itemConfig = item.config || {};
@@ -79,7 +78,6 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
     fetchLogs();
 
     const fetchStructureData = async () => {
-      setIsLoadingStructures(true);
       const libPromise = supabase.from('article_structure_libraries').select('id, name');
       const structPromise = supabase.from('article_structures').select('*');
       const [{ data: libData, error: libError }, { data: structData, error: structError }] = await Promise.all([libPromise, structPromise]);
@@ -90,7 +88,6 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
           setStructureLibraries(libData || []);
           setStructures(structData || []);
       }
-      setIsLoadingStructures(false);
     };
     fetchStructureData();
   }, [item]);
@@ -321,26 +318,6 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
                     </div>
                   </CardContent>
                 </Card>
-              </div>
-              <div className="lg:col-span-1 space-y-6">
-                <Card className="shadow-none border rounded-xl">
-                  <CardHeader className="flex flex-row items-center gap-4">
-                    <div className="flex-shrink-0 bg-green-100 p-3 rounded-lg"><ListOrdered className="h-6 w-6 text-green-600" /></div>
-                    <div>
-                      <CardTitle className="text-lg font-bold text-slate-900">Tùy chọn</CardTitle>
-                      <CardDescription className="text-sm text-slate-500 pt-1">Điều chỉnh số lượng và các thiết lập khác.</CardDescription>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Số lượng</Label>
-                      <Input type="number" value={config.quantity} onChange={e => handleConfigChange('quantity', e.target.value)} />
-                      <p className="text-xs text-muted-foreground">NÊN CHỌN 1 (Số lượng bài nhiều hơn 1 có thể ảnh hưởng đến chất lượng của bài viết)</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-              <div className="lg:col-span-3">
                 <Card className="shadow-none border rounded-xl">
                   <CardHeader className="flex flex-row items-center gap-4">
                     <div className="flex-shrink-0 bg-yellow-100 p-3 rounded-lg"><Compass className="h-6 w-6 text-yellow-600" /></div>
@@ -358,6 +335,24 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
                       <Label htmlFor="reference-example">Ví dụ tham khảo</Label>
                       <Textarea id="reference-example" value={config.referenceExample || ''} onChange={e => handleConfigChange('referenceExample', e.target.value)} placeholder="Dán một bài viết hoặc đoạn văn mẫu vào đây..." className="min-h-[150px]" />
                       <p className="text-xs text-muted-foreground">AI sẽ tham khảo văn phong, cách xưng hô, giọng điệu từ ví dụ này nhưng không sao chép nội dung.</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+              <div className="lg:col-span-1 space-y-6">
+                <Card className="shadow-none border rounded-xl">
+                  <CardHeader className="flex flex-row items-center gap-4">
+                    <div className="flex-shrink-0 bg-green-100 p-3 rounded-lg"><ListOrdered className="h-6 w-6 text-green-600" /></div>
+                    <div>
+                      <CardTitle className="text-lg font-bold text-slate-900">Tùy chọn</CardTitle>
+                      <CardDescription className="text-sm text-slate-500 pt-1">Điều chỉnh số lượng và các thiết lập khác.</CardDescription>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Số lượng</Label>
+                      <Input type="number" value={config.quantity} onChange={e => handleConfigChange('quantity', e.target.value)} />
+                      <p className="text-xs text-muted-foreground">NÊN CHỌN 1 (Số lượng bài nhiều hơn 1 có thể ảnh hưởng đến chất lượng của bài viết)</p>
                     </div>
                   </CardContent>
                 </Card>
