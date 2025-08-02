@@ -7,7 +7,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Settings, Save, Loader2, Trash2, FileText, Sparkles, Bot, ShieldCheck, MessageSquarePlus, PlusCircle, Copy, ChevronDown, Search, Download, MoreHorizontal, Edit, Library } from 'lucide-react';
+import { Settings, Save, Loader2, Trash2, FileText, Sparkles, Bot, ShieldCheck, MessageSquarePlus, PlusCircle, Copy, ChevronDown, Search, Download, MoreHorizontal, Edit, Library, LayoutTemplate } from 'lucide-react';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { GenerationLogDialog } from './GenerationLogDialog';
 import ReactMarkdown from 'react-markdown';
@@ -27,6 +27,8 @@ type PromptLibrary = { id: number; name: string; };
 type GeneratedArticle = { id: string; content: string; type: string; };
 type Log = { id: number; created_at: string; prompt: string; response: any; };
 type MandatoryCondition = { id: string; content: string; };
+type StructureLibrary = { id: number; name: string; };
+type ArticleStructure = { id: number; library_id: number; name: string; description: string | null; structure_content: string | null; };
 
 interface ArticleGenerationDetailProps {
   project: Project;
@@ -52,6 +54,10 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
   const [searchTerm, setSearchTerm] = useState('');
   const [isLibraryDialogOpen, setIsLibraryDialogOpen] = useState(false);
 
+  const [structureLibraries, setStructureLibraries] = useState<StructureLibrary[]>([]);
+  const [structures, setStructures] = useState<ArticleStructure[]>([]);
+  const [isLoadingStructures, setIsLoadingStructures] = useState(true);
+
   useEffect(() => {
     const itemConfig = item.config || {};
     setConfig(itemConfig);
@@ -71,7 +77,33 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
         setIsLoadingLogs(false);
     };
     fetchLogs();
+
+    const fetchStructureData = async () => {
+      setIsLoadingStructures(true);
+      const libPromise = supabase.from('article_structure_libraries').select('id, name');
+      const structPromise = supabase.from('article_structures').select('*');
+      const [{ data: libData, error: libError }, { data: structData, error: structError }] = await Promise.all([libPromise, structPromise]);
+      
+      if (libError || structError) {
+          showError("Lỗi tải dữ liệu cấu trúc bài viết.");
+      } else {
+          setStructureLibraries(libData || []);
+          setStructures(structData || []);
+      }
+      setIsLoadingStructures(false);
+    };
+    fetchStructureData();
   }, [item]);
+
+  const structuresInSelectedLibrary = useMemo(() => {
+    if (!config.structureLibraryId) return [];
+    return structures.filter(s => s.library_id === Number(config.structureLibraryId));
+  }, [config.structureLibraryId, structures]);
+
+  const selectedStructure = useMemo(() => {
+    if (!config.structureId) return null;
+    return structures.find(s => s.id === Number(config.structureId));
+  }, [config.structureId, structures]);
 
   const handleConfigChange = (field: string, value: any) => {
     setConfig((prev: any) => ({ ...prev, [field]: value }));
@@ -248,7 +280,35 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
               <div className="space-y-4">
                 <div className="space-y-2"><Label>Ngành</Label><Select value={config.libraryId} onValueChange={v => handleConfigChange('libraryId', v)}><SelectTrigger><SelectValue placeholder="Chọn thư viện prompt" /></SelectTrigger><SelectContent>{promptLibraries.map(lib => (<SelectItem key={lib.id} value={String(lib.id)}>{lib.name}</SelectItem>))}</SelectContent></Select></div>
-                <div className="space-y-2"><Label>Dạng bài</Label><Select value={config.format} onValueChange={v => handleConfigChange('format', v)}><SelectTrigger><SelectValue placeholder="Chọn dạng bài" /></SelectTrigger><SelectContent><SelectItem value="question">Đặt câu hỏi / thảo luận</SelectItem><SelectItem value="review">Review</SelectItem><SelectItem value="sharing">Chia sẻ</SelectItem><SelectItem value="comparison">So sánh</SelectItem><SelectItem value="storytelling">Story telling</SelectItem></SelectContent></Select></div>
+                
+                <div className="space-y-4 p-4 border rounded-lg bg-slate-50/50">
+                  <div className="space-y-2">
+                    <Label>Dạng bài</Label>
+                    <Select value={config.structureLibraryId} onValueChange={v => { handleConfigChange('structureLibraryId', v); handleConfigChange('structureId', null); }}>
+                      <SelectTrigger><SelectValue placeholder="Chọn thư viện cấu trúc" /></SelectTrigger>
+                      <SelectContent>{structureLibraries.map(lib => (<SelectItem key={lib.id} value={String(lib.id)}>{lib.name}</SelectItem>))}</SelectContent>
+                    </Select>
+                  </div>
+                  {config.structureLibraryId && (
+                    <div className="space-y-2">
+                      <Label>Cấu trúc cụ thể</Label>
+                      <Select value={config.structureId} onValueChange={v => handleConfigChange('structureId', v)} disabled={structuresInSelectedLibrary.length === 0}>
+                        <SelectTrigger><SelectValue placeholder="Chọn cấu trúc chi tiết" /></SelectTrigger>
+                        <SelectContent>{structuresInSelectedLibrary.map(s => (<SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>))}</SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  {selectedStructure && (
+                    <Card className="mt-2 bg-white shadow-none">
+                      <CardHeader className="p-3"><CardTitle className="text-sm flex items-center gap-2"><LayoutTemplate className="h-4 w-4" />{selectedStructure.name}</CardTitle></CardHeader>
+                      <CardContent className="p-3 pt-0 text-xs space-y-2">
+                        {selectedStructure.description && <p className="text-muted-foreground italic">{selectedStructure.description}</p>}
+                        <div className="prose prose-xs max-w-none prose-slate"><ReactMarkdown>{selectedStructure.structure_content || ''}</ReactMarkdown></div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+
                 <div className="space-y-2">
                   <Label>Số lượng</Label>
                   <Input type="number" value={config.quantity} onChange={e => handleConfigChange('quantity', e.target.value)} />

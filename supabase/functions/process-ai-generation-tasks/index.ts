@@ -75,6 +75,17 @@ const buildArticlePrompt = (basePrompt, config) => {
     .map(c => `- ${c.content}`)
     .join('\n');
 
+  let structureText = '';
+  if (config.structure && config.structure.structure_content) {
+    structureText = `
+    ---
+    **CẤU TRÚC BÀI VIẾT BẮT BUỘC:**
+    AI phải tuân thủ TUYỆT ĐỐI cấu trúc sau đây khi viết bài:
+    ${config.structure.structure_content}
+    ---
+    `;
+  }
+
   const finalPrompt = `
     ${basePrompt}
 
@@ -86,6 +97,7 @@ const buildArticlePrompt = (basePrompt, config) => {
 
     **Định hướng nội dung chi tiết:**
     ${config.direction || 'Không có'}
+    ${structureText}
     ---
     **ĐIỀU KIỆN BẮT BUỘC (QUAN TRỌNG NHẤT):**
     AI phải tuân thủ TUYỆT ĐỐI tất cả các điều kiện sau đây cho MỌI bài viết được tạo ra:
