@@ -175,8 +175,8 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig })
                 <Input id="language" value={config.language} onChange={(e) => handleFieldChange('language', e.target.value)} className="bg-slate-100/70 border-slate-200 rounded-lg h-11" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="goal" className="text-sm font-medium text-slate-800">Mục tiêu trò chuyện</Label>
-                <Input id="goal" placeholder="VD: Bán hàng, giải đáp" value={config.goal} onChange={(e) => handleFieldChange('goal', e.target.value)} className="bg-slate-100/70 border-slate-200 rounded-lg h-11" />
+                <Label htmlFor="goal" className="text-sm font-medium text-slate-800">Mục tiêu cần đạt</Label>
+                <Input id="goal" placeholder="VD: Chốt đơn, thu thập thông tin" value={config.goal} onChange={(e) => handleFieldChange('goal', e.target.value)} className="bg-slate-100/70 border-slate-200 rounded-lg h-11" />
               </div>
             </CardContent>
           </Card>
