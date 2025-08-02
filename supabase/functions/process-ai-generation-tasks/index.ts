@@ -177,7 +177,14 @@ serve(async (req) => {
       }
 
       if (library.config.useCoT) {
-        finalPrompt += "\n\nLet's think step by step.";
+        let cotPrompt = "Let's think step by step.";
+        if (library.config.cotFactors && library.config.cotFactors.length > 0) {
+          const factorsText = library.config.cotFactors
+            .map((factor: { value: string }) => `- ${factor.value}`)
+            .join('\n');
+          cotPrompt += "\n\nHere are the key factors to consider in your thinking process:\n" + factorsText;
+        }
+        finalPrompt += `\n\n${cotPrompt}`;
       }
 
       await supabaseAdmin.from('ai_generation_tasks').update({ progress_step: 'Đang gửi yêu cầu đến AI...' }).eq('id', task.id);

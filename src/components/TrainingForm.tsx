@@ -37,6 +37,7 @@ export type TrainingConfig = {
   topP: number;
   maxTokens: number;
   useCoT: boolean;
+  cotFactors: TrainingItem[];
 };
 
 export const initialConfig: TrainingConfig = {
@@ -60,6 +61,7 @@ export const initialConfig: TrainingConfig = {
   topP: 0.95,
   maxTokens: 2048,
   useCoT: false,
+  cotFactors: [],
 };
 
 interface TrainingFormProps {
@@ -98,7 +100,7 @@ const DynamicPrefixedList = ({ title, description, items, setItems, prefix, butt
   };
 
 export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig }) => {
-  const handleFieldChange = (field: keyof Omit<TrainingConfig, 'processSteps' | 'documents' | 'promptTemplate' | 'temperature' | 'topP' | 'maxTokens' | 'useCoT'>, value: string) => {
+  const handleFieldChange = (field: keyof Omit<TrainingConfig, 'processSteps' | 'documents' | 'promptTemplate' | 'temperature' | 'topP' | 'maxTokens' | 'useCoT' | 'cotFactors'>, value: string) => {
     setConfig(prev => ({ ...prev, [field]: value }));
   };
 
@@ -117,9 +119,13 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig })
     setConfig(prev => ({ ...prev, [field]: checked }));
   };
 
-  const handleDynamicListChange = (field: 'processSteps', items: TrainingItem[]) => {
+  const handleDynamicListChange = (field: 'processSteps' | 'cotFactors', items: TrainingItem[]) => {
     setConfig(prev => ({ ...prev, [field]: items }));
   };
+
+  const handleAddCotFactor = () => handleDynamicListChange('cotFactors', [...(config.cotFactors || []), { id: crypto.randomUUID(), value: '' }]);
+  const handleCotFactorChange = (id: string, value: string) => handleDynamicListChange('cotFactors', (config.cotFactors || []).map(item => item.id === id ? { ...item, value } : item));
+  const handleRemoveCotFactor = (id: string) => handleDynamicListChange('cotFactors', (config.cotFactors || []).filter(item => item.id !== id));
 
   return (
     <div className="space-y-8 mt-6">
@@ -217,15 +223,39 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig })
               <CardDescription className="text-sm text-slate-500 pt-1">Áp dụng các kỹ thuật để cải thiện khả năng suy luận của mô hình.</CardDescription>
             </CardHeader>
             <CardContent className="p-6 pt-0">
-              <div className="flex items-center justify-between p-3 border rounded-lg bg-slate-50/50">
-                <div className="flex items-center gap-3">
-                  <BrainCircuit className="h-5 w-5 text-blue-600" />
-                  <div>
-                    <Label htmlFor="cot-switch">Chain of Thought (CoT)</Label>
-                    <p className="text-xs text-muted-foreground">Thêm "Let's think step by step." để AI suy luận logic hơn.</p>
+              <div className="p-3 border rounded-lg bg-slate-50/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <BrainCircuit className="h-5 w-5 text-blue-600" />
+                    <div>
+                      <Label htmlFor="cot-switch">Chain of Thought (CoT)</Label>
+                      <p className="text-xs text-muted-foreground">Hướng dẫn AI suy luận logic hơn.</p>
+                    </div>
                   </div>
+                  <Switch id="cot-switch" checked={config.useCoT} onCheckedChange={(checked) => handleSwitchChange('useCoT', checked)} />
                 </div>
-                <Switch id="cot-switch" checked={config.useCoT} onCheckedChange={(checked) => handleSwitchChange('useCoT', checked)} />
+                {config.useCoT && (
+                  <div className="mt-4 pt-4 border-t space-y-2">
+                    <Label className="text-sm font-medium">Các yếu tố cần suy nghĩ</Label>
+                    {(config.cotFactors || []).map(factor => (
+                      <div key={factor.id} className="flex items-center gap-2">
+                        <Input
+                          value={factor.value}
+                          onChange={(e) => handleCotFactorChange(factor.id, e.target.value)}
+                          placeholder="VD: Phân tích cảm xúc của khách hàng"
+                          className="bg-white"
+                        />
+                        <Button variant="ghost" size="icon" onClick={() => handleRemoveCotFactor(factor.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button variant="outline" size="sm" onClick={handleAddCotFactor} className="border-dashed">
+                      <PlusCircle className="mr-2 h-4 w-4" />
+                      Thêm yếu tố
+                    </Button>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
