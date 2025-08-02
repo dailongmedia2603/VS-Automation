@@ -366,8 +366,8 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
             <div className="flex items-center gap-3"><Settings className="h-5 w-5 text-blue-600" /><span>Cấu hình & Tùy chọn</span></div>
           </AccordionTrigger>
           <AccordionContent className="px-6 pb-6 bg-white rounded-b-2xl">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
-              <div className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-8 gap-y-6 p-6">
+              <div className="lg:col-span-2 space-y-6">
                 <div className="space-y-2"><Label>Ngành</Label><Select value={config.libraryId} onValueChange={v => handleConfigChange('libraryId', v)}><SelectTrigger><SelectValue placeholder="Chọn thư viện prompt" /></SelectTrigger><SelectContent>{promptLibraries.map(lib => (<SelectItem key={lib.id} value={String(lib.id)}>{lib.name}</SelectItem>))}</SelectContent></Select></div>
                 <div className="space-y-2"><Label>Nội dung Post</Label><Textarea value={config.postContent} onChange={e => handleConfigChange('postContent', e.target.value)} placeholder="Dán nội dung bài viết cần bình luận..." className="min-h-[120px]" /></div>
                 <div className="space-y-2"><Label>Định hướng comment</Label><Textarea value={config.commentDirection} onChange={e => handleConfigChange('commentDirection', e.target.value)} placeholder="Nhập định hướng chi tiết..." className="min-h-[80px]" /></div>
@@ -377,53 +377,58 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                   <p className="text-xs text-muted-foreground">AI sẽ tham khảo văn phong, cách xưng hô, giọng điệu từ ví dụ này nhưng không sao chép nội dung.</p>
                 </div>
               </div>
-              <div className="space-y-4">
+              <div className="lg:col-span-1 space-y-6">
                 <div className="space-y-2">
                   <Label>Tỉ lệ comment</Label>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     { (config.ratios || []).map((ratio: CommentRatio) => (
-                      <div key={ratio.id} className="flex items-center gap-2 p-2 border rounded-lg bg-white">
-                        <Input 
-                          placeholder="Loại comment" 
-                          value={ratio.type} 
-                          onChange={(e) => handleRatioChange(ratio.id, 'type', e.target.value)} 
-                          className="w-40" 
-                        />
-                        <div className="flex items-center w-28 flex-shrink-0">
+                      <div key={ratio.id} className="p-3 border rounded-lg bg-slate-50/50 space-y-2">
+                        <div className="flex items-center gap-2">
                           <Input 
-                            type="number" 
-                            value={ratio.percentage} 
-                            onChange={(e) => handleRatioChange(ratio.id, 'percentage', e.target.value)} 
-                            className="rounded-r-none border-r-0 text-right focus-visible:ring-offset-0 focus-visible:ring-0" 
+                            placeholder="Loại comment" 
+                            value={ratio.type} 
+                            onChange={(e) => handleRatioChange(ratio.id, 'type', e.target.value)} 
+                            className="flex-1 bg-white"
                           />
-                          <div className="flex h-10 items-center rounded-r-md border border-l-0 border-input bg-slate-100 px-3 text-sm text-muted-foreground">
-                            %
+                          <div className="flex items-center w-28 flex-shrink-0">
+                            <Input 
+                              type="number" 
+                              value={ratio.percentage} 
+                              onChange={(e) => handleRatioChange(ratio.id, 'percentage', e.target.value)} 
+                              className="rounded-r-none border-r-0 text-right focus-visible:ring-offset-0 focus-visible:ring-0 bg-white" 
+                            />
+                            <div className="flex h-10 items-center rounded-r-md border border-l-0 border-input bg-slate-100 px-3 text-sm text-muted-foreground">
+                              %
+                            </div>
                           </div>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleRemoveRatio(ratio.id)} 
+                            disabled={config.ratios?.length <= 1}
+                            className="flex-shrink-0"
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
                         </div>
                         <Input 
-                          placeholder="Nội dung định hướng" 
+                          placeholder={`Nội dung định hướng cho loại "${ratio.type || '...'}"`} 
                           value={ratio.content} 
                           onChange={(e) => handleRatioChange(ratio.id, 'content', e.target.value)} 
-                          className="flex-1" 
+                          className="bg-white"
                         />
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={() => handleRemoveRatio(ratio.id)} 
-                          disabled={config.ratios?.length <= 1}
-                          className="flex-shrink-0"
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
                       </div>
                     )) }
                   </div>
                   <div className="flex items-center justify-between mt-2">
-                    <Button variant="outline" size="sm" onClick={handleAddRatio}><PlusCircle className="h-4 w-4 mr-2" />Thêm tỉ lệ</Button>
+                    <Button variant="outline" size="sm" onClick={handleAddRatio} className="border-dashed"><PlusCircle className="h-4 w-4 mr-2" />Thêm tỉ lệ</Button>
                     {totalPercentage > 100 && (<p className="text-sm text-destructive font-medium">Tổng tỉ lệ vượt quá 100%!</p>)}
                   </div>
                 </div>
-                <div className="space-y-2"><Label>Số lượng comment</Label><Input type="number" value={config.quantity} onChange={e => handleConfigChange('quantity', e.target.value)} defaultValue={10} /></div>
+                <div className="space-y-2">
+                  <Label>Số lượng comment</Label>
+                  <Input type="number" value={config.quantity} onChange={e => handleConfigChange('quantity', e.target.value)} defaultValue={10} />
+                </div>
               </div>
             </div>
             <div className="flex justify-end mt-6 px-6">

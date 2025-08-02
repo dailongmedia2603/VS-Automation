@@ -277,8 +277,8 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
             <div className="flex items-center gap-3"><Settings className="h-5 w-5 text-blue-600" /><span>Cấu hình & Tùy chọn</span></div>
           </AccordionTrigger>
           <AccordionContent className="px-6 pb-6 bg-white rounded-b-2xl">
-            <div className="p-6 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-8 gap-y-6 p-6">
+              <div className="lg:col-span-2 space-y-6">
                 <div className="space-y-2">
                   <Label>Ngành</Label>
                   <Select value={config.libraryId} onValueChange={v => handleConfigChange('libraryId', v)}>
@@ -286,54 +286,53 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
                     <SelectContent>{promptLibraries.map(lib => (<SelectItem key={lib.id} value={String(lib.id)}>{lib.name}</SelectItem>))}</SelectContent>
                   </Select>
                 </div>
+
+                <div className="space-y-2">
+                  <Label>Dạng bài</Label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Select value={config.structureLibraryId} onValueChange={v => { handleConfigChange('structureLibraryId', v); handleConfigChange('structureId', null); }}>
+                      <SelectTrigger><SelectValue placeholder="Chọn thư viện cấu trúc" /></SelectTrigger>
+                      <SelectContent>{structureLibraries.map(lib => (<SelectItem key={lib.id} value={String(lib.id)}>{lib.name}</SelectItem>))}</SelectContent>
+                    </Select>
+                    {config.structureLibraryId && (
+                      <Select value={config.structureId} onValueChange={v => handleConfigChange('structureId', v)} disabled={structuresInSelectedLibrary.length === 0}>
+                        <SelectTrigger><SelectValue placeholder="Chọn cấu trúc chi tiết" /></SelectTrigger>
+                        <SelectContent>{structuresInSelectedLibrary.map(s => (<SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>))}</SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                  {selectedStructure && (
+                    <Card className="mt-4 bg-slate-50/50 shadow-none border">
+                      <CardHeader className="p-3"><CardTitle className="text-sm flex items-center gap-2"><LayoutTemplate className="h-4 w-4" />{selectedStructure.name}</CardTitle></CardHeader>
+                      <CardContent className="p-3 pt-0 text-xs space-y-2">
+                        {selectedStructure.description && <p className="text-muted-foreground italic">{selectedStructure.description}</p>}
+                        <div className="prose prose-xs max-w-none prose-slate"><ReactMarkdown>{selectedStructure.structure_content || ''}</ReactMarkdown></div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Định hướng nội dung</Label>
+                  <Textarea value={config.direction} onChange={e => handleConfigChange('direction', e.target.value)} placeholder="Nhập định hướng chi tiết cho bài viết..." className="min-h-[150px]" />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="reference-example">Ví dụ tham khảo</Label>
+                  <Textarea id="reference-example" value={config.referenceExample || ''} onChange={e => handleConfigChange('referenceExample', e.target.value)} placeholder="Dán một bài viết hoặc đoạn văn mẫu vào đây..." className="min-h-[150px]" />
+                  <p className="text-xs text-muted-foreground">AI sẽ tham khảo văn phong, cách xưng hô, giọng điệu từ ví dụ này nhưng không sao chép nội dung.</p>
+                </div>
+              </div>
+
+              <div className="lg:col-span-1 space-y-6">
                 <div className="space-y-2">
                   <Label>Số lượng</Label>
                   <Input type="number" value={config.quantity} onChange={e => handleConfigChange('quantity', e.target.value)} />
                   <p className="text-xs text-muted-foreground">NÊN CHỌN 1 (Số lượng bài nhiều hơn 1 có thể ảnh hưởng đến chất lượng của bài viết)</p>
                 </div>
               </div>
-
-              <div className="space-y-4 p-4 border rounded-lg bg-slate-50/50">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label>Dạng bài</Label>
-                    <Select value={config.structureLibraryId} onValueChange={v => { handleConfigChange('structureLibraryId', v); handleConfigChange('structureId', null); }}>
-                      <SelectTrigger><SelectValue placeholder="Chọn thư viện cấu trúc" /></SelectTrigger>
-                      <SelectContent>{structureLibraries.map(lib => (<SelectItem key={lib.id} value={String(lib.id)}>{lib.name}</SelectItem>))}</SelectContent>
-                    </Select>
-                  </div>
-                  {config.structureLibraryId && (
-                    <div className="space-y-2">
-                      <Label>Cấu trúc cụ thể</Label>
-                      <Select value={config.structureId} onValueChange={v => handleConfigChange('structureId', v)} disabled={structuresInSelectedLibrary.length === 0}>
-                        <SelectTrigger><SelectValue placeholder="Chọn cấu trúc chi tiết" /></SelectTrigger>
-                        <SelectContent>{structuresInSelectedLibrary.map(s => (<SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>))}</SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                </div>
-                {selectedStructure && (
-                  <Card className="mt-4 bg-white shadow-none">
-                    <CardHeader className="p-3"><CardTitle className="text-sm flex items-center gap-2"><LayoutTemplate className="h-4 w-4" />{selectedStructure.name}</CardTitle></CardHeader>
-                    <CardContent className="p-3 pt-0 text-xs space-y-2">
-                      {selectedStructure.description && <p className="text-muted-foreground italic">{selectedStructure.description}</p>}
-                      <div className="prose prose-xs max-w-none prose-slate"><ReactMarkdown>{selectedStructure.structure_content || ''}</ReactMarkdown></div>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label>Định hướng nội dung</Label>
-                <Textarea value={config.direction} onChange={e => handleConfigChange('direction', e.target.value)} placeholder="Nhập định hướng chi tiết cho bài viết..." className="min-h-[150px]" />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="reference-example">Ví dụ tham khảo</Label>
-                <Textarea id="reference-example" value={config.referenceExample || ''} onChange={e => handleConfigChange('referenceExample', e.target.value)} placeholder="Dán một bài viết hoặc đoạn văn mẫu vào đây..." className="min-h-[150px]" />
-                <p className="text-xs text-muted-foreground">AI sẽ tham khảo văn phong, cách xưng hô, giọng điệu từ ví dụ này nhưng không sao chép nội dung.</p>
-              </div>
             </div>
+            
             <div className="flex justify-end px-6">
               <Button onClick={() => handleSaveConfig(config)} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700">
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
