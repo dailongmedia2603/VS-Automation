@@ -8,6 +8,7 @@ import Settings from "./pages/Settings";
 import TrainingChatbot from "./pages/TrainingChatbot";
 import PromptLibraryDetail from "./pages/PromptLibraryDetail";
 import ConditionLibraryDetail from "./pages/ConditionLibraryDetail";
+import ArticleStructureLibraryDetail from "./pages/ArticleStructureLibraryDetail";
 import Staff from "./pages/Staff";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
@@ -54,6 +55,7 @@ const App = () => (
                       <Route path="/training-chatbot" element={<TrainingChatbot />} />
                       <Route path="/training-chatbot/prompts/:libraryId" element={<PromptLibraryDetail />} />
                       <Route path="/training-chatbot/conditions/:libraryId" element={<ConditionLibraryDetail />} />
+                      <Route path="/training-chatbot/structures/:libraryId" element={<ArticleStructureLibraryDetail />} />
                       <Route path="/training-documents" element={<TrainingDocuments />} />
                       <Route path="/staff" element={<Staff />} />
                       <Route path="/content-ai" element={<ContentAi />} />

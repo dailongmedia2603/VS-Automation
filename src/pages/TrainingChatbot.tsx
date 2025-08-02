@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Folder, PlusCircle, Search, List, LayoutGrid, ChevronDown, Loader2, ShieldCheck } from 'lucide-react';
+import { Folder, PlusCircle, Search, List, LayoutGrid, ChevronDown, Loader2, ShieldCheck, FileSignature } from 'lucide-react';
 import { StatWidget } from '@/components/content-ai/StatWidget';
 import { ProjectFolder } from '@/components/ProjectFolder';
 import { ProjectListItem } from '@/components/ProjectListItem';
@@ -41,7 +41,7 @@ const folderColors = [
 
 const getRandomColor = () => folderColors[Math.floor(Math.random() * folderColors.length)];
 
-const LibraryManager = ({ type }: { type: 'prompt' | 'condition' }) => {
+const LibraryManager = ({ type }: { type: 'prompt' | 'condition' | 'structure' }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [libraries, setLibraries] = useState<Library[]>([]);
@@ -54,9 +54,18 @@ const LibraryManager = ({ type }: { type: 'prompt' | 'condition' }) => {
   const [libraryToDelete, setLibraryToDelete] = useState<Library | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
-  const tableName = type === 'prompt' ? 'prompt_libraries' : 'condition_libraries';
-  const basePath = type === 'prompt' ? '/training-chatbot/prompts' : '/training-chatbot/conditions';
-  const typeName = type === 'prompt' ? 'Thư viện Prompt' : 'Thư viện Điều kiện';
+  const { tableName, basePath, typeName, icon: Icon, color } = useMemo(() => {
+    switch (type) {
+      case 'prompt':
+        return { tableName: 'prompt_libraries', basePath: '/training-chatbot/prompts', typeName: 'Thư viện Prompt', icon: Folder, color: 'bg-blue-500' };
+      case 'condition':
+        return { tableName: 'condition_libraries', basePath: '/training-chatbot/conditions', typeName: 'Thư viện Điều kiện', icon: ShieldCheck, color: 'bg-red-500' };
+      case 'structure':
+        return { tableName: 'article_structure_libraries', basePath: '/training-chatbot/structures', typeName: 'Thư viện Cấu trúc', icon: FileSignature, color: 'bg-green-500' };
+      default:
+        return { tableName: 'prompt_libraries', basePath: '/training-chatbot/prompts', typeName: 'Thư viện', icon: Folder, color: 'bg-gray-500' };
+    }
+  }, [type]);
 
   const fetchLibraries = async () => {
     setIsLoading(true);
@@ -146,7 +155,7 @@ const LibraryManager = ({ type }: { type: 'prompt' | 'condition' }) => {
     <>
       <div className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <StatWidget title={`Tổng số ${typeName}`} value={String(libraries.length)} icon={type === 'prompt' ? Folder : ShieldCheck} color={type === 'prompt' ? 'bg-blue-500' : 'bg-red-500'} />
+          <StatWidget title={`Tổng số ${typeName}`} value={String(libraries.length)} icon={Icon} color={color} />
         </div>
         <div className="flex items-center justify-between gap-4">
           <div className="relative flex-grow max-w-xs"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder={`Tìm kiếm ${typeName}...`} className="pl-9 bg-white rounded-lg" /></div>
@@ -185,12 +194,16 @@ const TrainingChatbot = () => {
         <TabsList className="flex justify-start items-center gap-1 p-0 bg-transparent">
           <TabsTrigger value="prompts" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Thư viện Prompt</TabsTrigger>
           <TabsTrigger value="conditions" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Thư viện Điều kiện</TabsTrigger>
+          <TabsTrigger value="structures" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Cấu trúc bài viết</TabsTrigger>
         </TabsList>
         <TabsContent value="prompts" className="mt-6">
           <LibraryManager type="prompt" />
         </TabsContent>
         <TabsContent value="conditions" className="mt-6">
           <LibraryManager type="condition" />
+        </TabsContent>
+        <TabsContent value="structures" className="mt-6">
+          <LibraryManager type="structure" />
         </TabsContent>
       </Tabs>
     </main>
