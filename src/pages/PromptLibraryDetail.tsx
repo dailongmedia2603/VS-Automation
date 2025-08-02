@@ -1,42 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from '@/integrations/supabase/client';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { TrainingForm, TrainingConfig, initialConfig } from '@/components/TrainingForm';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PromptConfigurator } from '@/components/PromptConfigurator';
 import { Button } from '@/components/ui/button';
 import { Eye, Loader2, ArrowLeft } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import TrainingPreview from '@/components/TrainingPreview';
-import PromptEngineering from '@/components/PromptEngineering';
 
 const TrainingModule = ({ config, setConfig, onSave, isSaving }: { config: TrainingConfig, setConfig: React.Dispatch<React.SetStateAction<TrainingConfig>>, onSave: () => void, isSaving: boolean }) => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
-  const setPromptTemplate = (template: TrainingConfig['promptTemplate']) => {
-    setConfig(prev => ({ ...prev, promptTemplate: template }));
-  };
-
   return (
     <>
-      <Tabs defaultValue="info" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 max-w-md bg-slate-200/75 p-1.5 rounded-xl h-12">
-          <TabsTrigger value="info" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-blue-600 text-slate-600 font-semibold text-base transition-all duration-300">Thông tin Train</TabsTrigger>
-          <TabsTrigger value="prompt" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-blue-600 text-slate-600 font-semibold text-base transition-all duration-300">Cấu hình Prompt</TabsTrigger>
-          <TabsTrigger value="engineering" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-blue-600 text-slate-600 font-semibold text-base transition-all duration-300">Prompt Engineering</TabsTrigger>
-        </TabsList>
-        <TabsContent value="info">
-          <TrainingForm config={config} setConfig={setConfig} />
-        </TabsContent>
-        <TabsContent value="prompt">
-          <PromptConfigurator template={config.promptTemplate} setTemplate={setPromptTemplate} />
-        </TabsContent>
-        <TabsContent value="engineering">
-          <PromptEngineering />
-        </TabsContent>
-      </Tabs>
+      <TrainingForm config={config} setConfig={setConfig} />
       <div className="flex justify-end pt-8 gap-3">
         <Button variant="outline" onClick={() => setIsPreviewOpen(true)} className="font-semibold rounded-lg border-slate-300 text-slate-700 hover:bg-slate-100">
           <Eye className="h-4 w-4 mr-2" />
@@ -139,7 +117,7 @@ const PromptLibraryDetail = () => {
   return (
     <main className="flex-1 space-y-8 p-6 sm:p-8 bg-slate-50">
       <div className="flex items-center gap-4">
-        <Link to="/training-chatbot">
+        <Link to="/training-chatbot?tab=prompts">
           <Button variant="outline" size="icon" className="h-10 w-10 rounded-full bg-white">
             <ArrowLeft className="h-5 w-5" />
           </Button>
