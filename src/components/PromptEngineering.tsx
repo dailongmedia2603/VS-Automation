@@ -10,10 +10,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PlusCircle, Trash2, Bot, Send, BrainCircuit, Loader2, Sparkles } from 'lucide-react';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
+import { supabase } from '@/integrations/supabase/client';
+import { useApiSettings } from '@/contexts/ApiSettingsContext';
 
 type Example = { id: string; input: string; output: string };
 
 const PromptEngineering = () => {
+  const { settings } = useApiSettings();
   const [systemPrompt, setSystemPrompt] = useState('Bạn là một trợ lý AI chuyên nghiệp. Trả về kết quả dưới định dạng JSON hợp lệ.');
   const [rolePrompt, setRolePrompt] = useState('');
   const [context, setContext] = useState('');
@@ -63,14 +66,45 @@ const PromptEngineering = () => {
     return prompt.trim();
   }, [systemPrompt, rolePrompt, context, instructions, examples, userQuery, useCoT]);
 
-  const handleRunTest = () => {
+  const handleRunTest = async () => {
+    if (!finalPrompt) {
+      showError("Prompt cuối cùng không được để trống.");
+      return;
+    }
     setIsGenerating(true);
     setAiResponse('');
-    // Simulate API call
-    setTimeout(() => {
-      setAiResponse(`{\n  "status": "success",\n  "data": {\n    "message": "Đây là một phản hồi mẫu từ AI dựa trên prompt của bạn.",\n    "parameters": {\n      "temperature": ${temperature},\n      "top_k": ${topK},\n      "top_p": ${topP},\n      "max_tokens": ${maxTokens}\n    }\n  }\n}`);
+    try {
+      const { data, error: functionError } = await supabase.functions.invoke(
+        "multi-ai-proxy",
+        {
+          body: {
+            messages: [{ role: "user", content: finalPrompt }],
+            apiUrl: settings.apiUrl,
+            apiKey: settings.apiKey,
+            // Note: Temperature, Top-K, etc. are not yet passed to the proxy.
+            // This would be a future enhancement.
+          },
+        }
+      );
+
+      if (functionError) {
+        const errorBody = await functionError.context.json();
+        throw new Error(errorBody.error || functionError.message);
+      }
+      if (data.error) throw new Error(data.error);
+
+      const content = data.choices?.[0]?.message?.content;
+      if (content) {
+        setAiResponse(content);
+      } else {
+        throw new Error("Phản hồi từ AI không hợp lệ.");
+      }
+    } catch (err: any) {
+      showError(`Thử nghiệm thất bại: ${err.message}`);
+      setAiResponse(`Lỗi: ${err.message}`);
+    } finally {
       setIsGenerating(false);
-    }, 1500);
+    }
   };
 
   const handleGenerateSuggestion = async () => {
