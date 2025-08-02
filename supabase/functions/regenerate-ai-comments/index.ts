@@ -143,13 +143,27 @@ serve(async (req) => {
     // --- End: Document Context Retrieval ---
 
     const basePrompt = buildBasePrompt(library.config, documentContext);
-    const finalPrompt = buildRegenerationPrompt(basePrompt, config, existingComments, feedback);
+    let finalPrompt = buildRegenerationPrompt(basePrompt, config, existingComments, feedback);
+
+    if (library.config.useCoT) {
+      finalPrompt += "\n\nLet's think step by step.";
+    }
 
     const modelToUse = aiSettings.gemini_content_model || 'gemini-pro';
+    
+    const generationConfig = {
+      temperature: library.config.temperature ?? 0.7,
+      topP: library.config.topP ?? 0.95,
+      maxOutputTokens: library.config.maxTokens ?? 2048,
+    };
+
     const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${aiSettings.google_gemini_api_key}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: finalPrompt }] }] }),
+        body: JSON.stringify({ 
+          contents: [{ parts: [{ text: finalPrompt }] }],
+          generationConfig: generationConfig
+        }),
     });
 
     const geminiData = await geminiRes.json();

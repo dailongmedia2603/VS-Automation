@@ -3,7 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Trash2 } from 'lucide-react';
+import { PlusCircle, Trash2, BrainCircuit } from 'lucide-react';
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 
 // Type definitions
 export type TrainingItem = { id: string; value: string };
@@ -31,6 +33,10 @@ export type TrainingConfig = {
   processSteps: TrainingItem[];
   documents: TrainingDocument[];
   promptTemplate: PromptTemplateItem[];
+  temperature: number;
+  topP: number;
+  maxTokens: number;
+  useCoT: boolean;
 };
 
 export const initialConfig: TrainingConfig = {
@@ -50,6 +56,10 @@ export const initialConfig: TrainingConfig = {
     { id: crypto.randomUUID(), title: 'TÀI LIỆU NỘI BỘ THAM KHẢO', content: '{{document_context}}' },
     { id: crypto.randomUUID(), title: 'HÀNH ĐỘNG', content: 'Dựa vào TOÀN BỘ thông tin trên, hãy tạo một câu trả lời duy nhất cho tin nhắn cuối cùng của khách hàng.\n**QUAN TRỌNG:** Chỉ trả lời với nội dung tin nhắn, không thêm bất kỳ tiền tố nào như "AI:", "Trả lời:", hay lời chào nào nếu không cần thiết theo ngữ cảnh.' },
   ],
+  temperature: 0.7,
+  topP: 0.95,
+  maxTokens: 2048,
+  useCoT: false,
 };
 
 interface TrainingFormProps {
@@ -88,8 +98,23 @@ const DynamicPrefixedList = ({ title, description, items, setItems, prefix, butt
   };
 
 export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig }) => {
-  const handleFieldChange = (field: keyof Omit<TrainingConfig, 'processSteps' | 'documents' | 'promptTemplate'>, value: string) => {
+  const handleFieldChange = (field: keyof Omit<TrainingConfig, 'processSteps' | 'documents' | 'promptTemplate' | 'temperature' | 'topP' | 'maxTokens' | 'useCoT'>, value: string) => {
     setConfig(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleNumericFieldChange = (field: 'maxTokens', value: string) => {
+    const numValue = parseInt(value, 10);
+    if (!isNaN(numValue)) {
+      setConfig(prev => ({ ...prev, [field]: numValue }));
+    }
+  };
+
+  const handleSliderChange = (field: 'temperature' | 'topP', value: number[]) => {
+    setConfig(prev => ({ ...prev, [field]: value[0] }));
+  };
+
+  const handleSwitchChange = (field: 'useCoT', checked: boolean) => {
+    setConfig(prev => ({ ...prev, [field]: checked }));
   };
 
   const handleDynamicListChange = (field: 'processSteps', items: TrainingItem[]) => {
@@ -158,6 +183,49 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig })
               <div className="space-y-2">
                 <Label htmlFor="goal" className="text-sm font-medium text-slate-800">Mục tiêu trò chuyện</Label>
                 <Input id="goal" placeholder="VD: Bán hàng, giải đáp" value={config.goal} onChange={(e) => handleFieldChange('goal', e.target.value)} className="bg-slate-100/70 border-slate-200" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white rounded-2xl shadow-lg shadow-slate-200/30 border border-slate-200/80">
+            <CardHeader className="p-6">
+              <CardTitle className="text-xl font-bold text-slate-900">Tham Số Cấu Hình Đầu Ra</CardTitle>
+              <CardDescription className="text-sm text-slate-500 pt-1">Kiểm soát cách LLM tạo ra phản hồi.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6 pt-0 space-y-6">
+              <div>
+                <Label className="flex justify-between text-sm font-medium text-slate-800"><span>Temperature:</span><span>{config.temperature}</span></Label>
+                <Slider value={[config.temperature]} onValueChange={(val) => handleSliderChange('temperature', val)} max={1} step={0.05} />
+                <p className="text-xs text-slate-500">Thấp: Chính xác, cao: Sáng tạo.</p>
+              </div>
+              <div>
+                <Label className="flex justify-between text-sm font-medium text-slate-800"><span>Top-P:</span><span>{config.topP}</span></Label>
+                <Slider value={[config.topP]} onValueChange={(val) => handleSliderChange('topP', val)} max={1} step={0.01} />
+                <p className="text-xs text-slate-500">Chọn token dựa trên tổng xác suất.</p>
+              </div>
+              <div>
+                <Label htmlFor="max-tokens" className="text-sm font-medium text-slate-800">Max Tokens</Label>
+                <Input id="max-tokens" type="number" value={config.maxTokens} onChange={e => handleNumericFieldChange('maxTokens', e.target.value)} className="bg-slate-100/70 border-slate-200" />
+                <p className="text-xs text-slate-500">Giới hạn độ dài tối đa của phản hồi.</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white rounded-2xl shadow-lg shadow-slate-200/30 border border-slate-200/80">
+            <CardHeader className="p-6">
+              <CardTitle className="text-xl font-bold text-slate-900">Kỹ Thuật Nâng Cao</CardTitle>
+              <CardDescription className="text-sm text-slate-500 pt-1">Áp dụng các kỹ thuật để cải thiện khả năng suy luận của mô hình.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6 pt-0">
+              <div className="flex items-center justify-between p-3 border rounded-lg bg-slate-50/50">
+                <div className="flex items-center gap-3">
+                  <BrainCircuit className="h-5 w-5 text-blue-600" />
+                  <div>
+                    <Label htmlFor="cot-switch">Chain of Thought (CoT)</Label>
+                    <p className="text-xs text-muted-foreground">Thêm "Let's think step by step." để AI suy luận logic hơn.</p>
+                  </div>
+                </div>
+                <Switch id="cot-switch" checked={config.useCoT} onCheckedChange={(checked) => handleSwitchChange('useCoT', checked)} />
               </div>
             </CardContent>
           </Card>

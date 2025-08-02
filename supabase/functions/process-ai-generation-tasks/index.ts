@@ -176,13 +176,27 @@ serve(async (req) => {
         finalPrompt = buildCommentPrompt(basePrompt, task.config);
       }
 
+      if (library.config.useCoT) {
+        finalPrompt += "\n\nLet's think step by step.";
+      }
+
       await supabaseAdmin.from('ai_generation_tasks').update({ progress_step: 'Đang gửi yêu cầu đến AI...' }).eq('id', task.id);
 
       const modelToUse = aiSettings.gemini_content_model || 'gemini-pro';
+      
+      const generationConfig = {
+        temperature: library.config.temperature ?? 0.7,
+        topP: library.config.topP ?? 0.95,
+        maxOutputTokens: library.config.maxTokens ?? 2048,
+      };
+
       const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${aiSettings.google_gemini_api_key}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: finalPrompt }] }] }),
+          body: JSON.stringify({ 
+            contents: [{ parts: [{ text: finalPrompt }] }],
+            generationConfig: generationConfig
+          }),
       });
 
       const geminiData = await geminiRes.json();
