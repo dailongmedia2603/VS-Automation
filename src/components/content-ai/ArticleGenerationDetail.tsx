@@ -325,7 +325,13 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
 
               <div className="space-y-2">
                 <Label>Định hướng nội dung</Label>
-                <Textarea value={config.direction} onChange={e => handleConfigChange('direction', e.target.value)} placeholder="Nhập định hướng chi tiết cho bài viết..." className="min-h-[200px]" />
+                <Textarea value={config.direction} onChange={e => handleConfigChange('direction', e.target.value)} placeholder="Nhập định hướng chi tiết cho bài viết..." className="min-h-[150px]" />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="reference-example">Ví dụ tham khảo</Label>
+                <Textarea id="reference-example" value={config.referenceExample || ''} onChange={e => handleConfigChange('referenceExample', e.target.value)} placeholder="Dán một bài viết hoặc đoạn văn mẫu vào đây..." className="min-h-[150px]" />
+                <p className="text-xs text-muted-foreground">AI sẽ tham khảo văn phong, cách xưng hô, giọng điệu từ ví dụ này nhưng không sao chép nội dung.</p>
               </div>
             </div>
             <div className="flex justify-end px-6">

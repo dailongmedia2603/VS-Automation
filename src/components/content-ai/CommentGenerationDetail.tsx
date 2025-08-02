@@ -371,6 +371,11 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                 <div className="space-y-2"><Label>Ngành</Label><Select value={config.libraryId} onValueChange={v => handleConfigChange('libraryId', v)}><SelectTrigger><SelectValue placeholder="Chọn thư viện prompt" /></SelectTrigger><SelectContent>{promptLibraries.map(lib => (<SelectItem key={lib.id} value={String(lib.id)}>{lib.name}</SelectItem>))}</SelectContent></Select></div>
                 <div className="space-y-2"><Label>Nội dung Post</Label><Textarea value={config.postContent} onChange={e => handleConfigChange('postContent', e.target.value)} placeholder="Dán nội dung bài viết cần bình luận..." className="min-h-[120px]" /></div>
                 <div className="space-y-2"><Label>Định hướng comment</Label><Textarea value={config.commentDirection} onChange={e => handleConfigChange('commentDirection', e.target.value)} placeholder="Nhập định hướng chi tiết..." className="min-h-[80px]" /></div>
+                <div className="space-y-2">
+                  <Label htmlFor="reference-example">Ví dụ tham khảo</Label>
+                  <Textarea id="reference-example" value={config.referenceExample || ''} onChange={e => handleConfigChange('referenceExample', e.target.value)} placeholder="Dán một bài viết hoặc đoạn văn mẫu vào đây..." className="min-h-[150px]" />
+                  <p className="text-xs text-muted-foreground">AI sẽ tham khảo văn phong, cách xưng hô, giọng điệu từ ví dụ này nhưng không sao chép nội dung.</p>
+                </div>
               </div>
               <div className="space-y-4">
                 <div className="space-y-2">
@@ -447,20 +452,8 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
               {mandatoryConditions.map((cond) => (
                 <div key={cond.id} className="flex items-center gap-2 p-2 border rounded-lg bg-white">
                   <ShieldCheck className="h-5 w-5 text-red-500 flex-shrink-0" />
-                  <Input 
-                    value={cond.content} 
-                    onChange={(e) => handleConditionChange(cond.id, e.target.value)} 
-                    placeholder="VD: Không được nhắc đến giá sản phẩm" 
-                    className="bg-transparent flex-1 border-none focus-visible:ring-0 focus-visible:ring-offset-0" 
-                  />
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    onClick={() => handleRemoveCondition(cond.id)}
-                    className="flex-shrink-0"
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                  <Input value={cond.content} onChange={(e) => handleConditionChange(cond.id, e.target.value)} placeholder="VD: Không được nhắc đến giá sản phẩm" className="bg-transparent flex-1 border-none focus-visible:ring-0 focus-visible:ring-offset-0" />
+                  <Button variant="ghost" size="icon" onClick={() => handleRemoveCondition(cond.id)} className="flex-shrink-0"><Trash2 className="h-4 w-4 text-destructive" /></Button>
                 </div>
               ))}
             </div>
