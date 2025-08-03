@@ -33,6 +33,14 @@ type MandatoryCondition = { id: string; content: string; };
 type StructureLibrary = { id: number; name: string; };
 type ArticleStructure = { id: number; library_id: number; name: string; description: string | null; structure_content: string | null; };
 
+const formatMapping: Record<string, string> = {
+  question: 'Đặt câu hỏi / thảo luận',
+  review: 'Review',
+  sharing: 'Chia sẻ',
+  comparison: 'So sánh',
+  storytelling: 'Story telling',
+};
+
 interface ArticleGenerationDetailProps {
   project: Project;
   item: ProjectItem;
@@ -503,7 +511,7 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
                   <TableHead>STT</TableHead>
                   <TableHead>Nội dung bài viết</TableHead>
                   <TableHead>Dạng bài</TableHead>
-                  <TableHead className="text-right">Thao tác</TableHead>
+                  <TableHead>Định hướng</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -521,26 +529,14 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
                   <TableRow key={result.id} className={cn(highlightedIds.includes(result.id) && "bg-green-50 hover:bg-green-100")}>
                     <TableCell><Checkbox checked={selectedIds.includes(result.id)} onCheckedChange={() => handleSelectRow(result.id)} /></TableCell>
                     <TableCell>{index + 1}</TableCell>
-                    <TableCell className="max-w-2xl">
+                    <TableCell className="max-w-xl">
                       <div className="prose prose-sm max-w-none prose-slate">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.content}</ReactMarkdown>
                       </div>
                     </TableCell>
-                    <TableCell><Badge variant="outline">{result.type}</Badge></TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                          <DropdownMenuItem>
-                            <Edit className="mr-2 h-4 w-4" />Sửa
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive">
-                            <Trash2 className="mr-2 h-4 w-4" />Xóa
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                    <TableCell><Badge variant="outline">{formatMapping[result.type] || result.type}</Badge></TableCell>
+                    <TableCell className="max-w-xs">
+                      <p className="line-clamp-3 text-sm text-muted-foreground">{config.direction}</p>
                     </TableCell>
                   </TableRow>
                 )) : !isGenerating && (<TableRow><TableCell colSpan={5} className="text-center h-24">Chưa có kết quả nào.</TableCell></TableRow>)}
