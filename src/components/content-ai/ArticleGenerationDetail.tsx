@@ -57,6 +57,7 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
   const [searchTerm, setSearchTerm] = useState('');
   const [isLibraryDialogOpen, setIsLibraryDialogOpen] = useState(false);
   const [articlesToRegenerate, setArticlesToRegenerate] = useState<string[]>([]);
+  const [highlightedIds, setHighlightedIds] = useState<string[]>([]);
 
   const [structureLibraries, setStructureLibraries] = useState<StructureLibrary[]>([]);
   const [structures, setStructures] = useState<ArticleStructure[]>([]);
@@ -141,6 +142,7 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
     setIsGenerating(true);
     const toastId = showLoading("AI đang viết bài, vui lòng chờ...");
     try {
+      const oldResults = JSON.parse(item.content || '[]') as GeneratedArticle[];
       const { data: updatedItem, error } = await supabase.functions.invoke('create-ai-generation-task', {
         body: { itemId: item.id, config: { ...config, mandatoryConditions } }
       });
@@ -151,6 +153,11 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
       }
       if (updatedItem.error) throw new Error(updatedItem.error);
       
+      const newResults = JSON.parse(updatedItem.content || '[]') as GeneratedArticle[];
+      const oldIds = new Set(oldResults.map(r => r.id));
+      const newIds = newResults.filter(r => !oldIds.has(r.id)).map(r => r.id);
+      setHighlightedIds(newIds);
+
       onSave(updatedItem);
       dismissToast(toastId);
       showSuccess("Đã tạo bài viết thành công!");
@@ -196,6 +203,7 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
       }
       if (updatedItem.error) throw new Error(updatedItem.error);
 
+      setHighlightedIds(articlesToRegenerate);
       onSave(updatedItem);
       dismissToast(toastId);
       showSuccess("Đã tạo lại bài viết theo feedback!");
@@ -510,7 +518,7 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
                   </TableRow>
                 )}
                 {filteredResults.length > 0 ? filteredResults.map((result, index) => (
-                  <TableRow key={result.id}>
+                  <TableRow key={result.id} className={cn(highlightedIds.includes(result.id) && "bg-green-50 hover:bg-green-100")}>
                     <TableCell><Checkbox checked={selectedIds.includes(result.id)} onCheckedChange={() => handleSelectRow(result.id)} /></TableCell>
                     <TableCell>{index + 1}</TableCell>
                     <TableCell className="max-w-2xl">
