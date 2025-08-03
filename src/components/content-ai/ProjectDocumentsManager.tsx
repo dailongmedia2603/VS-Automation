@@ -9,12 +9,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, Search, Trash2, Loader2, Edit, FileText, User } from 'lucide-react';
+import { PlusCircle, Search, Trash2, Loader2, Edit, FileText, User, Lightbulb } from 'lucide-react';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { type User as SupabaseUser } from '@supabase/supabase-js';
 import { useAuth } from '@/contexts/AuthContext';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 type Document = {
   id: number;
@@ -244,6 +245,22 @@ export const ProjectDocumentsManager = ({ projectId }: { projectId: string }) =>
           </CardContent>
         )}
       </Card>
+
+      <Alert className="bg-yellow-50 border-yellow-200 text-yellow-800">
+        <Lightbulb className="h-4 w-4 !text-yellow-600" />
+        <AlertTitle className="font-semibold !text-yellow-900">Gợi ý</AlertTitle>
+        <AlertDescription className="text-yellow-700">
+          Để AI thông tin và viết đúng hơn, nên bổ sung đầy đủ các tài liệu bao gồm:
+          <ul className="list-disc pl-5 mt-2 space-y-1">
+            <li>Danh sách xưng hô (để AI chủ động xưng hô đúng theo mong muốn)</li>
+            <li>Thông tin sản phẩm</li>
+            <li>Khách hàng mục tiêu</li>
+            <li>Lợi ích sản phẩm (sản phẩm giúp được gì cho khách hàng)</li>
+            <li>Vấn đề & nhu cầu của khách hàng</li>
+          </ul>
+        </AlertDescription>
+      </Alert>
+
       <div className="flex-1 overflow-y-auto">
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
