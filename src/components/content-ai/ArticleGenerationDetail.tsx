@@ -20,6 +20,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import * as XLSX from 'xlsx';
 import { ConditionLibraryDialog } from './ConditionLibraryDialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 type Project = { id: number; name: string; };
 type ProjectItem = { id: number; name: string; type: 'article' | 'comment'; content: string | null; config: any; };
@@ -53,6 +54,7 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
   const [isBulkDeleteAlertOpen, setIsBulkDeleteAlertOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isLibraryDialogOpen, setIsLibraryDialogOpen] = useState(false);
+  const [articlesToRegenerate, setArticlesToRegenerate] = useState<string[]>([]);
 
   const [structureLibraries, setStructureLibraries] = useState<StructureLibrary[]>([]);
   const [structures, setStructures] = useState<ArticleStructure[]>([]);
@@ -159,8 +161,50 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
   };
 
   const handleRegenerateWithFeedback = async () => {
-    // This function will need a new edge function `regenerate-ai-articles`
-    showError("Tính năng này đang được phát triển!");
+    if (!feedbackText.trim()) {
+      showError("Vui lòng nhập nội dung feedback.");
+      return;
+    }
+    if (articlesToRegenerate.length === 0) {
+      showError("Vui lòng chọn ít nhất một bài viết để tạo lại.");
+      return;
+    }
+    setIsGenerating(true);
+    setIsFeedbackDialogOpen(false);
+    const toastId = showLoading("AI đang tiếp nhận feedback và tạo lại...");
+    try {
+      const { data: updatedItem, error } = await supabase.functions.invoke('regenerate-ai-articles', {
+        body: {
+          itemId: item.id,
+          feedback: feedbackText,
+          existingArticles: results,
+          articleIdsToRegenerate: articlesToRegenerate,
+        }
+      });
+
+      if (error) {
+        let errorMessage = error.message;
+        if (error.context && typeof error.context.json === 'function') {
+          try {
+            const errorBody = await error.context.json();
+            if (errorBody.error) errorMessage = errorBody.error;
+          } catch (e) { /* Ignore parsing error */ }
+        }
+        throw new Error(errorMessage);
+      }
+      if (updatedItem.error) throw new Error(updatedItem.error);
+
+      onSave(updatedItem);
+      dismissToast(toastId);
+      showSuccess("Đã tạo lại bài viết theo feedback!");
+      setFeedbackText('');
+      setArticlesToRegenerate([]);
+    } catch (err: any) {
+      dismissToast(toastId);
+      showError(`Tạo lại thất bại: ${err.message}`);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleConditionChange = (id: string, content: string) => {
@@ -499,13 +543,52 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
       <GenerationLogDialog isOpen={isLogOpen} onOpenChange={setIsLogOpen} logs={logs} isLoading={isLoadingLogs} onClearLogs={handleClearLogs} />
       
       <Dialog open={isFeedbackDialogOpen} onOpenChange={setIsFeedbackDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Feedback & Tạo lại</DialogTitle>
-            <DialogDescription>Nhập feedback để AI tạo lại bài viết tốt hơn.</DialogDescription>
+            <DialogDescription>Chọn bài viết và nhập feedback để AI tạo lại nội dung tốt hơn.</DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <Textarea placeholder="Ví dụ: Bài viết cần tập trung hơn vào lợi ích cho khách hàng..." value={feedbackText} onChange={(e) => setFeedbackText(e.target.value)} className="min-h-[120px]" />
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label>Chọn bài viết để tạo lại</Label>
+              <ScrollArea className="h-40 border rounded-md p-2">
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="select-all-regenerate"
+                      checked={articlesToRegenerate.length === results.length}
+                      onCheckedChange={(checked) => setArticlesToRegenerate(checked ? results.map(r => r.id) : [])}
+                    />
+                    <Label htmlFor="select-all-regenerate" className="font-medium">Chọn tất cả</Label>
+                  </div>
+                  {results.map((result, index) => (
+                    <div key={result.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`regen-${result.id}`}
+                        checked={articlesToRegenerate.includes(result.id)}
+                        onCheckedChange={(checked) => {
+                          setArticlesToRegenerate(prev => 
+                            checked ? [...prev, result.id] : prev.filter(id => id !== result.id)
+                          );
+                        }}
+                      />
+                      <Label htmlFor={`regen-${result.id}`} className="font-normal text-sm truncate">
+                        STT {index + 1}: {result.content.substring(0, 80)}...
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+            <div className="space-y-2">
+              <Label>Nội dung Feedback</Label>
+              <Textarea
+                placeholder="Ví dụ: Bài viết cần tập trung hơn vào lợi ích cho khách hàng..."
+                value={feedbackText}
+                onChange={(e) => setFeedbackText(e.target.value)}
+                className="min-h-[120px]"
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsFeedbackDialogOpen(false)}>Hủy</Button>
