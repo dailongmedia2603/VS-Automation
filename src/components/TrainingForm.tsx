@@ -50,7 +50,7 @@ export const initialConfig: TrainingConfig = {
   documents: [],
   promptTemplate: [
     { id: crypto.randomUUID(), title: 'YÊU CẦU TƯ VẤN CHO FANPAGE', content: 'Bạn là một trợ lý AI cho fanpage. Hãy dựa vào các thông tin dưới đây để tư vấn cho khách hàng.' },
-    { id: crypto.randomUUID(), title: 'THÔNG TIN HUẤN LUYỆN CHUNG', content: '- **Vai trò của bạn:** {{role}}\n- **Lĩnh vực kinh doanh:** {{industry}}\n- **Phong cách:** {{style}}\n- **Tông giọng:** {{tone}}\n- **Ngôn ngữ:** {{language}}\n- **Mục tiêu cuộc trò chuyện:** {{goal}}' },
+    { id: crypto.randomUUID(), title: 'THÔNG TIN HUẤN LUYỆN CHUNG', content: '- **Vai trò của bạn:** {{role}}\n- **Lĩnh vực kinh doanh:** {{industry}}\n- **Phong cách:** {{style}}\n- **Tông giọng:** {{tone}}\n- **Ngôn ngữ:** {{language}}\n- **Mục tiêu cần đạt:** {{goal}}' },
     { id: crypto.randomUUID(), title: 'LỊCH SỬ CUỘC TRÒ CHUYỆN', content: 'Dưới đây là toàn bộ lịch sử trò chuyện. Hãy phân tích để hiểu ngữ cảnh và trả lời tin nhắn cuối cùng của khách hàng.\n---\n{{conversation_history}}\n---' },
     { id: crypto.randomUUID(), title: 'TÀI LIỆU NỘI BỘ THAM KHẢO', content: '{{document_context}}' },
     { id: crypto.randomUUID(), title: 'HÀNH ĐỘNG', content: 'Dựa vào TOÀN BỘ thông tin trên, hãy tạo một câu trả lời duy nhất cho tin nhắn cuối cùng của khách hàng.\n**QUAN TRỌNG:** Chỉ trả lời với nội dung tin nhắn, không thêm bất kỳ tiền tố nào như "AI:", "Trả lời:", hay lời chào nào nếu không cần thiết theo ngữ cảnh.' },

@@ -7,6 +7,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const formatMapping: Record<string, string> = {
+  question: 'Đặt câu hỏi / thảo luận',
+  review: 'Review',
+  sharing: 'Chia sẻ',
+  comparison: 'So sánh',
+  storytelling: 'Story telling',
+};
+
 const buildBasePrompt = (libraryConfig, documentContext) => {
   const config = libraryConfig || {};
   const dataMap = {
@@ -92,6 +100,8 @@ const buildArticlePrompt = (basePrompt, config) => {
     `;
   }
 
+  const translatedFormat = formatMapping[config.format] || config.format || 'Không có';
+
   const finalPrompt = `
     ${basePrompt}
 
@@ -99,7 +109,7 @@ const buildArticlePrompt = (basePrompt, config) => {
     **THÔNG TIN CHI TIẾT BÀI VIẾT:**
 
     **Dạng bài:**
-    ${config.format || 'Không có'}
+    ${translatedFormat}
 
     **Định hướng nội dung chi tiết:**
     ${config.direction || 'Không có'}
