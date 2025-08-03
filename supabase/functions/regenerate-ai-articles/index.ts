@@ -116,20 +116,6 @@ serve(async (req) => {
     const { libraryId, direction } = config;
     if (!libraryId) throw new Error("Config is missing libraryId.");
 
-    // Fetch the full structure object if an ID is present in the config
-    if (config.structureId) {
-      const { data: structure, error: structError } = await supabaseAdmin
-        .from('article_structures')
-        .select('*')
-        .eq('id', config.structureId)
-        .single();
-      if (structError) {
-        console.warn(`Could not fetch structure with ID ${config.structureId}: ${structError.message}`);
-      } else {
-        config.structure = structure; // Attach the full structure object to the config
-      }
-    }
-
     const { data: aiSettings, error: settingsError } = await supabaseAdmin.from('ai_settings').select('google_gemini_api_key, gemini_content_model').eq('id', 1).single();
     if (settingsError || !aiSettings.google_gemini_api_key) throw new Error("Chưa cấu hình API Google Gemini.");
 

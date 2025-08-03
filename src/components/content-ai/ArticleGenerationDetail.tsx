@@ -33,14 +33,6 @@ type MandatoryCondition = { id: string; content: string; };
 type StructureLibrary = { id: number; name: string; };
 type ArticleStructure = { id: number; library_id: number; name: string; description: string | null; structure_content: string | null; };
 
-const formatMapping: Record<string, string> = {
-  question: 'Đặt câu hỏi / thảo luận',
-  review: 'Review',
-  sharing: 'Chia sẻ',
-  comparison: 'So sánh',
-  storytelling: 'Story telling',
-};
-
 interface ArticleGenerationDetailProps {
   project: Project;
   item: ProjectItem;
@@ -356,19 +348,6 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
                     </div>
                     <div className="space-y-2">
                       <Label>Dạng bài</Label>
-                      <Select value={config.format} onValueChange={v => handleConfigChange('format', v)}>
-                        <SelectTrigger><SelectValue placeholder="Chọn dạng bài" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="question">Đặt câu hỏi / thảo luận</SelectItem>
-                          <SelectItem value="review">Review</SelectItem>
-                          <SelectItem value="sharing">Chia sẻ</SelectItem>
-                          <SelectItem value="comparison">So sánh</SelectItem>
-                          <SelectItem value="storytelling">Story telling</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Cấu trúc bài viết</Label>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <Select value={config.structureLibraryId} onValueChange={v => { handleConfigChange('structureLibraryId', v); handleConfigChange('structureId', null); }}>
                           <SelectTrigger><SelectValue placeholder="Chọn thư viện cấu trúc" /></SelectTrigger>
@@ -524,7 +503,7 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
                   <TableHead>STT</TableHead>
                   <TableHead>Nội dung bài viết</TableHead>
                   <TableHead>Dạng bài</TableHead>
-                  <TableHead>Định hướng</TableHead>
+                  <TableHead className="text-right">Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -542,14 +521,26 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
                   <TableRow key={result.id} className={cn(highlightedIds.includes(result.id) && "bg-green-50 hover:bg-green-100")}>
                     <TableCell><Checkbox checked={selectedIds.includes(result.id)} onCheckedChange={() => handleSelectRow(result.id)} /></TableCell>
                     <TableCell>{index + 1}</TableCell>
-                    <TableCell className="max-w-xl">
+                    <TableCell className="max-w-2xl">
                       <div className="prose prose-sm max-w-none prose-slate">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.content}</ReactMarkdown>
                       </div>
                     </TableCell>
-                    <TableCell><Badge variant="outline">{formatMapping[result.type] || result.type}</Badge></TableCell>
-                    <TableCell className="max-w-xs">
-                      <p className="line-clamp-3 text-sm text-muted-foreground">{config.direction}</p>
+                    <TableCell><Badge variant="outline">{result.type}</Badge></TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          <DropdownMenuItem>
+                            <Edit className="mr-2 h-4 w-4" />Sửa
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive">
+                            <Trash2 className="mr-2 h-4 w-4" />Xóa
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 )) : !isGenerating && (<TableRow><TableCell colSpan={5} className="text-center h-24">Chưa có kết quả nào.</TableCell></TableRow>)}
