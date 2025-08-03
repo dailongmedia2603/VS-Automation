@@ -18,7 +18,6 @@ const formatMapping: Record<string, string> = {
 const buildBasePrompt = (libraryConfig, documentContext) => {
   const config = libraryConfig || {};
 
-  // Define the correct, hardcoded structure for the "THÔNG TIN HUẤN LUYỆN CHUNG" section
   const trainingInfoContent = [
     `- **Vai trò của bạn:** ${config.role || '(Chưa cung cấp)'}`,
     `- **Lĩnh vực kinh doanh:** ${config.industry || '(Chưa cung cấp)'}`,
@@ -28,18 +27,14 @@ const buildBasePrompt = (libraryConfig, documentContext) => {
     `- **Mục tiêu cần đạt:** ${config.goal || '(Chưa cung cấp)'}`
   ].join('\n');
 
-  // Define the full, correct prompt structure
   const promptStructure = [
-    { title: 'YÊU CẦU TƯ VẤN CHO FANPAGE', content: 'Bạn là một trợ lý AI cho fanpage. Hãy dựa vào các thông tin dưới đây để tư vấn cho khách hàng.' },
+    { title: 'YÊU CẦU VIẾT NỘI DUNG TỰ NHIÊN NHƯ NGƯỜI THẬT', content: 'Bạn là một trợ lý AI viết nội dung bài viết / comment tự nhiên như người dùng thật. Hãy dựa vào các thông tin dưới đây để xây dựng nội dung chất lượng và tự nhiên nhé.' },
     { title: 'THÔNG TIN HUẤN LUYỆN CHUNG', content: trainingInfoContent },
-    { title: 'LỊCH SỬ CUỘC TRÒ CHUYỆN', content: 'Dưới đây là toàn bộ lịch sử trò chuyện. Hãy phân tích để hiểu ngữ cảnh và trả lời tin nhắn cuối cùng của khách hàng.\n---\n{{conversation_history}}\n---' },
     { title: 'TÀI LIỆU NỘI BỘ THAM KHẢO', content: '{{document_context}}' },
-    { title: 'HÀNH ĐỘNG', content: 'Dựa vào TOÀN BỘ thông tin trên, hãy tạo một câu trả lời duy nhất cho tin nhắn cuối cùng của khách hàng.\n**QUAN TRỌNG:** Chỉ trả lời với nội dung tin nhắn, không thêm bất kỳ tiền tố nào như "AI:", "Trả lời:", hay lời chào nào nếu không cần thiết theo ngữ cảnh.' }
+    { title: 'HÀNH ĐỘNG', content: 'Dựa vào TOÀN BỘ thông tin, hãy tạo nội dung đúng yêu cầu, tự nhiên như người thật, không được có dấu hiệu máy móc, khô cứng, seeding' }
   ];
 
-  // Replace the dynamic placeholders
   const dataMap = {
-    '{{conversation_history}}': '(Lịch sử trò chuyện không áp dụng cho tác vụ này)',
     '{{document_context}}': documentContext || '(Không có tài liệu tham khảo liên quan)',
   };
 

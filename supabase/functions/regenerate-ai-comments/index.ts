@@ -9,20 +9,27 @@ const corsHeaders = {
 
 const buildBasePrompt = (libraryConfig, documentContext) => {
   const config = libraryConfig || {};
+  const trainingInfoContent = [
+    `- **Vai trò của bạn:** ${config.role || '(Chưa cung cấp)'}`,
+    `- **Lĩnh vực kinh doanh:** ${config.industry || '(Chưa cung cấp)'}`,
+    `- **Phong cách:** ${config.style || '(Chưa cung cấp)'}`,
+    `- **Tông giọng:** ${config.tone || '(Chưa cung cấp)'}`,
+    `- **Ngôn ngữ:** ${config.language || '(Chưa cung cấp)'}`,
+    `- **Mục tiêu cần đạt:** ${config.goal || '(Chưa cung cấp)'}`
+  ].join('\n');
+
+  const promptStructure = [
+    { title: 'YÊU CẦU VIẾT NỘI DUNG TỰ NHIÊN NHƯ NGƯỜI THẬT', content: 'Bạn là một trợ lý AI viết nội dung bài viết / comment tự nhiên như người dùng thật. Hãy dựa vào các thông tin dưới đây để xây dựng nội dung chất lượng và tự nhiên nhé.' },
+    { title: 'THÔNG TIN HUẤN LUYỆN CHUNG', content: trainingInfoContent },
+    { title: 'TÀI LIỆU NỘI BỘ THAM KHẢO', content: '{{document_context}}' },
+    { title: 'HÀNH ĐỘNG', content: 'Dựa vào TOÀN BỘ thông tin, hãy tạo nội dung đúng yêu cầu, tự nhiên như người thật, không được có dấu hiệu máy móc, khô cứng, seeding' }
+  ];
+  
   const dataMap = {
-    '{{industry}}': config.industry || '(Chưa cung cấp)',
-    '{{role}}': config.role || '(Chưa cung cấp)',
-    '{{style}}': config.style || '(Chưa cung cấp)',
-    '{{tone}}': config.tone || '(Chưa cung cấp)',
-    '{{language}}': config.language || '(Chưa cung cấp)',
-    '{{goal}}': config.goal || '(Chưa cung cấp)',
-    '{{conversation_history}}': '(Lịch sử trò chuyện không áp dụng cho tác vụ này)',
     '{{document_context}}': documentContext || '(Không có tài liệu tham khảo liên quan)',
   };
 
-  const promptTemplate = libraryConfig.promptTemplate || [];
-  
-  return promptTemplate.map(block => {
+  return promptStructure.map(block => {
     let content = block.content;
     for (const [key, value] of Object.entries(dataMap)) {
       content = content.replace(new RegExp(key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g'), String(value));
