@@ -7,7 +7,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Settings, Save, Loader2, Trash2, FileText, Sparkles, Bot, ShieldCheck, MessageSquarePlus, PlusCircle, Copy, ChevronDown, Search, Download, MoreHorizontal, Edit, Library, LayoutTemplate, FileInput, ListOrdered, Compass } from 'lucide-react';
+import { Settings, Save, Loader2, Trash2, FileText, Sparkles, Bot, ShieldCheck, MessageSquarePlus, PlusCircle, Copy, ChevronDown, Search, Download, MoreHorizontal, Edit, Library, LayoutTemplate, FileInput, ListOrdered, Compass, Check } from 'lucide-react';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { GenerationLogDialog } from './GenerationLogDialog';
 import ReactMarkdown from 'react-markdown';
@@ -20,7 +20,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import * as XLSX from 'xlsx';
 import { ConditionLibraryDialog } from './ConditionLibraryDialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from '@/lib/utils';
 
 type Project = { id: number; name: string; };
 type ProjectItem = { id: number; name: string; type: 'article' | 'comment'; content: string | null; config: any; };
@@ -551,34 +553,64 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
           <div className="py-4 space-y-4">
             <div className="space-y-2">
               <Label>Chọn bài viết để tạo lại</Label>
-              <ScrollArea className="h-40 border rounded-md p-2">
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="select-all-regenerate"
-                      checked={articlesToRegenerate.length === results.length}
-                      onCheckedChange={(checked) => setArticlesToRegenerate(checked ? results.map(r => r.id) : [])}
-                    />
-                    <Label htmlFor="select-all-regenerate" className="font-medium">Chọn tất cả</Label>
-                  </div>
-                  {results.map((result, index) => (
-                    <div key={result.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`regen-${result.id}`}
-                        checked={articlesToRegenerate.includes(result.id)}
-                        onCheckedChange={(checked) => {
-                          setArticlesToRegenerate(prev => 
-                            checked ? [...prev, result.id] : prev.filter(id => id !== result.id)
-                          );
-                        }}
-                      />
-                      <Label htmlFor={`regen-${result.id}`} className="font-normal text-sm truncate">
-                        STT {index + 1}: {result.content.substring(0, 80)}...
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start font-normal">
+                    {articlesToRegenerate.length > 0
+                      ? `Đã chọn ${articlesToRegenerate.length} bài viết`
+                      : "Chọn bài viết..."}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Tìm bài viết..." />
+                    <CommandList>
+                      <CommandEmpty>Không tìm thấy bài viết.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          onSelect={() => {
+                            if (articlesToRegenerate.length === results.length) {
+                              setArticlesToRegenerate([]);
+                            } else {
+                              setArticlesToRegenerate(results.map(r => r.id));
+                            }
+                          }}
+                        >
+                          <div className={cn(
+                            "mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+                            articlesToRegenerate.length === results.length ? "bg-primary text-primary-foreground" : "opacity-50 [&_svg]:invisible"
+                          )}>
+                            <Check className={cn("h-4 w-4")} />
+                          </div>
+                          Chọn tất cả
+                        </CommandItem>
+                        {results.map((result, index) => (
+                          <CommandItem
+                            key={result.id}
+                            onSelect={() => {
+                              setArticlesToRegenerate(prev =>
+                                prev.includes(result.id)
+                                  ? prev.filter(id => id !== result.id)
+                                  : [...prev, result.id]
+                              );
+                            }}
+                          >
+                            <div className={cn(
+                              "mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+                              articlesToRegenerate.includes(result.id) ? "bg-primary text-primary-foreground" : "opacity-50 [&_svg]:invisible"
+                            )}>
+                              <Check className={cn("h-4 w-4")} />
+                            </div>
+                            <span className="truncate">
+                              STT {index + 1}: {result.content.substring(0, 50)}...
+                            </span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="space-y-2">
               <Label>Nội dung Feedback</Label>
