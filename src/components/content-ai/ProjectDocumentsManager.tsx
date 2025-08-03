@@ -3,19 +3,20 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, Search, Trash2, Loader2, Edit, FileText, User, Lightbulb } from 'lucide-react';
+import { PlusCircle, Search, Trash2, Loader2, Edit, FileText, User, Lightbulb, MoreHorizontal } from 'lucide-react';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { type User as SupabaseUser } from '@supabase/supabase-js';
 import { useAuth } from '@/contexts/AuthContext';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 type Document = {
   id: number;
@@ -112,23 +113,36 @@ const DocumentViewDialog = ({ document, isOpen, onOpenChange }: { document: Docu
 
 const DocumentCard = ({ document, onSelect, isSelected, onEdit, onDelete, onView }: { document: Document, onSelect: (id: number, checked: boolean) => void, isSelected: boolean, onEdit: () => void, onDelete: () => void, onView: () => void }) => {
   return (
-    <Card className="group flex flex-col transition-all hover:shadow-md hover:-translate-y-1 rounded-2xl">
-      <CardHeader className="flex flex-row items-start gap-4 space-y-0 p-4">
-        <Checkbox checked={isSelected} onCheckedChange={(checked) => onSelect(document.id, !!checked)} className="mt-1" />
-        <div className="flex-1 cursor-pointer" onClick={onView}>
-          <CardTitle className="text-base">{document.title}</CardTitle>
-          <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{document.content}</p>
-        </div>
-      </CardHeader>
-      <CardContent className="p-4 pt-0 mt-auto">
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <div className="flex items-center gap-1.5"><User className="h-3 w-3" /><span>{document.creator_name || 'Không rõ'}</span></div>
-          <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit}><Edit className="h-4 w-4" /></Button>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onDelete}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+    <Card className="group flex flex-col transition-all duration-300 hover:shadow-lg hover:-translate-y-1 rounded-2xl bg-white">
+      <CardHeader className="flex-row items-start justify-between pb-2 p-4">
+        <div className="flex items-center gap-3">
+          <Checkbox checked={isSelected} onCheckedChange={(checked) => onSelect(document.id, !!checked)} />
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-blue-100 text-blue-600">
+            <FileText className="h-5 w-5" />
           </div>
         </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={onEdit}><Edit className="mr-2 h-4 w-4" />Sửa</DropdownMenuItem>
+            <DropdownMenuItem onSelect={onDelete} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </CardHeader>
+      <CardContent className="p-4 pt-0 flex-grow cursor-pointer" onClick={onView}>
+        <CardTitle className="text-base font-bold text-slate-800">{document.title}</CardTitle>
+        <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{document.content}</p>
       </CardContent>
+      <CardFooter className="p-4 pt-0">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <User className="h-3 w-3" />
+          <span>{document.creator_name || 'Không rõ'}</span>
+        </div>
+      </CardFooter>
     </Card>
   );
 };
