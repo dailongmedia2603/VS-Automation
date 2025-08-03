@@ -123,14 +123,29 @@ serve(async (req) => {
     if (libraryError || !library || !library.config) throw new Error("Không thể tải thư viện prompt.");
 
     let documentContext = '';
-    if (direction) {
-      const { data: embeddingData, error: embedError } = await supabaseAdmin.functions.invoke('embed-document', { body: { textToEmbed: direction } });
-      if (!embedError && !embeddingData.error) {
-        const { data: matchedDocs } = await supabaseAdmin.rpc('match_project_documents', {
-          p_project_id: config.projectId, p_query_embedding: embeddingData.embedding, p_match_threshold: 0.7, p_match_count: 3
-        });
-        if (matchedDocs && matchedDocs.length > 0) {
-          documentContext = matchedDocs.map(doc => `--- TÀI LIỆU: ${doc.title} ---\n${doc.content}`).join('\n\n');
+    const { relatedDocumentIds } = config;
+
+    if (relatedDocumentIds && Array.isArray(relatedDocumentIds) && relatedDocumentIds.length > 0) {
+      const { data: selectedDocs, error: docsError } = await supabaseAdmin
+        .from('documents')
+        .select('title, content')
+        .in('id', relatedDocumentIds);
+
+      if (docsError) {
+        console.warn("Could not fetch selected documents:", docsError.message);
+      } else if (selectedDocs && selectedDocs.length > 0) {
+        documentContext = selectedDocs.map(doc => `--- TÀI LIỆU: ${doc.title} ---\n${doc.content}`).join('\n\n');
+      }
+    } else {
+      if (direction) {
+        const { data: embeddingData, error: embedError } = await supabaseAdmin.functions.invoke('embed-document', { body: { textToEmbed: direction } });
+        if (!embedError && !embeddingData.error) {
+          const { data: matchedDocs } = await supabaseAdmin.rpc('match_project_documents', {
+            p_project_id: config.projectId, p_query_embedding: embeddingData.embedding, p_match_threshold: 0.7, p_match_count: 3
+          });
+          if (matchedDocs && matchedDocs.length > 0) {
+            documentContext = matchedDocs.map(doc => `--- TÀI LIỆU: ${doc.title} ---\n${doc.content}`).join('\n\n');
+          }
         }
       }
     }

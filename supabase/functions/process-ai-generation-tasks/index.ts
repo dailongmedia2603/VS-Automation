@@ -171,23 +171,41 @@ serve(async (req) => {
       if (libraryError || !library || !library.config) throw new Error("Không thể tải thư viện prompt hoặc thư viện chưa được cấu hình.");
       
       let documentContext = '';
-      const contextSource = item.type === 'article' ? direction : postContent;
-      if (contextSource) {
-        await supabaseAdmin.from('ai_generation_tasks').update({ progress_step: 'Đang tìm tài liệu liên quan...' }).eq('id', task.id);
-        const { data: embeddingData, error: embedError } = await supabaseAdmin.functions.invoke('embed-document', { body: { textToEmbed: contextSource } });
-        if (embedError || embeddingData.error) {
-          console.warn("Could not get embedding for context search:", embedError?.message || embeddingData.error);
-        } else {
-          const { data: matchedDocs, error: matchError } = await supabaseAdmin.rpc('match_project_documents', {
-            p_project_id: task.config.projectId,
-            p_query_embedding: embeddingData.embedding,
-            p_match_threshold: 0.7,
-            p_match_count: 3
-          });
-          if (matchError) {
-            console.warn("Could not match documents:", matchError.message);
-          } else if (matchedDocs && matchedDocs.length > 0) {
-            documentContext = matchedDocs.map(doc => `--- TÀI LIỆU: ${doc.title} ---\n${doc.content}`).join('\n\n');
+      const { relatedDocumentIds } = task.config;
+
+      if (relatedDocumentIds && Array.isArray(relatedDocumentIds) && relatedDocumentIds.length > 0) {
+        await supabaseAdmin.from('ai_generation_tasks').update({ progress_step: 'Đang tải tài liệu đã chọn...' }).eq('id', task.id);
+        
+        const { data: selectedDocs, error: docsError } = await supabaseAdmin
+          .from('documents')
+          .select('title, content')
+          .in('id', relatedDocumentIds);
+
+        if (docsError) {
+          console.warn("Could not fetch selected documents:", docsError.message);
+        } else if (selectedDocs && selectedDocs.length > 0) {
+          documentContext = selectedDocs.map(doc => `--- TÀI LIỆU: ${doc.title} ---\n${doc.content}`).join('\n\n');
+        }
+      } else {
+        // Fallback to semantic search if no documents are manually selected
+        const contextSource = item.type === 'article' ? direction : postContent;
+        if (contextSource) {
+          await supabaseAdmin.from('ai_generation_tasks').update({ progress_step: 'Đang tìm tài liệu liên quan...' }).eq('id', task.id);
+          const { data: embeddingData, error: embedError } = await supabaseAdmin.functions.invoke('embed-document', { body: { textToEmbed: contextSource } });
+          if (embedError || embeddingData.error) {
+            console.warn("Could not get embedding for context search:", embedError?.message || embeddingData.error);
+          } else {
+            const { data: matchedDocs, error: matchError } = await supabaseAdmin.rpc('match_project_documents', {
+              p_project_id: task.config.projectId,
+              p_query_embedding: embeddingData.embedding,
+              p_match_threshold: 0.7,
+              p_match_count: 3
+            });
+            if (matchError) {
+              console.warn("Could not match documents:", matchError.message);
+            } else if (matchedDocs && matchedDocs.length > 0) {
+              documentContext = matchedDocs.map(doc => `--- TÀI LIỆU: ${doc.title} ---\n${doc.content}`).join('\n\n');
+            }
           }
         }
       }

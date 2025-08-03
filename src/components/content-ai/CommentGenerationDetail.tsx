@@ -12,7 +12,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Settings, Save, Loader2, Search, Trash2, Download, FileText, PlusCircle, MoreHorizontal, Edit, Sparkles, Bot, ShieldCheck, ChevronDown, Copy, MessageSquarePlus, Library, FileInput, ListOrdered, Percent, Compass } from 'lucide-react';
+import { Settings, Save, Loader2, Search, Trash2, Download, FileText, PlusCircle, MoreHorizontal, Edit, Sparkles, Bot, ShieldCheck, ChevronDown, Copy, MessageSquarePlus, Library, FileInput, ListOrdered, Percent, Compass, Check } from 'lucide-react';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
@@ -21,6 +21,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ConditionLibraryDialog } from './ConditionLibraryDialog';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 
 type Project = { id: number; name: string; };
 type ProjectItem = { id: number; name: string; type: 'article' | 'comment'; content: string | null; config: any; };
@@ -29,6 +30,7 @@ type CommentRatio = { id: string; type: string; percentage: number; content: str
 type GeneratedComment = { id: string; content: string; type: string; metConditionIds: string[]; };
 type Log = { id: number; created_at: string; prompt: string; response: any; };
 type MandatoryCondition = { id: string; content: string; };
+type Document = { id: number; title: string; };
 
 interface CommentGenerationDetailProps {
   project: Project;
@@ -58,6 +60,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
   const [isFeedbackDialogOpen, setIsFeedbackDialogOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
   const [isLibraryDialogOpen, setIsLibraryDialogOpen] = useState(false);
+  const [projectDocuments, setProjectDocuments] = useState<Document[]>([]);
 
   useEffect(() => {
     const itemConfig = item.config || {};
@@ -92,7 +95,19 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
         setIsLoadingLogs(false);
     };
     fetchLogs();
-  }, [item]);
+
+    const fetchProjectDocuments = async () => {
+      if (!project?.id) return;
+      const { data, error } = await supabase
+        .from('documents')
+        .select('id, title')
+        .eq('project_id', project.id);
+      if (!error) {
+        setProjectDocuments(data || []);
+      }
+    };
+    fetchProjectDocuments();
+  }, [item, project]);
 
   const handleConfigChange = (field: string, value: any) => {
     setConfig((prev: any) => ({ ...prev, [field]: value }));
@@ -151,7 +166,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
     const toastId = showLoading("AI đang xử lý, vui lòng chờ...");
     try {
       const { data: updatedItem, error } = await supabase.functions.invoke('create-ai-generation-task', {
-        body: { itemId: item.id, config: { ...config, mandatoryConditions } }
+        body: { itemId: item.id, config: { ...config, mandatoryConditions, projectId: project.id } }
       });
       
       if (error) {
@@ -413,6 +428,48 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2"><Label>Số lượng comment</Label><Input type="number" value={config.quantity} onChange={e => handleConfigChange('quantity', e.target.value)} defaultValue={10} /></div>
+                    <div className="space-y-2">
+                      <Label>Tài liệu liên quan</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className="w-full justify-start font-normal">
+                            {(config.relatedDocumentIds || []).length > 0
+                              ? `Đã chọn ${(config.relatedDocumentIds || []).length} tài liệu`
+                              : "Chọn tài liệu..."}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Tìm tài liệu..." />
+                            <CommandList>
+                              <CommandEmpty>Không tìm thấy tài liệu.</CommandEmpty>
+                              <CommandGroup>
+                                {projectDocuments.map((doc) => (
+                                  <CommandItem
+                                    key={doc.id}
+                                    onSelect={() => {
+                                      const selected = config.relatedDocumentIds || [];
+                                      const newSelected = selected.includes(doc.id)
+                                        ? selected.filter((id: number) => id !== doc.id)
+                                        : [...selected, doc.id];
+                                      handleConfigChange('relatedDocumentIds', newSelected);
+                                    }}
+                                  >
+                                    <div className={cn(
+                                      "mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+                                      (config.relatedDocumentIds || []).includes(doc.id) ? "bg-primary text-primary-foreground" : "opacity-50 [&_svg]:invisible"
+                                    )}>
+                                      <Check className={cn("h-4 w-4")} />
+                                    </div>
+                                    <span className="truncate">{doc.title}</span>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
                   </CardContent>
                 </Card>
                 <Card className="shadow-none border rounded-xl">
@@ -445,7 +502,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                 </Card>
               </div>
             </div>
-            <div className="flex justify-end mt-6 px-6">
+            <div className="flex justify-end px-6">
               <Button onClick={() => handleSaveConfig(config)} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700">
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                 Lưu cấu hình
