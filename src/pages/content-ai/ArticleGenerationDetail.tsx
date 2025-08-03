@@ -332,7 +332,7 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
           </AccordionTrigger>
           <AccordionContent className="px-6 pb-6 bg-white rounded-b-2xl">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 p-6">
-              <div className="lg:col-span-2">
+              <div className="lg:col-span-2 space-y-6">
                 <Card className="shadow-none border rounded-xl">
                   <CardHeader className="flex flex-row items-center gap-4">
                     <div className="flex-shrink-0 bg-blue-100 p-3 rounded-lg"><FileInput className="h-6 w-6 text-blue-600" /></div>
@@ -376,7 +376,7 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
                   </CardContent>
                 </Card>
               </div>
-              <div className="lg:col-span-1">
+              <div className="lg:col-span-1 space-y-6">
                 <Card className="shadow-none border rounded-xl">
                   <CardHeader className="flex flex-row items-center gap-4">
                     <div className="flex-shrink-0 bg-green-100 p-3 rounded-lg"><ListOrdered className="h-6 w-6 text-green-600" /></div>
