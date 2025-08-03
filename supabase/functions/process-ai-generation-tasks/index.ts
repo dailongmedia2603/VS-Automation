@@ -83,36 +83,34 @@ const buildCommentPrompt = (basePrompt, config) => {
 };
 
 const buildArticlePrompt = (basePrompt, config) => {
-  const conditionsText = (config.mandatoryConditions || [])
-    .map(c => `- ${c.content}`)
-    .join('\n');
-
+  const conditionsText = (config.mandatoryConditions || []).map(c => `- ${c.content}`).join('\n');
   let structureText = '';
   if (config.structure && config.structure.structure_content) {
     structureText = `
-    ---
-    **CẤU TRÚC BÀI VIẾT BẮT BUỘC:**
-    AI phải tuân thủ TUYỆT ĐỐI cấu trúc sau đây khi viết bài:
-    ${config.structure.structure_content}
-    ---
-    `;
+---
+**CẤU TRÚC BÀI VIẾT BẮT BUỘC:**
+AI phải tuân thủ TUYỆT ĐỐI cấu trúc sau đây khi viết bài:
+${config.structure.structure_content}
+---`;
   }
-
   let wordCountText = '';
   if (config.wordCount && Number(config.wordCount) > 0) {
     wordCountText = `
-    ---
-    **ĐỘ DÀI BÀI VIẾT:**
-    Bài viết phải có độ dài khoảng ${config.wordCount} từ. Cho phép chênh lệch trong khoảng +/- 10%.
-    ---
-    `;
+---
+**ĐỘ DÀI BÀI VIẾT:**
+Bài viết phải có độ dài khoảng ${config.wordCount} từ. Cho phép chênh lệch trong khoảng +/- 10%.
+---`;
   }
-
+  let referenceExampleText = '';
+  if (config.referenceExample && config.referenceExample.trim() !== '') {
+    referenceExampleText = `
+**Ví dụ tham khảo (Về văn phong, giọng điệu):**
+${config.referenceExample}`;
+  }
   const translatedFormat = formatMapping[config.format] || config.format || 'Không có';
 
   const finalPrompt = `
     ${basePrompt}
-
     ---
     **THÔNG TIN CHI TIẾT BÀI VIẾT:**
 
@@ -121,6 +119,8 @@ const buildArticlePrompt = (basePrompt, config) => {
 
     **Định hướng nội dung chi tiết:**
     ${config.direction || 'Không có'}
+    
+    ${referenceExampleText} 
     ${structureText}
     ${wordCountText}
     ---

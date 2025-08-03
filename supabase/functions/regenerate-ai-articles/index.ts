@@ -60,6 +60,12 @@ ${config.structure.structure_content}
 Bài viết phải có độ dài khoảng ${config.wordCount} từ. Cho phép chênh lệch trong khoảng +/- 10%.
 ---`;
   }
+  let referenceExampleText = '';
+  if (config.referenceExample && config.referenceExample.trim() !== '') {
+    referenceExampleText = `
+**Ví dụ tham khảo (Về văn phong, giọng điệu):**
+${config.referenceExample}`;
+  }
   const translatedFormat = formatMapping[config.format] || config.format || 'Không có';
 
   return `
@@ -74,6 +80,7 @@ Bài viết phải có độ dài khoảng ${config.wordCount} từ. Cho phép c
     **THÔNG TIN CHI TIẾT (GIỮ NGUYÊN):**
     **Dạng bài:** ${translatedFormat}
     **Định hướng nội dung chi tiết:** ${config.direction || 'Không có'}
+    ${referenceExampleText}
     ${structureText}
     ${wordCountText}
     ---
