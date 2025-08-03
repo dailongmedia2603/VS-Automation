@@ -32,6 +32,7 @@ type Log = { id: number; created_at: string; prompt: string; response: any; };
 type MandatoryCondition = { id: string; content: string; };
 type StructureLibrary = { id: number; name: string; };
 type ArticleStructure = { id: number; library_id: number; name: string; description: string | null; structure_content: string | null; };
+type Document = { id: number; title: string; };
 
 interface ArticleGenerationDetailProps {
   project: Project;
@@ -61,6 +62,7 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
 
   const [structureLibraries, setStructureLibraries] = useState<StructureLibrary[]>([]);
   const [structures, setStructures] = useState<ArticleStructure[]>([]);
+  const [projectDocuments, setProjectDocuments] = useState<Document[]>([]);
 
   useEffect(() => {
     const itemConfig = item.config || {};
@@ -95,7 +97,19 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
       }
     };
     fetchStructureData();
-  }, [item]);
+
+    const fetchProjectDocuments = async () => {
+      if (!project?.id) return;
+      const { data, error } = await supabase
+        .from('documents')
+        .select('id, title')
+        .eq('project_id', project.id);
+      if (!error) {
+        setProjectDocuments(data || []);
+      }
+    };
+    fetchProjectDocuments();
+  }, [item, project]);
 
   const structuresInSelectedLibrary = useMemo(() => {
     if (!config.structureLibraryId) return [];
@@ -144,7 +158,7 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
     try {
       const oldResults = JSON.parse(item.content || '[]') as GeneratedArticle[];
       const { data: updatedItem, error } = await supabase.functions.invoke('create-ai-generation-task', {
-        body: { itemId: item.id, config: { ...config, mandatoryConditions } }
+        body: { itemId: item.id, config: { ...config, mandatoryConditions, projectId: project.id } }
       });
       
       if (error) {
@@ -412,6 +426,48 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
                       <Label>Số từ / bài (ước tính)</Label>
                       <Input type="number" placeholder="VD: 800" value={config.wordCount || ''} onChange={e => handleConfigChange('wordCount', e.target.value)} />
                       <p className="text-xs text-muted-foreground">AI sẽ cố gắng viết trong khoảng +/- 10% số từ bạn yêu cầu.</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Tài liệu liên quan</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className="w-full justify-start font-normal">
+                            {(config.relatedDocumentIds || []).length > 0
+                              ? `Đã chọn ${(config.relatedDocumentIds || []).length} tài liệu`
+                              : "Chọn tài liệu..."}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Tìm tài liệu..." />
+                            <CommandList>
+                              <CommandEmpty>Không tìm thấy tài liệu.</CommandEmpty>
+                              <CommandGroup>
+                                {projectDocuments.map((doc) => (
+                                  <CommandItem
+                                    key={doc.id}
+                                    onSelect={() => {
+                                      const selected = config.relatedDocumentIds || [];
+                                      const newSelected = selected.includes(doc.id)
+                                        ? selected.filter((id: number) => id !== doc.id)
+                                        : [...selected, doc.id];
+                                      handleConfigChange('relatedDocumentIds', newSelected);
+                                    }}
+                                  >
+                                    <div className={cn(
+                                      "mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+                                      (config.relatedDocumentIds || []).includes(doc.id) ? "bg-primary text-primary-foreground" : "opacity-50 [&_svg]:invisible"
+                                    )}>
+                                      <Check className={cn("h-4 w-4")} />
+                                    </div>
+                                    <span className="truncate">{doc.title}</span>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                     </div>
                   </CardContent>
                 </Card>
