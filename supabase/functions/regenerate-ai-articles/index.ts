@@ -7,14 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const formatMapping: Record<string, string> = {
-  question: 'Đặt câu hỏi / thảo luận',
-  review: 'Review',
-  sharing: 'Chia sẻ',
-  comparison: 'So sánh',
-  storytelling: 'Story telling',
-};
-
 const buildBasePrompt = (libraryConfig, documentContext) => {
   const config = libraryConfig || {};
   const trainingInfoContent = [
@@ -66,7 +58,7 @@ Bài viết phải có độ dài khoảng ${config.wordCount} từ. Cho phép c
 **Ví dụ tham khảo (Về văn phong, giọng điệu):**
 ${config.referenceExample}`;
   }
-  const translatedFormat = formatMapping[config.format] || config.format || 'Không có';
+  const dangBai = config.structure?.name || config.format || 'Không có';
 
   return `
     ${basePrompt}
@@ -78,7 +70,7 @@ ${config.referenceExample}`;
     "${feedback}"
     ---
     **THÔNG TIN CHI TIẾT (GIỮ NGUYÊN):**
-    **Dạng bài:** ${translatedFormat}
+    **Dạng bài:** ${dangBai}
     **Định hướng nội dung chi tiết:** ${config.direction || 'Không có'}
     ${referenceExampleText}
     ${structureText}
@@ -113,8 +105,21 @@ serve(async (req) => {
     if (itemError || !item) throw new Error("Không tìm thấy mục tương ứng.");
 
     const { config } = item;
-    const { libraryId, direction } = config;
+    const { libraryId, direction, structureId } = config;
     if (!libraryId) throw new Error("Config is missing libraryId.");
+
+    if (structureId) {
+      const { data: structure, error: structError } = await supabaseAdmin
+        .from('article_structures')
+        .select('*')
+        .eq('id', structureId)
+        .single();
+      if (structError) {
+        console.warn(`Could not fetch structure with ID ${structureId}: ${structError.message}`);
+      } else {
+        config.structure = structure;
+      }
+    }
 
     const { data: aiSettings, error: settingsError } = await supabaseAdmin.from('ai_settings').select('google_gemini_api_key, gemini_content_model').eq('id', 1).single();
     if (settingsError || !aiSettings.google_gemini_api_key) throw new Error("Chưa cấu hình API Google Gemini.");
