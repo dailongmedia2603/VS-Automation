@@ -13,6 +13,8 @@ import { PlusCircle, Search, Trash2, Loader2, Edit, FileText, User } from 'lucid
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { type User as SupabaseUser } from '@supabase/supabase-js';
 import { useAuth } from '@/contexts/AuthContext';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 type Document = {
   id: number;
@@ -29,13 +31,12 @@ type Document = {
 
 const DocumentDialog = ({ isOpen, onOpenChange, onSave, document, user }: { isOpen: boolean, onOpenChange: (open: boolean) => void, onSave: (doc: Partial<Document>) => void, document: Partial<Document> | null, user: SupabaseUser | null }) => {
   const [currentDoc, setCurrentDoc] = useState<Partial<Document>>({});
-  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (document) {
       setCurrentDoc(document);
     } else {
-      setCurrentDoc({ document_type: 'Chung' });
+      setCurrentDoc({});
     }
   }, [document]);
 
@@ -48,6 +49,8 @@ const DocumentDialog = ({ isOpen, onOpenChange, onSave, document, user }: { isOp
     await onSave({ ...currentDoc, creator_name: currentDoc.creator_name || user?.email || 'Không rõ' });
     setIsSaving(false);
   };
+
+  const [isSaving, setIsSaving] = useState(false);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -67,10 +70,6 @@ const DocumentDialog = ({ isOpen, onOpenChange, onSave, document, user }: { isOp
             <p className="text-xs text-muted-foreground">Để AI hiểu mục tiêu khi đọc nội dung này.</p>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="document_type">Loại tài liệu</Label>
-            <Input id="document_type" value={currentDoc.document_type || ''} onChange={e => setCurrentDoc(d => ({ ...d, document_type: e.target.value }))} className="bg-slate-100 border-none rounded-lg" />
-          </div>
-          <div className="space-y-2">
             <Label htmlFor="content">Nội dung</Label>
             <Textarea id="content" value={currentDoc.content || ''} onChange={e => setCurrentDoc(d => ({ ...d, content: e.target.value }))} className="bg-slate-100 border-none rounded-lg min-h-[120px]" />
           </div>
@@ -81,6 +80,29 @@ const DocumentDialog = ({ isOpen, onOpenChange, onSave, document, user }: { isOp
             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Lưu
           </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+const DocumentViewDialog = ({ document, isOpen, onOpenChange }: { document: Document | null, isOpen: boolean, onOpenChange: (open: boolean) => void }) => {
+  if (!document) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{document.title}</DialogTitle>
+          <DialogDescription>{document.purpose || 'Không có mô tả mục đích.'}</DialogDescription>
+        </DialogHeader>
+        <div className="py-4 max-h-[60vh] overflow-y-auto pr-4">
+          <div className="prose prose-sm max-w-none prose-slate">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{document.content || ''}</ReactMarkdown>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button onClick={() => onOpenChange(false)}>Đóng</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -120,6 +142,7 @@ export const ProjectDocumentsManager = ({ projectId }: { projectId: string }) =>
   const [editingDocument, setEditingDocument] = useState<Partial<Document> | null>(null);
   const [docToDelete, setDocToDelete] = useState<Document | null>(null);
   const [isBulkDeleteAlertOpen, setIsBulkDeleteAlertOpen] = useState(false);
+  const [viewingDocument, setViewingDocument] = useState<Document | null>(null);
 
   const fetchDocuments = useCallback(async () => {
     setIsLoading(true);
@@ -234,7 +257,7 @@ export const ProjectDocumentsManager = ({ projectId }: { projectId: string }) =>
                 document={doc}
                 isSelected={selectedIds.includes(doc.id)}
                 onSelect={handleSelect}
-                onView={() => { /* Implement view if needed */ }}
+                onView={() => setViewingDocument(doc)}
                 onEdit={() => { setEditingDocument(doc); setIsAddEditDialogOpen(true); }}
                 onDelete={() => setDocToDelete(doc)}
               />
@@ -249,6 +272,7 @@ export const ProjectDocumentsManager = ({ projectId }: { projectId: string }) =>
         )}
       </div>
       <DocumentDialog isOpen={isAddEditDialogOpen} onOpenChange={setIsAddEditDialogOpen} onSave={handleSave} document={editingDocument} user={user} />
+      <DocumentViewDialog isOpen={!!viewingDocument} onOpenChange={() => setViewingDocument(null)} document={viewingDocument} />
       <AlertDialog open={!!docToDelete} onOpenChange={() => setDocToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>Bạn có chắc chắn?</AlertDialogTitle><AlertDialogDescription>Hành động này sẽ xóa vĩnh viễn tài liệu "{docToDelete?.title}".</AlertDialogDescription></AlertDialogHeader>
