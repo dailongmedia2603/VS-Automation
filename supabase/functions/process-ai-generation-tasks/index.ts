@@ -17,20 +17,33 @@ const formatMapping: Record<string, string> = {
 
 const buildBasePrompt = (libraryConfig, documentContext) => {
   const config = libraryConfig || {};
+
+  // Define the correct, hardcoded structure for the "THÔNG TIN HUẤN LUYỆN CHUNG" section
+  const trainingInfoContent = [
+    `- **Vai trò của bạn:** ${config.role || '(Chưa cung cấp)'}`,
+    `- **Lĩnh vực kinh doanh:** ${config.industry || '(Chưa cung cấp)'}`,
+    `- **Phong cách:** ${config.style || '(Chưa cung cấp)'}`,
+    `- **Tông giọng:** ${config.tone || '(Chưa cung cấp)'}`,
+    `- **Ngôn ngữ:** ${config.language || '(Chưa cung cấp)'}`,
+    `- **Mục tiêu cần đạt:** ${config.goal || '(Chưa cung cấp)'}`
+  ].join('\n');
+
+  // Define the full, correct prompt structure
+  const promptStructure = [
+    { title: 'YÊU CẦU TƯ VẤN CHO FANPAGE', content: 'Bạn là một trợ lý AI cho fanpage. Hãy dựa vào các thông tin dưới đây để tư vấn cho khách hàng.' },
+    { title: 'THÔNG TIN HUẤN LUYỆN CHUNG', content: trainingInfoContent },
+    { title: 'LỊCH SỬ CUỘC TRÒ CHUYỆN', content: 'Dưới đây là toàn bộ lịch sử trò chuyện. Hãy phân tích để hiểu ngữ cảnh và trả lời tin nhắn cuối cùng của khách hàng.\n---\n{{conversation_history}}\n---' },
+    { title: 'TÀI LIỆU NỘI BỘ THAM KHẢO', content: '{{document_context}}' },
+    { title: 'HÀNH ĐỘNG', content: 'Dựa vào TOÀN BỘ thông tin trên, hãy tạo một câu trả lời duy nhất cho tin nhắn cuối cùng của khách hàng.\n**QUAN TRỌNG:** Chỉ trả lời với nội dung tin nhắn, không thêm bất kỳ tiền tố nào như "AI:", "Trả lời:", hay lời chào nào nếu không cần thiết theo ngữ cảnh.' }
+  ];
+
+  // Replace the dynamic placeholders
   const dataMap = {
-    '{{industry}}': config.industry || '(Chưa cung cấp)',
-    '{{role}}': config.role || '(Chưa cung cấp)',
-    '{{style}}': config.style || '(Chưa cung cấp)',
-    '{{tone}}': config.tone || '(Chưa cung cấp)',
-    '{{language}}': config.language || '(Chưa cung cấp)',
-    '{{goal}}': config.goal || '(Chưa cung cấp)',
     '{{conversation_history}}': '(Lịch sử trò chuyện không áp dụng cho tác vụ này)',
     '{{document_context}}': documentContext || '(Không có tài liệu tham khảo liên quan)',
   };
 
-  const promptTemplate = libraryConfig.promptTemplate || [];
-  
-  return promptTemplate.map(block => {
+  return promptStructure.map(block => {
     let content = block.content;
     for (const [key, value] of Object.entries(dataMap)) {
       content = content.replace(new RegExp(key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g'), String(value));
