@@ -113,7 +113,7 @@ serve(async (req) => {
     if (itemError || !item) throw new Error("Không tìm thấy mục tương ứng.");
 
     const { config } = item;
-    const { libraryId, direction } = config;
+    const { libraryId } = config;
     if (!libraryId) throw new Error("Config is missing libraryId.");
 
     const { data: aiSettings, error: settingsError } = await supabaseAdmin.from('ai_settings').select('google_gemini_api_key, gemini_content_model').eq('id', 1).single();
@@ -135,18 +135,6 @@ serve(async (req) => {
         console.warn("Could not fetch selected documents:", docsError.message);
       } else if (selectedDocs && selectedDocs.length > 0) {
         documentContext = selectedDocs.map(doc => `--- TÀI LIỆU: ${doc.title} ---\n${doc.content}`).join('\n\n');
-      }
-    } else {
-      if (direction) {
-        const { data: embeddingData, error: embedError } = await supabaseAdmin.functions.invoke('embed-document', { body: { textToEmbed: direction } });
-        if (!embedError && !embeddingData.error) {
-          const { data: matchedDocs } = await supabaseAdmin.rpc('match_project_documents', {
-            p_project_id: config.projectId, p_query_embedding: embeddingData.embedding, p_match_threshold: 0.7, p_match_count: 3
-          });
-          if (matchedDocs && matchedDocs.length > 0) {
-            documentContext = matchedDocs.map(doc => `--- TÀI LIỆU: ${doc.title} ---\n${doc.content}`).join('\n\n');
-          }
-        }
       }
     }
 

@@ -161,7 +161,7 @@ serve(async (req) => {
       const { data: item, error: itemError } = await supabaseAdmin.from('content_ai_items').select('type, content').eq('id', task.item_id).single();
       if (itemError) throw itemError;
 
-      const { libraryId, postContent, direction } = task.config;
+      const { libraryId } = task.config;
       if (!libraryId) throw new Error("Config is missing libraryId.");
 
       const { data: aiSettings, error: settingsError } = await supabaseAdmin.from('ai_settings').select('*').eq('id', 1).single();
@@ -185,28 +185,6 @@ serve(async (req) => {
           console.warn("Could not fetch selected documents:", docsError.message);
         } else if (selectedDocs && selectedDocs.length > 0) {
           documentContext = selectedDocs.map(doc => `--- TÀI LIỆU: ${doc.title} ---\n${doc.content}`).join('\n\n');
-        }
-      } else {
-        // Fallback to semantic search if no documents are manually selected
-        const contextSource = item.type === 'article' ? direction : postContent;
-        if (contextSource) {
-          await supabaseAdmin.from('ai_generation_tasks').update({ progress_step: 'Đang tìm tài liệu liên quan...' }).eq('id', task.id);
-          const { data: embeddingData, error: embedError } = await supabaseAdmin.functions.invoke('embed-document', { body: { textToEmbed: contextSource } });
-          if (embedError || embeddingData.error) {
-            console.warn("Could not get embedding for context search:", embedError?.message || embeddingData.error);
-          } else {
-            const { data: matchedDocs, error: matchError } = await supabaseAdmin.rpc('match_project_documents', {
-              p_project_id: task.config.projectId,
-              p_query_embedding: embeddingData.embedding,
-              p_match_threshold: 0.7,
-              p_match_count: 3
-            });
-            if (matchError) {
-              console.warn("Could not match documents:", matchError.message);
-            } else if (matchedDocs && matchedDocs.length > 0) {
-              documentContext = matchedDocs.map(doc => `--- TÀI LIỆU: ${doc.title} ---\n${doc.content}`).join('\n\n');
-            }
-          }
         }
       }
 
