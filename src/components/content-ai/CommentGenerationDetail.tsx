@@ -241,21 +241,30 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
 
     const commentsWithMeta: CommentWithMeta[] = results.map((comment, index) => {
         const stt = index + 1;
-        const replyMatch = comment.content.match(/^(?:\d+\s*reply\s*->\s*(\d+)\.\s*)?(.*)$/s);
-        
-        const rawContent = replyMatch && replyMatch[2] ? replyMatch[2].trim() : comment.content.trim();
-        const typeMatch = rawContent.match(/^\[(.*?)\]\s*(.*)$/s);
-        
-        const contentWithoutType = typeMatch ? typeMatch[2].trim() : rawContent;
-        const personMatch = contentWithoutType.match(/(.*)\s*\((\d+)\)$/s);
+        let currentContent = comment.content.trim();
+
+        // 1. Extract Type
+        const typeMatch = currentContent.match(/^\[(.*?)\]\s*(.*)$/s);
+        const type = typeMatch ? typeMatch[1] : comment.type;
+        currentContent = typeMatch ? typeMatch[2].trim() : currentContent;
+
+        // 2. Extract Reply Info
+        const replyMatch = currentContent.match(/^(?:\d+\s*reply\s*->\s*(\d+)\.\s*)?(.*)$/s);
+        const parentStt = replyMatch && replyMatch[1] ? parseInt(replyMatch[1], 10) : null;
+        currentContent = replyMatch && replyMatch[2] ? replyMatch[2].trim() : currentContent;
+
+        // 3. Extract Person Number
+        const personMatch = currentContent.match(/(.*)\s*\((\d+)\)$/s);
+        const person = personMatch ? parseInt(personMatch[2], 10) : null;
+        const cleanContent = personMatch ? personMatch[1].trim() : currentContent;
 
         return {
             ...comment,
             stt,
-            parentStt: replyMatch && replyMatch[1] ? parseInt(replyMatch[1], 10) : null,
-            cleanContent: personMatch ? personMatch[1].trim() : contentWithoutType,
-            type: typeMatch ? typeMatch[1] : comment.type,
-            person: personMatch ? parseInt(personMatch[2], 10) : null,
+            parentStt,
+            cleanContent,
+            type,
+            person,
         };
     });
 
@@ -653,7 +662,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
               {selectedIds.length > 0 && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline">
                       Thao tác ({selectedIds.length})
                       <ChevronDown className="ml-2 h-4 w-4" />
                     </Button>
@@ -702,7 +711,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
         <CardContent>
           <div className="border rounded-lg overflow-hidden">
             <Table>
-              <TableHeader><TableRow><TableHead className="w-12"><Checkbox checked={selectedIds.length === filteredResults.length && filteredResults.length > 0} onCheckedChange={(checked) => handleSelectAll(!!checked)} /></TableHead><TableHead>STT</TableHead><TableHead>Người</TableHead><TableHead>Nội dung comment</TableHead><TableHead>Loại comment</TableHead><TableHead>Điều kiện</TableHead><TableHead className="text-right">Thao tác</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead className="w-12"><Checkbox checked={selectedIds.length > 0 && selectedIds.length === filteredResults.length && filteredResults.length > 0} onCheckedChange={(checked) => handleSelectAll(!!checked)} /></TableHead><TableHead>STT</TableHead><TableHead>Người</TableHead><TableHead>Nội dung comment</TableHead><TableHead>Loại comment</TableHead><TableHead>Điều kiện</TableHead><TableHead className="text-right">Thao tác</TableHead></TableRow></TableHeader>
               <TableBody>
                 {isGenerating && (
                   <TableRow>
@@ -789,7 +798,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
       </Card>
 
       <GenerationLogDialog isOpen={isLogOpen} onOpenChange={setIsLogOpen} logs={logs} isLoading={isLoadingLogs} onClearLogs={handleClearLogs} />
-
+      
       <AlertDialog open={isBulkDeleteAlertOpen} onOpenChange={setIsBulkDeleteAlertOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
