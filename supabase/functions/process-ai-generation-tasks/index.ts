@@ -103,17 +103,21 @@ ${replyDirectionText}
     **YÊU CẦU:** Dựa vào TOÀN BỘ thông tin trên, hãy tạo ra chính xác ${totalQuantity} bình luận. Mỗi bình luận trên một dòng.
     **CỰC KỲ QUAN TRỌNG:**
     1.  Mỗi bình luận PHẢI bắt đầu bằng tên loại trong dấu ngoặc vuông, ví dụ: "[Tên Loại] Nội dung bình luận".
-    2.  **QUY TẮC ĐÁNH SỐ NGƯỜI (CHỈ ÁP DỤNG CHO HỘI THOẠI CÓ REPLY):**
-        - **CHỈ** thêm số định danh người \`(X)\` vào cuối các bình luận là một phần của một chuỗi hội thoại (tức là một bình luận gốc có reply, và các reply của nó).
-        - **KHÔNG** thêm số định danh người cho các bình luận đơn lẻ không có reply.
-        - Trong một chuỗi hội thoại, bình luận gốc **LUÔN LUÔN** là của người \`(1)\`.
-        - Các reply trong chuỗi hội thoại đó có thể là của người \`(2)\`, \`(3)\`,... hoặc người \`(1)\` trả lời lại.
-        - Việc đánh số người được reset cho mỗi chuỗi hội thoại mới.
-    - Ví dụ comment đơn lẻ: \`[Tương tác] Sữa này tốt thật.\`
-    - Ví dụ hội thoại:
-      \`[Hỏi lại] Sữa này vị ngọt không mom? (1)\`
-      \`1 reply -> X. [Tương tác] Vị thanh mát dễ uống lắm mom (2)\`
-      \`2 reply -> X. [Tương tác] Cảm ơn mom nhé (1)\`
+    2.  **QUY TẮC ĐÁNH SỐ NGƯỜI (CỰC KỲ QUAN TRỌNG):**
+        - **Quy tắc Vàng:** Việc đánh số người \`(1)\`, \`(2)\`... **CHỈ** được áp dụng cho những bình luận là một phần của **chuỗi hội thoại**.
+        - **Định nghĩa chuỗi hội thoại:** Một chuỗi hội thoại bao gồm một bình luận gốc (không phải là reply) và tất cả các bình luận trả lời nó.
+        - **Bình luận đơn lẻ:** Những bình luận không có ai trả lời và cũng không trả lời ai thì **TUYỆT ĐỐI KHÔNG** được đánh số người.
+        - **Quy tắc bắt đầu:** Bình luận gốc của **bất kỳ** chuỗi hội thoại nào **LUÔN LUÔN** được đánh số là \`(1)\`.
+        - **Quy tắc tiếp diễn:** Các reply trong chuỗi hội thoại đó có thể là của người \`(2)\`, \`(3)\`,... hoặc người \`(1)\` trả lời lại.
+        - **Quy tắc reset:** Khi một chuỗi hội thoại kết thúc và một chuỗi hội thoại **mới** bắt đầu (với một bình luận gốc khác), việc đánh số sẽ được **reset** và bắt đầu lại từ \`(1)\`.
+    - **VÍ DỤ MINH HỌA HOÀN CHỈNH:**
+      \`1. [Tương tác] Sữa này tốt thật.\`
+      \`2. [Hỏi lại] Sữa này vị ngọt không mom? (1)\`
+      \`3. [Tương tác] Ui y chang nhà mình luôn.\`
+      \`4. [Tương tác] 2 reply -> 2. Vị thanh mát dễ uống lắm mom ạ. (2)\`
+      \`5. [Hỏi lại] Bé nhà mình 7 tháng uống được không? (1)\`
+      \`6. [Tương tác] 3 reply -> 2. Cảm ơn mom nhé. (1)\`
+      \`7. [Tương tác] 5 reply -> 5. Được đó mom, bé nhà mình cũng 7 tháng. (2)\`
     - Chỉ trả về danh sách các bình luận, KHÔNG thêm bất kỳ lời chào, câu giới thiệu, hay dòng phân cách nào.
   `;
   return finalPrompt;

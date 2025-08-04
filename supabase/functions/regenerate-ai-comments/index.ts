@@ -49,6 +49,29 @@ const buildRegenerationPrompt = (basePrompt, config, existingComments, feedback)
   
   const existingCommentsText = existingComments.map((c, i) => `${i + 1}. [${c.type}] ${c.content}`).join('\n');
 
+  const replyQuantity = Number(config.replyQuantity) || 0;
+  const totalQuantity = Number(config.quantity) || 10;
+  const parentQuantity = totalQuantity - replyQuantity;
+
+  let replyInstruction = '';
+  if (replyQuantity > 0) {
+    const replyDirectionText = config.replyDirection 
+      ? `- **Định hướng cho reply:** ${config.replyDirection}` 
+      : '';
+
+    replyInstruction = `
+---
+**QUY TẮC REPLY (CỰC KỲ QUAN TRỌNG):**
+- Trong tổng số ${totalQuantity} bình luận, phải có chính xác **${replyQuantity} bình luận là reply**.
+- Các reply PHẢI trả lời các bình luận gốc (từ 1 đến ${parentQuantity}).
+- Cú pháp reply BẮT BUỘC: \`[STT reply] reply -> [STT comment gốc]. [Nội dung]\`.
+- Ví dụ: \`1 reply -> 5. Đúng rồi đó mom...\`
+${replyDirectionText}
+- **TUYỆT ĐỐI KHÔNG** sử dụng các định dạng khác như \`(reply)\` hay bất kỳ định dạng nào khác.
+---
+`;
+  }
+
   const finalPrompt = `
     ${basePrompt}
 
@@ -70,6 +93,7 @@ const buildRegenerationPrompt = (basePrompt, config, existingComments, feedback)
 
     **Tỉ lệ và loại bình luận cần tạo:**
     ${ratiosText || 'Không có'}
+    ${replyInstruction}
     ---
     **ĐIỀU KIỆN BẮT BUỘC (QUAN TRỌNG NHẤT):**
     AI phải tuân thủ TUYỆT ĐỐI tất cả các điều kiện sau đây cho MỌI bình luận được tạo ra:
@@ -77,7 +101,24 @@ const buildRegenerationPrompt = (basePrompt, config, existingComments, feedback)
     ---
 
     **YÊU CẦU MỚI:** Dựa vào **FEEDBACK TỪ NGƯỜI DÙNG** và toàn bộ thông tin trên, hãy **VIẾT LẠI TOÀN BỘ** danh sách gồm ${config.quantity || 10} bình luận mới tốt hơn. Mỗi bình luận trên một dòng.
-    **CỰC KỲ QUAN TRỌNG:** Mỗi bình luận PHẢI bắt đầu bằng tên loại trong dấu ngoặc vuông, ví dụ: "[Tên Loại] Nội dung bình luận.". Chỉ trả về danh sách các bình luận, KHÔNG thêm bất kỳ lời chào, câu giới thiệu, hay dòng phân cách nào.
+    **CỰC KỲ QUAN TRỌNG:**
+    1.  Mỗi bình luận PHẢI bắt đầu bằng tên loại trong dấu ngoặc vuông, ví dụ: "[Tên Loại] Nội dung bình luận.".
+    2.  **QUY TẮC ĐÁNH SỐ NGƯỜI (CỰC KỲ QUAN TRỌNG):**
+        - **Quy tắc Vàng:** Việc đánh số người \`(1)\`, \`(2)\`... **CHỈ** được áp dụng cho những bình luận là một phần của **chuỗi hội thoại**.
+        - **Định nghĩa chuỗi hội thoại:** Một chuỗi hội thoại bao gồm một bình luận gốc (không phải là reply) và tất cả các bình luận trả lời nó.
+        - **Bình luận đơn lẻ:** Những bình luận không có ai trả lời và cũng không trả lời ai thì **TUYỆT ĐỐI KHÔNG** được đánh số người.
+        - **Quy tắc bắt đầu:** Bình luận gốc của **bất kỳ** chuỗi hội thoại nào **LUÔN LUÔN** được đánh số là \`(1)\`.
+        - **Quy tắc tiếp diễn:** Các reply trong chuỗi hội thoại đó có thể là của người \`(2)\`, \`(3)\`,... hoặc người \`(1)\` trả lời lại.
+        - **Quy tắc reset:** Khi một chuỗi hội thoại kết thúc và một chuỗi hội thoại **mới** bắt đầu (với một bình luận gốc khác), việc đánh số sẽ được **reset** và bắt đầu lại từ \`(1)\`.
+    - **VÍ DỤ MINH HỌA HOÀN CHỈNH:**
+      \`1. [Tương tác] Sữa này tốt thật.\`
+      \`2. [Hỏi lại] Sữa này vị ngọt không mom? (1)\`
+      \`3. [Tương tác] Ui y chang nhà mình luôn.\`
+      \`4. [Tương tác] 2 reply -> 2. Vị thanh mát dễ uống lắm mom ạ. (2)\`
+      \`5. [Hỏi lại] Bé nhà mình 7 tháng uống được không? (1)\`
+      \`6. [Tương tác] 3 reply -> 2. Cảm ơn mom nhé. (1)\`
+      \`7. [Tương tác] 5 reply -> 5. Được đó mom, bé nhà mình cũng 7 tháng. (2)\`
+    - Chỉ trả về danh sách các bình luận, KHÔNG thêm bất kỳ lời chào, câu giới thiệu, hay dòng phân cách nào.
   `;
   return finalPrompt;
 };
@@ -194,16 +235,12 @@ serve(async (req) => {
 
     const newComments = rawContent.split('\n')
       .map(line => line.trim())
-      .filter(line => line.startsWith('[') && line.includes(']'))
+      .filter(line => line)
       .map(line => {
-        const match = line.match(/^\[(.*?)\]\s*(.*)$/);
-        const type = match ? match[1] : 'Chưa phân loại';
-        const content = match ? match[2] : line;
-        
         return { 
           id: crypto.randomUUID(), 
-          content: content, 
-          type: type,
+          content: line, 
+          type: 'N/A', // Type will be parsed on the frontend
           metConditionIds: allConditionIds
         };
       });
