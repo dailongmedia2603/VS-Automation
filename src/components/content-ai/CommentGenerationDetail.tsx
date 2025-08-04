@@ -718,15 +718,18 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                   const totalConditions = mandatoryConditions.length;
                   const metCount = result.metConditionIds?.length ?? totalConditions;
                   const allConditionsMet = totalConditions > 0 && metCount === totalConditions;
+                  const isPartOfThread = result.level > 0 || (result.children && result.children.length > 0);
 
                   return (
                     <TableRow key={result.id}>
                       <TableCell><Checkbox checked={selectedIds.includes(result.id)} onCheckedChange={() => handleSelectRow(result.id)} /></TableCell>
                       <TableCell>{result.stt}</TableCell>
                       <TableCell>
-                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 text-slate-600 font-semibold text-sm">
-                          {result.person}
-                        </div>
+                        {isPartOfThread ? (
+                          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 text-slate-600 font-semibold text-sm">
+                            {result.person}
+                          </div>
+                        ) : null}
                       </TableCell>
                       <TableCell className="max-w-md break-words">
                         <div className={cn("flex items-start")} style={{ paddingLeft: `${result.level * 24}px` }}>

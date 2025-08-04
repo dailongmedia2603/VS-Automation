@@ -104,7 +104,9 @@ ${replyDirectionText}
     **CỰC KỲ QUAN TRỌNG:** Mỗi bình luận PHẢI bắt đầu bằng tên loại trong dấu ngoặc vuông, VÀ kết thúc bằng số định danh người bình luận trong dấu ngoặc đơn.
     - Ví dụ comment gốc: \`[Tên Loại] Nội dung bình luận (1)\`
     - Ví dụ reply: \`1 reply -> 5. [Tên Loại] Nội dung reply (2)\`
-    - Tất cả comment gốc đều là của người (1). Các reply có thể là của người (2), (3),... hoặc (1) trả lời lại để tạo hội thoại.
+    - **QUY TẮC ĐÁNH SỐ NGƯỜI:**
+      - Tất cả các bình luận gốc (không phải reply) BẮT BUỘC phải là của người (1).
+      - Các reply có thể là của người (2), (3),... hoặc người (1) trả lời lại để tạo hội thoại.
     - Chỉ trả về danh sách các bình luận, KHÔNG thêm bất kỳ lời chào, câu giới thiệu, hay dòng phân cách nào.
   `;
   return finalPrompt;
