@@ -243,9 +243,15 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
         const stt = index + 1;
         let currentContent = comment.content.trim();
 
+        // 0. Strip leading number (e.g., "10. ")
+        const leadingNumberMatch = currentContent.match(/^\d+\.\s*(.*)$/s);
+        if (leadingNumberMatch) {
+            currentContent = leadingNumberMatch[1].trim();
+        }
+
         // 1. Extract Type
         const typeMatch = currentContent.match(/^\[(.*?)\]\s*(.*)$/s);
-        const type = typeMatch ? typeMatch[1] : comment.type;
+        const type = typeMatch ? typeMatch[1] : 'N/A';
         currentContent = typeMatch ? typeMatch[2].trim() : currentContent;
 
         // 2. Extract Reply Info
