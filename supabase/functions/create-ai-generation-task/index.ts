@@ -68,30 +68,13 @@ serve(async (req) => {
 
     if (insertError) throw insertError;
 
-    // Invoke and wait for the processor to finish
-    const { error: processError } = await supabaseAdmin.functions.invoke('process-ai-generation-tasks');
-    if (processError) {
-        // Try to get a more specific error message from the context
-        let detailedError = processError.message;
-        try {
-            const context = await processError.context.json();
-            if (context.error) detailedError = context.error;
-        } catch(e) { /* ignore json parsing error */ }
-        throw new Error(detailedError);
-    }
+    // Fire-and-forget invocation of the processor. We don't wait for it.
+    // This makes the initial request fast and avoids timeouts.
+    supabaseAdmin.functions.invoke('process-ai-generation-tasks').catch(console.error);
 
-    // Fetch the updated item to return to the client
-    const { data: updatedItem, error: fetchError } = await supabaseAdmin
-        .from('content_ai_items')
-        .select('*')
-        .eq('id', itemId)
-        .single();
-    
-    if (fetchError) throw fetchError;
-
-    return new Response(JSON.stringify(updatedItem), {
+    return new Response(JSON.stringify(newTask), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200, // Return 200 instead of 201 as we are returning the final resource
+      status: 201, // 201 Created: Indicates a resource was created.
     });
 
   } catch (error) {
