@@ -12,7 +12,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Settings, Save, Loader2, Search, Trash2, Download, FileText, PlusCircle, MoreHorizontal, Edit, Sparkles, Bot, ShieldCheck, ChevronDown, Copy, MessageSquarePlus, Library, FileInput, ListOrdered, Percent, Compass, Check } from 'lucide-react';
+import { Settings, Save, Loader2, Search, Trash2, Download, FileText, PlusCircle, MoreHorizontal, Edit, Sparkles, Bot, ShieldCheck, MessageSquarePlus, Library, FileInput, ListOrdered, Percent, Compass, Check, CornerDownRight, ChevronDown, Copy } from 'lucide-react';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
@@ -227,9 +227,46 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
     }
   };
 
+  const threadedResults = useMemo(() => {
+    if (!results || results.length === 0) return [];
+
+    const commentsWithMeta = results.map((comment, index) => {
+        const stt = index + 1;
+        const replyMatch = comment.content.match(/^(?:\d+\s*reply\s*->\s*(\d+)\.\s*)?(.*)$/s);
+        
+        return {
+            ...comment,
+            stt,
+            parentStt: replyMatch && replyMatch[1] ? parseInt(replyMatch[1], 10) : null,
+            cleanContent: replyMatch && replyMatch[2] ? replyMatch[2].trim() : comment.content.trim(),
+        };
+    });
+
+    const parentComments = commentsWithMeta.filter(c => c.parentStt === null);
+    const replyMap = new Map<number, any[]>();
+    commentsWithMeta.filter(c => c.parentStt !== null).forEach(reply => {
+        if (!replyMap.has(reply.parentStt!)) {
+            replyMap.set(reply.parentStt!, []);
+        }
+        replyMap.get(reply.parentStt!)!.push(reply);
+    });
+
+    const finalResults: any[] = [];
+    parentComments.forEach(parent => {
+        finalResults.push({ ...parent, level: 0 });
+        const replies = replyMap.get(parent.stt) || [];
+        replies.sort((a, b) => a.stt - b.stt);
+        replies.forEach(reply => {
+            finalResults.push({ ...reply, level: 1 });
+        });
+    });
+
+    return finalResults;
+  }, [results]);
+
   const filteredResults = useMemo(() => {
-    return results.filter(r => r.content.toLowerCase().includes(searchTerm.toLowerCase()));
-  }, [results, searchTerm]);
+    return threadedResults.filter(r => r.cleanContent.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [threadedResults, searchTerm]);
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) setSelectedIds(filteredResults.map(r => r.id));
@@ -275,7 +312,12 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
       const total = mandatoryConditions.length;
       const met = r.metConditionIds?.length ?? total;
       const conditionDisplay = total > 0 ? (met === total ? 'Đạt' : `${met}/${total}`) : 'N/A';
-      return { 'Nội dung Comment': r.content, 'Loại comment': r.type, 'Điều kiện': conditionDisplay };
+      return { 
+        'STT': r.stt,
+        'Nội dung Comment': `${' '.repeat(r.level * 4)}${r.cleanContent}`,
+        'Loại comment': r.type, 
+        'Điều kiện': conditionDisplay 
+      };
     });
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
@@ -295,14 +337,27 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
     setMandatoryConditions(prev => prev.filter(c => c.id !== id));
   };
 
-  const handleOpenEditDialog = (comment: GeneratedComment) => {
+  const handleOpenEditDialog = (comment: any) => {
     setEditingComment(comment);
-    setEditedContent(comment.content);
+    setEditedContent(comment.cleanContent);
   };
 
   const handleUpdateComment = async () => {
     if (!editingComment) return;
-    const newResults = results.map(r => r.id === editingComment.id ? { ...r, content: editedContent } : r);
+
+    const originalCommentMeta = results.map((c, i) => ({...c, stt: i+1})).find(c => c.id === editingComment.id);
+    if (!originalCommentMeta) {
+        showError("Không tìm thấy bình luận gốc để cập nhật.");
+        return;
+    }
+
+    let newFullContent = editedContent;
+    const replyMatch = originalCommentMeta.content.match(/^(?:\d+\s*reply\s*->\s*(\d+)\.\s*)/s);
+    if (replyMatch) {
+        newFullContent = `${replyMatch[0]}${editedContent}`;
+    }
+
+    const newResults = results.map(r => r.id === editingComment.id ? { ...r, content: newFullContent } : r);
     
     setResults(newResults);
     setEditingComment(null);
@@ -614,7 +669,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                     </TableCell>
                   </TableRow>
                 )}
-                {filteredResults.length > 0 ? filteredResults.map((result, index) => {
+                {filteredResults.length > 0 ? filteredResults.map((result) => {
                   const totalConditions = mandatoryConditions.length;
                   const metCount = result.metConditionIds?.length ?? totalConditions;
                   const allConditionsMet = totalConditions > 0 && metCount === totalConditions;
@@ -622,8 +677,15 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                   return (
                     <TableRow key={result.id}>
                       <TableCell><Checkbox checked={selectedIds.includes(result.id)} onCheckedChange={() => handleSelectRow(result.id)} /></TableCell>
-                      <TableCell>{index + 1}</TableCell>
-                      <TableCell className="max-w-md break-words">{result.content}</TableCell>
+                      <TableCell>{result.stt}</TableCell>
+                      <TableCell className="max-w-md break-words">
+                        <div className={cn("flex items-start", result.level > 0 && "pl-6")}>
+                          {result.level > 0 && (
+                            <CornerDownRight className="h-4 w-4 text-slate-400 mr-2 mt-1 flex-shrink-0" />
+                          )}
+                          <span>{result.cleanContent}</span>
+                        </div>
+                      </TableCell>
                       <TableCell><Badge variant="outline">{result.type}</Badge></TableCell>
                       <TableCell>
                         <Popover>
