@@ -135,9 +135,21 @@ export const ProjectDetailProvider = ({ projectId, children }: { projectId: stri
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'content_ai_items', filter: `project_id=eq.${projectId}` },
         (payload) => {
-          const updatedItem = payload.new as ProjectItem;
-          showSuccess(`Đã tạo xong nội dung cho "${updatedItem.name}"!`);
-          setNewlyUpdatedItemIds(prev => new Set(prev).add(updatedItem.id));
+          const newItem = payload.new as ProjectItem;
+          const oldItem = payload.old as ProjectItem;
+
+          try {
+            const newContent = JSON.parse(newItem.content || '[]');
+            const oldContent = JSON.parse(oldItem.content || '[]');
+
+            if (Array.isArray(newContent) && Array.isArray(oldContent) && newContent.length > oldContent.length) {
+              showSuccess(`Đã tạo xong nội dung cho "${newItem.name}"!`);
+              setNewlyUpdatedItemIds(prev => new Set(prev).add(newItem.id));
+            }
+          } catch (e) {
+            console.error("Error processing realtime update payload:", e);
+          }
+          
           fetchProjectData(true);
         }
       )
@@ -163,8 +175,8 @@ export const ProjectDetailProvider = ({ projectId, children }: { projectId: stri
       });
 
     return () => {
-      channel.unsubscribe();
-      taskChannel.unsubscribe();
+      supabase.removeChannel(channel);
+      supabase.removeChannel(taskChannel);
     };
   }, [projectId, fetchProjectData, refetchProcessingTasks]);
 
