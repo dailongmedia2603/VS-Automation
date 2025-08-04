@@ -62,6 +62,10 @@ const buildCommentPrompt = (basePrompt, config) => {
 
   let replyInstruction = '';
   if (replyQuantity > 0) {
+    const replyDirectionText = config.replyDirection 
+      ? `- **Định hướng cho reply:** ${config.replyDirection}` 
+      : '';
+
     replyInstruction = `
 ---
 **QUY TẮC REPLY (CỰC KỲ QUAN TRỌNG):**
@@ -69,6 +73,7 @@ const buildCommentPrompt = (basePrompt, config) => {
 - Các reply PHẢI trả lời các bình luận gốc (từ 1 đến ${parentQuantity}).
 - Cú pháp reply BẮT BUỘC: \`[STT reply] reply -> [STT comment gốc]. [Nội dung]\`.
 - Ví dụ: \`1 reply -> 5. Đúng rồi đó mom...\`
+${replyDirectionText}
 - **TUYỆT ĐỐI KHÔNG** sử dụng các định dạng khác như \`(reply)\` hay bất kỳ định dạng nào khác.
 ---
 `;

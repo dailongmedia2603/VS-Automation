@@ -489,9 +489,20 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                       </div>
                       <div className="space-y-2">
                         <Label>Số lượng replies</Label>
-                        <Input type="number" value={config.replyQuantity || 0} onChange={e => handleConfigChange('replyQuantity', e.target.value)} placeholder="VD: 3" />
+                        <Input type="number" value={config.replyQuantity || 0} onChange={e => handleConfigChange('replyQuantity', parseInt(e.target.value, 10) || 0)} placeholder="VD: 3" />
                       </div>
                     </div>
+                    {Number(config.replyQuantity) > 0 && (
+                      <div className="space-y-2">
+                        <Label>Định hướng reply</Label>
+                        <Textarea
+                          value={config.replyDirection || ''}
+                          onChange={e => handleConfigChange('replyDirection', e.target.value)}
+                          placeholder="Nhập định hướng cho các replies..."
+                          className="min-h-[80px]"
+                        />
+                      </div>
+                    )}
                     <div className="space-y-2">
                       <Label>Tài liệu liên quan</Label>
                       <Popover>
