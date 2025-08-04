@@ -57,7 +57,7 @@ export const initialConfig: TrainingConfig = {
   ],
   temperature: 0.7,
   topP: 0.95,
-  maxTokens: 2048,
+  maxTokens: 100000,
   useCoT: false,
   cotFactors: [],
 };
