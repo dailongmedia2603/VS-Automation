@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { ProjectDocumentsManager } from '@/components/content-ai/ProjectDocumentsManager';
 import { CommentGenerationDetail } from '@/components/content-ai/CommentGenerationDetail';
 import { ArticleGenerationDetail } from '@/components/content-ai/ArticleGenerationDetail';
+import { Badge } from '@/components/ui/badge';
 
 type Project = {
   id: number;
@@ -51,6 +52,7 @@ const ProjectDetail = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [promptLibraries, setPromptLibraries] = useState<PromptLibrary[]>([]);
+  const [newlyUpdatedItemIds, setNewlyUpdatedItemIds] = useState<Set<number>>(new Set());
 
   const [newItem, setNewItem] = useState({ name: '', type: 'article' as 'article' | 'comment' });
   const [newItemConfig, setNewItemConfig] = useState<any>({ quantity: 1 });
@@ -109,6 +111,12 @@ const ProjectDetail = () => {
         (payload) => {
           const updatedItem = payload.new as ProjectItem;
           
+          const oldItem = items.find(item => item.id === updatedItem.id);
+          if (oldItem && oldItem.content !== updatedItem.content) {
+            showSuccess(`Đã tạo xong nội dung cho "${updatedItem.name}"!`);
+            setNewlyUpdatedItemIds(prev => new Set(prev).add(updatedItem.id));
+          }
+
           setItems((currentItems) => 
             currentItems.map((item) => (item.id === updatedItem.id ? updatedItem : item))
           );
@@ -126,7 +134,21 @@ const ProjectDetail = () => {
     return () => {
       supabase.removeChannel(itemsChannel);
     };
-  }, [projectId]);
+  }, [projectId, items]);
+
+  const handleSelectView = (view: 'documents' | ProjectItem) => {
+    if (typeof view === 'object' && view.id) {
+      setNewlyUpdatedItemIds(prev => {
+        if (prev.has(view.id)) {
+          const newSet = new Set(prev);
+          newSet.delete(view.id);
+          return newSet;
+        }
+        return prev;
+      });
+    }
+    setSelectedView(view);
+  };
 
   const handleOpenAddDialog = () => {
     setNewItem({ name: '', type: 'article' });
@@ -249,7 +271,7 @@ const ProjectDetail = () => {
   const articles = items.filter(item => item.type === 'article');
   const comments = items.filter(item => item.type === 'comment');
 
-  const ItemList = ({ items }: { items: ProjectItem[] }) => {
+  const ItemList = ({ items, newlyUpdatedIds }: { items: ProjectItem[], newlyUpdatedIds: Set<number> }) => {
     const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -263,7 +285,7 @@ const ProjectDetail = () => {
             {items.map(item => (
                 <div
                     key={item.id}
-                    onClick={() => editingItemId !== item.id && setSelectedView(item)}
+                    onClick={() => editingItemId !== item.id && handleSelectView(item)}
                     className={cn(
                         "group w-full text-left p-2 rounded-md text-sm flex items-center justify-between cursor-pointer",
                         selectedView && typeof selectedView === 'object' && selectedView.id === item.id && editingItemId !== item.id
@@ -288,7 +310,14 @@ const ProjectDetail = () => {
                         </div>
                     ) : (
                         <>
-                            <span className="truncate">{item.name}</span>
+                            <span className="truncate flex-1 flex items-center gap-2">
+                                {item.name}
+                                {newlyUpdatedIds.has(item.id) && (
+                                    <Badge variant="secondary" className="bg-green-100 text-green-800 animate-pulse">
+                                        Tạo xong
+                                    </Badge>
+                                )}
+                            </span>
                             <div className="flex items-center flex-shrink-0">
                                 <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
                                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setEditingItemId(item.id); setEditingName(item.name); }}>
@@ -348,7 +377,7 @@ const ProjectDetail = () => {
             <div className="flex flex-col h-full p-4">
               <div className="p-2">
                 <button
-                  onClick={() => setSelectedView('documents')}
+                  onClick={() => handleSelectView('documents')}
                   className={cn(
                     "w-full text-left p-3 rounded-lg text-base font-semibold flex items-center gap-3 transition-colors",
                     selectedView === 'documents'
@@ -363,11 +392,11 @@ const ProjectDetail = () => {
               <Accordion type="multiple" defaultValue={['articles', 'comments']} className="w-full">
                 <AccordionItem value="articles">
                   <AccordionTrigger className="text-base font-semibold hover:no-underline"><div className="flex items-center gap-2"><FileText className="h-5 w-5 text-blue-600" /><span>Viết bài viết ({articles.length})</span></div></AccordionTrigger>
-                  <AccordionContent><ItemList items={articles} /></AccordionContent>
+                  <AccordionContent><ItemList items={articles} newlyUpdatedIds={newlyUpdatedItemIds} /></AccordionContent>
                 </AccordionItem>
                 <AccordionItem value="comments">
                   <AccordionTrigger className="text-base font-semibold hover:no-underline"><div className="flex items-center gap-2"><MessageSquare className="h-5 w-5 text-green-600" /><span>Viết comment ({comments.length})</span></div></AccordionTrigger>
-                  <AccordionContent><ItemList items={comments} /></AccordionContent>
+                  <AccordionContent><ItemList items={comments} newlyUpdatedIds={newlyUpdatedItemIds} /></AccordionContent>
                 </AccordionItem>
               </Accordion>
             </div>

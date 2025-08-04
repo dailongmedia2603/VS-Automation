@@ -154,10 +154,8 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
     if (!config.direction) { showError("Vui lòng nhập 'Định hướng nội dung'."); return; }
 
     setIsGenerating(true);
-    const toastId = showLoading("AI đang viết bài, vui lòng chờ...");
     try {
-      const oldResults = JSON.parse(item.content || '[]') as GeneratedArticle[];
-      const { data: updatedItem, error } = await supabase.functions.invoke('create-ai-generation-task', {
+      const { data: taskData, error } = await supabase.functions.invoke('create-ai-generation-task', {
         body: { itemId: item.id, config: { ...config, mandatoryConditions, projectId: project.id } }
       });
       
@@ -165,18 +163,11 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
         const errorBody = await error.context.json();
         throw new Error(errorBody.error || error.message);
       }
-      if (updatedItem.error) throw new Error(updatedItem.error);
+      if (taskData.error) throw new Error(taskData.error);
       
-      const newResults = JSON.parse(updatedItem.content || '[]') as GeneratedArticle[];
-      const oldIds = new Set(oldResults.map(r => r.id));
-      const newIds = newResults.filter(r => !oldIds.has(r.id)).map(r => r.id);
-      setHighlightedIds(newIds);
+      showSuccess("Yêu cầu đã được gửi. AI đang xử lý trong nền...");
 
-      onSave(updatedItem);
-      dismissToast(toastId);
-      showSuccess("Đã tạo bài viết thành công!");
     } catch (err: any) {
-      dismissToast(toastId);
       showError(`Không thể bắt đầu: ${err.message}`);
     } finally {
       setIsGenerating(false);

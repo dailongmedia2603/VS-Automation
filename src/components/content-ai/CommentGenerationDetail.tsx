@@ -172,9 +172,8 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
     if (!config.postContent) { showError("Vui lòng nhập 'Nội dung Post'."); return; }
 
     setIsGenerating(true);
-    const toastId = showLoading("AI đang xử lý, vui lòng chờ...");
     try {
-      const { data: updatedItem, error } = await supabase.functions.invoke('create-ai-generation-task', {
+      const { data: taskData, error } = await supabase.functions.invoke('create-ai-generation-task', {
         body: { itemId: item.id, config: { ...config, mandatoryConditions, projectId: project.id } }
       });
       
@@ -182,13 +181,10 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
         const errorBody = await error.context.json();
         throw new Error(errorBody.error || error.message);
       }
-      if (updatedItem.error) throw new Error(updatedItem.error);
+      if (taskData.error) throw new Error(taskData.error);
       
-      onSave(updatedItem);
-      dismissToast(toastId);
-      showSuccess("Đã tạo comment thành công!");
+      showSuccess("Yêu cầu đã được gửi. AI đang xử lý trong nền...");
     } catch (err: any) {
-      dismissToast(toastId);
       showError(`Không thể bắt đầu: ${err.message}`);
     } finally {
       setIsGenerating(false);
