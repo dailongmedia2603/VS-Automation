@@ -12,7 +12,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Settings, Save, Loader2, Search, Trash2, Download, FileText, PlusCircle, MoreHorizontal, Edit, Sparkles, Bot, ShieldCheck, MessageSquarePlus, Library, FileInput, ListOrdered, Percent, Compass, Check, CornerDownRight, ChevronDown, Copy, User as UserIcon } from 'lucide-react';
+import { Settings, Save, Loader2, Search, Trash2, Download, FileText, PlusCircle, MoreHorizontal, Edit, Sparkles, Bot, ShieldCheck, MessageSquarePlus, Library, FileInput, ListOrdered, Percent, Compass, Check, CornerDownRight, ChevronDown, Copy } from 'lucide-react';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
