@@ -22,6 +22,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ConditionLibraryDialog } from './ConditionLibraryDialog';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { useProjectDetail } from '@/contexts/ProjectDetailContext';
 
 type Project = { id: number; name: string; };
 type ProjectItem = { id: number; name: string; type: 'article' | 'comment'; content: string | null; config: any; };
@@ -49,6 +50,7 @@ interface CommentGenerationDetailProps {
 }
 
 export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave }: CommentGenerationDetailProps) => {
+  const { refetchProcessingTasks } = useProjectDetail();
   const [config, setConfig] = useState<any>({});
   const [mandatoryConditions, setMandatoryConditions] = useState<MandatoryCondition[]>([]);
   const [results, setResults] = useState<GeneratedComment[]>([]);
@@ -185,6 +187,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
       if (taskData.error) throw new Error(taskData.error);
       
       showSuccess("Yêu cầu đã được gửi. AI đang xử lý trong nền...");
+      await refetchProcessingTasks();
     } catch (err: any) {
       showError(`Không thể bắt đầu: ${err.message}`);
     } finally {

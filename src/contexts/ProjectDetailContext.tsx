@@ -51,6 +51,7 @@ interface ProjectDetailContextType {
   handleDeleteItem: (item: ProjectItem) => void;
   handleConfirmDelete: () => void;
   setIsDeleteDialogOpen: (isOpen: boolean) => void;
+  refetchProcessingTasks: () => Promise<void>;
 }
 
 const ProjectDetailContext = createContext<ProjectDetailContextType | undefined>(undefined);
@@ -68,6 +69,30 @@ export const ProjectDetailProvider = ({ projectId, children }: { projectId: stri
   const [editingName, setEditingName] = useState('');
   const [itemToDelete, setItemToDelete] = useState<ProjectItem | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+
+  const refetchProcessingTasks = useCallback(async () => {
+    if (!projectId) return;
+    const { data: itemsData, error: itemsError } = await supabase.from('content_ai_items').select('id').eq('project_id', projectId);
+    if (itemsError) {
+      console.error("Error fetching items for task check:", itemsError);
+      return;
+    }
+    const itemIds = itemsData.map(i => i.id);
+    if (itemIds.length > 0) {
+      const { data: tasksData, error: tasksError } = await supabase
+        .from('ai_generation_tasks')
+        .select('item_id')
+        .in('item_id', itemIds)
+        .in('status', ['pending', 'running']);
+      if (!tasksError) {
+        setProcessingItemIds(new Set(tasksData.map(t => t.item_id)));
+      } else {
+        console.error("Error fetching processing tasks:", tasksError);
+      }
+    } else {
+      setProcessingItemIds(new Set());
+    }
+  }, [projectId]);
 
   const fetchProjectData = useCallback(async () => {
     setIsLoading(true);
@@ -90,30 +115,14 @@ export const ProjectDetailProvider = ({ projectId, children }: { projectId: stri
       const currentItems = itemsData || [];
       setItems(currentItems);
       setPromptLibraries(librariesData || []);
-
-      if (currentItems.length > 0) {
-        const itemIds = currentItems.map(i => i.id);
-        const { data: tasksData, error: tasksError } = await supabase
-          .from('ai_generation_tasks')
-          .select('item_id')
-          .in('item_id', itemIds)
-          .in('status', ['pending', 'running']);
-        
-        if (tasksError) {
-          console.error("Error fetching processing tasks:", tasksError);
-        } else {
-          setProcessingItemIds(new Set(tasksData.map(t => t.item_id)));
-        }
-      } else {
-        setProcessingItemIds(new Set());
-      }
+      await refetchProcessingTasks();
 
     } catch (error: any) {
       showError("Không thể tải dữ liệu dự án: " + error.message);
     } finally {
       setIsLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, refetchProcessingTasks]);
 
   useEffect(() => {
     fetchProjectData();
@@ -152,25 +161,8 @@ export const ProjectDetailProvider = ({ projectId, children }: { projectId: stri
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'ai_generation_tasks' },
-        (payload) => {
-          const refetchTasks = async () => {
-            const { data: itemsData, error: itemsError } = await supabase.from('content_ai_items').select('id').eq('project_id', projectId);
-            if (itemsError) return;
-            const itemIds = itemsData.map(i => i.id);
-            if (itemIds.length > 0) {
-              const { data: tasksData, error: tasksError } = await supabase
-                .from('ai_generation_tasks')
-                .select('item_id')
-                .in('item_id', itemIds)
-                .in('status', ['pending', 'running']);
-              if (!tasksError) {
-                setProcessingItemIds(new Set(tasksData.map(t => t.item_id)));
-              }
-            } else {
-              setProcessingItemIds(new Set());
-            }
-          };
-          refetchTasks();
+        () => {
+          refetchProcessingTasks();
         }
       )
       .subscribe();
@@ -179,7 +171,7 @@ export const ProjectDetailProvider = ({ projectId, children }: { projectId: stri
       supabase.removeChannel(channel);
       supabase.removeChannel(taskChannel);
     };
-  }, [projectId]);
+  }, [projectId, refetchProcessingTasks]);
 
   const handleSelectView = (view: 'documents' | ProjectItem) => {
     if (typeof view === 'object' && view.id) {
@@ -259,6 +251,7 @@ export const ProjectDetailProvider = ({ projectId, children }: { projectId: stri
     handleDeleteItem,
     handleConfirmDelete,
     setIsDeleteDialogOpen,
+    refetchProcessingTasks,
   };
 
   return (

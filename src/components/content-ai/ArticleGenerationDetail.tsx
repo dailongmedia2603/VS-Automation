@@ -23,6 +23,7 @@ import { ConditionLibraryDialog } from './ConditionLibraryDialog';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from '@/lib/utils';
+import { useProjectDetail } from '@/contexts/ProjectDetailContext';
 
 type Project = { id: number; name: string; };
 type ProjectItem = { id: number; name: string; type: 'article' | 'comment'; content: string | null; config: any; };
@@ -42,6 +43,7 @@ interface ArticleGenerationDetailProps {
 }
 
 export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave }: ArticleGenerationDetailProps) => {
+  const { refetchProcessingTasks } = useProjectDetail();
   const [config, setConfig] = useState<any>({});
   const [mandatoryConditions, setMandatoryConditions] = useState<MandatoryCondition[]>([]);
   const [results, setResults] = useState<GeneratedArticle[]>([]);
@@ -166,6 +168,7 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
       if (taskData.error) throw new Error(taskData.error);
       
       showSuccess("Yêu cầu đã được gửi. AI đang xử lý trong nền...");
+      await refetchProcessingTasks();
 
     } catch (err: any) {
       showError(`Không thể bắt đầu: ${err.message}`);
