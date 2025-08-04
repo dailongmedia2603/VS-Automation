@@ -482,7 +482,16 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="space-y-2"><Label>Số lượng comment</Label><Input type="number" value={config.quantity} onChange={e => handleConfigChange('quantity', e.target.value)} defaultValue={10} /></div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Số lượng comment</Label>
+                        <Input type="number" value={config.quantity} onChange={e => handleConfigChange('quantity', e.target.value)} defaultValue={10} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Số lượng replies</Label>
+                        <Input type="number" value={config.replyQuantity || 0} onChange={e => handleConfigChange('replyQuantity', e.target.value)} placeholder="VD: 3" />
+                      </div>
+                    </div>
                     <div className="space-y-2">
                       <Label>Tài liệu liên quan</Label>
                       <Popover>

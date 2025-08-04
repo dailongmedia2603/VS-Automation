@@ -56,6 +56,24 @@ const buildCommentPrompt = (basePrompt, config) => {
     .map(c => `- ${c.content}`)
     .join('\n');
 
+  const replyQuantity = Number(config.replyQuantity) || 0;
+  const totalQuantity = Number(config.quantity) || 10;
+  const parentQuantity = totalQuantity - replyQuantity;
+
+  let replyInstruction = '';
+  if (replyQuantity > 0) {
+    replyInstruction = `
+---
+**QUY TẮC REPLY (CỰC KỲ QUAN TRỌNG):**
+- Trong tổng số ${totalQuantity} bình luận, phải có chính xác **${replyQuantity} bình luận là reply**.
+- Các reply PHẢI trả lời các bình luận gốc (từ 1 đến ${parentQuantity}).
+- Cú pháp reply BẮT BUỘC: \`[STT reply] reply -> [STT comment gốc]. [Nội dung]\`.
+- Ví dụ: \`1 reply -> 5. Đúng rồi đó mom...\`
+- **TUYỆT ĐỐI KHÔNG** sử dụng các định dạng khác như \`(reply)\` hay bất kỳ định dạng nào khác.
+---
+`;
+  }
+
   const finalPrompt = `
     ${basePrompt}
 
@@ -70,13 +88,14 @@ const buildCommentPrompt = (basePrompt, config) => {
 
     **Tỉ lệ và loại bình luận cần tạo:**
     ${ratiosText || 'Không có'}
+    ${replyInstruction}
     ---
     **ĐIỀU KIỆN BẮT BUỘC (QUAN TRỌNG NHẤT):**
     AI phải tuân thủ TUYỆT ĐỐI tất cả các điều kiện sau đây cho MỌI bình luận được tạo ra:
     ${conditionsText || 'Không có điều kiện nào.'}
     ---
 
-    **YÊU CẦU:** Dựa vào TOÀN BỘ thông tin trên, hãy tạo ra chính xác ${config.quantity || 10} bình luận. Mỗi bình luận trên một dòng.
+    **YÊU CẦU:** Dựa vào TOÀN BỘ thông tin trên, hãy tạo ra chính xác ${totalQuantity} bình luận. Mỗi bình luận trên một dòng.
     **CỰC KỲ QUAN TRỌNG:** Mỗi bình luận PHẢI bắt đầu bằng tên loại trong dấu ngoặc vuông, ví dụ: "[Tên Loại] Nội dung bình luận.". Chỉ trả về danh sách các bình luận, KHÔNG thêm bất kỳ lời chào, câu giới thiệu, hay dòng phân cách nào.
   `;
   return finalPrompt;
@@ -265,7 +284,7 @@ serve(async (req) => {
         const allConditionIds = mandatoryConditions.map((c) => c.id);
         newContent = rawContent.split('\n')
           .map(line => line.trim())
-          .filter(line => line.startsWith('[') && line.includes(']'))
+          .filter(line => line)
           .map(line => {
             const match = line.match(/^\[(.*?)\]\s*(.*)$/);
             const type = match ? match[1] : 'Chưa phân loại';
