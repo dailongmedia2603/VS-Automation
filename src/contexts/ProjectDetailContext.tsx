@@ -141,7 +141,11 @@ export const ProjectDetailProvider = ({ projectId, children }: { projectId: stri
           fetchProjectData(true);
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        if (err) {
+          console.error('Realtime subscription lỗi, sẽ thử lại…', err);
+        }
+      });
 
     const taskChannel = supabase
       .channel(`project-tasks-update-${projectId}`)
@@ -152,11 +156,15 @@ export const ProjectDetailProvider = ({ projectId, children }: { projectId: stri
           refetchProcessingTasks();
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        if (err) {
+          console.error('Realtime task channel subscription lỗi:', err);
+        }
+      });
 
     return () => {
-      supabase.removeChannel(channel);
-      supabase.removeChannel(taskChannel);
+      channel.unsubscribe();
+      taskChannel.unsubscribe();
     };
   }, [projectId, fetchProjectData, refetchProcessingTasks]);
 
