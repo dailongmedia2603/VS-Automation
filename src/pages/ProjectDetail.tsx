@@ -18,11 +18,7 @@ import { ProjectDocumentsManager } from '@/components/content-ai/ProjectDocument
 import { CommentGenerationDetail } from '@/components/content-ai/CommentGenerationDetail';
 import { ArticleGenerationDetail } from '@/components/content-ai/ArticleGenerationDetail';
 import { Badge } from '@/components/ui/badge';
-
-type Project = {
-  id: number;
-  name: string;
-};
+import { ProjectDetailProvider, useProjectDetail } from '@/contexts/ProjectDetailContext';
 
 type ProjectItem = {
   id: number;
@@ -43,121 +39,101 @@ type CommentRatio = {
   content: string;
 };
 
-const ProjectDetail = () => {
-  const { projectId } = useParams<{ projectId: string }>();
-  const [project, setProject] = useState<Project | null>(null);
-  const [items, setItems] = useState<ProjectItem[]>([]);
-  const [selectedView, setSelectedView] = useState<'documents' | ProjectItem | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+const ItemList = ({ items, newlyUpdatedIds }: { items: ProjectItem[], newlyUpdatedIds: Set<number> }) => {
+  const { selectedView, handleSelectView, editingItemId, setEditingItemId, setEditingName, editingName, handleSaveName, handleDeleteItem } = useProjectDetail();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+      if (editingItemId && inputRef.current) {
+          inputRef.current.focus();
+      }
+  }, [editingItemId]);
+
+  return (
+      <div className="flex flex-col gap-1 pl-2">
+          {items.map(item => (
+              <div
+                  key={item.id}
+                  onClick={() => editingItemId !== item.id && handleSelectView(item)}
+                  className={cn(
+                      "group w-full text-left p-2 rounded-md text-sm flex items-center justify-between cursor-pointer",
+                      selectedView && typeof selectedView === 'object' && selectedView.id === item.id && editingItemId !== item.id
+                          ? "bg-blue-100 text-blue-700 font-semibold"
+                          : "hover:bg-slate-100"
+                  )}
+              >
+                  {editingItemId === item.id ? (
+                      <div className="flex-1 flex items-center gap-1">
+                          <Input
+                              ref={inputRef}
+                              value={editingName}
+                              onChange={(e) => setEditingName(e.target.value)}
+                              onBlur={handleSaveName}
+                              onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
+                              className="h-7 text-sm"
+                              onClick={(e) => e.stopPropagation()}
+                          />
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleSaveName}>
+                              <Check className="h-4 w-4" />
+                          </Button>
+                      </div>
+                  ) : (
+                      <>
+                          <span className="truncate flex-1 flex items-center gap-2">
+                              {newlyUpdatedIds.has(item.id) && (
+                                  <span className="relative flex h-2 w-2 flex-shrink-0">
+                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                  </span>
+                              )}
+                              <span className="truncate">{item.name}</span>
+                              {newlyUpdatedIds.has(item.id) && (
+                                  <Badge variant="secondary" className="bg-green-100 text-green-800">
+                                      Mới
+                                  </Badge>
+                              )}
+                          </span>
+                          <div className="flex items-center flex-shrink-0">
+                              <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
+                                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setEditingItemId(item.id); setEditingName(item.name); }}>
+                                      <Edit className="h-3 w-3" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteItem(item); }}>
+                                      <Trash2 className="h-3 w-3" />
+                                  </Button>
+                              </div>
+                              <ChevronRight className={cn("h-4 w-4 text-slate-400", selectedView && typeof selectedView === 'object' && selectedView.id === item.id && "text-blue-700")} />
+                          </div>
+                      </>
+                  )}
+              </div>
+          ))}
+      </div>
+  );
+};
+
+const ProjectDetailContent = () => {
+  const {
+    project,
+    items,
+    selectedView,
+    isLoading,
+    promptLibraries,
+    newlyUpdatedItemIds,
+    handleSelectView,
+    handleItemUpdate,
+    fetchProjectData
+  } = useProjectDetail();
+
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [promptLibraries, setPromptLibraries] = useState<PromptLibrary[]>([]);
-  const [newlyUpdatedItemIds, setNewlyUpdatedItemIds] = useState<Set<number>>(new Set());
-
   const [newItem, setNewItem] = useState({ name: '', type: 'article' as 'article' | 'comment' });
   const [newItemConfig, setNewItemConfig] = useState<any>({ quantity: 1 });
   const [commentRatios, setCommentRatios] = useState<CommentRatio[]>([{ id: crypto.randomUUID(), percentage: 100, content: '' }]);
 
-  const [editingItemId, setEditingItemId] = useState<number | null>(null);
-  const [editingName, setEditingName] = useState('');
-  const [itemToDelete, setItemToDelete] = useState<ProjectItem | null>(null);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-
   const totalPercentage = useMemo(() => {
     return commentRatios.reduce((sum, ratio) => sum + (Number(ratio.percentage) || 0), 0);
   }, [commentRatios]);
-
-  const fetchProjectData = useCallback(async () => {
-    if (!projectId) return;
-    setIsLoading(true);
-    try {
-      const projectPromise = supabase.from('content_ai_ds_du_an').select('id, name').eq('id', projectId).single();
-      const itemsPromise = supabase.from('content_ai_items').select('*').eq('project_id', projectId).order('created_at', { ascending: false });
-      const librariesPromise = supabase.from('prompt_libraries').select('id, name');
-      
-      const [
-        { data: projectData, error: projectError }, 
-        { data: itemsData, error: itemsError },
-        { data: librariesData, error: librariesError }
-      ] = await Promise.all([projectPromise, itemsPromise, librariesPromise]);
-
-      if (projectError) throw projectError;
-      if (itemsError) throw itemsError;
-      if (librariesError) throw librariesError;
-
-      setProject(projectData);
-      setItems(itemsData || []);
-      setPromptLibraries(librariesData || []);
-    } catch (error: any) {
-      showError("Không thể tải dữ liệu dự án: " + error.message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [projectId]);
-
-  useEffect(() => {
-    fetchProjectData();
-  }, [fetchProjectData]);
-
-  // Effect for real-time content updates
-  useEffect(() => {
-    if (!projectId) return;
-
-    const handleRealtimeUpdate = (payload: any) => {
-      const updatedItem = payload.new as ProjectItem;
-      let contentHasChanged = false;
-
-      // Luôn cập nhật danh sách để đảm bảo giao diện đồng bộ với DB
-      setItems((currentItems) => {
-        const oldItem = currentItems.find(item => item.id === updatedItem.id);
-        if (oldItem && oldItem.content !== updatedItem.content) {
-          contentHasChanged = true;
-        }
-        return currentItems.map((item) => (item.id === updatedItem.id ? updatedItem : item));
-      });
-
-      // Nếu nội dung thực sự thay đổi, hiển thị thông báo
-      if (contentHasChanged) {
-        showSuccess(`Đã tạo xong nội dung cho "${updatedItem.name}"!`);
-        setNewlyUpdatedItemIds(prev => new Set(prev).add(updatedItem.id));
-      }
-
-      // Cập nhật view chi tiết nếu đang xem mục được cập nhật
-      setSelectedView(currentView => {
-        if (currentView && typeof currentView === 'object' && currentView.id === updatedItem.id) {
-          return updatedItem;
-        }
-        return currentView;
-      });
-    };
-
-    const itemsChannel = supabase
-      .channel(`project-items-update-${projectId}`)
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'content_ai_items', filter: `project_id=eq.${projectId}` },
-        handleRealtimeUpdate
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(itemsChannel);
-    };
-  }, [projectId]);
-
-  const handleSelectView = (view: 'documents' | ProjectItem) => {
-    if (typeof view === 'object' && view.id) {
-      setNewlyUpdatedItemIds(prev => {
-        if (prev.has(view.id)) {
-          const newSet = new Set(prev);
-          newSet.delete(view.id);
-          return newSet;
-        }
-        return prev;
-      });
-    }
-    setSelectedView(view);
-  };
 
   const handleOpenAddDialog = () => {
     setNewItem({ name: '', type: 'article' });
@@ -181,7 +157,7 @@ const ProjectDetail = () => {
   };
 
   const handleAddItem = async () => {
-    if (!newItem.name.trim() || !projectId) {
+    if (!newItem.name.trim() || !project?.id) {
       showError("Tên bài viết không được để trống.");
       return;
     }
@@ -195,7 +171,7 @@ const ProjectDetail = () => {
       const { error } = await supabase.from('content_ai_items').insert({
         name: newItem.name.trim(),
         type: newItem.type,
-        project_id: projectId,
+        project_id: project.id,
         config: finalConfig
       });
 
@@ -224,133 +200,8 @@ const ProjectDetail = () => {
     setCommentRatios(commentRatios.map(r => r.id === id ? { ...r, [field]: value } : r));
   };
 
-  const handleItemUpdate = (updatedItem: ProjectItem) => {
-    setItems(prevItems => 
-        prevItems.map(item => item.id === updatedItem.id ? updatedItem : item)
-    );
-    if (selectedView && typeof selectedView === 'object' && selectedView.id === updatedItem.id) {
-        setSelectedView(updatedItem);
-    }
-  };
-
-  const handleSaveName = async () => {
-    if (!editingItemId || !editingName.trim()) {
-        setEditingItemId(null);
-        return;
-    }
-    const { error } = await supabase
-        .from('content_ai_items')
-        .update({ name: editingName.trim() })
-        .eq('id', editingItemId);
-    
-    if (error) {
-        showError("Cập nhật tên thất bại: " + error.message);
-    } else {
-        showSuccess("Đã cập nhật tên!");
-        fetchProjectData();
-    }
-    setEditingItemId(null);
-  };
-
-  const handleDeleteItem = (item: ProjectItem) => {
-      setItemToDelete(item);
-      setIsDeleteDialogOpen(true);
-  };
-
-  const handleConfirmDelete = async () => {
-      if (!itemToDelete) return;
-      const { error } = await supabase
-          .from('content_ai_items')
-          .delete()
-          .eq('id', itemToDelete.id);
-      
-      if (error) {
-          showError("Xóa thất bại: " + error.message);
-      } else {
-          showSuccess("Đã xóa mục thành công!");
-          if (selectedView && typeof selectedView === 'object' && selectedView.id === itemToDelete.id) {
-              setSelectedView(null);
-          }
-          fetchProjectData();
-      }
-      setIsDeleteDialogOpen(false);
-      setItemToDelete(null);
-  };
-
   const articles = items.filter(item => item.type === 'article');
   const comments = items.filter(item => item.type === 'comment');
-
-  const ItemList = ({ items, newlyUpdatedIds }: { items: ProjectItem[], newlyUpdatedIds: Set<number> }) => {
-    const inputRef = useRef<HTMLInputElement>(null);
-
-    useEffect(() => {
-        if (editingItemId && inputRef.current) {
-            inputRef.current.focus();
-        }
-    }, [editingItemId]);
-
-    return (
-        <div className="flex flex-col gap-1 pl-2">
-            {items.map(item => (
-                <div
-                    key={item.id}
-                    onClick={() => editingItemId !== item.id && handleSelectView(item)}
-                    className={cn(
-                        "group w-full text-left p-2 rounded-md text-sm flex items-center justify-between cursor-pointer",
-                        selectedView && typeof selectedView === 'object' && selectedView.id === item.id && editingItemId !== item.id
-                            ? "bg-blue-100 text-blue-700 font-semibold"
-                            : "hover:bg-slate-100"
-                    )}
-                >
-                    {editingItemId === item.id ? (
-                        <div className="flex-1 flex items-center gap-1">
-                            <Input
-                                ref={inputRef}
-                                value={editingName}
-                                onChange={(e) => setEditingName(e.target.value)}
-                                onBlur={handleSaveName}
-                                onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
-                                className="h-7 text-sm"
-                                onClick={(e) => e.stopPropagation()}
-                            />
-                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleSaveName}>
-                                <Check className="h-4 w-4" />
-                            </Button>
-                        </div>
-                    ) : (
-                        <>
-                            <span className="truncate flex-1 flex items-center gap-2">
-                                {newlyUpdatedIds.has(item.id) && (
-                                    <span className="relative flex h-2 w-2 flex-shrink-0">
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                                    </span>
-                                )}
-                                <span className="truncate">{item.name}</span>
-                                {newlyUpdatedIds.has(item.id) && (
-                                    <Badge variant="secondary" className="bg-green-100 text-green-800">
-                                        Mới
-                                    </Badge>
-                                )}
-                            </span>
-                            <div className="flex items-center flex-shrink-0">
-                                <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
-                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setEditingItemId(item.id); setEditingName(item.name); }}>
-                                        <Edit className="h-3 w-3" />
-                                    </Button>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteItem(item); }}>
-                                        <Trash2 className="h-3 w-3" />
-                                    </Button>
-                                </div>
-                                <ChevronRight className={cn("h-4 w-4 text-slate-400", selectedView && typeof selectedView === 'object' && selectedView.id === item.id && "text-blue-700")} />
-                            </div>
-                        </>
-                    )}
-                </div>
-            ))}
-        </div>
-    );
-  };
 
   if (isLoading) {
     return (
@@ -419,7 +270,7 @@ const ProjectDetail = () => {
           <ResizableHandle withHandle />
           <ResizablePanel defaultSize={80}>
             <div className="h-full p-6 overflow-y-auto">
-              {selectedView === 'documents' && projectId && <ProjectDocumentsManager projectId={projectId} />}
+              {selectedView === 'documents' && project.id && <ProjectDocumentsManager projectId={String(project.id)} />}
               
               {selectedView && typeof selectedView === 'object' && selectedView.type === 'comment' && (
                 <CommentGenerationDetail 
@@ -574,22 +425,18 @@ const ProjectDetail = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-            <AlertDialogHeader>
-                <AlertDialogTitle>Bạn có chắc chắn?</AlertDialogTitle>
-                <AlertDialogDescription>
-                    Hành động này sẽ xóa vĩnh viễn mục "{itemToDelete?.name}".
-                </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogCancel>Hủy</AlertDialogCancel>
-                <AlertDialogAction onClick={handleConfirmDelete} className="bg-red-600 hover:bg-red-700">Xóa</AlertDialogAction>
-            </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
+  );
+};
+
+const ProjectDetail = () => {
+  const { projectId } = useParams<{ projectId: string }>();
+  if (!projectId) return <div>Project ID is required.</div>;
+
+  return (
+    <ProjectDetailProvider projectId={projectId}>
+      <ProjectDetailContent />
+    </ProjectDetailProvider>
   );
 };
 
