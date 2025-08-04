@@ -33,16 +33,17 @@ export const ImportPostsDialog = ({ isOpen, onOpenChange, projectId, onSuccess }
   const [importResult, setImportResult] = useState<{ success: number; failed: number } | null>(null);
 
   const postCount = useMemo(() => {
-    if (!parsedData) return 0;
-    const postNames = new Set(parsedData.map(row => row.post_name?.trim()).filter(Boolean));
+    if (!parsedData || parsedData.length === 0) return 0;
+    const postNames = new Set(parsedData.map(row => String(row.post_name || '').trim()).filter(Boolean));
     return postNames.size;
   }, [parsedData]);
 
   const commentCount = useMemo(() => {
-    if (!parsedData) return 0;
+    if (!parsedData || parsedData.length === 0) return 0;
     return parsedData.reduce((acc, row) => {
-      if (row.comment_content?.trim()) {
-        acc += row.comment_content.trim().split('\n').filter(line => line.trim()).length;
+      const content = String(row.comment_content || '');
+      if (content.trim()) {
+        acc += content.trim().split('\n').filter(line => line.trim()).length;
       }
       return acc;
     }, 0);
@@ -100,13 +101,27 @@ export const ImportPostsDialog = ({ isOpen, onOpenChange, projectId, onSuccess }
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
         
-        const requiredFields = ['post_name', 'post_type', 'id_list'];
-        const firstRow = jsonData[0] || {};
-        if (!requiredFields.every(field => field in firstRow)) {
-          throw new Error("File Excel thiếu các cột bắt buộc: post_name, post_type, id_list.");
+        if (jsonData.length === 0) {
+          throw new Error("File Excel trống hoặc không có dữ liệu.");
         }
 
-        setParsedData(jsonData as ParsedRow[]);
+        const firstRow = jsonData[0] || {};
+        const headers = Object.keys(firstRow).map(h => h.toLowerCase().trim());
+        const requiredFields = ['post_name', 'post_type', 'id_list'];
+        
+        if (!requiredFields.every(field => headers.includes(field))) {
+          throw new Error(`File Excel thiếu các cột bắt buộc. Cần có: ${requiredFields.join(', ')}.`);
+        }
+
+        const normalizedData = jsonData.map(row => {
+          const newRow: any = {};
+          for (const key in row) {
+            newRow[key.toLowerCase().trim()] = row[key];
+          }
+          return newRow;
+        });
+
+        setParsedData(normalizedData as ParsedRow[]);
       } catch (error: any) {
         showError(`Lỗi đọc file: ${error.message}`);
         setFile(null);
@@ -132,15 +147,15 @@ export const ImportPostsDialog = ({ isOpen, onOpenChange, projectId, onSuccess }
       const row = postsToImport[i];
       try {
         const postData = {
-          name: row.post_name?.trim(),
+          name: String(row.post_name || '').trim(),
           type: row.post_type,
-          links: row.id_list,
-          content: row.post_content,
-          comments: row.comment_content ? row.comment_content.trim().split('\n').filter(c => c.trim()) : []
+          links: String(row.id_list || ''),
+          content: String(row.post_content || ''),
+          comments: String(row.comment_content || '').trim() ? String(row.comment_content).trim().split('\n').filter(c => c.trim()) : []
         };
 
         if (!postData.name) {
-          throw new Error(`Row ${i + 2} is missing a post name.`);
+          throw new Error(`Dòng ${i + 2} thiếu tên bài viết.`);
         }
 
         const { data: newPost, error: postError } = await supabase
@@ -183,7 +198,7 @@ export const ImportPostsDialog = ({ isOpen, onOpenChange, projectId, onSuccess }
         }
         successCount++;
       } catch (error: any) {
-        console.error(`Failed to import post from row ${i + 2} ("${row.post_name}"):`, error.message);
+        console.error(`Lỗi import dòng ${i + 2} ("${row.post_name}"):`, error.message);
         failedCount++;
       }
       setImportProgress(((i + 1) / totalPosts) * 100);
