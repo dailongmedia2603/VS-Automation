@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, MessageSquare, FileText, PlusCircle, UploadCloud, ChevronRight, Loader2, BookOpen, Trash2, Edit, Check } from 'lucide-react';
@@ -25,11 +25,6 @@ type ProjectItem = {
   type: 'article' | 'comment';
   content: string | null;
   config: any;
-};
-
-type PromptLibrary = {
-  id: number;
-  name: string;
 };
 
 type CommentRatio = {
