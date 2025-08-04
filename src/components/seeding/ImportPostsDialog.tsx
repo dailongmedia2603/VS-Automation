@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from '@/components/ui/button';
@@ -31,6 +31,22 @@ export const ImportPostsDialog = ({ isOpen, onOpenChange, projectId, onSuccess }
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
   const [importResult, setImportResult] = useState<{ success: number; failed: number } | null>(null);
+
+  const postCount = useMemo(() => {
+    if (!parsedData) return 0;
+    const postNames = new Set(parsedData.map(row => row.post_name?.trim()).filter(Boolean));
+    return postNames.size;
+  }, [parsedData]);
+
+  const commentCount = useMemo(() => {
+    if (!parsedData) return 0;
+    return parsedData.reduce((acc, row) => {
+      if (row.comment_content?.trim()) {
+        acc += row.comment_content.trim().split('\n').filter(line => line.trim()).length;
+      }
+      return acc;
+    }, 0);
+  }, [parsedData]);
 
   const resetState = () => {
     setFile(null);
@@ -106,34 +122,27 @@ export const ImportPostsDialog = ({ isOpen, onOpenChange, projectId, onSuccess }
     setImportProgress(0);
     setImportResult({ success: 0, failed: 0 });
 
-    const dataByPost = parsedData.reduce((acc, row) => {
-      const postName = row.post_name?.trim();
-      if (!postName) return acc;
-
-      if (!acc[postName]) {
-        acc[postName] = {
-          name: postName,
-          type: row.post_type,
-          links: row.id_list,
-          content: row.post_content,
-          comments: [],
-        };
-      }
-      if (row.comment_content?.trim()) {
-        acc[postName].comments.push(...row.comment_content.trim().split('\n'));
-      }
-      return acc;
-    }, {} as Record<string, { name: string; type: string; links: string; content?: string; comments: string[] }>);
-
-    const postsToImport = Object.values(dataByPost);
+    const postsToImport = parsedData;
     const totalPosts = postsToImport.length;
     let successCount = 0;
     let failedCount = 0;
     const successfulPosts: any[] = [];
 
     for (let i = 0; i < totalPosts; i++) {
-      const postData = postsToImport[i];
+      const row = postsToImport[i];
       try {
+        const postData = {
+          name: row.post_name?.trim(),
+          type: row.post_type,
+          links: row.id_list,
+          content: row.post_content,
+          comments: row.comment_content ? row.comment_content.trim().split('\n').filter(c => c.trim()) : []
+        };
+
+        if (!postData.name) {
+          throw new Error(`Row ${i + 2} is missing a post name.`);
+        }
+
         const { data: newPost, error: postError } = await supabase
           .from('seeding_posts')
           .insert({
@@ -151,7 +160,6 @@ export const ImportPostsDialog = ({ isOpen, onOpenChange, projectId, onSuccess }
 
         if (newPost) {
           successfulPosts.push(newPost);
-          // Handle comments for 'comment_check'
           if (postData.type === 'comment_check' && postData.comments.length > 0) {
             const commentsToInsert = postData.comments.map(commentContent => ({
               post_id: newPost.id,
@@ -161,9 +169,8 @@ export const ImportPostsDialog = ({ isOpen, onOpenChange, projectId, onSuccess }
             if (commentsError) throw commentsError;
           }
 
-          // Handle group IDs for 'post_approval'
           if (postData.type === 'post_approval' && postData.links) {
-            const groupIds = postData.links.toString().split('\n').map(id => id.trim()).filter(id => id);
+            const groupIds = String(postData.links).split('\n').map(id => id.trim()).filter(id => id);
             if (groupIds.length > 0) {
               const groupsToInsert = groupIds.map(groupId => ({
                 post_id: newPost.id,
@@ -176,7 +183,7 @@ export const ImportPostsDialog = ({ isOpen, onOpenChange, projectId, onSuccess }
         }
         successCount++;
       } catch (error: any) {
-        console.error(`Failed to import post "${postData.name}":`, error.message);
+        console.error(`Failed to import post from row ${i + 2} ("${row.post_name}"):`, error.message);
         failedCount++;
       }
       setImportProgress(((i + 1) / totalPosts) * 100);
@@ -235,7 +242,7 @@ export const ImportPostsDialog = ({ isOpen, onOpenChange, projectId, onSuccess }
 
           {parsedData.length > 0 && !isImporting && (
             <div className="text-center text-sm text-slate-600 pt-2">
-              <p>Đã tìm thấy <span className="font-bold">{Object.keys(parsedData.reduce((acc, row) => ({...acc, [row.post_name]: true}), {})).length}</span> bài viết và <span className="font-bold">{parsedData.filter(r => r.comment_content).length}</span> bình luận.</p>
+              <p>Đã tìm thấy <span className="font-bold">{postCount}</span> bài viết và <span className="font-bold">{commentCount}</span> bình luận.</p>
             </div>
           )}
           {isImporting && (
