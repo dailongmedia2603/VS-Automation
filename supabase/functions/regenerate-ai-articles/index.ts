@@ -152,11 +152,24 @@ serve(async (req) => {
 
       const finalPrompt = buildRegenerationPrompt(basePrompt, config, originalArticle, feedback);
       
-      const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${aiSettings.google_gemini_api_key}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: finalPrompt }] }], generationConfig }),
-      });
+      let geminiRes;
+      const maxRetries = 3;
+      const retryDelay = 2000;
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${aiSettings.google_gemini_api_key}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ parts: [{ text: finalPrompt }] }], generationConfig }),
+        });
+        if (geminiRes.ok) break;
+        if (geminiRes.status >= 500 && attempt < maxRetries) {
+          console.warn(`Attempt ${attempt} failed with status ${geminiRes.status}. Retrying in ${retryDelay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+        } else {
+          break;
+        }
+      }
+
       const geminiData = await geminiRes.json();
       if (!geminiRes.ok) throw new Error(geminiData?.error?.message || 'Lỗi gọi API Gemini.');
       
