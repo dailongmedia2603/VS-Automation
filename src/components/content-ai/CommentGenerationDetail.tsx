@@ -12,7 +12,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Settings, Save, Loader2, Search, Trash2, Download, FileText, PlusCircle, MoreHorizontal, Edit, Sparkles, Bot, ShieldCheck, MessageSquarePlus, Library, FileInput, ListOrdered, Percent, Compass, Check, CornerDownRight, ChevronDown, Copy } from 'lucide-react';
+import { Settings, Save, Loader2, Search, Trash2, Download, FileText, PlusCircle, MoreHorizontal, Edit, Sparkles, Bot, ShieldCheck, MessageSquarePlus, Library, FileInput, ListOrdered, Percent, Compass, Check, CornerDownRight, ChevronDown, Copy, User as UserIcon } from 'lucide-react';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
@@ -31,6 +31,15 @@ type GeneratedComment = { id: string; content: string; type: string; metConditio
 type Log = { id: number; created_at: string; prompt: string; response: any; };
 type MandatoryCondition = { id: string; content: string; };
 type Document = { id: number; title: string; };
+
+type CommentWithMeta = GeneratedComment & {
+    stt: number;
+    parentStt: number | null;
+    cleanContent: string;
+    type: string;
+    person: number;
+    children?: CommentWithMeta[];
+};
 
 interface CommentGenerationDetailProps {
   project: Project;
@@ -230,22 +239,23 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
   const threadedResults = useMemo(() => {
     if (!results || results.length === 0) return [];
 
-    type CommentWithMeta = GeneratedComment & {
-        stt: number;
-        parentStt: number | null;
-        cleanContent: string;
-        children?: CommentWithMeta[];
-    };
-
     const commentsWithMeta: CommentWithMeta[] = results.map((comment, index) => {
         const stt = index + 1;
         const replyMatch = comment.content.match(/^(?:\d+\s*reply\s*->\s*(\d+)\.\s*)?(.*)$/s);
         
+        const rawContent = replyMatch && replyMatch[2] ? replyMatch[2].trim() : comment.content.trim();
+        const typeMatch = rawContent.match(/^\[(.*?)\]\s*(.*)$/s);
+        
+        const contentWithoutType = typeMatch ? typeMatch[2].trim() : rawContent;
+        const personMatch = contentWithoutType.match(/(.*)\s*\((\d+)\)$/s);
+
         return {
             ...comment,
             stt,
             parentStt: replyMatch && replyMatch[1] ? parseInt(replyMatch[1], 10) : null,
-            cleanContent: replyMatch && replyMatch[2] ? replyMatch[2].trim() : comment.content.trim(),
+            cleanContent: personMatch ? personMatch[1].trim() : contentWithoutType,
+            type: typeMatch ? typeMatch[1] : comment.type,
+            person: personMatch ? parseInt(personMatch[2], 10) : 1,
         };
     });
 
@@ -328,6 +338,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
       const conditionDisplay = total > 0 ? (met === total ? 'Đạt' : `${met}/${total}`) : 'N/A';
       return { 
         'STT': r.stt,
+        'Người': r.person,
         'Nội dung Comment': `${' '.repeat(r.level * 4)}${r.cleanContent}`,
         'Loại comment': r.type, 
         'Điều kiện': conditionDisplay 
@@ -691,11 +702,11 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
         <CardContent>
           <div className="border rounded-lg overflow-hidden">
             <Table>
-              <TableHeader><TableRow><TableHead className="w-12"><Checkbox checked={selectedIds.length === filteredResults.length && filteredResults.length > 0} onCheckedChange={(checked) => handleSelectAll(!!checked)} /></TableHead><TableHead>STT</TableHead><TableHead>Nội dung comment</TableHead><TableHead>Loại comment</TableHead><TableHead>Điều kiện</TableHead><TableHead className="text-right">Thao tác</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead className="w-12"><Checkbox checked={selectedIds.length === filteredResults.length && filteredResults.length > 0} onCheckedChange={(checked) => handleSelectAll(!!checked)} /></TableHead><TableHead>STT</TableHead><TableHead>Người</TableHead><TableHead>Nội dung comment</TableHead><TableHead>Loại comment</TableHead><TableHead>Điều kiện</TableHead><TableHead className="text-right">Thao tác</TableHead></TableRow></TableHeader>
               <TableBody>
                 {isGenerating && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center p-4">
+                    <TableCell colSpan={7} className="text-center p-4">
                       <div className="flex items-center justify-center gap-3 text-slate-500">
                         <Bot className="h-5 w-5 animate-bounce" />
                         <span className="font-medium">AI đang làm việc... Tác vụ đang chạy trong nền.</span>
@@ -712,8 +723,13 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                     <TableRow key={result.id}>
                       <TableCell><Checkbox checked={selectedIds.includes(result.id)} onCheckedChange={() => handleSelectRow(result.id)} /></TableCell>
                       <TableCell>{result.stt}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 text-slate-600 font-semibold text-sm">
+                          {result.person}
+                        </div>
+                      </TableCell>
                       <TableCell className="max-w-md break-words">
-                        <div className={cn("flex items-start", result.level > 0 && "pl-6")}>
+                        <div className={cn("flex items-start")} style={{ paddingLeft: `${result.level * 24}px` }}>
                           {result.level > 0 && (
                             <CornerDownRight className="h-4 w-4 text-slate-400 mr-2 mt-1 flex-shrink-0" />
                           )}
@@ -762,7 +778,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                       </TableCell>
                     </TableRow>
                   )
-                }) : !isGenerating && (<TableRow><TableCell colSpan={6} className="text-center h-24">Chưa có kết quả nào.</TableCell></TableRow>)}
+                }) : !isGenerating && (<TableRow><TableCell colSpan={7} className="text-center h-24">Chưa có kết quả nào.</TableCell></TableRow>)}
               </TableBody>
             </Table>
           </div>

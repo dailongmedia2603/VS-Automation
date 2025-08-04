@@ -101,7 +101,11 @@ ${replyDirectionText}
     ---
 
     **YÊU CẦU:** Dựa vào TOÀN BỘ thông tin trên, hãy tạo ra chính xác ${totalQuantity} bình luận. Mỗi bình luận trên một dòng.
-    **CỰC KỲ QUAN TRỌNG:** Mỗi bình luận PHẢI bắt đầu bằng tên loại trong dấu ngoặc vuông, ví dụ: "[Tên Loại] Nội dung bình luận.". Chỉ trả về danh sách các bình luận, KHÔNG thêm bất kỳ lời chào, câu giới thiệu, hay dòng phân cách nào.
+    **CỰC KỲ QUAN TRỌNG:** Mỗi bình luận PHẢI bắt đầu bằng tên loại trong dấu ngoặc vuông, VÀ kết thúc bằng số định danh người bình luận trong dấu ngoặc đơn.
+    - Ví dụ comment gốc: \`[Tên Loại] Nội dung bình luận (1)\`
+    - Ví dụ reply: \`1 reply -> 5. [Tên Loại] Nội dung reply (2)\`
+    - Tất cả comment gốc đều là của người (1). Các reply có thể là của người (2), (3),... hoặc (1) trả lời lại để tạo hội thoại.
+    - Chỉ trả về danh sách các bình luận, KHÔNG thêm bất kỳ lời chào, câu giới thiệu, hay dòng phân cách nào.
   `;
   return finalPrompt;
 };
@@ -291,13 +295,10 @@ serve(async (req) => {
           .map(line => line.trim())
           .filter(line => line)
           .map(line => {
-            const match = line.match(/^\[(.*?)\]\s*(.*)$/);
-            const type = match ? match[1] : 'Chưa phân loại';
-            const content = match ? match[2] : line;
             return { 
               id: crypto.randomUUID(), 
-              content: content, 
-              type: type,
+              content: line, 
+              type: 'N/A', // Type will be parsed on the frontend
               metConditionIds: allConditionIds
             };
           });
