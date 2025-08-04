@@ -153,7 +153,7 @@ export const ProjectDetailProvider = ({ projectId, children }: { projectId: stri
           fetchProjectData(true);
         }
       )
-      .subscribe((status, err) => {
+      .subscribe((_status, err) => {
         if (err) {
           console.error('Realtime subscription lỗi, sẽ thử lại…', err);
         }
@@ -168,7 +168,7 @@ export const ProjectDetailProvider = ({ projectId, children }: { projectId: stri
           refetchProcessingTasks();
         }
       )
-      .subscribe((status, err) => {
+      .subscribe((_status, err) => {
         if (err) {
           console.error('Realtime task channel subscription lỗi:', err);
         }
