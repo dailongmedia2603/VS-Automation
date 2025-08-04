@@ -230,7 +230,14 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
   const threadedResults = useMemo(() => {
     if (!results || results.length === 0) return [];
 
-    const commentsWithMeta = results.map((comment, index) => {
+    type CommentWithMeta = GeneratedComment & {
+        stt: number;
+        parentStt: number | null;
+        cleanContent: string;
+        children?: CommentWithMeta[];
+    };
+
+    const commentsWithMeta: CommentWithMeta[] = results.map((comment, index) => {
         const stt = index + 1;
         const replyMatch = comment.content.match(/^(?:\d+\s*reply\s*->\s*(\d+)\.\s*)?(.*)$/s);
         
@@ -242,24 +249,31 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
         };
     });
 
-    const parentComments = commentsWithMeta.filter(c => c.parentStt === null);
-    const replyMap = new Map<number, any[]>();
-    commentsWithMeta.filter(c => c.parentStt !== null).forEach(reply => {
-        if (!replyMap.has(reply.parentStt!)) {
-            replyMap.set(reply.parentStt!, []);
+    const commentMap = new Map<number, CommentWithMeta>(commentsWithMeta.map(c => [c.stt, c]));
+    const rootComments: CommentWithMeta[] = [];
+
+    commentsWithMeta.forEach(comment => {
+        if (comment.parentStt && commentMap.has(comment.parentStt)) {
+            const parent = commentMap.get(comment.parentStt)!;
+            if (!parent.children) {
+                parent.children = [];
+            }
+            parent.children.push(comment);
+        } else {
+            rootComments.push(comment);
         }
-        replyMap.get(reply.parentStt!)!.push(reply);
     });
 
-    const finalResults: any[] = [];
-    parentComments.forEach(parent => {
-        finalResults.push({ ...parent, level: 0 });
-        const replies = replyMap.get(parent.stt) || [];
-        replies.sort((a, b) => a.stt - b.stt);
-        replies.forEach(reply => {
-            finalResults.push({ ...reply, level: 1 });
-        });
-    });
+    const finalResults: (CommentWithMeta & { level: number })[] = [];
+    const flatten = (comment: CommentWithMeta, level: number) => {
+        finalResults.push({ ...comment, level });
+        if (comment.children) {
+            comment.children.sort((a, b) => a.stt - b.stt);
+            comment.children.forEach((child) => flatten(child, level + 1));
+        }
+    };
+
+    rootComments.sort((a, b) => a.stt - b.stt).forEach(comment => flatten(comment, 0));
 
     return finalResults;
   }, [results]);
