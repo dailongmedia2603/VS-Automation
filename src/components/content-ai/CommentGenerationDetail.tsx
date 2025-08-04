@@ -70,6 +70,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
   const [feedbackText, setFeedbackText] = useState('');
   const [isLibraryDialogOpen, setIsLibraryDialogOpen] = useState(false);
   const [projectDocuments, setProjectDocuments] = useState<Document[]>([]);
+  const [articlesToRegenerate, setArticlesToRegenerate] = useState<string[]>([]);
 
   useEffect(() => {
     const itemConfig = item.config || {};
@@ -314,9 +315,20 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
 
   const handleBulkCopy = () => {
     if (selectedIds.length === 0) return;
-    const contentToCopy = results
+    
+    const contentToCopy = threadedResults
       .filter(r => selectedIds.includes(r.id))
-      .map(r => r.content)
+      .map(r => {
+        let formattedContent = '';
+        if (r.level > 0) {
+          formattedContent += '\t';
+        }
+        formattedContent += r.cleanContent;
+        if (r.person !== null) {
+          formattedContent += ` (${r.person})`;
+        }
+        return formattedContent;
+      })
       .join('\n');
     
     navigator.clipboard.writeText(contentToCopy).then(() => {
@@ -851,20 +863,84 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
       </AlertDialog>
 
       <Dialog open={isFeedbackDialogOpen} onOpenChange={setIsFeedbackDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Feedback & Tạo lại</DialogTitle>
             <DialogDescription>
-              Nhập feedback của bạn để AI có thể tạo lại danh sách comment tốt hơn. AI sẽ xem xét các comment hiện tại và feedback của bạn để cải thiện.
+              Chọn bài viết và nhập feedback để AI tạo lại nội dung tốt hơn. AI sẽ xem xét các comment hiện tại và feedback của bạn để cải thiện.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <Textarea
-              placeholder="Ví dụ: Các comment cần tự nhiên hơn, thêm một vài bình luận hỏi về giá..."
-              value={feedbackText}
-              onChange={(e) => setFeedbackText(e.target.value)}
-              className="min-h-[120px]"
-            />
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label>Chọn bài viết để tạo lại</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start font-normal">
+                    {articlesToRegenerate.length > 0
+                      ? `Đã chọn ${articlesToRegenerate.length} bài viết`
+                      : "Chọn bài viết..."}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Tìm bài viết..." />
+                    <CommandList>
+                      <CommandEmpty>Không tìm thấy bài viết.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          onSelect={() => {
+                            if (articlesToRegenerate.length === results.length) {
+                              setArticlesToRegenerate([]);
+                            } else {
+                              setArticlesToRegenerate(results.map(r => r.id));
+                            }
+                          }}
+                        >
+                          <div className={cn(
+                            "mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+                            articlesToRegenerate.length === results.length ? "bg-primary text-primary-foreground" : "opacity-50 [&_svg]:invisible"
+                          )}>
+                            <Check className={cn("h-4 w-4")} />
+                          </div>
+                          Chọn tất cả
+                        </CommandItem>
+                        {results.map((result, index) => (
+                          <CommandItem
+                            key={result.id}
+                            onSelect={() => {
+                              setArticlesToRegenerate(prev =>
+                                prev.includes(result.id)
+                                  ? prev.filter(id => id !== result.id)
+                                  : [...prev, result.id]
+                              );
+                            }}
+                          >
+                            <div className={cn(
+                              "mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+                              articlesToRegenerate.includes(result.id) ? "bg-primary text-primary-foreground" : "opacity-50 [&_svg]:invisible"
+                            )}>
+                              <Check className={cn("h-4 w-4")} />
+                            </div>
+                            <span className="truncate">
+                              STT {index + 1}: {result.content.substring(0, 50)}...
+                            </span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-2">
+              <Label>Nội dung Feedback</Label>
+              <Textarea
+                placeholder="Ví dụ: Các comment cần tự nhiên hơn, thêm một vài bình luận hỏi về giá..."
+                value={feedbackText}
+                onChange={(e) => setFeedbackText(e.target.value)}
+                className="min-h-[120px]"
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsFeedbackDialogOpen(false)}>Hủy</Button>
