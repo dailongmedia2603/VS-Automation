@@ -101,12 +101,19 @@ ${replyDirectionText}
     ---
 
     **YÊU CẦU:** Dựa vào TOÀN BỘ thông tin trên, hãy tạo ra chính xác ${totalQuantity} bình luận. Mỗi bình luận trên một dòng.
-    **CỰC KỲ QUAN TRỌNG:** Mỗi bình luận PHẢI bắt đầu bằng tên loại trong dấu ngoặc vuông, VÀ kết thúc bằng số định danh người bình luận trong dấu ngoặc đơn.
-    - Ví dụ comment gốc: \`[Tên Loại] Nội dung bình luận (1)\`
-    - Ví dụ reply: \`1 reply -> 5. [Tên Loại] Nội dung reply (2)\`
-    - **QUY TẮC ĐÁNH SỐ NGƯỜI:**
-      - Tất cả các bình luận gốc (không phải reply) BẮT BUỘC phải là của người (1).
-      - Các reply có thể là của người (2), (3),... hoặc người (1) trả lời lại để tạo hội thoại.
+    **CỰC KỲ QUAN TRỌNG:**
+    1.  Mỗi bình luận PHẢI bắt đầu bằng tên loại trong dấu ngoặc vuông, ví dụ: "[Tên Loại] Nội dung bình luận".
+    2.  **QUY TẮC ĐÁNH SỐ NGƯỜI (CHỈ ÁP DỤNG CHO HỘI THOẠI CÓ REPLY):**
+        - **CHỈ** thêm số định danh người \`(X)\` vào cuối các bình luận là một phần của một chuỗi hội thoại (tức là một bình luận gốc có reply, và các reply của nó).
+        - **KHÔNG** thêm số định danh người cho các bình luận đơn lẻ không có reply.
+        - Trong một chuỗi hội thoại, bình luận gốc **LUÔN LUÔN** là của người \`(1)\`.
+        - Các reply trong chuỗi hội thoại đó có thể là của người \`(2)\`, \`(3)\`,... hoặc người \`(1)\` trả lời lại.
+        - Việc đánh số người được reset cho mỗi chuỗi hội thoại mới.
+    - Ví dụ comment đơn lẻ: \`[Tương tác] Sữa này tốt thật.\`
+    - Ví dụ hội thoại:
+      \`[Hỏi lại] Sữa này vị ngọt không mom? (1)\`
+      \`1 reply -> X. [Tương tác] Vị thanh mát dễ uống lắm mom (2)\`
+      \`2 reply -> X. [Tương tác] Cảm ơn mom nhé (1)\`
     - Chỉ trả về danh sách các bình luận, KHÔNG thêm bất kỳ lời chào, câu giới thiệu, hay dòng phân cách nào.
   `;
   return finalPrompt;

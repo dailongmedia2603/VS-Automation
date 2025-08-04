@@ -37,7 +37,7 @@ type CommentWithMeta = GeneratedComment & {
     parentStt: number | null;
     cleanContent: string;
     type: string;
-    person: number;
+    person: number | null;
     children?: CommentWithMeta[];
 };
 
@@ -255,7 +255,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
             parentStt: replyMatch && replyMatch[1] ? parseInt(replyMatch[1], 10) : null,
             cleanContent: personMatch ? personMatch[1].trim() : contentWithoutType,
             type: typeMatch ? typeMatch[1] : comment.type,
-            person: personMatch ? parseInt(personMatch[2], 10) : 1,
+            person: personMatch ? parseInt(personMatch[2], 10) : null,
         };
     });
 
@@ -725,7 +725,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                       <TableCell><Checkbox checked={selectedIds.includes(result.id)} onCheckedChange={() => handleSelectRow(result.id)} /></TableCell>
                       <TableCell>{result.stt}</TableCell>
                       <TableCell>
-                        {isPartOfThread ? (
+                        {result.person !== null && isPartOfThread ? (
                           <div className="flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 text-slate-600 font-semibold text-sm">
                             {result.person}
                           </div>
