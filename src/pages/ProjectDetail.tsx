@@ -39,7 +39,7 @@ type CommentRatio = {
 };
 
 const ItemList = ({ items, newlyUpdatedIds }: { items: ProjectItem[], newlyUpdatedIds: Set<number> }) => {
-  const { selectedView, handleSelectView, editingItemId, setEditingItemId, setEditingName, editingName, handleSaveName, handleDeleteItem } = useProjectDetail();
+  const { selectedView, handleSelectView, editingItemId, setEditingItemId, setEditingName, editingName, handleSaveName, handleDeleteItem, processingItemIds } = useProjectDetail();
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -50,63 +50,73 @@ const ItemList = ({ items, newlyUpdatedIds }: { items: ProjectItem[], newlyUpdat
 
   return (
       <div className="flex flex-col gap-1 pl-2">
-          {items.map(item => (
-              <div
-                  key={item.id}
-                  onClick={() => editingItemId !== item.id && handleSelectView(item)}
-                  className={cn(
-                      "group w-full text-left p-2 rounded-md text-sm flex items-center justify-between cursor-pointer",
-                      selectedView && typeof selectedView === 'object' && selectedView.id === item.id && editingItemId !== item.id
-                          ? "bg-blue-100 text-blue-700 font-semibold"
-                          : "hover:bg-slate-100"
-                  )}
-              >
-                  {editingItemId === item.id ? (
-                      <div className="flex-1 flex items-center gap-1">
-                          <Input
-                              ref={inputRef}
-                              value={editingName}
-                              onChange={(e) => setEditingName(e.target.value)}
-                              onBlur={handleSaveName}
-                              onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
-                              className="h-7 text-sm"
-                              onClick={(e) => e.stopPropagation()}
-                          />
-                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleSaveName}>
-                              <Check className="h-4 w-4" />
-                          </Button>
-                      </div>
-                  ) : (
-                      <>
-                          <span className="truncate flex-1 flex items-center gap-2">
-                              {newlyUpdatedIds.has(item.id) && (
-                                  <span className="relative flex h-2 w-2 flex-shrink-0">
-                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                                  </span>
-                              )}
-                              <span className="truncate">{item.name}</span>
-                              {newlyUpdatedIds.has(item.id) && (
-                                  <Badge variant="secondary" className="bg-green-100 text-green-800">
-                                      Mới
-                                  </Badge>
-                              )}
-                          </span>
-                          <div className="flex items-center flex-shrink-0">
-                              <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
-                                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setEditingItemId(item.id); setEditingName(item.name); }}>
-                                      <Edit className="h-3 w-3" />
-                                  </Button>
-                                  <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteItem(item); }}>
-                                      <Trash2 className="h-3 w-3" />
-                                  </Button>
-                              </div>
-                              <ChevronRight className={cn("h-4 w-4 text-slate-400", selectedView && typeof selectedView === 'object' && selectedView.id === item.id && "text-blue-700")} />
+          {items.map(item => {
+              const isProcessing = processingItemIds.has(item.id);
+              const isNewlyUpdated = newlyUpdatedIds.has(item.id) && !isProcessing;
+              return (
+                  <div
+                      key={item.id}
+                      onClick={() => editingItemId !== item.id && handleSelectView(item)}
+                      className={cn(
+                          "group w-full text-left p-2 rounded-md text-sm flex items-center justify-between cursor-pointer",
+                          selectedView && typeof selectedView === 'object' && selectedView.id === item.id && editingItemId !== item.id
+                              ? "bg-blue-100 text-blue-700 font-semibold"
+                              : "hover:bg-slate-100"
+                      )}
+                  >
+                      {editingItemId === item.id ? (
+                          <div className="flex-1 flex items-center gap-1">
+                              <Input
+                                  ref={inputRef}
+                                  value={editingName}
+                                  onChange={(e) => setEditingName(e.target.value)}
+                                  onBlur={handleSaveName}
+                                  onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
+                                  className="h-7 text-sm"
+                                  onClick={(e) => e.stopPropagation()}
+                              />
+                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleSaveName}>
+                                  <Check className="h-4 w-4" />
+                              </Button>
                           </div>
-                      </>
-                  )}
-              </div>
-          ))}
+                      ) : (
+                          <>
+                              <span className="truncate flex-1 flex items-center gap-2">
+                                  {isProcessing && (
+                                      <span className="relative flex h-2 w-2 flex-shrink-0" title="AI đang xử lý...">
+                                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                                      </span>
+                                  )}
+                                  {isNewlyUpdated && (
+                                      <span className="relative flex h-2 w-2 flex-shrink-0" title="Nội dung mới">
+                                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                          <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                      </span>
+                                  )}
+                                  <span className="truncate">{item.name}</span>
+                                  {isNewlyUpdated && (
+                                      <Badge variant="secondary" className="bg-green-100 text-green-800">
+                                          Mới
+                                      </Badge>
+                                  )}
+                              </span>
+                              <div className="flex items-center flex-shrink-0">
+                                  <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
+                                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setEditingItemId(item.id); setEditingName(item.name); }}>
+                                          <Edit className="h-3 w-3" />
+                                      </Button>
+                                      <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteItem(item); }}>
+                                          <Trash2 className="h-3 w-3" />
+                                      </Button>
+                                  </div>
+                                  <ChevronRight className={cn("h-4 w-4 text-slate-400", selectedView && typeof selectedView === 'object' && selectedView.id === item.id && "text-blue-700")} />
+                              </div>
+                          </>
+                      )}
+                  </div>
+              );
+          })}
       </div>
   );
 };

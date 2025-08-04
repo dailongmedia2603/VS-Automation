@@ -37,6 +37,7 @@ interface ProjectDetailContextType {
   isLoading: boolean;
   promptLibraries: PromptLibrary[];
   newlyUpdatedItemIds: Set<number>;
+  processingItemIds: Set<number>;
   editingItemId: number | null;
   editingName: string;
   itemToDelete: ProjectItem | null;
@@ -61,6 +62,7 @@ export const ProjectDetailProvider = ({ projectId, children }: { projectId: stri
   const [isLoading, setIsLoading] = useState(true);
   const [promptLibraries, setPromptLibraries] = useState<PromptLibrary[]>([]);
   const [newlyUpdatedItemIds, setNewlyUpdatedItemIds] = useState<Set<number>>(new Set());
+  const [processingItemIds, setProcessingItemIds] = useState<Set<number>>(new Set());
   
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState('');
@@ -85,8 +87,27 @@ export const ProjectDetailProvider = ({ projectId, children }: { projectId: stri
       if (librariesError) throw librariesError;
 
       setProject(projectData);
-      setItems(itemsData || []);
+      const currentItems = itemsData || [];
+      setItems(currentItems);
       setPromptLibraries(librariesData || []);
+
+      if (currentItems.length > 0) {
+        const itemIds = currentItems.map(i => i.id);
+        const { data: tasksData, error: tasksError } = await supabase
+          .from('ai_generation_tasks')
+          .select('item_id')
+          .in('item_id', itemIds)
+          .in('status', ['pending', 'running']);
+        
+        if (tasksError) {
+          console.error("Error fetching processing tasks:", tasksError);
+        } else {
+          setProcessingItemIds(new Set(tasksData.map(t => t.item_id)));
+        }
+      } else {
+        setProcessingItemIds(new Set());
+      }
+
     } catch (error: any) {
       showError("Không thể tải dữ liệu dự án: " + error.message);
     } finally {
@@ -126,8 +147,37 @@ export const ProjectDetailProvider = ({ projectId, children }: { projectId: stri
       )
       .subscribe();
 
+    const taskChannel = supabase
+      .channel(`project-tasks-update-${projectId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'ai_generation_tasks' },
+        (payload) => {
+          const refetchTasks = async () => {
+            const { data: itemsData, error: itemsError } = await supabase.from('content_ai_items').select('id').eq('project_id', projectId);
+            if (itemsError) return;
+            const itemIds = itemsData.map(i => i.id);
+            if (itemIds.length > 0) {
+              const { data: tasksData, error: tasksError } = await supabase
+                .from('ai_generation_tasks')
+                .select('item_id')
+                .in('item_id', itemIds)
+                .in('status', ['pending', 'running']);
+              if (!tasksError) {
+                setProcessingItemIds(new Set(tasksData.map(t => t.item_id)));
+              }
+            } else {
+              setProcessingItemIds(new Set());
+            }
+          };
+          refetchTasks();
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
+      supabase.removeChannel(taskChannel);
     };
   }, [projectId]);
 
@@ -195,6 +245,7 @@ export const ProjectDetailProvider = ({ projectId, children }: { projectId: stri
     isLoading,
     promptLibraries,
     newlyUpdatedItemIds,
+    processingItemIds,
     editingItemId,
     editingName,
     itemToDelete,
