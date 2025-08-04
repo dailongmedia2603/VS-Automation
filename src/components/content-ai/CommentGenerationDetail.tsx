@@ -325,7 +325,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
         }
         formattedContent += r.cleanContent;
         if (r.person !== null) {
-          formattedContent += ` (${r.person})`;
+          formattedContent += `\t(${r.person})`;
         }
         return formattedContent;
       })
