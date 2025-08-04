@@ -110,16 +110,15 @@ const ProjectDetail = () => {
         { event: 'UPDATE', schema: 'public', table: 'content_ai_items', filter: `project_id=eq.${projectId}` },
         (payload) => {
           const updatedItem = payload.new as ProjectItem;
-          
-          const oldItem = items.find(item => item.id === updatedItem.id);
-          if (oldItem && oldItem.content !== updatedItem.content) {
-            showSuccess(`Đã tạo xong nội dung cho "${updatedItem.name}"!`);
-            setNewlyUpdatedItemIds(prev => new Set(prev).add(updatedItem.id));
-          }
 
-          setItems((currentItems) => 
-            currentItems.map((item) => (item.id === updatedItem.id ? updatedItem : item))
-          );
+          setItems((currentItems) => {
+            const oldItem = currentItems.find(item => item.id === updatedItem.id);
+            if (oldItem && oldItem.content !== updatedItem.content) {
+              showSuccess(`Đã tạo xong nội dung cho "${updatedItem.name}"!`);
+              setNewlyUpdatedItemIds(prev => new Set(prev).add(updatedItem.id));
+            }
+            return currentItems.map((item) => (item.id === updatedItem.id ? updatedItem : item));
+          });
 
           setSelectedView(currentView => {
             if (currentView && typeof currentView === 'object' && currentView.id === updatedItem.id) {
@@ -134,7 +133,7 @@ const ProjectDetail = () => {
     return () => {
       supabase.removeChannel(itemsChannel);
     };
-  }, [projectId, items]);
+  }, [projectId]);
 
   const handleSelectView = (view: 'documents' | ProjectItem) => {
     if (typeof view === 'object' && view.id) {
