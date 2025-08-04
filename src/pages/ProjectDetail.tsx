@@ -103,30 +103,40 @@ const ProjectDetail = () => {
   useEffect(() => {
     if (!projectId) return;
 
+    const handleRealtimeUpdate = (payload: any) => {
+      const updatedItem = payload.new as ProjectItem;
+      let contentHasChanged = false;
+
+      // Luôn cập nhật danh sách để đảm bảo giao diện đồng bộ với DB
+      setItems((currentItems) => {
+        const oldItem = currentItems.find(item => item.id === updatedItem.id);
+        if (oldItem && oldItem.content !== updatedItem.content) {
+          contentHasChanged = true;
+        }
+        return currentItems.map((item) => (item.id === updatedItem.id ? updatedItem : item));
+      });
+
+      // Nếu nội dung thực sự thay đổi, hiển thị thông báo
+      if (contentHasChanged) {
+        showSuccess(`Đã tạo xong nội dung cho "${updatedItem.name}"!`);
+        setNewlyUpdatedItemIds(prev => new Set(prev).add(updatedItem.id));
+      }
+
+      // Cập nhật view chi tiết nếu đang xem mục được cập nhật
+      setSelectedView(currentView => {
+        if (currentView && typeof currentView === 'object' && currentView.id === updatedItem.id) {
+          return updatedItem;
+        }
+        return currentView;
+      });
+    };
+
     const itemsChannel = supabase
       .channel(`project-items-update-${projectId}`)
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'content_ai_items', filter: `project_id=eq.${projectId}` },
-        (payload) => {
-          const updatedItem = payload.new as ProjectItem;
-
-          setItems((currentItems) => {
-            const oldItem = currentItems.find(item => item.id === updatedItem.id);
-            if (oldItem && oldItem.content !== updatedItem.content) {
-              showSuccess(`Đã tạo xong nội dung cho "${updatedItem.name}"!`);
-              setNewlyUpdatedItemIds(prev => new Set(prev).add(updatedItem.id));
-            }
-            return currentItems.map((item) => (item.id === updatedItem.id ? updatedItem : item));
-          });
-
-          setSelectedView(currentView => {
-            if (currentView && typeof currentView === 'object' && currentView.id === updatedItem.id) {
-              return updatedItem;
-            }
-            return currentView;
-          });
-        }
+        handleRealtimeUpdate
       )
       .subscribe();
 
