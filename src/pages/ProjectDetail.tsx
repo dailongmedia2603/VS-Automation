@@ -257,7 +257,7 @@ const ProjectDetailContent = () => {
               </div>
               <Accordion type="multiple" defaultValue={['articles', 'comments']} className="w-full">
                 <AccordionItem value="articles">
-                  <AccordionTrigger className="text-base font-semibold hover:no-underline"><div className="flex items-center gap-2"><FileText className="h-5 w-5 text-blue-600" /><span>Viết bài viết ({articles.length})</span></div></AccordionTrigger>
+                  <AccordionTrigger className="text-base font-semibold hover:no-underline"><div className="flex items-center gap-2"><FileText className="h-5 w-5 text-blue-600" /><span>Viết post ({articles.length})</span></div></AccordionTrigger>
                   <AccordionContent><ItemList items={articles} newlyUpdatedIds={newlyUpdatedItemIds} /></AccordionContent>
                 </AccordionItem>
                 <AccordionItem value="comments">
@@ -319,7 +319,7 @@ const ProjectDetailContent = () => {
               <Select value={newItem.type} onValueChange={(v) => handleTypeChange(v as any)}>
                 <SelectTrigger id="post-type"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="article">Viết bài viết</SelectItem>
+                  <SelectItem value="article">Viết post</SelectItem>
                   <SelectItem value="comment">Viết comment</SelectItem>
                 </SelectContent>
               </Select>
