@@ -44,7 +44,7 @@ interface ProjectDetailContextType {
   isDeleteDialogOpen: boolean;
   handleSelectView: (view: 'documents' | ProjectItem) => void;
   handleItemUpdate: (updatedItem: ProjectItem) => void;
-  fetchProjectData: () => void;
+  fetchProjectData: (isBackgroundRefresh?: boolean) => void;
   setEditingItemId: (id: number | null) => void;
   setEditingName: (name: string) => void;
   handleSaveName: () => void;
@@ -94,8 +94,8 @@ export const ProjectDetailProvider = ({ projectId, children }: { projectId: stri
     }
   }, [projectId]);
 
-  const fetchProjectData = useCallback(async () => {
-    setIsLoading(true);
+  const fetchProjectData = useCallback(async (isBackgroundRefresh = false) => {
+    if (!isBackgroundRefresh) setIsLoading(true);
     try {
       const projectPromise = supabase.from('content_ai_ds_du_an').select('id, name').eq('id', projectId).single();
       const itemsPromise = supabase.from('content_ai_items').select('*').eq('project_id', projectId).order('created_at', { ascending: false });
@@ -120,7 +120,7 @@ export const ProjectDetailProvider = ({ projectId, children }: { projectId: stri
     } catch (error: any) {
       showError("Không thể tải dữ liệu dự án: " + error.message);
     } finally {
-      setIsLoading(false);
+      if (!isBackgroundRefresh) setIsLoading(false);
     }
   }, [projectId, refetchProcessingTasks]);
 
@@ -136,22 +136,9 @@ export const ProjectDetailProvider = ({ projectId, children }: { projectId: stri
         { event: 'UPDATE', schema: 'public', table: 'content_ai_items', filter: `project_id=eq.${projectId}` },
         (payload) => {
           const updatedItem = payload.new as ProjectItem;
-          
-          setItems((currentItems) => {
-            const oldItem = currentItems.find(item => item.id === updatedItem.id);
-            if (oldItem && oldItem.content !== updatedItem.content) {
-              showSuccess(`Đã tạo xong nội dung cho "${updatedItem.name}"!`);
-              setNewlyUpdatedItemIds(prev => new Set(prev).add(updatedItem.id));
-            }
-            return currentItems.map((item) => (item.id === updatedItem.id ? updatedItem : item));
-          });
-
-          setSelectedView(currentView => {
-            if (currentView && typeof currentView === 'object' && currentView.id === updatedItem.id) {
-              return updatedItem;
-            }
-            return currentView;
-          });
+          showSuccess(`Đã tạo xong nội dung cho "${updatedItem.name}"!`);
+          setNewlyUpdatedItemIds(prev => new Set(prev).add(updatedItem.id));
+          fetchProjectData(true);
         }
       )
       .subscribe();
@@ -171,7 +158,7 @@ export const ProjectDetailProvider = ({ projectId, children }: { projectId: stri
       supabase.removeChannel(channel);
       supabase.removeChannel(taskChannel);
     };
-  }, [projectId, refetchProcessingTasks]);
+  }, [projectId, fetchProjectData, refetchProcessingTasks]);
 
   const handleSelectView = (view: 'documents' | ProjectItem) => {
     if (typeof view === 'object' && view.id) {
