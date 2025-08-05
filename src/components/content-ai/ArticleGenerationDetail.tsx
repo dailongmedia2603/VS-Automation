@@ -23,7 +23,6 @@ import { ConditionLibraryDialog } from './ConditionLibraryDialog';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from '@/lib/utils';
-import { useProjectDetail } from '@/contexts/ProjectDetailContext';
 
 type Project = { id: number; name: string; };
 type ProjectItem = { id: number; name: string; type: 'article' | 'comment'; content: string | null; config: any; };
