@@ -7,13 +7,167 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// ... (Toàn bộ logic xây dựng prompt từ hàm process-ai-generation-tasks cũ sẽ được chuyển vào đây) ...
-// This is a simplified placeholder. The full logic will be implemented.
+const formatMapping: Record<string, string> = {
+  question: 'Đặt câu hỏi / thảo luận',
+  review: 'Review',
+  sharing: 'Chia sẻ',
+  comparison: 'So sánh',
+  storytelling: 'Story telling',
+};
 
-const formatMapping = { /* ... */ };
-const buildBasePrompt = (/*...*/) => { /* ... */ };
-const buildCommentPrompt = (/*...*/) => { /* ... */ };
-const buildArticlePrompt = (/*...*/) => { /* ... */ };
+const buildBasePrompt = (libraryConfig, documentContext) => {
+  const config = libraryConfig || {};
+  const trainingInfoContent = [
+    `- **Vai trò của bạn:** ${config.role || '(Chưa cung cấp)'}`,
+    `- **Lĩnh vực kinh doanh:** ${config.industry || '(Chưa cung cấp)'}`,
+    `- **Phong cách:** ${config.style || '(Chưa cung cấp)'}`,
+    `- **Tông giọng:** ${config.tone || '(Chưa cung cấp)'}`,
+    `- **Ngôn ngữ:** ${config.language || '(Chưa cung cấp)'}`,
+    `- **Mục tiêu cần đạt:** ${config.goal || '(Chưa cung cấp)'}`
+  ].join('\n');
+  const promptStructure = [
+    { title: 'YÊU CẦU VIẾT NỘI DUNG TỰ NHIÊN NHƯ NGƯỜI THẬT', content: 'Bạn là một trợ lý AI viết nội dung bài viết / comment tự nhiên như người dùng thật. Hãy dựa vào các thông tin dưới đây để xây dựng nội dung chất lượng và tự nhiên nhé.' },
+    { title: 'THÔNG TIN HUẤN LUYỆN CHUNG', content: trainingInfoContent },
+    { title: 'TÀI LIỆU NỘI BỘ THAM KHẢO', content: '{{document_context}}' },
+    { title: 'HÀNH ĐỘNG', content: 'Dựa vào TOÀN BỘ thông tin, hãy tạo nội dung đúng yêu cầu, tự nhiên như người thật, không được có dấu hiệu máy móc, khô cứng, seeding' }
+  ];
+  const dataMap = {
+    '{{document_context}}': documentContext || '(Không có tài liệu tham khảo liên quan)',
+  };
+  return promptStructure.map(block => {
+    let content = block.content;
+    for (const [key, value] of Object.entries(dataMap)) {
+      content = content.replace(new RegExp(key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g'), String(value));
+    }
+    return `### ${block.title.toUpperCase()}\n\n${content}`;
+  }).join('\n\n---\n\n');
+};
+
+const buildCommentPrompt = (basePrompt, config) => {
+  const ratiosText = (config.ratios || [])
+    .map(r => `- Loại: ${r.type || 'Chung'}, Tỉ lệ: ${r.percentage}%, Định hướng: ${r.content}`)
+    .join('\n');
+  const conditionsText = (config.mandatoryConditions || []).map(c => `- ${c.content}`).join('\n');
+  const replyQuantity = Number(config.replyQuantity) || 0;
+  const totalQuantity = Number(config.quantity) || 10;
+  const parentQuantity = totalQuantity - replyQuantity;
+  let replyInstruction = '';
+  let numberingAndExampleInstruction = '';
+  if (replyQuantity > 0) {
+      const replyDirectionText = config.replyDirection ? `- **Định hướng cho reply:** ${config.replyDirection}` : '';
+      replyInstruction = `
+---
+**QUY TẮC REPLY (CỰC KỲ QUAN TRỌNG):**
+- Trong tổng số ${totalQuantity} bình luận, phải có chính xác **${replyQuantity} bình luận là reply**.
+- Các reply PHẢI trả lời các bình luận gốc (từ 1 đến ${parentQuantity}).
+- Cú pháp reply BẮT BUỘC: \`[STT reply] reply -> [STT comment gốc]. [Nội dung]\`.
+- Ví dụ: \`1 reply -> 5. Đúng rồi đó mom...\`
+${replyDirectionText}
+- **TUYỆT ĐỐI KHÔNG** sử dụng các định dạng khác như \`(reply)\` hay bất kỳ định dạng nào khác.
+---
+`;
+      numberingAndExampleInstruction = `
+**CỰC KỲ QUAN TRỌNG:**
+1.  Mỗi bình luận PHẢI bắt đầu bằng tên loại trong dấu ngoặc vuông, ví dụ: "[Tên Loại] Nội dung bình luận".
+2.  **QUY TẮC ĐÁNH SỐ NGƯỜI (CỰC KỲ QUAN TRỌNG):**
+    - **Quy tắc Vàng:** Việc đánh số người \`(1)\`, \`(2)\`... **CHỈ** được áp dụng cho những bình luận là một phần của **chuỗi hội thoại**.
+    - **Định nghĩa chuỗi hội thoại:** Một chuỗi hội thoại bao gồm một bình luận gốc (không phải là reply) và tất cả các bình luận trả lời nó.
+    - **Bình luận đơn lẻ:** Những bình luận không có ai trả lời và cũng không trả lời ai thì **TUYỆT ĐỐI KHÔNG** được đánh số người.
+    - **Quy tắc bắt đầu:** Bình luận gốc của **bất kỳ** chuỗi hội thoại nào **LUÔN LUÔN** được đánh số là \`(1)\`.
+    - **Quy tắc tiếp diễn:** Các reply trong chuỗi hội thoại đó có thể là của người \`(2)\`, \`(3)\`,... hoặc người \`(1)\` trả lời lại.
+    - **Quy tắc reset:** Khi một chuỗi hội thoại kết thúc và một chuỗi hội thoại **mới** bắt đầu (với một bình luận gốc khác), việc đánh số sẽ được **reset** và bắt đầu lại từ \`(1)\`.
+- **VÍ DỤ MINH HỌA HOÀN CHỈNH:**
+  \`1. [Tương tác] Sữa này tốt thật.\`
+  \`2. [Hỏi lại] Sữa này vị ngọt không mom? (1)\`
+  \`3. [Tương tác] Ui y chang nhà mình luôn.\`
+  \`4. [Tương tác] 2 reply -> 2. Vị thanh mát dễ uống lắm mom ạ. (2)\`
+  \`5. [Hỏi lại] Bé nhà mình 7 tháng uống được không? (1)\`
+  \`6. [Tương tác] 3 reply -> 2. Cảm ơn mom nhé. (1)\`
+  \`7. [Tương tác] 5 reply -> 5. Được đó mom, bé nhà mình cũng 7 tháng. (2)\`
+- Chỉ trả về danh sách các bình luận, KHÔNG thêm bất kỳ lời chào, câu giới thiệu, hay dòng phân cách nào.
+`;
+  } else {
+      numberingAndExampleInstruction = `
+**CỰC KỲ QUAN TRỌNG:**
+1.  Mỗi bình luận PHẢI bắt đầu bằng tên loại trong dấu ngoặc vuông, ví dụ: "[Tên Loại] Nội dung bình luận".
+2.  Tất cả các bình luận phải là các bình luận độc lập, không trả lời nhau.
+3.  **TUYỆT ĐỐI KHÔNG** sử dụng cú pháp reply (\`reply ->\`) hoặc đánh số người \`(1)\`, \`(2)\`...
+- **VÍ DỤ MINH HỌA:**
+  \`[Tương tác] Sữa này tốt thật.\`
+  \`[Hỏi lại] Sữa này vị ngọt không mom?\`
+  \`[Tương tác] Ui y chang nhà mình luôn.\`
+- Chỉ trả về danh sách các bình luận, KHÔNG thêm bất kỳ lời chào, câu giới thiệu, hay dòng phân cách nào.
+`;
+  }
+  const finalPrompt = `
+    ${basePrompt}
+    ---
+    **THÔNG TIN CHI TIẾT:**
+    **Nội dung bài viết để bình luận:**
+    ${config.postContent || 'Không có'}
+    **Định hướng chung cho bình luận:**
+    ${config.commentDirection || 'Không có'}
+    **Tỉ lệ và loại bình luận cần tạo:**
+    ${ratiosText || 'Không có'}
+    ${replyInstruction}
+    ---
+    **ĐIỀU KIỆN BẮT BUỘC (QUAN TRỌNG NHẤT):**
+    AI phải tuân thủ TUYỆT ĐỐI tất cả các điều kiện sau đây cho MỌI bình luận được tạo ra:
+    ${conditionsText || 'Không có điều kiện nào.'}
+    ---
+    **YÊU CẦU:** Dựa vào TOÀN BỘ thông tin trên, hãy tạo ra chính xác ${totalQuantity} bình luận. Mỗi bình luận trên một dòng.
+    ${numberingAndExampleInstruction}
+  `;
+  return finalPrompt;
+};
+
+const buildArticlePrompt = (basePrompt, config) => {
+  const conditionsText = (config.mandatoryConditions || []).map(c => `- ${c.content}`).join('\n');
+  let structureText = '';
+  if (config.structure && config.structure.structure_content) {
+    structureText = `
+---
+**CẤU TRÚC BÀI VIẾT BẮT BUỘC:**
+AI phải tuân thủ TUYỆT ĐỐI cấu trúc sau đây khi viết bài:
+${config.structure.structure_content}
+---`;
+  }
+  let wordCountText = '';
+  if (config.wordCount && Number(config.wordCount) > 0) {
+    wordCountText = `
+---
+**ĐỘ DÀI BÀI VIẾT:**
+Bài viết phải có độ dài khoảng ${config.wordCount} từ. Cho phép chênh lệch trong khoảng +/- 10%.
+---`;
+  }
+  let referenceExampleText = '';
+  if (config.referenceExample && config.referenceExample.trim() !== '') {
+    referenceExampleText = `
+**Ví dụ tham khảo (Về văn phong, giọng điệu):**
+${config.referenceExample}`;
+  }
+  const translatedFormat = formatMapping[config.format] || config.format || 'Không có';
+  const finalPrompt = `
+    ${basePrompt}
+    ---
+    **THÔNG TIN CHI TIẾT BÀI VIẾT:**
+    **Dạng bài:**
+    ${translatedFormat}
+    **Định hướng nội dung chi tiết:**
+    ${config.direction || 'Không có'}
+    ${referenceExampleText} 
+    ${structureText}
+    ${wordCountText}
+    ---
+    **ĐIỀU KIỆN BẮT BUỘC (QUAN TRỌNG NHẤT):**
+    AI phải tuân thủ TUYỆT ĐỐI tất cả các điều kiện sau đây cho MỌI bài viết được tạo ra:
+    ${conditionsText || 'Không có điều kiện nào.'}
+    ---
+    **YÊU CẦU:** Dựa vào TOÀN BỘ thông tin trên, hãy tạo ra chính xác ${config.quantity || 1} bài viết hoàn chỉnh.
+    **CỰC KỲ QUAN TRỌNG:** Nếu tạo nhiều hơn 1 bài viết, hãy phân cách mỗi bài viết bằng một dòng duy nhất chứa chính xác: "--- ARTICLE SEPARATOR ---". Chỉ trả về nội dung bài viết, KHÔNG thêm bất kỳ lời chào, câu giới thiệu, hay tiêu đề không cần thiết nào.
+  `;
+  return finalPrompt;
+};
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -36,8 +190,6 @@ serve(async (req) => {
     const jwt = authHeader.replace('Bearer ', '');
     const { data: { user } } = await createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_ANON_KEY') ?? '').auth.getUser(jwt);
     if (!user) throw new Error("User not authenticated.");
-
-    // --- Start of logic moved from process-ai-generation-tasks ---
     
     const { data: item, error: itemError } = await supabaseAdmin.from('content_ai_items').select('type, content').eq('id', itemId).single();
     if (itemError) throw itemError;
@@ -75,7 +227,14 @@ serve(async (req) => {
     }
 
     if (library.config.useCoT) {
-      // ... CoT logic ...
+      let cotPrompt = "Let's think step by step.";
+      if (library.config.cotFactors && library.config.cotFactors.length > 0) {
+        const factorsText = library.config.cotFactors
+          .map((factor: { value: string }) => `- ${factor.value}`)
+          .join('\n');
+        cotPrompt += "\n\nHere are the key factors to consider in your thinking process:\n" + factorsText;
+      }
+      finalPrompt += `\n\n${cotPrompt}`;
     }
 
     const modelToUse = aiSettings.gemini_content_model || 'gemini-pro';
@@ -126,8 +285,6 @@ serve(async (req) => {
     if (updateError) throw updateError;
 
     await supabaseAdmin.from('content_ai_logs').insert({ item_id: itemId, creator_id: user.id, prompt: finalPrompt, response: geminiData });
-
-    // --- End of moved logic ---
 
     return new Response(JSON.stringify(updatedItem), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
