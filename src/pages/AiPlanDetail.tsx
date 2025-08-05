@@ -15,7 +15,6 @@ import remarkGfm from 'remark-gfm';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { AiPlanLogDialog } from '@/components/ai-plan/AiPlanLogDialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 type Plan = {
   id: number;
@@ -181,103 +180,99 @@ const AiPlanDetail = () => {
 
         <ResizablePanelGroup direction="horizontal" className="flex-1 rounded-2xl border bg-white shadow-sm overflow-hidden">
           <ResizablePanel defaultSize={40} minSize={30}>
-            <ScrollArea className="h-full">
-              <div className="p-4">
-                <Card className="border-none shadow-none">
-                  <CardHeader>
-                    <CardTitle>Cấu hình AI</CardTitle>
-                    <CardDescription>Nhập thông tin chi tiết về chiến dịch của bạn.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
+            <div className="h-full p-4">
+              <Card className="border-none shadow-none">
+                <CardHeader>
+                  <CardTitle>Cấu hình AI</CardTitle>
+                  <CardDescription>Nhập thông tin chi tiết về chiến dịch của bạn.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2"><FileText className="h-4 w-4" />Mô tả sản phẩm/dịch vụ</Label>
+                    <Textarea placeholder="VD: Một ứng dụng quản lý công việc..." value={plan.config?.productDescription || ''} onChange={e => handleConfigChange('productDescription', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2"><Users className="h-4 w-4" />Đối tượng khách hàng mục tiêu</Label>
+                    <Textarea placeholder="VD: Nhân viên văn phòng, 25-35 tuổi..." value={plan.config?.targetAudience || ''} onChange={e => handleConfigChange('targetAudience', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2"><Target className="h-4 w-4" />Mục tiêu chiến dịch</Label>
+                    <Input placeholder="VD: Tăng nhận diện thương hiệu, 1000 đơn hàng" value={plan.config?.goals || ''} onChange={e => handleConfigChange('goals', e.target.value)} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label className="flex items-center gap-2"><FileText className="h-4 w-4" />Mô tả sản phẩm/dịch vụ</Label>
-                      <Textarea placeholder="VD: Một ứng dụng quản lý công việc..." value={plan.config?.productDescription || ''} onChange={e => handleConfigChange('productDescription', e.target.value)} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-2"><Users className="h-4 w-4" />Đối tượng khách hàng mục tiêu</Label>
-                      <Textarea placeholder="VD: Nhân viên văn phòng, 25-35 tuổi..." value={plan.config?.targetAudience || ''} onChange={e => handleConfigChange('targetAudience', e.target.value)} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-2"><Target className="h-4 w-4" />Mục tiêu chiến dịch</Label>
-                      <Input placeholder="VD: Tăng nhận diện thương hiệu, 1000 đơn hàng" value={plan.config?.goals || ''} onChange={e => handleConfigChange('goals', e.target.value)} />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label className="flex items-center gap-2"><DollarSign className="h-4 w-4" />Ngân sách (dự kiến)</Label>
-                        <Input placeholder="VD: 50,000,000 VND" value={plan.config?.budget || ''} onChange={e => handleConfigChange('budget', e.target.value)} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="flex items-center gap-2"><Calendar className="h-4 w-4" />Thời gian</Label>
-                        <Input placeholder="VD: 3 tháng" value={plan.config?.timeline || ''} onChange={e => handleConfigChange('timeline', e.target.value)} />
-                      </div>
+                      <Label className="flex items-center gap-2"><DollarSign className="h-4 w-4" />Ngân sách (dự kiến)</Label>
+                      <Input placeholder="VD: 50,000,000 VND" value={plan.config?.budget || ''} onChange={e => handleConfigChange('budget', e.target.value)} />
                     </div>
                     <div className="space-y-2">
-                      <Label className="flex items-center gap-2"><MessageSquare className="h-4 w-4" />Thông điệp chính</Label>
-                      <Input placeholder="VD: Làm việc thông minh hơn, không phải chăm hơn" value={plan.config?.keyMessage || ''} onChange={e => handleConfigChange('keyMessage', e.target.value)} />
+                      <Label className="flex items-center gap-2"><Calendar className="h-4 w-4" />Thời gian</Label>
+                      <Input placeholder="VD: 3 tháng" value={plan.config?.timeline || ''} onChange={e => handleConfigChange('timeline', e.target.value)} />
                     </div>
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-2"><BarChart2 className="h-4 w-4" />Đối thủ cạnh tranh</Label>
-                      <Textarea placeholder="Liệt kê các đối thủ chính và điểm mạnh/yếu của họ..." value={plan.config?.competitors || ''} onChange={e => handleConfigChange('competitors', e.target.value)} />
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </ScrollArea>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2"><MessageSquare className="h-4 w-4" />Thông điệp chính</Label>
+                    <Input placeholder="VD: Làm việc thông minh hơn, không phải chăm hơn" value={plan.config?.keyMessage || ''} onChange={e => handleConfigChange('keyMessage', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2"><BarChart2 className="h-4 w-4" />Đối thủ cạnh tranh</Label>
+                    <Textarea placeholder="Liệt kê các đối thủ chính và điểm mạnh/yếu của họ..." value={plan.config?.competitors || ''} onChange={e => handleConfigChange('competitors', e.target.value)} />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </ResizablePanel>
           <ResizableHandle withHandle />
           <ResizablePanel defaultSize={60}>
-            <ScrollArea className="h-full bg-slate-50">
-              <div className="p-6">
-                {plan.plan_data ? (
-                  <div className="space-y-8">
-                    <div className="p-8 bg-blue-600 text-white rounded-2xl shadow-lg">
-                      <h2 className="text-2xl font-bold">Tóm tắt chiến lược</h2>
-                      <p className="mt-2 text-blue-100">{plan.plan_data.executiveSummary}</p>
-                    </div>
-
-                    <Tabs defaultValue="strengths">
-                      <TabsList className="grid w-full grid-cols-4">
-                        <TabsTrigger value="strengths"><Swords className="mr-2 h-4 w-4" />Điểm mạnh</TabsTrigger>
-                        <TabsTrigger value="weaknesses"><Shield className="mr-2 h-4 w-4" />Điểm yếu</TabsTrigger>
-                        <TabsTrigger value="opportunities"><TrendingUp className="mr-2 h-4 w-4" />Cơ hội</TabsTrigger>
-                        <TabsTrigger value="threats"><AlertTriangle className="mr-2 h-4 w-4" />Thách thức</TabsTrigger>
-                      </TabsList>
-                      <TabsContent value="strengths" className="p-4 prose prose-sm"><ReactMarkdown>{plan.plan_data.swotAnalysis.strengths}</ReactMarkdown></TabsContent>
-                      <TabsContent value="weaknesses" className="p-4 prose prose-sm"><ReactMarkdown>{plan.plan_data.swotAnalysis.weaknesses}</ReactMarkdown></TabsContent>
-                      <TabsContent value="opportunities" className="p-4 prose prose-sm"><ReactMarkdown>{plan.plan_data.swotAnalysis.opportunities}</ReactMarkdown></TabsContent>
-                      <TabsContent value="threats" className="p-4 prose prose-sm"><ReactMarkdown>{plan.plan_data.swotAnalysis.threats}</ReactMarkdown></TabsContent>
-                    </Tabs>
-
-                    <Card>
-                      <CardHeader><CardTitle>Chỉ số đo lường (KPIs)</CardTitle></CardHeader>
-                      <CardContent>
-                        <ResponsiveContainer width="100%" height={250}>
-                          <BarChart data={kpiChartData} layout="vertical" margin={{ left: 100 }}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis type="number" hide />
-                            <YAxis type="category" dataKey="name" width={150} tickLine={false} axisLine={false} />
-                            <Tooltip cursor={{ fill: '#f3f4f6' }} />
-                            <Bar dataKey="value" fill="#3B82F6" radius={[0, 4, 4, 0]} background={{ fill: '#eee', radius: 4 }} />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </CardContent>
-                    </Card>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <Card><CardHeader><CardTitle>Đối tượng mục tiêu</CardTitle></CardHeader><CardContent><p className="text-sm">{plan.plan_data.targetAudience}</p></CardContent></Card>
-                      <Card><CardHeader><CardTitle>Kênh triển khai</CardTitle></CardHeader><CardContent><div className="prose prose-sm"><ReactMarkdown>{plan.plan_data.marketingChannels}</ReactMarkdown></div></CardContent></Card>
-                    </div>
-                    <Card><CardHeader><CardTitle>Trụ cột nội dung</CardTitle></CardHeader><CardContent><div className="prose prose-sm"><ReactMarkdown>{plan.plan_data.contentPillars}</ReactMarkdown></div></CardContent></Card>
+            <div className="h-full bg-slate-50 p-6">
+              {plan.plan_data ? (
+                <div className="space-y-8">
+                  <div className="p-8 bg-blue-600 text-white rounded-2xl shadow-lg">
+                    <h2 className="text-2xl font-bold">Tóm tắt chiến lược</h2>
+                    <p className="mt-2 text-blue-100">{plan.plan_data.executiveSummary}</p>
                   </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-full text-center text-slate-500">
-                    <Sparkles className="h-12 w-12 mb-4 text-slate-400" />
-                    <h3 className="text-lg font-semibold">Kế hoạch của bạn sẽ xuất hiện ở đây</h3>
-                    <p className="mt-1 text-sm max-w-sm">Điền thông tin cấu hình bên trái và nhấn "Tạo kế hoạch" để AI bắt đầu làm việc.</p>
+
+                  <Tabs defaultValue="strengths">
+                    <TabsList className="grid w-full grid-cols-4">
+                      <TabsTrigger value="strengths"><Swords className="mr-2 h-4 w-4" />Điểm mạnh</TabsTrigger>
+                      <TabsTrigger value="weaknesses"><Shield className="mr-2 h-4 w-4" />Điểm yếu</TabsTrigger>
+                      <TabsTrigger value="opportunities"><TrendingUp className="mr-2 h-4 w-4" />Cơ hội</TabsTrigger>
+                      <TabsTrigger value="threats"><AlertTriangle className="mr-2 h-4 w-4" />Thách thức</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="strengths" className="p-4 prose prose-sm"><ReactMarkdown>{plan.plan_data.swotAnalysis.strengths}</ReactMarkdown></TabsContent>
+                    <TabsContent value="weaknesses" className="p-4 prose prose-sm"><ReactMarkdown>{plan.plan_data.swotAnalysis.weaknesses}</ReactMarkdown></TabsContent>
+                    <TabsContent value="opportunities" className="p-4 prose prose-sm"><ReactMarkdown>{plan.plan_data.swotAnalysis.opportunities}</ReactMarkdown></TabsContent>
+                    <TabsContent value="threats" className="p-4 prose prose-sm"><ReactMarkdown>{plan.plan_data.swotAnalysis.threats}</ReactMarkdown></TabsContent>
+                  </Tabs>
+
+                  <Card>
+                    <CardHeader><CardTitle>Chỉ số đo lường (KPIs)</CardTitle></CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={250}>
+                        <BarChart data={kpiChartData} layout="vertical" margin={{ left: 100 }}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis type="number" hide />
+                          <YAxis type="category" dataKey="name" width={150} tickLine={false} axisLine={false} />
+                          <Tooltip cursor={{ fill: '#f3f4f6' }} />
+                          <Bar dataKey="value" fill="#3B82F6" radius={[0, 4, 4, 0]} background={{ fill: '#eee', radius: 4 }} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <Card><CardHeader><CardTitle>Đối tượng mục tiêu</CardTitle></CardHeader><CardContent><p className="text-sm">{plan.plan_data.targetAudience}</p></CardContent></Card>
+                    <Card><CardHeader><CardTitle>Kênh triển khai</CardTitle></CardHeader><CardContent><div className="prose prose-sm"><ReactMarkdown>{plan.plan_data.marketingChannels}</ReactMarkdown></div></CardContent></Card>
                   </div>
-                )}
-              </div>
-            </ScrollArea>
+                  <Card><CardHeader><CardTitle>Trụ cột nội dung</CardTitle></CardHeader><CardContent><div className="prose prose-sm"><ReactMarkdown>{plan.plan_data.contentPillars}</ReactMarkdown></div></CardContent></Card>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-center text-slate-500">
+                  <Sparkles className="h-12 w-12 mb-4 text-slate-400" />
+                  <h3 className="text-lg font-semibold">Kế hoạch của bạn sẽ xuất hiện ở đây</h3>
+                  <p className="mt-1 text-sm max-w-sm">Điền thông tin cấu hình bên trái và nhấn "Tạo kế hoạch" để AI bắt đầu làm việc.</p>
+                </div>
+              )}
+            </div>
           </ResizablePanel>
         </ResizablePanelGroup>
       </main>

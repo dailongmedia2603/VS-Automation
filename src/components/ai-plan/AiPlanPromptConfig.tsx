@@ -11,7 +11,6 @@ import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import ReactMarkdown from 'react-markdown';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 type PromptBlock = {
   id: string;
@@ -134,40 +133,38 @@ export const AiPlanPromptConfig = () => {
           <CardDescription>Xây dựng prompt của bạn bằng cách thêm và sắp xếp các khối nội dung.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <ScrollArea className="h-[60vh] pr-4">
-            <div className="space-y-3">
-              {blocks.map((block, index) => (
-                <Card key={block.id} className="bg-slate-50/70">
-                  <CardContent className="p-3 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Input value={block.title} onChange={e => updateBlock(block.id, 'title', e.target.value)} className="font-semibold border-none bg-transparent focus-visible:ring-1" />
-                      <div className="flex items-center">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => moveBlock(index, 'up')} disabled={index === 0}><ArrowUp className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => moveBlock(index, 'down')} disabled={index === blocks.length - 1}><ArrowDown className="h-4 w-4" /></Button>
-                        <Popover>
-                          <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><Code className="h-4 w-4" /></Button></PopoverTrigger>
-                          <PopoverContent className="w-60 p-1">
-                            <div className="text-xs text-muted-foreground p-2">Chèn biến</div>
-                            {placeholders.map(p => (
-                              <Button key={p} variant="ghost" className="w-full justify-start font-mono text-xs h-8" onClick={() => insertPlaceholder(p)}>{`{{${p}}}`}</Button>
-                            ))}
-                          </PopoverContent>
-                        </Popover>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => deleteBlock(block.id)}><Trash2 className="h-4 w-4" /></Button>
-                      </div>
+          <div className="space-y-3">
+            {blocks.map((block, index) => (
+              <Card key={block.id} className="bg-slate-50/70">
+                <CardContent className="p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Input value={block.title} onChange={e => updateBlock(block.id, 'title', e.target.value)} className="font-semibold border-none bg-transparent focus-visible:ring-1" />
+                    <div className="flex items-center">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => moveBlock(index, 'up')} disabled={index === 0}><ArrowUp className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => moveBlock(index, 'down')} disabled={index === blocks.length - 1}><ArrowDown className="h-4 w-4" /></Button>
+                      <Popover>
+                        <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><Code className="h-4 w-4" /></Button></PopoverTrigger>
+                        <PopoverContent className="w-60 p-1">
+                          <div className="text-xs text-muted-foreground p-2">Chèn biến</div>
+                          {placeholders.map(p => (
+                            <Button key={p} variant="ghost" className="w-full justify-start font-mono text-xs h-8" onClick={() => insertPlaceholder(p)}>{`{{${p}}}`}</Button>
+                          ))}
+                        </PopoverContent>
+                      </Popover>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => deleteBlock(block.id)}><Trash2 className="h-4 w-4" /></Button>
                     </div>
-                    <Textarea
-                      data-id={block.id}
-                      value={block.content}
-                      onChange={e => updateBlock(block.id, 'content', e.target.value)}
-                      onFocus={e => activeTextareaRef.current = e.target}
-                      className="min-h-[100px] bg-white"
-                    />
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </ScrollArea>
+                  </div>
+                  <Textarea
+                    data-id={block.id}
+                    value={block.content}
+                    onChange={e => updateBlock(block.id, 'content', e.target.value)}
+                    onFocus={e => activeTextareaRef.current = e.target}
+                    className="min-h-[100px] bg-white"
+                  />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
           <div className="flex items-center justify-between pt-4 border-t">
             <Button variant="outline" onClick={addBlock}><PlusCircle className="mr-2 h-4 w-4" />Thêm khối</Button>
             <div className="flex items-center gap-2">

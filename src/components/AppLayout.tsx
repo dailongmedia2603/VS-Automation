@@ -22,7 +22,7 @@ export function AppLayout() {
       )}>
         <Sidebar isCollapsed={isCollapsed} toggleSidebar={toggleSidebar} />
       </aside>
-      <div className="flex-1 flex flex-col bg-slate-50 overflow-hidden">
+      <div className="flex-1 flex flex-col bg-slate-50 overflow-y-auto">
         <header className="md:hidden sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-white px-4 sm:px-6">
           <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
             <SheetTrigger asChild>
