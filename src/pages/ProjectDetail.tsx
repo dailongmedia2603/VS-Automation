@@ -34,7 +34,7 @@ type CommentRatio = {
 };
 
 const ItemList = ({ items, newlyUpdatedIds }: { items: ProjectItem[], newlyUpdatedIds: Set<number> }) => {
-  const { selectedView, handleSelectView, editingItemId, setEditingItemId, setEditingName, editingName, handleSaveName, handleDeleteItem, processingItemIds } = useProjectDetail();
+  const { selectedView, handleSelectView, editingItemId, setEditingItemId, setEditingName, editingName, handleSaveName, handleDeleteItem } = useProjectDetail();
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -46,8 +46,7 @@ const ItemList = ({ items, newlyUpdatedIds }: { items: ProjectItem[], newlyUpdat
   return (
       <div className="flex flex-col gap-1 pl-2">
           {items.map(item => {
-              const isProcessing = processingItemIds.has(item.id);
-              const isNewlyUpdated = newlyUpdatedIds.has(item.id) && !isProcessing;
+              const isNewlyUpdated = newlyUpdatedIds.has(item.id);
               return (
                   <div
                       key={item.id}
@@ -77,12 +76,6 @@ const ItemList = ({ items, newlyUpdatedIds }: { items: ProjectItem[], newlyUpdat
                       ) : (
                           <>
                               <span className="truncate flex-1 flex items-center gap-2">
-                                  {isProcessing && (
-                                      <span className="relative flex h-2 w-2 flex-shrink-0" title="AI đang xử lý...">
-                                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                                      </span>
-                                  )}
                                   {isNewlyUpdated && (
                                       <span className="relative flex h-2 w-2 flex-shrink-0" title="Nội dung mới">
                                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>

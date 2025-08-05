@@ -50,7 +50,6 @@ interface CommentGenerationDetailProps {
 }
 
 export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave }: CommentGenerationDetailProps) => {
-  const { refetchProcessingTasks } = useProjectDetail();
   const [config, setConfig] = useState<any>({});
   const [mandatoryConditions, setMandatoryConditions] = useState<MandatoryCondition[]>([]);
   const [results, setResults] = useState<GeneratedComment[]>([]);
@@ -175,8 +174,9 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
     if (!config.postContent) { showError("Vui lòng nhập 'Nội dung Post'."); return; }
 
     setIsGenerating(true);
+    const toastId = showLoading("AI đang xử lý, vui lòng chờ...");
     try {
-      const { data: taskData, error } = await supabase.functions.invoke('create-ai-generation-task', {
+      const { data: updatedItem, error } = await supabase.functions.invoke('generate-ai-content', {
         body: { itemId: item.id, config: { ...config, mandatoryConditions, projectId: project.id } }
       });
       
@@ -184,12 +184,15 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
         const errorBody = await error.context.json();
         throw new Error(errorBody.error || error.message);
       }
-      if (taskData.error) throw new Error(taskData.error);
+      if (updatedItem.error) throw new Error(updatedItem.error);
       
-      showSuccess("Yêu cầu đã được gửi. AI đang xử lý trong nền...");
-      await refetchProcessingTasks();
+      dismissToast(toastId);
+      showSuccess("Đã tạo nội dung thành công!");
+      onSave(updatedItem);
+
     } catch (err: any) {
-      showError(`Không thể bắt đầu: ${err.message}`);
+      dismissToast(toastId);
+      showError(`Không thể tạo nội dung: ${err.message}`);
     } finally {
       setIsGenerating(false);
     }
