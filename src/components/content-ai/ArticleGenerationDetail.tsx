@@ -360,7 +360,7 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
                       <Label>Ngành</Label>
-                      <Select value={config.libraryId} onValueChange={v => handleConfigChange('libraryId', Number(v))}>
+                      <Select value={config.libraryId?.toString()} onValueChange={v => handleConfigChange('libraryId', Number(v))}>
                         <SelectTrigger><SelectValue placeholder="Chọn thư viện prompt" /></SelectTrigger>
                         <SelectContent>{promptLibraries.map(lib => (<SelectItem key={lib.id} value={String(lib.id)}>{lib.name}</SelectItem>))}</SelectContent>
                       </Select>
@@ -381,12 +381,12 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
                     <div className="space-y-2">
                       <Label>Cấu trúc bài viết</Label>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Select value={config.structureLibraryId} onValueChange={v => { handleConfigChange('structureLibraryId', v); handleConfigChange('structureId', null); }}>
+                        <Select value={config.structureLibraryId?.toString()} onValueChange={v => { handleConfigChange('structureLibraryId', Number(v)); handleConfigChange('structureId', null); }}>
                           <SelectTrigger><SelectValue placeholder="Chọn thư viện cấu trúc" /></SelectTrigger>
                           <SelectContent>{structureLibraries.map(lib => (<SelectItem key={lib.id} value={String(lib.id)}>{lib.name}</SelectItem>))}</SelectContent>
                         </Select>
                         {config.structureLibraryId && (
-                          <Select value={config.structureId} onValueChange={v => handleConfigChange('structureId', v)} disabled={structuresInSelectedLibrary.length === 0}>
+                          <Select value={config.structureId?.toString()} onValueChange={v => handleConfigChange('structureId', Number(v))} disabled={structuresInSelectedLibrary.length === 0}>
                             <SelectTrigger><SelectValue placeholder="Chọn cấu trúc chi tiết" /></SelectTrigger>
                             <SelectContent>{structuresInSelectedLibrary.map(s => (<SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>))}</SelectContent>
                           </Select>

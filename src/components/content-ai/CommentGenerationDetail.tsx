@@ -510,8 +510,17 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="space-y-2"><Label>Ngành</Label><Select value={config.libraryId} onValueChange={v => handleConfigChange('libraryId', Number(v))}><SelectTrigger><SelectValue placeholder="Chọn thư viện prompt" /></SelectTrigger><SelectContent>{promptLibraries.map(lib => (<SelectItem key={lib.id} value={String(lib.id)}>{lib.name}</SelectItem>))}</SelectContent></Select></div>
-                    <div className="space-y-2"><Label>Nội dung Post</Label><Textarea value={config.postContent} onChange={e => handleConfigChange('postContent', e.target.value)} placeholder="Dán nội dung bài viết cần bình luận..." className="min-h-[120px]" /></div>
+                    <div className="space-y-2">
+                      <Label>Ngành</Label>
+                      <Select value={config.libraryId?.toString()} onValueChange={v => handleConfigChange('libraryId', Number(v))}>
+                        <SelectTrigger><SelectValue placeholder="Chọn thư viện prompt" /></SelectTrigger>
+                        <SelectContent>{promptLibraries.map(lib => (<SelectItem key={lib.id} value={String(lib.id)}>{lib.name}</SelectItem>))}</SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Nội dung Post</Label>
+                      <Textarea value={config.postContent} onChange={e => handleConfigChange('postContent', e.target.value)} placeholder="Dán nội dung bài viết cần bình luận..." className="min-h-[120px]" />
+                    </div>
                   </CardContent>
                 </Card>
                 <Card className="shadow-none border rounded-xl">
