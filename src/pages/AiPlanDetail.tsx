@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Sparkles, Save, Loader2, FileText, Users, Target, DollarSign, Calendar, MessageSquare, BarChart2, Swords, Shield, TrendingUp, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Sparkles, Save, Loader2, FileText, Users, Target, DollarSign, Calendar, MessageSquare, Share, BarChart2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -10,17 +10,17 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { AiPlanLogDialog } from '@/components/ai-plan/AiPlanLogDialog';
+import { AiPlanContentView } from '@/components/ai-plan/AiPlanContentView';
+import { SharePlanDialog } from '@/components/ai-plan/SharePlanDialog';
 
 type Plan = {
   id: number;
   name: string;
   config: any;
   plan_data: any;
+  is_public: boolean;
+  public_id: string | null;
 };
 
 type Log = {
@@ -39,6 +39,7 @@ const AiPlanDetail = () => {
   const [isLogOpen, setIsLogOpen] = useState(false);
   const [logs, setLogs] = useState<Log[]>([]);
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
 
   useEffect(() => {
     const fetchPlan = async () => {
@@ -129,13 +130,9 @@ const AiPlanDetail = () => {
     }
   };
 
-  const kpiChartData = plan?.plan_data?.kpis
-    ? String(plan.plan_data.kpis)
-        .split('\n')
-        .map(line => line.replace(/^- /, '').trim())
-        .filter(Boolean)
-        .map((kpi, index) => ({ name: kpi, value: 100 - index * 15 }))
-    : [];
+  const handlePlanUpdate = (updates: Partial<Plan>) => {
+    setPlan(prev => prev ? { ...prev, ...updates } : null);
+  };
 
   if (isLoading) {
     return <main className="flex-1 p-6 sm:p-8 bg-slate-50"><Skeleton className="h-full w-full" /></main>;
@@ -163,6 +160,10 @@ const AiPlanDetail = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setIsShareDialogOpen(true)} className="bg-white">
+              <Share className="mr-2 h-4 w-4" />
+              Chia sẻ
+            </Button>
             <Button variant="outline" onClick={handleOpenLogDialog} className="bg-white">
               <FileText className="mr-2 h-4 w-4" />
               Log AI
@@ -180,7 +181,7 @@ const AiPlanDetail = () => {
 
         <ResizablePanelGroup direction="horizontal" className="flex-1 rounded-2xl border bg-white shadow-sm overflow-hidden">
           <ResizablePanel defaultSize={40} minSize={30}>
-            <div className="h-full p-4">
+            <div className="h-full p-4 overflow-y-auto">
               <Card className="border-none shadow-none">
                 <CardHeader>
                   <CardTitle>Cấu hình AI</CardTitle>
@@ -223,59 +224,20 @@ const AiPlanDetail = () => {
           </ResizablePanel>
           <ResizableHandle withHandle />
           <ResizablePanel defaultSize={60}>
-            <div className="h-full bg-slate-50 p-6">
-              {plan.plan_data ? (
-                <div className="space-y-8">
-                  <div className="p-8 bg-blue-600 text-white rounded-2xl shadow-lg">
-                    <h2 className="text-2xl font-bold">Tóm tắt chiến lược</h2>
-                    <p className="mt-2 text-blue-100">{plan.plan_data.executiveSummary}</p>
-                  </div>
-
-                  <Tabs defaultValue="strengths">
-                    <TabsList className="grid w-full grid-cols-4">
-                      <TabsTrigger value="strengths"><Swords className="mr-2 h-4 w-4" />Điểm mạnh</TabsTrigger>
-                      <TabsTrigger value="weaknesses"><Shield className="mr-2 h-4 w-4" />Điểm yếu</TabsTrigger>
-                      <TabsTrigger value="opportunities"><TrendingUp className="mr-2 h-4 w-4" />Cơ hội</TabsTrigger>
-                      <TabsTrigger value="threats"><AlertTriangle className="mr-2 h-4 w-4" />Thách thức</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="strengths" className="p-4 prose prose-sm"><ReactMarkdown>{plan.plan_data.swotAnalysis.strengths}</ReactMarkdown></TabsContent>
-                    <TabsContent value="weaknesses" className="p-4 prose prose-sm"><ReactMarkdown>{plan.plan_data.swotAnalysis.weaknesses}</ReactMarkdown></TabsContent>
-                    <TabsContent value="opportunities" className="p-4 prose prose-sm"><ReactMarkdown>{plan.plan_data.swotAnalysis.opportunities}</ReactMarkdown></TabsContent>
-                    <TabsContent value="threats" className="p-4 prose prose-sm"><ReactMarkdown>{plan.plan_data.swotAnalysis.threats}</ReactMarkdown></TabsContent>
-                  </Tabs>
-
-                  <Card>
-                    <CardHeader><CardTitle>Chỉ số đo lường (KPIs)</CardTitle></CardHeader>
-                    <CardContent>
-                      <ResponsiveContainer width="100%" height={250}>
-                        <BarChart data={kpiChartData} layout="vertical" margin={{ left: 100 }}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis type="number" hide />
-                          <YAxis type="category" dataKey="name" width={150} tickLine={false} axisLine={false} />
-                          <Tooltip cursor={{ fill: '#f3f4f6' }} />
-                          <Bar dataKey="value" fill="#3B82F6" radius={[0, 4, 4, 0]} background={{ fill: '#eee', radius: 4 }} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </CardContent>
-                  </Card>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <Card><CardHeader><CardTitle>Đối tượng mục tiêu</CardTitle></CardHeader><CardContent><p className="text-sm">{plan.plan_data.targetAudience}</p></CardContent></Card>
-                    <Card><CardHeader><CardTitle>Kênh triển khai</CardTitle></CardHeader><CardContent><div className="prose prose-sm"><ReactMarkdown>{plan.plan_data.marketingChannels}</ReactMarkdown></div></CardContent></Card>
-                  </div>
-                  <Card><CardHeader><CardTitle>Trụ cột nội dung</CardTitle></CardHeader><CardContent><div className="prose prose-sm"><ReactMarkdown>{plan.plan_data.contentPillars}</ReactMarkdown></div></CardContent></Card>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-center text-slate-500">
-                  <Sparkles className="h-12 w-12 mb-4 text-slate-400" />
-                  <h3 className="text-lg font-semibold">Kế hoạch của bạn sẽ xuất hiện ở đây</h3>
-                  <p className="mt-1 text-sm max-w-sm">Điền thông tin cấu hình bên trái và nhấn "Tạo kế hoạch" để AI bắt đầu làm việc.</p>
-                </div>
-              )}
+            <div className="h-full bg-slate-50 p-6 overflow-y-auto">
+              <AiPlanContentView planData={plan.plan_data} />
             </div>
           </ResizablePanel>
         </ResizablePanelGroup>
       </main>
+      {plan && (
+        <SharePlanDialog
+          isOpen={isShareDialogOpen}
+          onOpenChange={setIsShareDialogOpen}
+          plan={plan}
+          onPlanUpdate={handlePlanUpdate}
+        />
+      )}
       <AiPlanLogDialog
         isOpen={isLogOpen}
         onOpenChange={setIsLogOpen}
