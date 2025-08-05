@@ -58,6 +58,12 @@ const navSections = [
       { name: "Công cụ", icon: Wrench, href: "/tools", permission: "view_tools" },
     ],
   },
+  {
+    title: "",
+    items: [
+      { name: "AI Plan", icon: Briefcase, href: "/ai-plan", permission: "view_ai_plan" },
+    ],
+  },
 ];
 
 const bottomNavItems: NavItem[] = [
@@ -258,7 +264,7 @@ export function Sidebar({ className, isCollapsed, toggleSidebar, onLinkClick, hi
           if (accessibleItems.length === 0) return null;
           return (
             <div key={section.title}>
-              <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>{section.title}</p>
+              {section.title && <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>{section.title}</p>}
               <nav className="flex flex-col space-y-1">
                   {accessibleItems.map(renderLink)}
               </nav>
