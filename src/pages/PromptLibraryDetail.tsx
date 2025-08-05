@@ -7,20 +7,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Loader2, ArrowLeft } from 'lucide-react';
 
-const TrainingModule = ({ config, setConfig, onSave, isSaving }: { config: TrainingConfig, setConfig: React.Dispatch<React.SetStateAction<TrainingConfig>>, onSave: () => void, isSaving: boolean }) => {
-  return (
-    <>
-      <TrainingForm config={config} setConfig={setConfig} />
-      <div className="flex justify-end pt-8 gap-3">
-        <Button onClick={onSave} disabled={isSaving} size="lg" className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold">
-          {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Lưu thay đổi
-        </Button>
-      </div>
-    </>
-  );
-};
-
 const PromptLibraryDetail = () => {
   const { libraryId } = useParams<{ libraryId: string }>();
   const [libraryName, setLibraryName] = useState('');
@@ -67,12 +53,15 @@ const PromptLibraryDetail = () => {
     const toastId = showLoading("Đang lưu cấu hình...");
 
     try {
-        const { error } = await supabase
+        const { data, error } = await supabase
             .from('prompt_libraries')
             .update({ config: config, updated_at: new Date().toISOString() })
-            .eq('id', libraryId);
+            .eq('id', libraryId)
+            .select()
+            .single();
 
         if (error) throw error;
+        if (!data) throw new Error("Không thể cập nhật thư viện. Có thể bạn không có quyền chỉnh sửa hoặc thư viện không tồn tại.");
 
         dismissToast(toastId);
         showSuccess("Đã lưu thay đổi thành công!");
@@ -114,12 +103,16 @@ const PromptLibraryDetail = () => {
           </p>
         </div>
       </div>
-      <TrainingModule
+      <TrainingForm
         config={config}
         setConfig={setConfig}
-        isSaving={isSaving}
-        onSave={handleSave}
       />
+       <div className="flex justify-end pt-8 gap-3">
+        <Button onClick={handleSave} disabled={isSaving} size="lg" className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold">
+          {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Lưu thay đổi
+        </Button>
+      </div>
     </main>
   );
 };
