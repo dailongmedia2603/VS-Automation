@@ -60,6 +60,7 @@ serve(async (req) => {
     }
     
     const planStructure = (templateData.structure as any)?.output_fields || templateData.structure as any[];
+    const inputStructure = (templateData.structure as any)?.input_fields || [];
 
     const { data: promptConfig, error: promptError } = await supabaseAdmin
       .from('ai_plan_prompt_config')
@@ -75,9 +76,26 @@ serve(async (req) => {
       .map(block => `### ${block.title.toUpperCase()}\n\n${block.content}`)
       .join('\n\n---\n\n');
 
+    // Replace placeholders with actual config values
     for (const key in config) {
       const placeholder = `{{${key}}}`;
       prompt = prompt.replace(new RegExp(placeholder, 'g'), config[key] || 'Not provided.');
+    }
+
+    // Add a new section explaining the inputs to the AI
+    if (inputStructure.length > 0) {
+      const inputDescriptions = inputStructure
+        .map((field: any) => `*   **${field.label}:** ${config[field.id] || '(không có)'}\n    *   *Mô tả/Hướng dẫn cho AI:* ${field.description || 'Không có.'}`)
+        .join('\n');
+      
+      const inputExplanationBlock = `
+---
+### DỮ LIỆU ĐẦU VÀO & HƯỚNG DẪN
+Đây là dữ liệu và hướng dẫn chi tiết bạn nhận được từ người dùng để xây dựng kế hoạch:
+${inputDescriptions}
+---
+`;
+      prompt += inputExplanationBlock;
     }
 
     const jsonStructureDescription = planStructure.map(field => {

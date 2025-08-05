@@ -255,17 +255,18 @@ const AiPlanDetail = () => {
                       <Label className="flex items-center gap-2">{field.label}</Label>
                       {field.type === 'textarea' ? (
                         <Textarea 
-                          placeholder={field.description || "..."}
                           value={plan.config?.[field.id] || ''} 
                           onChange={e => handleConfigChange(field.id, e.target.value)} 
                           className="min-h-[100px]"
                         />
                       ) : (
                         <Input 
-                          placeholder={field.description || "..."}
                           value={plan.config?.[field.id] || ''} 
                           onChange={e => handleConfigChange(field.id, e.target.value)} 
                         />
+                      )}
+                      {field.description && (
+                        <p className="text-xs text-muted-foreground">{field.description}</p>
                       )}
                     </div>
                   ))}
