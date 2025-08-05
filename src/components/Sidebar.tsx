@@ -261,7 +261,7 @@ export function Sidebar({ className, isCollapsed, toggleSidebar, onLinkClick, hi
             <div key={section.title}>
               {section.title && <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>{section.title}</p>}
               <nav className="flex flex-col space-y-1">
-                  {accessibleItems.map(renderLink)}
+                  {accessibleItems.map(item => <React.Fragment key={item.href}>{renderLink(item)}</React.Fragment>)}
               </nav>
             </div>
           );
@@ -271,7 +271,7 @@ export function Sidebar({ className, isCollapsed, toggleSidebar, onLinkClick, hi
        <div className="mt-auto">
          <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>CÀI ĐẶT CHUNG</p>
          <nav className="flex flex-col space-y-1">
-            {bottomNavItems.filter(item => hasPermission(item.permission)).map(renderLink)}
+            {bottomNavItems.filter(item => hasPermission(item.permission)).map(item => <React.Fragment key={item.href}>{renderLink(item)}</React.Fragment>)}
          </nav>
        </div>
     </div>
