@@ -205,7 +205,7 @@ const CheckSeeding = () => {
   };
 
   return (
-    <main className="flex-1 flex flex-col p-6 sm:p-8 bg-slate-50">
+    <main className="flex-1 flex flex-col p-6 sm:p-8 bg-slate-50 overflow-y-auto">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">Check Seeding</h1>
@@ -235,7 +235,7 @@ const CheckSeeding = () => {
         <SeedingStatCard title="Đang Check" value={stats.checking} icon={FolderClock} color="bg-amber-500" />
       </div>
 
-      <Card className="shadow-sm rounded-2xl bg-white mt-8 flex-1 flex flex-col min-h-0">
+      <Card className="shadow-sm rounded-2xl bg-white mt-8">
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="relative flex-grow max-w-xs">
@@ -274,7 +274,7 @@ const CheckSeeding = () => {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="flex-1 overflow-y-auto">
+        <CardContent>
           <div className="border rounded-lg overflow-hidden">
             <Table>
               <TableHeader>
