@@ -62,18 +62,21 @@ serve(async (req) => {
     const planStructure = (templateData.structure as any)?.output_fields || templateData.structure as any[];
     const inputStructure = (templateData.structure as any)?.input_fields || [];
 
-    const { data: promptConfig, error: promptError } = await supabaseAdmin
+    const { data: promptConfigData, error: promptError } = await supabaseAdmin
       .from('ai_plan_prompt_config')
       .select('prompt_structure')
       .eq('id', 1)
       .single();
 
-    if (promptError || !promptConfig || !promptConfig.prompt_structure || !Array.isArray(promptConfig.prompt_structure)) {
+    if (promptError || !promptConfigData || !promptConfigData.prompt_structure) {
       throw new Error("AI Plan prompt structure is not configured or is invalid.");
     }
 
-    let prompt = (promptConfig.prompt_structure as { title: string, content: string }[])
-      .map(block => `### ${block.title.toUpperCase()}\n\n${block.content}`)
+    const promptConfig = promptConfigData.prompt_structure;
+    const blocks = Array.isArray(promptConfig) ? promptConfig : promptConfig.blocks || [];
+
+    let prompt = blocks
+      .map((block: { title: string, content: string }) => `### ${block.title.toUpperCase()}\n\n${block.content}`)
       .join('\n\n---\n\n');
 
     // Replace placeholders with actual config values
@@ -82,7 +85,6 @@ serve(async (req) => {
       prompt = prompt.replace(new RegExp(placeholder, 'g'), config[key] || 'Not provided.');
     }
 
-    // Add a new section explaining the inputs to the AI
     if (inputStructure.length > 0) {
       const inputDescriptions = inputStructure
         .map((field: any) => `*   **${field.label}:** ${config[field.id] || '(không có)'}\n    *   *Mô tả/Hướng dẫn cho AI:* ${field.description || 'Không có.'}`)
@@ -96,6 +98,17 @@ ${inputDescriptions}
 ---
 `;
       prompt += inputExplanationBlock;
+    }
+
+    if (promptConfig.useCoT) {
+      let cotPrompt = "Let's think step by step.";
+      if (promptConfig.cotFactors && promptConfig.cotFactors.length > 0) {
+        const factorsText = promptConfig.cotFactors
+          .map((factor: { value: string }) => `- ${factor.value}`)
+          .join('\n');
+        cotPrompt += "\n\nHere are the key factors to consider in your thinking process:\n" + factorsText;
+      }
+      prompt += `\n\n${cotPrompt}`;
     }
 
     const jsonStructureDescription = planStructure.map(field => {
@@ -130,10 +143,19 @@ ${jsonStructureDescription}
 
     const modelToUse = aiSettings.gemini_content_model || 'gemini-pro';
 
+    const generationConfig = {
+      temperature: promptConfig.temperature ?? 0.7,
+      topP: promptConfig.topP ?? 0.95,
+      maxOutputTokens: promptConfig.maxTokens ?? 8192,
+    };
+
     const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${aiSettings.google_gemini_api_key}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+      body: JSON.stringify({ 
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: generationConfig
+      }),
     });
 
     const geminiData = await geminiRes.json();

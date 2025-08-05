@@ -4,18 +4,43 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Save, Loader2, Info, PlusCircle, Trash2, ArrowUp, ArrowDown, Eye, Code } from 'lucide-react';
+import { Save, Loader2, Info, PlusCircle, Trash2, ArrowUp, ArrowDown, Eye, Code, SlidersHorizontal, BrainCircuit } from 'lucide-react';
 import { showSuccess, showError } from '@/utils/toast';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import ReactMarkdown from 'react-markdown';
+import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
 
 type PromptBlock = {
   id: string;
   title: string;
   content: string;
+};
+
+type CotFactor = {
+  id: string;
+  value: string;
+};
+
+type PromptConfig = {
+  blocks: PromptBlock[];
+  temperature: number;
+  topP: number;
+  maxTokens: number;
+  useCoT: boolean;
+  cotFactors: CotFactor[];
+};
+
+const initialConfig: PromptConfig = {
+  blocks: [],
+  temperature: 0.7,
+  topP: 0.95,
+  maxTokens: 8192,
+  useCoT: false,
+  cotFactors: [],
 };
 
 const placeholders = [
@@ -29,7 +54,7 @@ const placeholders = [
 ];
 
 export const AiPlanPromptConfig = () => {
-  const [blocks, setBlocks] = useState<PromptBlock[]>([]);
+  const [config, setConfig] = useState<PromptConfig>(initialConfig);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -46,8 +71,15 @@ export const AiPlanPromptConfig = () => {
           .single();
         
         if (error && error.code !== 'PGRST116') throw error;
-        if (data && Array.isArray(data.prompt_structure)) {
-          setBlocks(data.prompt_structure);
+        
+        if (data && data.prompt_structure) {
+          if (Array.isArray(data.prompt_structure)) {
+            // Old format, migrate
+            setConfig(prev => ({ ...prev, blocks: data.prompt_structure }));
+          } else {
+            // New format
+            setConfig(prev => ({ ...prev, ...data.prompt_structure }));
+          }
         }
       } catch (error: any) {
         showError("Không thể tải prompt: " + error.message);
@@ -63,7 +95,7 @@ export const AiPlanPromptConfig = () => {
     try {
       const { error } = await supabase
         .from('ai_plan_prompt_config')
-        .upsert({ id: 1, prompt_structure: blocks, updated_at: new Date().toISOString() });
+        .upsert({ id: 1, prompt_structure: config, updated_at: new Date().toISOString() });
       
       if (error) throw error;
       showSuccess("Đã lưu prompt thành công!");
@@ -76,25 +108,25 @@ export const AiPlanPromptConfig = () => {
 
   const addBlock = () => {
     const newBlock: PromptBlock = { id: crypto.randomUUID(), title: 'Tiêu đề mới', content: '' };
-    setBlocks([...blocks, newBlock]);
+    setConfig(prev => ({ ...prev, blocks: [...prev.blocks, newBlock] }));
   };
 
   const updateBlock = (id: string, field: 'title' | 'content', value: string) => {
-    setBlocks(blocks.map(b => b.id === id ? { ...b, [field]: value } : b));
+    setConfig(prev => ({ ...prev, blocks: prev.blocks.map(b => b.id === id ? { ...b, [field]: value } : b) }));
   };
 
   const deleteBlock = (id: string) => {
-    setBlocks(blocks.filter(b => b.id !== id));
+    setConfig(prev => ({ ...prev, blocks: prev.blocks.filter(b => b.id !== id) }));
   };
 
   const moveBlock = (index: number, direction: 'up' | 'down') => {
-    if ((direction === 'up' && index === 0) || (direction === 'down' && index === blocks.length - 1)) {
+    if ((direction === 'up' && index === 0) || (direction === 'down' && index === config.blocks.length - 1)) {
       return;
     }
-    const newBlocks = [...blocks];
+    const newBlocks = [...config.blocks];
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     [newBlocks[index], newBlocks[targetIndex]] = [newBlocks[targetIndex], newBlocks[index]];
-    setBlocks(newBlocks);
+    setConfig(prev => ({ ...prev, blocks: newBlocks }));
   };
 
   const insertPlaceholder = (placeholder: string) => {
@@ -108,7 +140,6 @@ export const AiPlanPromptConfig = () => {
       const blockId = textarea.dataset.id;
       if (blockId) {
         updateBlock(blockId, 'content', newText);
-        // Restore focus and cursor position after state update
         setTimeout(() => {
           textarea.focus();
           textarea.selectionStart = textarea.selectionEnd = start + placeholder.length + 4;
@@ -117,9 +148,25 @@ export const AiPlanPromptConfig = () => {
     }
   };
 
+  const handleConfigChange = (field: keyof Omit<PromptConfig, 'blocks' | 'cotFactors'>, value: any) => {
+    setConfig(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleCotFactorChange = (id: string, value: string) => {
+    setConfig(prev => ({ ...prev, cotFactors: prev.cotFactors.map(f => f.id === id ? { ...f, value } : f) }));
+  };
+
+  const addCotFactor = () => {
+    setConfig(prev => ({ ...prev, cotFactors: [...prev.cotFactors, { id: crypto.randomUUID(), value: '' }] }));
+  };
+
+  const removeCotFactor = (id: string) => {
+    setConfig(prev => ({ ...prev, cotFactors: prev.cotFactors.filter(f => f.id !== id) }));
+  };
+
   const previewPrompt = useMemo(() => {
-    return blocks.map(block => `### ${block.title.toUpperCase()}\n\n${block.content}`).join('\n\n---\n\n');
-  }, [blocks]);
+    return config.blocks.map(block => `### ${block.title.toUpperCase()}\n\n${block.content}`).join('\n\n---\n\n');
+  }, [config.blocks]);
 
   if (isLoading) {
     return <Card><CardHeader><Skeleton className="h-6 w-1/3" /></CardHeader><CardContent><Skeleton className="h-64 w-full" /></CardContent></Card>;
@@ -127,56 +174,114 @@ export const AiPlanPromptConfig = () => {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Cấu hình Prompt tạo Kế hoạch AI</CardTitle>
-          <CardDescription>Xây dựng prompt của bạn bằng cách thêm và sắp xếp các khối nội dung.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3">
-            {blocks.map((block, index) => (
-              <Card key={block.id} className="bg-slate-50/70">
-                <CardContent className="p-3 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Input value={block.title} onChange={e => updateBlock(block.id, 'title', e.target.value)} className="font-semibold border-none bg-transparent focus-visible:ring-1" />
-                    <div className="flex items-center">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => moveBlock(index, 'up')} disabled={index === 0}><ArrowUp className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => moveBlock(index, 'down')} disabled={index === blocks.length - 1}><ArrowDown className="h-4 w-4" /></Button>
-                      <Popover>
-                        <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><Code className="h-4 w-4" /></Button></PopoverTrigger>
-                        <PopoverContent className="w-60 p-1">
-                          <div className="text-xs text-muted-foreground p-2">Chèn biến</div>
-                          {placeholders.map(p => (
-                            <Button key={p} variant="ghost" className="w-full justify-start font-mono text-xs h-8" onClick={() => insertPlaceholder(p)}>{`{{${p}}}`}</Button>
-                          ))}
-                        </PopoverContent>
-                      </Popover>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => deleteBlock(block.id)}><Trash2 className="h-4 w-4" /></Button>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <div className="lg:col-span-2 space-y-4">
+          <Card className="shadow-sm rounded-2xl bg-white">
+            <CardHeader>
+              <CardTitle>Cấu trúc Prompt</CardTitle>
+              <CardDescription>Xây dựng prompt của bạn bằng cách thêm và sắp xếp các khối nội dung.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {config.blocks.map((block, index) => (
+                <Card key={block.id} className="bg-slate-50/70">
+                  <CardContent className="p-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Input value={block.title} onChange={e => updateBlock(block.id, 'title', e.target.value)} className="font-semibold border-none bg-transparent focus-visible:ring-1" />
+                      <div className="flex items-center">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => moveBlock(index, 'up')} disabled={index === 0}><ArrowUp className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => moveBlock(index, 'down')} disabled={index === config.blocks.length - 1}><ArrowDown className="h-4 w-4" /></Button>
+                        <Popover>
+                          <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><Code className="h-4 w-4" /></Button></PopoverTrigger>
+                          <PopoverContent className="w-60 p-1">
+                            <div className="text-xs text-muted-foreground p-2">Chèn biến</div>
+                            {placeholders.map(p => (
+                              <Button key={p} variant="ghost" className="w-full justify-start font-mono text-xs h-8" onClick={() => insertPlaceholder(p)}>{`{{${p}}}`}</Button>
+                            ))}
+                          </PopoverContent>
+                        </Popover>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => deleteBlock(block.id)}><Trash2 className="h-4 w-4" /></Button>
+                      </div>
                     </div>
+                    <Textarea data-id={block.id} value={block.content} onChange={e => updateBlock(block.id, 'content', e.target.value)} onFocus={e => activeTextareaRef.current = e.target} className="min-h-[100px] bg-white" />
+                  </CardContent>
+                </Card>
+              ))}
+              <div className="pt-2">
+                <Button variant="outline" onClick={addBlock} className="w-full border-dashed"><PlusCircle className="mr-2 h-4 w-4" />Thêm khối</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        <div className="lg:col-span-1 space-y-6">
+          <Card className="bg-white rounded-2xl shadow-sm border border-slate-200/80">
+            <CardHeader className="p-6 flex flex-row items-center gap-4">
+              <div className="flex-shrink-0 bg-purple-100 p-3 rounded-lg"><SlidersHorizontal className="h-6 w-6 text-purple-600" /></div>
+              <div>
+                <CardTitle className="text-xl font-bold text-slate-900">Tham Số Đầu Ra</CardTitle>
+                <CardDescription className="text-sm text-slate-500 pt-1">Kiểm soát cách LLM tạo ra phản hồi.</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 pt-0 space-y-6">
+              <div>
+                <Label className="flex justify-between text-sm font-medium text-slate-800"><span>Temperature:</span><span>{config.temperature}</span></Label>
+                <Slider value={[config.temperature]} onValueChange={(val) => handleConfigChange('temperature', val[0])} max={1} step={0.05} />
+                <p className="text-xs text-slate-500">Thấp: Chính xác, cao: Sáng tạo.</p>
+              </div>
+              <div>
+                <Label className="flex justify-between text-sm font-medium text-slate-800"><span>Top-P:</span><span>{config.topP}</span></Label>
+                <Slider value={[config.topP]} onValueChange={(val) => handleConfigChange('topP', val[0])} max={1} step={0.01} />
+                <p className="text-xs text-slate-500">Chọn token dựa trên tổng xác suất.</p>
+              </div>
+              <div>
+                <Label htmlFor="max-tokens" className="text-sm font-medium text-slate-800">Max Tokens</Label>
+                <Input id="max-tokens" type="number" value={config.maxTokens} onChange={e => handleConfigChange('maxTokens', parseInt(e.target.value, 10))} className="bg-slate-100/70 border-slate-200 rounded-lg h-11" />
+                <p className="text-xs text-slate-500">Giới hạn độ dài tối đa của phản hồi.</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-white rounded-2xl shadow-sm border border-slate-200/80">
+            <CardHeader className="p-6 flex flex-row items-center gap-4">
+              <div className="flex-shrink-0 bg-amber-100 p-3 rounded-lg"><BrainCircuit className="h-6 w-6 text-amber-600" /></div>
+              <div>
+                <CardTitle className="text-xl font-bold text-slate-900">Kỹ Thuật Nâng Cao</CardTitle>
+                <CardDescription className="text-sm text-slate-500 pt-1">Cải thiện khả năng suy luận của mô hình.</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 pt-0">
+              <div className="p-3 border rounded-lg bg-slate-50/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="cot-switch">Chain of Thought (CoT)</Label>
+                    <p className="text-xs text-muted-foreground">Hướng dẫn AI suy luận logic hơn.</p>
                   </div>
-                  <Textarea
-                    data-id={block.id}
-                    value={block.content}
-                    onChange={e => updateBlock(block.id, 'content', e.target.value)}
-                    onFocus={e => activeTextareaRef.current = e.target}
-                    className="min-h-[100px] bg-white"
-                  />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-          <div className="flex items-center justify-between pt-4 border-t">
-            <Button variant="outline" onClick={addBlock}><PlusCircle className="mr-2 h-4 w-4" />Thêm khối</Button>
-            <div className="flex items-center gap-2">
-              <Button variant="secondary" onClick={() => setIsPreviewOpen(true)}><Eye className="mr-2 h-4 w-4" />Xem trước</Button>
-              <Button onClick={handleSave} disabled={isSaving}>
-                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                Lưu Prompt
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+                  <Switch id="cot-switch" checked={config.useCoT} onCheckedChange={(checked) => handleConfigChange('useCoT', checked)} />
+                </div>
+                {config.useCoT && (
+                  <div className="mt-4 pt-4 border-t space-y-2">
+                    <Label className="text-sm font-medium">Các yếu tố cần suy nghĩ</Label>
+                    {(config.cotFactors || []).map(factor => (
+                      <div key={factor.id} className="flex items-center gap-2">
+                        <Textarea value={factor.value} onChange={(e) => handleCotFactorChange(factor.id, e.target.value)} placeholder="VD: Phân tích cảm xúc của khách hàng" className="bg-white" rows={2} />
+                        <Button variant="ghost" size="icon" onClick={() => removeCotFactor(factor.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      </div>
+                    ))}
+                    <Button variant="outline" size="sm" onClick={addCotFactor} className="border-dashed"><PlusCircle className="mr-2 h-4 w-4" />Thêm yếu tố</Button>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+      <div className="flex justify-end pt-4">
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" onClick={() => setIsPreviewOpen(true)}><Eye className="mr-2 h-4 w-4" />Xem trước</Button>
+          <Button onClick={handleSave} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700">
+            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+            Lưu Prompt
+          </Button>
+        </div>
+      </div>
       <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
         <DialogContent className="sm:max-w-3xl">
           <DialogHeader><DialogTitle>Xem trước Prompt</DialogTitle></DialogHeader>
