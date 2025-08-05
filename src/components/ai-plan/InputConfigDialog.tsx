@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PlusCircle, Trash2 } from 'lucide-react';
+import { PlusCircle, Trash2, Loader2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 export type InputField = {
@@ -19,11 +19,12 @@ interface InputConfigDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   initialFields: InputField[];
-  onApply: (fields: InputField[]) => void;
+  onApply: (fields: InputField[]) => Promise<void>;
 }
 
 export const InputConfigDialog = ({ isOpen, onOpenChange, initialFields, onApply }: InputConfigDialogProps) => {
   const [fields, setFields] = useState<InputField[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -44,13 +45,20 @@ export const InputConfigDialog = ({ isOpen, onOpenChange, initialFields, onApply
     setFields(fields.filter(f => f.id !== id));
   };
 
-  const handleApply = () => {
-    onApply(fields);
-    onOpenChange(false);
+  const handleApply = async () => {
+    setIsSaving(true);
+    try {
+      await onApply(fields);
+      onOpenChange(false);
+    } catch (error) {
+      // Parent shows toast, dialog stays open
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+    <Dialog open={isOpen} onOpenChange={(open) => !isSaving && onOpenChange(open)}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Cấu hình đầu vào</DialogTitle>
@@ -80,20 +88,23 @@ export const InputConfigDialog = ({ isOpen, onOpenChange, initialFields, onApply
                   <Label>Mô tả (Placeholder)</Label>
                   <Textarea value={field.description} onChange={e => handleFieldChange(field.id, 'description', e.target.value)} rows={2} />
                 </div>
-                <Button variant="ghost" size="icon" className="absolute top-2 right-2 text-destructive hover:text-destructive" onClick={() => removeField(field.id)}>
+                <Button variant="ghost" size="icon" className="absolute top-2 right-2 text-destructive hover:text-destructive" onClick={() => removeField(field.id)} disabled={isSaving}>
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
             ))}
-            <Button variant="outline" onClick={addField} className="w-full border-dashed">
+            <Button variant="outline" onClick={addField} className="w-full border-dashed" disabled={isSaving}>
               <PlusCircle className="mr-2 h-4 w-4" />
               Thêm trường
             </Button>
           </div>
         </ScrollArea>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Hủy</Button>
-          <Button onClick={handleApply}>Áp dụng</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>Hủy</Button>
+          <Button onClick={handleApply} disabled={isSaving}>
+            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Áp dụng
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

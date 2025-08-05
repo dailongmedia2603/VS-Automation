@@ -173,7 +173,6 @@ const AiPlanDetail = () => {
 
   const handleApplyInputConfig = async (newFields: InputField[]) => {
     if (!plan || !plan.template_id) return;
-    const toastId = showLoading("Đang áp dụng cấu hình...");
     try {
       const newStructure: TemplateStructure = {
         input_fields: newFields,
@@ -190,8 +189,7 @@ const AiPlanDetail = () => {
       showSuccess("Đã áp dụng cấu hình đầu vào mới!");
     } catch (error: any) {
       showError("Lưu cấu hình thất bại: " + error.message);
-    } finally {
-      dismissToast(toastId);
+      throw error;
     }
   };
 
