@@ -7,46 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const buildPrompt = (config) => {
-  return `
-    **ROLE:** You are an expert marketing strategist AI. Your task is to create a comprehensive marketing plan based on the user's input.
-
-    **USER INPUT:**
-    - **Product/Service Description:** ${config.productDescription || 'Not provided.'}
-    - **Target Audience:** ${config.targetAudience || 'Not provided.'}
-    - **Campaign Goals:** ${config.goals || 'Not provided.'}
-    - **Budget:** ${config.budget || 'Not provided.'}
-    - **Timeline:** ${config.timeline || 'Not provided.'}
-    - **Key Message:** ${config.keyMessage || 'Not provided.'}
-    - **Competitors:** ${config.competitors || 'Not provided.'}
-
-    **TASK:**
-    Based on the information above, generate a detailed marketing plan. The plan must be structured as a JSON object.
-
-    **OUTPUT FORMAT (Strictly follow this JSON structure):**
-    \`\`\`json
-    {
-      "executiveSummary": "A brief summary of the entire marketing plan.",
-      "swotAnalysis": {
-        "strengths": "- Point 1\\n- Point 2",
-        "weaknesses": "- Point 1\\n- Point 2",
-        "opportunities": "- Point 1\\n- Point 2",
-        "threats": "- Point 1\\n- Point 2"
-      },
-      "targetAudience": "A detailed description of the target audience persona.",
-      "marketingChannels": "- Channel 1 (e.g., Social Media - Facebook, TikTok)\\n- Channel 2 (e.g., Google Ads)",
-      "contentPillars": "- Pillar 1 (e.g., Educational Content)\\n- Pillar 2 (e.g., Customer Testimonials)",
-      "kpis": "- KPI 1 (e.g., Reach)\\n- KPI 2 (e.g., Conversion Rate)"
-    }
-    \`\`\`
-
-    **INSTRUCTIONS:**
-    1.  Analyze the user's input carefully.
-    2.  Fill in each section of the JSON object with insightful and actionable marketing strategies.
-    3.  The output MUST be only the JSON object inside the markdown code block. Do not include any other text or explanations.
-  `;
-};
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -82,7 +42,23 @@ serve(async (req) => {
       throw new Error("Google Gemini API key is not configured in settings.");
     }
 
-    const prompt = buildPrompt(config);
+    const { data: promptConfig, error: promptError } = await supabaseAdmin
+      .from('ai_plan_prompt_config')
+      .select('prompt_template')
+      .eq('id', 1)
+      .single();
+
+    if (promptError || !promptConfig || !promptConfig.prompt_template) {
+      throw new Error("AI Plan prompt template is not configured.");
+    }
+
+    let prompt = promptConfig.prompt_template;
+
+    for (const key in config) {
+      const placeholder = `{{${key}}}`;
+      prompt = prompt.replace(new RegExp(placeholder, 'g'), config[key] || 'Not provided.');
+    }
+
     const modelToUse = aiSettings.gemini_content_model || 'gemini-pro';
 
     const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${aiSettings.google_gemini_api_key}`, {
