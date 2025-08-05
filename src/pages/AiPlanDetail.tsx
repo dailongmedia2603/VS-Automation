@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Sparkles, Save, Loader2, FileText, Share } from 'lucide-react';
+import { ArrowLeft, Sparkles, Save, Loader2, FileText, Share, Settings2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,6 +13,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { AiPlanLogDialog } from '@/components/ai-plan/AiPlanLogDialog';
 import { AiPlanContentView } from '@/components/ai-plan/AiPlanContentView';
 import { SharePlanDialog } from '@/components/ai-plan/SharePlanDialog';
+import { InputConfigDialog, type InputField } from '@/components/ai-plan/InputConfigDialog';
 
 type Plan = {
   id: number;
@@ -31,17 +32,24 @@ type Log = {
   response: any;
 };
 
-type PlanStructure = {
+type OutputStructure = {
   id: string;
   label: string;
   type: 'text' | 'textarea' | 'dynamic_group';
   icon: string;
+  sub_fields?: { id: string; label: string; type: 'text' | 'textarea' }[];
 }[];
+
+type TemplateStructure = {
+  input_fields: InputField[];
+  output_fields: OutputStructure;
+};
 
 const AiPlanDetail = () => {
   const { planId } = useParams();
   const [plan, setPlan] = useState<Plan | null>(null);
-  const [planStructure, setPlanStructure] = useState<PlanStructure | null>(null);
+  const [inputStructure, setInputStructure] = useState<InputField[]>([]);
+  const [outputStructure, setOutputStructure] = useState<OutputStructure | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -49,6 +57,7 @@ const AiPlanDetail = () => {
   const [logs, setLogs] = useState<Log[]>([]);
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [isInputConfigOpen, setIsInputConfigOpen] = useState(false);
 
   useEffect(() => {
     const fetchPlan = async () => {
@@ -63,8 +72,7 @@ const AiPlanDetail = () => {
         if (error) throw error;
         setPlan(data);
 
-        // Fetch the template structure
-        const templateId = data.template_id || 1; // Fallback to default template
+        const templateId = data.template_id || 1;
         const { data: templateData, error: templateError } = await supabase
           .from('ai_plan_templates')
           .select('structure')
@@ -72,7 +80,15 @@ const AiPlanDetail = () => {
           .single();
         
         if (templateError) throw templateError;
-        setPlanStructure(templateData.structure as PlanStructure);
+
+        if (templateData.structure && typeof templateData.structure === 'object' && !Array.isArray(templateData.structure)) {
+          const structure = templateData.structure as TemplateStructure;
+          setInputStructure(structure.input_fields || []);
+          setOutputStructure(structure.output_fields || []);
+        } else {
+          setInputStructure([]);
+          setOutputStructure((templateData.structure as OutputStructure) || []);
+        }
 
       } catch (error: any) {
         showError("Không thể tải kế hoạch: " + error.message);
@@ -155,6 +171,30 @@ const AiPlanDetail = () => {
     setPlan(prev => prev ? { ...prev, ...updates } : null);
   };
 
+  const handleApplyInputConfig = async (newFields: InputField[]) => {
+    if (!plan || !plan.template_id) return;
+    const toastId = showLoading("Đang áp dụng cấu hình...");
+    try {
+      const newStructure: TemplateStructure = {
+        input_fields: newFields,
+        output_fields: outputStructure || [],
+      };
+      const { error } = await supabase
+        .from('ai_plan_templates')
+        .update({ structure: newStructure })
+        .eq('id', plan.template_id);
+      
+      if (error) throw error;
+
+      setInputStructure(newFields);
+      showSuccess("Đã áp dụng cấu hình đầu vào mới!");
+    } catch (error: any) {
+      showError("Lưu cấu hình thất bại: " + error.message);
+    } finally {
+      dismissToast(toastId);
+    }
+  };
+
   if (isLoading) {
     return <main className="flex-1 p-6 sm:p-8 bg-slate-50"><Skeleton className="h-full w-full" /></main>;
   }
@@ -205,29 +245,42 @@ const AiPlanDetail = () => {
             <div className="h-full p-4 overflow-y-auto">
               <Card className="border-none shadow-none">
                 <CardHeader>
-                  <CardTitle>Thông tin đầu vào</CardTitle>
-                  <CardDescription>Nhập thông tin chi tiết về chiến dịch của bạn.</CardDescription>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <CardTitle>Thông tin đầu vào</CardTitle>
+                      <CardDescription>Nhập thông tin chi tiết về chiến dịch của bạn.</CardDescription>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => setIsInputConfigOpen(true)}>
+                      <Settings2 className="mr-2 h-4 w-4" />
+                      Cấu hình đầu vào
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {planStructure?.map(field => (
+                  {inputStructure.map(field => (
                     <div key={field.id} className="space-y-2">
                       <Label className="flex items-center gap-2">{field.label}</Label>
                       {field.type === 'textarea' ? (
                         <Textarea 
-                          placeholder="..." 
+                          placeholder={field.description || "..."}
                           value={plan.config?.[field.id] || ''} 
                           onChange={e => handleConfigChange(field.id, e.target.value)} 
                           className="min-h-[100px]"
                         />
                       ) : (
                         <Input 
-                          placeholder="..." 
+                          placeholder={field.description || "..."}
                           value={plan.config?.[field.id] || ''} 
                           onChange={e => handleConfigChange(field.id, e.target.value)} 
                         />
                       )}
                     </div>
                   ))}
+                  {inputStructure.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      Chưa có trường đầu vào nào được cấu hình.
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -235,7 +288,7 @@ const AiPlanDetail = () => {
           <ResizableHandle withHandle />
           <ResizablePanel defaultSize={60}>
             <div className="h-full bg-slate-50 p-6 overflow-y-auto">
-              <AiPlanContentView planData={plan.plan_data} planStructure={planStructure!} />
+              <AiPlanContentView planData={plan.plan_data} planStructure={outputStructure!} />
             </div>
           </ResizablePanel>
         </ResizablePanelGroup>
@@ -253,6 +306,12 @@ const AiPlanDetail = () => {
         onOpenChange={setIsLogOpen}
         logs={logs}
         isLoading={isLoadingLogs}
+      />
+      <InputConfigDialog
+        isOpen={isInputConfigOpen}
+        onOpenChange={setIsInputConfigOpen}
+        initialFields={inputStructure}
+        onApply={handleApplyInputConfig}
       />
     </>
   );

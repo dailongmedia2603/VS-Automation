@@ -58,7 +58,8 @@ serve(async (req) => {
     if (templateError || !templateData || !templateData.structure) {
       throw new Error("AI Plan template structure is not configured or is invalid.");
     }
-    const planStructure = templateData.structure as any[];
+    
+    const planStructure = (templateData.structure as any)?.output_fields || templateData.structure as any[];
 
     const { data: promptConfig, error: promptError } = await supabaseAdmin
       .from('ai_plan_prompt_config')
