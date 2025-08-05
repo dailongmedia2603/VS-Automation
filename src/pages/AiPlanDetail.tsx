@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Sparkles, Save, Loader2, FileText, Share, Settings2 } from 'lucide-react';
+import { ArrowLeft, Sparkles, Save, Loader2, FileText, Share, Settings2, PencilLine } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -251,23 +251,31 @@ const AiPlanDetail = () => {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {inputStructure.map(field => (
-                    <div key={field.id} className="space-y-2">
-                      <Label className="flex items-center gap-2">{field.label}</Label>
-                      {field.type === 'textarea' ? (
-                        <Textarea 
-                          value={plan.config?.[field.id] || ''} 
-                          onChange={e => handleConfigChange(field.id, e.target.value)} 
-                          className="min-h-[100px]"
-                        />
-                      ) : (
-                        <Input 
-                          value={plan.config?.[field.id] || ''} 
-                          onChange={e => handleConfigChange(field.id, e.target.value)} 
-                        />
-                      )}
-                      {field.description && (
-                        <p className="text-xs text-muted-foreground">{field.description}</p>
-                      )}
+                    <div key={field.id} className="border rounded-xl overflow-hidden bg-white">
+                      <div className="p-3 bg-slate-50 border-b flex items-center gap-3">
+                        <PencilLine className="h-5 w-5 text-blue-600 flex-shrink-0" />
+                        <div className="flex-1">
+                          <Label className="text-base font-semibold text-slate-800">{field.label}</Label>
+                        </div>
+                      </div>
+                      <div className="p-4 space-y-2">
+                        {field.description && (
+                          <p className="text-sm text-muted-foreground">{field.description}</p>
+                        )}
+                        {field.type === 'textarea' ? (
+                          <Textarea 
+                            value={plan.config?.[field.id] || ''} 
+                            onChange={e => handleConfigChange(field.id, e.target.value)} 
+                            className="min-h-[120px] bg-white"
+                          />
+                        ) : (
+                          <Input 
+                            value={plan.config?.[field.id] || ''} 
+                            onChange={e => handleConfigChange(field.id, e.target.value)} 
+                            className="bg-white"
+                          />
+                        )}
+                      </div>
                     </div>
                   ))}
                   {inputStructure.length === 0 && (
