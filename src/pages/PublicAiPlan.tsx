@@ -66,7 +66,7 @@ const PublicAiPlan = () => {
 
   return (
     <main className="p-6 sm:p-8 md:p-12 bg-slate-50 min-h-screen">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         <div className="mb-8 text-center">
           <img src={hexaLogo} alt="DAILONG MEDIA Logo" className="w-48 h-auto mx-auto mb-4" />
           <h1 className="text-4xl font-bold tracking-tight text-slate-900">{plan?.name}</h1>
