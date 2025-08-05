@@ -60,7 +60,7 @@ export const ProjectDetailProvider = ({ projectId, children }: { projectId: stri
   const [selectedView, setSelectedView] = useState<'documents' | ProjectItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [promptLibraries, setPromptLibraries] = useState<PromptLibrary[]>([]);
-  const [newlyUpdatedItemIds, setNewlyUpdatedItemIds] = useState<Set<number>>(new Set());
+  const [newlyUpdatedItemIds] = useState<Set<number>>(new Set());
   
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState('');
