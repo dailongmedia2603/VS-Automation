@@ -221,7 +221,7 @@ const ContentAi = () => {
 
   return (
     <>
-      <main className="flex-1 space-y-8 p-6 sm:p-8 bg-slate-50">
+      <main className="flex-1 space-y-8 p-6 sm:p-8 bg-slate-50 overflow-y-auto">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-slate-900">Content AI</h1>
