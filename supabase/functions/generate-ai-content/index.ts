@@ -238,14 +238,11 @@ serve(async (req) => {
     }
 
     const modelToUse = aiSettings.gemini_content_model || 'gemini-pro';
-    const GEMINI_MAX_TOKENS = 8192;
-    let maxTokens = library.config.maxTokens ?? 2048;
-    if (maxTokens > GEMINI_MAX_TOKENS) maxTokens = GEMINI_MAX_TOKENS;
-
+    
     const generationConfig = {
       temperature: library.config.temperature ?? 0.7,
       topP: library.config.topP ?? 0.95,
-      maxOutputTokens: maxTokens,
+      maxOutputTokens: library.config.maxTokens ?? 8192,
     };
 
     const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${aiSettings.google_gemini_api_key}`, {

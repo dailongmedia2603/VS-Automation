@@ -216,7 +216,7 @@ serve(async (req) => {
     const generationConfig = {
       temperature: library.config.temperature ?? 0.7,
       topP: library.config.topP ?? 0.95,
-      maxOutputTokens: library.config.maxTokens ?? 2048,
+      maxOutputTokens: library.config.maxTokens ?? 8192,
     };
 
     let geminiRes;
