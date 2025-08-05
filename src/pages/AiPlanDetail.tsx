@@ -68,29 +68,30 @@ const AiPlanDetail = () => {
     setIsSaving(false);
   };
 
-  const handleGeneratePlan = () => {
-    // Placeholder for AI generation logic
+  const handleGeneratePlan = async () => {
+    if (!plan) return;
     setIsGenerating(true);
     const toastId = showLoading("AI đang xây dựng kế hoạch...");
-    setTimeout(() => {
-      const samplePlan = {
-        executiveSummary: "Chiến dịch ra mắt sản phẩm X nhằm mục tiêu tăng nhận diện thương hiệu và đạt 1,000 đơn hàng trong 3 tháng đầu.",
-        swotAnalysis: {
-          strengths: "- Công nghệ vượt trội\n- Đội ngũ giàu kinh nghiệm",
-          weaknesses: "- Thương hiệu mới\n- Ngân sách hạn chế",
-          opportunities: "- Thị trường đang phát triển\n- Đối thủ chưa mạnh",
-          threats: "- Thay đổi chính sách\n- Rào cản gia nhập thấp"
-        },
-        targetAudience: "Nhân viên văn phòng, độ tuổi 25-35, thu nhập khá, quan tâm đến công nghệ và hiệu suất công việc.",
-        marketingChannels: "- Mạng xã hội (Facebook, TikTok)\n- Google Ads\n- Email Marketing\n- Hợp tác với KOLs",
-        contentPillars: "- Hướng dẫn sử dụng\n- So sánh với đối thủ\n- Case study thành công\n- Nội dung giải trí, viral",
-        kpis: "- Lượt tiếp cận (Reach)\n- Tỷ lệ chuyển đổi (Conversion Rate)\n- Chi phí mỗi chuyển đổi (CPA)\n- Doanh thu"
-      };
-      setPlan(prev => prev ? { ...prev, plan_data: samplePlan } : null);
-      setIsGenerating(false);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-ai-plan', {
+        body: { planId: plan.id, config: plan.config }
+      });
+
+      if (error) {
+        const errorBody = await error.context.json();
+        throw new Error(errorBody.error || error.message);
+      }
+      if (data.error) throw new Error(data.error);
+
+      setPlan(data);
       dismissToast(toastId);
       showSuccess("AI đã tạo kế hoạch thành công!");
-    }, 2000);
+    } catch (err: any) {
+      dismissToast(toastId);
+      showError(`Tạo kế hoạch thất bại: ${err.message}`);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   if (isLoading) {
