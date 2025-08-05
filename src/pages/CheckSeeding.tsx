@@ -205,7 +205,7 @@ const CheckSeeding = () => {
   };
 
   return (
-    <main className="flex-1 space-y-8 p-6 sm:p-8 bg-slate-50">
+    <main className="flex-1 flex flex-col p-6 sm:p-8 bg-slate-50">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">Check Seeding</h1>
@@ -229,13 +229,13 @@ const CheckSeeding = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
         <SeedingStatCard title="Tổng dự án" value={stats.total} icon={ListTodo} color="bg-blue-500" />
         <SeedingStatCard title="Hoàn thành" value={stats.completed} icon={CheckCircle} color="bg-green-500" />
         <SeedingStatCard title="Đang Check" value={stats.checking} icon={FolderClock} color="bg-amber-500" />
       </div>
 
-      <Card className="shadow-sm rounded-2xl bg-white">
+      <Card className="shadow-sm rounded-2xl bg-white mt-8 flex-1 flex flex-col">
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="relative flex-grow max-w-xs">
@@ -274,7 +274,7 @@ const CheckSeeding = () => {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex-1 overflow-y-auto">
           <div className="border rounded-lg overflow-hidden">
             <Table>
               <TableHeader>
@@ -367,7 +367,7 @@ const CheckSeeding = () => {
       </Card>
 
       {pageCount > 1 && (
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mt-8">
           <div className="text-sm text-muted-foreground">Đã chọn {selectedIds.length} trên {filteredProjects.length} dự án.</div>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
