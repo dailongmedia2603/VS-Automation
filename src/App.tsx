@@ -31,6 +31,7 @@ import CheckPostScanDetail from "@/pages/tools/CheckPostScanDetail";
 import { PermissionProvider } from "./contexts/PermissionContext";
 import Reports from "./pages/Reports";
 import AiPlan from "./pages/AiPlan";
+import AiPlanDetail from "./pages/AiPlanDetail";
 
 const queryClient = new QueryClient();
 
@@ -68,6 +69,7 @@ const App = () => (
                       <Route path="/tools/check-post-scan" element={<CheckPostScan />} />
                       <Route path="/tools/check-post-scan/:projectId" element={<CheckPostScanDetail />} />
                       <Route path="/ai-plan" element={<AiPlan />} />
+                      <Route path="/ai-plan/:planId" element={<AiPlanDetail />} />
                     </Route>
                   </Route>
                   <Route path="*" element={<NotFound />} />
