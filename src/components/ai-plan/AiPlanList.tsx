@@ -100,7 +100,7 @@ export const AiPlanList = () => {
         const randomColor = getRandomColor();
         const { data: newProject, error } = await supabase
           .from('ai_plans')
-          .insert({ name: projectName.trim(), creator_id: user.id, color: randomColor })
+          .insert({ name: projectName.trim(), creator_id: user.id, color: randomColor, template_id: 1 })
           .select().single();
         if (error) throw error;
         showSuccess("Đã tạo kế hoạch thành công!");
@@ -135,29 +135,12 @@ export const AiPlanList = () => {
 
   const renderProjectView = () => {
     if (isLoading) {
-      return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-48 w-full rounded-2xl" />)}
-        </div>
-      );
+      return <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-48 w-full rounded-2xl" />)}</div>;
     }
-
     if (projects.length === 0) {
-        return (
-            <div className="text-center py-16 text-muted-foreground col-span-full">
-                <Folder className="mx-auto h-12 w-12" />
-                <h3 className="mt-4 text-lg font-semibold">Chưa có kế hoạch nào</h3>
-                <p className="mt-1 text-sm">Hãy bắt đầu bằng cách tạo một kế hoạch mới.</p>
-            </div>
-        )
+      return <div className="text-center py-16 text-muted-foreground col-span-full"><Folder className="mx-auto h-12 w-12" /><h3 className="mt-4 text-lg font-semibold">Chưa có kế hoạch nào</h3><p className="mt-1 text-sm">Hãy bắt đầu bằng cách tạo một kế hoạch mới.</p></div>;
     }
-
-    const projectActions = (project: Project) => ({
-      onEdit: () => handleOpenDialog(project),
-      onShare: () => {},
-      onDelete: () => handleOpenDeleteDialog(project),
-    });
-
+    const projectActions = (project: Project) => ({ onEdit: () => handleOpenDialog(project), onShare: () => {}, onDelete: () => handleOpenDeleteDialog(project) });
     const displayProjects = projects.map(p => ({
       ...p,
       files: p.items_count,
@@ -221,9 +204,7 @@ export const AiPlanList = () => {
           </div>
           <div className="flex items-center gap-2">
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="bg-white rounded-lg">Sắp xếp theo <ChevronDown className="ml-2 h-4 w-4" /></Button>
-              </DropdownMenuTrigger>
+              <DropdownMenuTrigger asChild><Button variant="outline" className="bg-white rounded-lg">Sắp xếp theo <ChevronDown className="ml-2 h-4 w-4" /></Button></DropdownMenuTrigger>
               <DropdownMenuContent>
                 <DropdownMenuItem>Tên</DropdownMenuItem>
                 <DropdownMenuItem>Ngày sửa đổi</DropdownMenuItem>

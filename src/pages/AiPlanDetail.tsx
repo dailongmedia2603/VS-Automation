@@ -64,15 +64,28 @@ const AiPlanDetail = () => {
       if (!planId) return;
       setIsLoading(true);
       try {
-        const { data, error } = await supabase
+        let { data, error } = await supabase
           .from('ai_plans')
           .select('*')
           .eq('id', planId)
           .single();
         if (error) throw error;
+
+        // If template_id is null, assign a default and update the plan
+        if (!data.template_id) {
+          const { data: updatedPlan, error: updateError } = await supabase
+            .from('ai_plans')
+            .update({ template_id: 1 }) // Default template ID is 1
+            .eq('id', planId)
+            .select('*')
+            .single();
+          if (updateError) throw updateError;
+          data = updatedPlan; // Use the updated plan data
+        }
+        
         setPlan(data);
 
-        const templateId = data.template_id || 1;
+        const templateId = data.template_id;
         const { data: templateData, error: templateError } = await supabase
           .from('ai_plan_templates')
           .select('structure')
