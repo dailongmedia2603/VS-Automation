@@ -56,11 +56,6 @@ const navSections = [
     title: "Công cụ",
     items: [
       { name: "Công cụ", icon: Wrench, href: "/tools", permission: "view_tools" },
-    ],
-  },
-  {
-    title: "",
-    items: [
       { name: "AI Plan", icon: Briefcase, href: "/ai-plan", permission: "view_ai_plan" },
     ],
   },
