@@ -9,11 +9,20 @@ type Plan = {
   id: number;
   name: string;
   plan_data: any;
+  template_id: number | null;
 };
+
+type PlanStructure = {
+  id: string;
+  label: string;
+  type: 'text' | 'textarea' | 'dynamic_group';
+  icon: string;
+}[];
 
 const PublicAiPlan = () => {
   const { publicId } = useParams<{ publicId: string }>();
   const [plan, setPlan] = useState<Plan | null>(null);
+  const [planStructure, setPlanStructure] = useState<PlanStructure | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,7 +37,7 @@ const PublicAiPlan = () => {
       try {
         const { data, error } = await supabase
           .from('ai_plans')
-          .select('id, name, plan_data')
+          .select('id, name, plan_data, template_id')
           .eq('public_id', publicId)
           .eq('is_public', true)
           .single();
@@ -37,6 +46,17 @@ const PublicAiPlan = () => {
         if (!data) throw new Error("Không tìm thấy kế hoạch hoặc kế hoạch không được công khai.");
         
         setPlan(data);
+
+        const templateId = data.template_id || 1;
+        const { data: templateData, error: templateError } = await supabase
+          .from('ai_plan_templates')
+          .select('structure')
+          .eq('id', templateId)
+          .single();
+        
+        if (templateError) throw templateError;
+        setPlanStructure(templateData.structure as PlanStructure);
+
       } catch (error: any) {
         setError(error.message);
       } finally {
@@ -72,7 +92,7 @@ const PublicAiPlan = () => {
           <h1 className="text-4xl font-bold tracking-tight text-slate-900">{plan?.name}</h1>
           <p className="text-muted-foreground mt-2">Một kế hoạch marketing được tạo bởi AI</p>
         </div>
-        {plan && <AiPlanContentView planData={plan.plan_data} />}
+        {plan && planStructure && <AiPlanContentView planData={plan.plan_data} planStructure={planStructure} />}
       </div>
     </main>
   );

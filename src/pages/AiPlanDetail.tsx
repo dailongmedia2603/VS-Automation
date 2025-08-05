@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Sparkles, Save, Loader2, FileText, Users, Target, DollarSign, Calendar, MessageSquare, Share, BarChart2 } from 'lucide-react';
+import { ArrowLeft, Sparkles, Save, Loader2, FileText, Share } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -21,6 +21,7 @@ type Plan = {
   plan_data: any;
   is_public: boolean;
   public_id: string | null;
+  template_id: number | null;
 };
 
 type Log = {
@@ -30,9 +31,17 @@ type Log = {
   response: any;
 };
 
+type PlanStructure = {
+  id: string;
+  label: string;
+  type: 'text' | 'textarea' | 'dynamic_group';
+  icon: string;
+}[];
+
 const AiPlanDetail = () => {
   const { planId } = useParams();
   const [plan, setPlan] = useState<Plan | null>(null);
+  const [planStructure, setPlanStructure] = useState<PlanStructure | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -53,6 +62,18 @@ const AiPlanDetail = () => {
           .single();
         if (error) throw error;
         setPlan(data);
+
+        // Fetch the template structure
+        const templateId = data.template_id || 1; // Fallback to default template
+        const { data: templateData, error: templateError } = await supabase
+          .from('ai_plan_templates')
+          .select('structure')
+          .eq('id', templateId)
+          .single();
+        
+        if (templateError) throw templateError;
+        setPlanStructure(templateData.structure as PlanStructure);
+
       } catch (error: any) {
         showError("Không thể tải kế hoạch: " + error.message);
       } finally {
@@ -184,40 +205,29 @@ const AiPlanDetail = () => {
             <div className="h-full p-4 overflow-y-auto">
               <Card className="border-none shadow-none">
                 <CardHeader>
-                  <CardTitle>Cấu hình AI</CardTitle>
+                  <CardTitle>Thông tin đầu vào</CardTitle>
                   <CardDescription>Nhập thông tin chi tiết về chiến dịch của bạn.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2"><FileText className="h-4 w-4" />Mô tả sản phẩm/dịch vụ</Label>
-                    <Textarea placeholder="VD: Một ứng dụng quản lý công việc..." value={plan.config?.productDescription || ''} onChange={e => handleConfigChange('productDescription', e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2"><Users className="h-4 w-4" />Đối tượng khách hàng mục tiêu</Label>
-                    <Textarea placeholder="VD: Nhân viên văn phòng, 25-35 tuổi..." value={plan.config?.targetAudience || ''} onChange={e => handleConfigChange('targetAudience', e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2"><Target className="h-4 w-4" />Mục tiêu chiến dịch</Label>
-                    <Input placeholder="VD: Tăng nhận diện thương hiệu, 1000 đơn hàng" value={plan.config?.goals || ''} onChange={e => handleConfigChange('goals', e.target.value)} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-2"><DollarSign className="h-4 w-4" />Ngân sách (dự kiến)</Label>
-                      <Input placeholder="VD: 50,000,000 VND" value={plan.config?.budget || ''} onChange={e => handleConfigChange('budget', e.target.value)} />
+                  {planStructure?.map(field => (
+                    <div key={field.id} className="space-y-2">
+                      <Label className="flex items-center gap-2">{field.label}</Label>
+                      {field.type === 'textarea' ? (
+                        <Textarea 
+                          placeholder="..." 
+                          value={plan.config?.[field.id] || ''} 
+                          onChange={e => handleConfigChange(field.id, e.target.value)} 
+                          className="min-h-[100px]"
+                        />
+                      ) : (
+                        <Input 
+                          placeholder="..." 
+                          value={plan.config?.[field.id] || ''} 
+                          onChange={e => handleConfigChange(field.id, e.target.value)} 
+                        />
+                      )}
                     </div>
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-2"><Calendar className="h-4 w-4" />Thời gian</Label>
-                      <Input placeholder="VD: 3 tháng" value={plan.config?.timeline || ''} onChange={e => handleConfigChange('timeline', e.target.value)} />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2"><MessageSquare className="h-4 w-4" />Thông điệp chính</Label>
-                    <Input placeholder="VD: Làm việc thông minh hơn, không phải chăm hơn" value={plan.config?.keyMessage || ''} onChange={e => handleConfigChange('keyMessage', e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2"><BarChart2 className="h-4 w-4" />Đối thủ cạnh tranh</Label>
-                    <Textarea placeholder="Liệt kê các đối thủ chính và điểm mạnh/yếu của họ..." value={plan.config?.competitors || ''} onChange={e => handleConfigChange('competitors', e.target.value)} />
-                  </div>
+                  ))}
                 </CardContent>
               </Card>
             </div>
@@ -225,7 +235,7 @@ const AiPlanDetail = () => {
           <ResizableHandle withHandle />
           <ResizablePanel defaultSize={60}>
             <div className="h-full bg-slate-50 p-6 overflow-y-auto">
-              <AiPlanContentView planData={plan.plan_data} />
+              <AiPlanContentView planData={plan.plan_data} planStructure={planStructure!} />
             </div>
           </ResizablePanel>
         </ResizablePanelGroup>
