@@ -44,13 +44,8 @@ const initialConfig: PromptConfig = {
 };
 
 const placeholders = [
-  'productDescription',
-  'targetAudience',
-  'goals',
-  'budget',
-  'timeline',
-  'keyMessage',
-  'competitors',
+  { value: 'thong_tin_dau_vao', label: 'Thông tin đầu vào' },
+  { value: 'tai_lieu', label: 'Tài liệu' },
 ];
 
 export const AiPlanPromptConfig = () => {
@@ -195,7 +190,12 @@ export const AiPlanPromptConfig = () => {
                           <PopoverContent className="w-60 p-1">
                             <div className="text-xs text-muted-foreground p-2">Chèn biến</div>
                             {placeholders.map(p => (
-                              <Button key={p} variant="ghost" className="w-full justify-start font-mono text-xs h-8" onClick={() => insertPlaceholder(p)}>{`{{${p}}}`}</Button>
+                              <Button key={p.value} variant="ghost" className="w-full justify-start h-auto py-1.5" onClick={() => insertPlaceholder(p.value)}>
+                                <div className="flex flex-col items-start">
+                                  <span className="font-mono text-xs">{`{{${p.value}}}`}</span>
+                                  <span className="font-sans text-xs text-muted-foreground font-normal">{p.label}</span>
+                                </div>
+                              </Button>
                             ))}
                           </PopoverContent>
                         </Popover>

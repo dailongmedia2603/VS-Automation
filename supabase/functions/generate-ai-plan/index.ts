@@ -79,25 +79,28 @@ serve(async (req) => {
       .map((block: { title: string, content: string }) => `### ${block.title.toUpperCase()}\n\n${block.content}`)
       .join('\n\n---\n\n');
 
-    // Replace placeholders with actual config values
-    for (const key in config) {
-      const placeholder = `{{${key}}}`;
-      prompt = prompt.replace(new RegExp(placeholder, 'g'), config[key] || 'Not provided.');
-    }
-
-    if (inputStructure.length > 0) {
+    // Replace {{thong_tin_dau_vao}} placeholder
+    if (prompt.includes('{{thong_tin_dau_vao}}')) {
       const inputDescriptions = inputStructure
         .map((field: any) => `*   **${field.label}:** ${config[field.id] || '(không có)'}\n    *   *Mô tả/Hướng dẫn cho AI:* ${field.description || 'Không có.'}`)
         .join('\n');
-      
-      const inputExplanationBlock = `
----
-### DỮ LIỆU ĐẦU VÀO & HƯỚNG DẪN
-Đây là dữ liệu và hướng dẫn chi tiết bạn nhận được từ người dùng để xây dựng kế hoạch:
-${inputDescriptions}
----
-`;
-      prompt += inputExplanationBlock;
+      prompt = prompt.replace(/{{thong_tin_dau_vao}}/g, inputDescriptions || 'Không có thông tin đầu vào.');
+    }
+
+    // Replace {{tai_lieu}} placeholder
+    if (prompt.includes('{{tai_lieu}}')) {
+      let documentContext = '(Không có tài liệu tham khảo)';
+      const { data: globalDocs, error: docsError } = await supabaseAdmin
+          .from('documents')
+          .select('title, content')
+          .is('project_id', null);
+
+      if (docsError) {
+          console.warn("Could not fetch global documents:", docsError.message);
+      } else if (globalDocs && globalDocs.length > 0) {
+          documentContext = globalDocs.map(doc => `--- TÀI LIỆU: ${doc.title} ---\n${doc.content}`).join('\n\n');
+      }
+      prompt = prompt.replace(/{{tai_lieu}}/g, documentContext);
     }
 
     if (promptConfig.useCoT) {
