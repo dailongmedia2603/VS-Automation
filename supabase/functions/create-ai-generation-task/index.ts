@@ -44,15 +44,18 @@ serve(async (req) => {
       throw new Error(`Đã có một tác vụ đang chạy cho mục này (Trạng thái: ${existingTask.status}). Vui lòng chờ hoàn tất.`);
     }
 
+    // Create a mutable copy of the config to add fetched data
+    const finalConfig = { ...config };
+
     // Fetch the selected structure and add it to the config
-    if (config.structureId) {
+    if (finalConfig.structureId) {
       const { data: structure, error: structError } = await supabaseAdmin
         .from('article_structures')
         .select('*')
-        .eq('id', config.structureId)
+        .eq('id', finalConfig.structureId)
         .single();
       if (structError) throw new Error("Không tìm thấy cấu trúc bài viết đã chọn.");
-      config.structure = structure; // Attach the full structure object
+      finalConfig.structure = structure; // Attach the full structure object
     }
 
     const { data: newTask, error: insertError } = await supabase
@@ -60,7 +63,7 @@ serve(async (req) => {
       .insert({
         item_id: itemId,
         creator_id: user.id,
-        config: config,
+        config: finalConfig, // Use the enriched config object
         status: 'pending'
       })
       .select()
