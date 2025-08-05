@@ -198,6 +198,7 @@ serve(async (req) => {
     Deno.env.get('SUPABASE_URL') ?? '',
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
+  console.log("--- process-ai-generation-tasks function invoked ---");
 
   try {
     const { data: task, error: taskError } = await supabaseAdmin
@@ -210,9 +211,11 @@ serve(async (req) => {
 
     if (taskError) throw taskError;
     if (!task) {
+      console.log("No pending tasks found. Exiting.");
       return new Response(JSON.stringify({ message: "No pending tasks." }), { status: 200 });
     }
 
+    console.log(`Processing task ID: ${task.id} for item ID: ${task.item_id}`);
     await supabaseAdmin.from('ai_generation_tasks').update({ status: 'running', progress_step: 'Đang chuẩn bị prompt...' }).eq('id', task.id);
 
     try {
@@ -225,8 +228,10 @@ serve(async (req) => {
       const { data: aiSettings, error: settingsError } = await supabaseAdmin.from('ai_settings').select('*').eq('id', 1).single();
       if (settingsError || !aiSettings.google_gemini_api_key) throw new Error("Chưa cấu hình API Google Gemini.");
 
+      console.log(`Fetching library ID: ${libraryId}`);
       const { data: library, error: libraryError } = await supabaseAdmin.from('prompt_libraries').select('config').eq('id', libraryId).single();
       if (libraryError || !library || !library.config) throw new Error("Không thể tải thư viện prompt hoặc thư viện chưa được cấu hình.");
+      console.log("Library config fetched successfully.");
       
       let documentContext = '';
       const { relatedDocumentIds } = task.config;
@@ -246,6 +251,7 @@ serve(async (req) => {
         }
       }
 
+      console.log("Building final prompt...");
       const basePrompt = buildBasePrompt(library.config, documentContext);
       
       let finalPrompt;
@@ -267,10 +273,10 @@ serve(async (req) => {
       }
 
       await supabaseAdmin.from('ai_generation_tasks').update({ progress_step: 'Đang gửi yêu cầu đến AI...' }).eq('id', task.id);
+      console.log("Prompt built. Sending request to AI...");
 
       const modelToUse = aiSettings.gemini_content_model || 'gemini-pro';
       
-      // Safeguard for maxOutputTokens
       const GEMINI_MAX_TOKENS = 8192;
       let maxTokens = library.config.maxTokens ?? 2048;
       if (maxTokens > GEMINI_MAX_TOKENS) {
@@ -307,12 +313,14 @@ serve(async (req) => {
         }
       }
 
+      console.log(`Gemini API response status: ${geminiRes.status}`);
       const geminiData = await geminiRes.json();
       if (!geminiRes.ok) throw new Error(geminiData?.error?.message || 'Lỗi gọi API Gemini.');
       
       geminiData.model_used = modelToUse;
 
       await supabaseAdmin.from('ai_generation_tasks').update({ progress_step: 'Đang xử lý và lưu kết quả...' }).eq('id', task.id);
+      console.log("AI response received. Processing and saving results...");
 
       const rawContent = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
       
@@ -346,20 +354,25 @@ serve(async (req) => {
       const updatedContent = [...existingContent, ...newContent];
 
       await supabaseAdmin.from('content_ai_items').update({ content: JSON.stringify(updatedContent) }).eq('id', task.item_id);
+      console.log(`Updated content_ai_items for item ID: ${task.item_id}`);
       
       await supabaseAdmin.from('ai_generation_tasks').update({ status: 'completed', result: { newContentCount: newContent.length }, progress_step: null }).eq('id', task.id);
+      console.log(`Task ID: ${task.id} marked as completed.`);
 
       await supabaseAdmin.from('content_ai_logs').insert({ item_id: task.item_id, creator_id: task.creator_id, prompt: finalPrompt, response: geminiData });
+      console.log(`Logged interaction for task ID: ${task.id}`);
 
     } catch (executionError) {
+      console.error(`Error during execution of task ${task.id}:`, executionError.message);
       await supabaseAdmin.from('ai_generation_tasks').update({ status: 'failed', error_message: executionError.message, progress_step: 'Thất bại' }).eq('id', task.id);
       throw executionError;
     }
 
+    console.log(`--- Task ${task.id} finished successfully ---`);
     return new Response(JSON.stringify({ message: `Task ${task.id} completed.` }), { status: 200 });
 
   } catch (error) {
-    console.error("Error in task processor:", error.message);
+    console.error("--- Error in task processor main block:", error.message);
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 });
