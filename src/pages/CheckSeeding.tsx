@@ -235,7 +235,7 @@ const CheckSeeding = () => {
         <SeedingStatCard title="Đang Check" value={stats.checking} icon={FolderClock} color="bg-amber-500" />
       </div>
 
-      <Card className="shadow-sm rounded-2xl bg-white mt-8 flex-1 flex flex-col">
+      <Card className="shadow-sm rounded-2xl bg-white mt-8 flex-1 flex flex-col min-h-0">
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="relative flex-grow max-w-xs">
