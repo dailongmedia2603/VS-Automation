@@ -63,6 +63,15 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) throw new Error("Missing Authorization header");
+    const jwt = authHeader.replace('Bearer ', '');
+    const { data: { user } } = await createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    ).auth.getUser(jwt);
+    if (!user) throw new Error("User not authenticated.");
+
     const { data: aiSettings, error: settingsError } = await supabaseAdmin
       .from('ai_settings')
       .select('google_gemini_api_key, gemini_content_model')
@@ -100,6 +109,13 @@ serve(async (req) => {
     } catch (e) {
       throw new Error("Failed to parse the AI's JSON response.");
     }
+
+    await supabaseAdmin.from('ai_plan_logs').insert({
+      plan_id: planId,
+      creator_id: user.id,
+      prompt: prompt,
+      response: geminiData
+    });
 
     const { data: updatedPlan, error: updateError } = await supabaseAdmin
       .from('ai_plans')
