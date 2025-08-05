@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Sparkles, Save, Loader2, FileText, Users, Target, DollarSign, Calendar, MessageSquare, BarChart2 } from 'lucide-react';
+import { ArrowLeft, Sparkles, Save, Loader2, FileText, Users, Target, DollarSign, Calendar, MessageSquare, BarChart2, Swords, Shield, TrendingUp, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -12,6 +12,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 type Plan = {
   id: number;
@@ -93,6 +95,14 @@ const AiPlanDetail = () => {
       setIsGenerating(false);
     }
   };
+
+  const kpiChartData = plan?.plan_data?.kpis
+    ? String(plan.plan_data.kpis)
+        .split('\n')
+        .map(line => line.replace(/^- /, '').trim())
+        .filter(Boolean)
+        .map((kpi, index) => ({ name: kpi, value: 100 - index * 15 }))
+    : [];
 
   if (isLoading) {
     return <main className="flex-1 p-6 sm:p-8 bg-slate-50"><Skeleton className="h-full w-full" /></main>;
@@ -177,28 +187,45 @@ const AiPlanDetail = () => {
         <ResizablePanel defaultSize={60}>
           <div className="h-full p-6 bg-slate-50 overflow-y-auto">
             {plan.plan_data ? (
-              <div className="space-y-6">
+              <div className="space-y-8">
+                <div className="p-8 bg-blue-600 text-white rounded-2xl shadow-lg">
+                  <h2 className="text-2xl font-bold">Tóm tắt chiến lược</h2>
+                  <p className="mt-2 text-blue-100">{plan.plan_data.executiveSummary}</p>
+                </div>
+
+                <Tabs defaultValue="strengths">
+                  <TabsList className="grid w-full grid-cols-4">
+                    <TabsTrigger value="strengths"><Swords className="mr-2 h-4 w-4" />Điểm mạnh</TabsTrigger>
+                    <TabsTrigger value="weaknesses"><Shield className="mr-2 h-4 w-4" />Điểm yếu</TabsTrigger>
+                    <TabsTrigger value="opportunities"><TrendingUp className="mr-2 h-4 w-4" />Cơ hội</TabsTrigger>
+                    <TabsTrigger value="threats"><AlertTriangle className="mr-2 h-4 w-4" />Thách thức</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="strengths" className="p-4 prose prose-sm"><ReactMarkdown>{plan.plan_data.swotAnalysis.strengths}</ReactMarkdown></TabsContent>
+                  <TabsContent value="weaknesses" className="p-4 prose prose-sm"><ReactMarkdown>{plan.plan_data.swotAnalysis.weaknesses}</ReactMarkdown></TabsContent>
+                  <TabsContent value="opportunities" className="p-4 prose prose-sm"><ReactMarkdown>{plan.plan_data.swotAnalysis.opportunities}</ReactMarkdown></TabsContent>
+                  <TabsContent value="threats" className="p-4 prose prose-sm"><ReactMarkdown>{plan.plan_data.swotAnalysis.threats}</ReactMarkdown></TabsContent>
+                </Tabs>
+
                 <Card>
-                  <CardHeader><CardTitle>Tóm tắt chiến lược</CardTitle></CardHeader>
-                  <CardContent><p className="text-sm">{plan.plan_data.executiveSummary}</p></CardContent>
-                </Card>
-                <Card>
-                  <CardHeader><CardTitle>Phân tích SWOT</CardTitle></CardHeader>
-                  <CardContent className="grid grid-cols-2 gap-4">
-                    <div><h4 className="font-semibold">Điểm mạnh</h4><div className="prose prose-sm"><ReactMarkdown>{plan.plan_data.swotAnalysis.strengths}</ReactMarkdown></div></div>
-                    <div><h4 className="font-semibold">Điểm yếu</h4><div className="prose prose-sm"><ReactMarkdown>{plan.plan_data.swotAnalysis.weaknesses}</ReactMarkdown></div></div>
-                    <div><h4 className="font-semibold">Cơ hội</h4><div className="prose prose-sm"><ReactMarkdown>{plan.plan_data.swotAnalysis.opportunities}</ReactMarkdown></div></div>
-                    <div><h4 className="font-semibold">Thách thức</h4><div className="prose prose-sm"><ReactMarkdown>{plan.plan_data.swotAnalysis.threats}</ReactMarkdown></div></div>
+                  <CardHeader><CardTitle>Chỉ số đo lường (KPIs)</CardTitle></CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <BarChart data={kpiChartData} layout="vertical" margin={{ left: 100 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis type="number" hide />
+                        <YAxis type="category" dataKey="name" width={150} tickLine={false} axisLine={false} />
+                        <Tooltip cursor={{ fill: '#f3f4f6' }} />
+                        <Bar dataKey="value" fill="#3B82F6" radius={[0, 4, 4, 0]} background={{ fill: '#eee', radius: 4 }} />
+                      </BarChart>
+                    </ResponsiveContainer>
                   </CardContent>
                 </Card>
+
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <Card><CardHeader><CardTitle>Đối tượng mục tiêu</CardTitle></CardHeader><CardContent><p className="text-sm">{plan.plan_data.targetAudience}</p></CardContent></Card>
-                  <Card><CardHeader><CardTitle>Chỉ số đo lường (KPIs)</CardTitle></CardHeader><CardContent><div className="prose prose-sm"><ReactMarkdown>{plan.plan_data.kpis}</ReactMarkdown></div></CardContent></Card>
-                </div>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <Card><CardHeader><CardTitle>Kênh triển khai</CardTitle></CardHeader><CardContent><div className="prose prose-sm"><ReactMarkdown>{plan.plan_data.marketingChannels}</ReactMarkdown></div></CardContent></Card>
-                  <Card><CardHeader><CardTitle>Trụ cột nội dung</CardTitle></CardHeader><CardContent><div className="prose prose-sm"><ReactMarkdown>{plan.plan_data.contentPillars}</ReactMarkdown></div></CardContent></Card>
                 </div>
+                <Card><CardHeader><CardTitle>Trụ cột nội dung</CardTitle></CardHeader><CardContent><div className="prose prose-sm"><ReactMarkdown>{plan.plan_data.contentPillars}</ReactMarkdown></div></CardContent></Card>
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-center text-slate-500">
