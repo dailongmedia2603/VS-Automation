@@ -171,26 +171,8 @@ const AiPlanDetail = () => {
     setPlan(prev => prev ? { ...prev, ...updates } : null);
   };
 
-  const handleApplyInputConfig = async (newFields: InputField[]) => {
-    if (!plan || !plan.template_id) return;
-    try {
-      const newStructure: TemplateStructure = {
-        input_fields: newFields,
-        output_fields: outputStructure || [],
-      };
-      const { error } = await supabase
-        .from('ai_plan_templates')
-        .update({ structure: newStructure })
-        .eq('id', plan.template_id);
-      
-      if (error) throw error;
-
-      setInputStructure(newFields);
-      showSuccess("Đã áp dụng cấu hình đầu vào mới!");
-    } catch (error: any) {
-      showError("Lưu cấu hình thất bại: " + error.message);
-      throw error;
-    }
+  const handleInputConfigSuccess = (newFields: InputField[]) => {
+    setInputStructure(newFields);
   };
 
   if (isLoading) {
@@ -309,7 +291,9 @@ const AiPlanDetail = () => {
         isOpen={isInputConfigOpen}
         onOpenChange={setIsInputConfigOpen}
         initialFields={inputStructure}
-        onApply={handleApplyInputConfig}
+        templateId={plan.template_id!}
+        outputStructure={outputStructure}
+        onSuccess={handleInputConfigSuccess}
       />
     </>
   );

@@ -7,6 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PlusCircle, Trash2, Loader2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { supabase } from '@/integrations/supabase/client';
+import { showSuccess, showError } from '@/utils/toast';
 
 export type InputField = {
   id: string;
@@ -19,16 +21,17 @@ interface InputConfigDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   initialFields: InputField[];
-  onApply: (fields: InputField[]) => Promise<void>;
+  templateId: number;
+  outputStructure: any;
+  onSuccess: (fields: InputField[]) => void;
 }
 
-export const InputConfigDialog = ({ isOpen, onOpenChange, initialFields, onApply }: InputConfigDialogProps) => {
+export const InputConfigDialog = ({ isOpen, onOpenChange, initialFields, templateId, outputStructure, onSuccess }: InputConfigDialogProps) => {
   const [fields, setFields] = useState<InputField[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-      // Deep copy and ensure IDs exist
       setFields(JSON.parse(JSON.stringify(initialFields.map(f => ({ ...f, id: f.id || crypto.randomUUID() })))));
     }
   }, [isOpen, initialFields]);
@@ -48,10 +51,22 @@ export const InputConfigDialog = ({ isOpen, onOpenChange, initialFields, onApply
   const handleApply = async () => {
     setIsSaving(true);
     try {
-      await onApply(fields);
+      const newStructure = {
+        input_fields: fields,
+        output_fields: outputStructure || [],
+      };
+      const { error } = await supabase
+        .from('ai_plan_templates')
+        .update({ structure: newStructure })
+        .eq('id', templateId);
+      
+      if (error) throw error;
+
+      showSuccess("Đã áp dụng cấu hình đầu vào mới!");
+      onSuccess(fields);
       onOpenChange(false);
-    } catch (error) {
-      // Parent shows toast, dialog stays open
+    } catch (error: any) {
+      showError("Lưu cấu hình thất bại: " + error.message);
     } finally {
       setIsSaving(false);
     }
