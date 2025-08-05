@@ -75,7 +75,7 @@ const PromptLibraryDetail = () => {
 
   if (isLoading) {
     return (
-      <main className="flex-1 space-y-8 p-6 sm:p-8 bg-slate-50">
+      <main className="flex-1 space-y-8 p-6 sm:p-8 bg-slate-50 overflow-y-auto">
         <div className="space-y-2">
           <Skeleton className="h-10 w-1/3 rounded-lg" />
           <Skeleton className="h-5 w-1/2 rounded-lg" />
@@ -89,7 +89,7 @@ const PromptLibraryDetail = () => {
   }
 
   return (
-    <main className="flex-1 space-y-8 p-6 sm:p-8 bg-slate-50">
+    <main className="flex-1 space-y-8 p-6 sm:p-8 bg-slate-50 overflow-y-auto">
       <div className="flex items-center gap-4">
         <Link to="/training-chatbot?tab=prompts">
           <Button variant="outline" size="icon" className="h-10 w-10 rounded-full bg-white">

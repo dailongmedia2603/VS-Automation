@@ -202,7 +202,7 @@ const StaffList = () => {
 
 const Staff = () => {
   return (
-    <main className="flex-1 space-y-6 p-6 sm:p-8">
+    <main className="flex-1 space-y-6 p-6 sm:p-8 overflow-y-auto">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-slate-900">Nhân sự & Phân quyền</h1>
         <p className="text-muted-foreground mt-2 max-w-2xl">

@@ -268,7 +268,7 @@ const Settings = () => {
 
   if (pageIsLoading) {
     return (
-      <main className="flex-1 space-y-6 p-6 sm:p-8">
+      <main className="flex-1 space-y-6 p-6 sm:p-8 overflow-y-auto">
         <Skeleton className="h-8 w-1/3 rounded-lg" />
         <Card className="shadow-sm rounded-2xl bg-white">
           <CardHeader>
@@ -292,7 +292,7 @@ const Settings = () => {
   }
 
   return (
-    <main className="flex-1 space-y-6 p-6 sm:p-8">
+    <main className="flex-1 space-y-6 p-6 sm:p-8 overflow-y-auto">
       <h2 className="text-3xl font-bold tracking-tight">Cài đặt chung</h2>
       <Tabs defaultValue="api-facebook">
         <TabsList className="flex justify-start items-center gap-1 p-0 bg-transparent">
