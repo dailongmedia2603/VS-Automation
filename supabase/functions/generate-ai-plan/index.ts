@@ -32,6 +32,13 @@ serve(async (req) => {
     ).auth.getUser(jwt);
     if (!user) throw new Error("User not authenticated.");
 
+    const { data: plan, error: planError } = await supabaseAdmin
+      .from('ai_plans')
+      .select('template_id')
+      .eq('id', planId)
+      .single();
+    if (planError) throw planError;
+
     const { data: aiSettings, error: settingsError } = await supabaseAdmin
       .from('ai_settings')
       .select('google_gemini_api_key, gemini_content_model')
@@ -41,6 +48,17 @@ serve(async (req) => {
     if (settingsError || !aiSettings.google_gemini_api_key) {
       throw new Error("Google Gemini API key is not configured in settings.");
     }
+
+    const templateId = plan.template_id || 1;
+    const { data: templateData, error: templateError } = await supabaseAdmin
+      .from('ai_plan_templates')
+      .select('structure')
+      .eq('id', templateId)
+      .single();
+    if (templateError || !templateData || !templateData.structure) {
+      throw new Error("AI Plan template structure is not configured or is invalid.");
+    }
+    const planStructure = templateData.structure as any[];
 
     const { data: promptConfig, error: promptError } = await supabaseAdmin
       .from('ai_plan_prompt_config')
@@ -61,6 +79,36 @@ serve(async (req) => {
       prompt = prompt.replace(new RegExp(placeholder, 'g'), config[key] || 'Not provided.');
     }
 
+    const jsonStructureDescription = planStructure.map(field => {
+      if (field.type === 'dynamic_group') {
+        const subFields = (field.sub_fields || []).map((sub: any) => `      - "${sub.id}": (string) // ${sub.label}`).join('\n');
+        return `  "${field.id}": [ // An array of objects for ${field.label}
+    {
+${subFields}
+    },
+    ...
+  ]`;
+      } else {
+        return `  "${field.id}": (string) // ${field.label}`;
+      }
+    }).join(',\n');
+
+    const outputInstruction = `
+---
+### YÊU CẦU ĐẦU RA (CỰC KỲ QUAN TRỌNG)
+
+Bạn PHẢI trả lời bằng một khối mã JSON duy nhất được bao bọc trong \`\`\`json ... \`\`\`.
+JSON object phải có cấu trúc chính xác như sau:
+\`\`\`json
+{
+${jsonStructureDescription}
+}
+\`\`\`
+- **TUYỆT ĐỐI KHÔNG** thêm bất kỳ văn bản, lời chào, hoặc giải thích nào bên ngoài khối mã JSON.
+- Hãy điền giá trị cho mỗi trường dựa trên thông tin đã được cung cấp và kiến thức của bạn.
+`;
+    prompt += outputInstruction;
+
     const modelToUse = aiSettings.gemini_content_model || 'gemini-pro';
 
     const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${aiSettings.google_gemini_api_key}`, {
@@ -76,16 +124,20 @@ serve(async (req) => {
 
     const rawContent = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
     
+    let jsonString = '';
     const jsonMatch = rawContent.match(/```json\n([\s\S]*?)\n```/);
-    if (!jsonMatch || !jsonMatch[1]) {
-      throw new Error("AI did not return a valid JSON plan.");
+    if (jsonMatch && jsonMatch[1]) {
+      jsonString = jsonMatch[1];
+    } else {
+      jsonString = rawContent;
     }
 
     let planData;
     try {
-      planData = JSON.parse(jsonMatch[1]);
+      planData = JSON.parse(jsonString);
     } catch (e) {
-      throw new Error("Failed to parse the AI's JSON response.");
+      console.error("Failed to parse JSON from AI response. Raw content:", rawContent);
+      throw new Error("AI đã trả về một định dạng JSON không hợp lệ. Vui lòng thử lại.");
     }
 
     await supabaseAdmin.from('ai_plan_logs').insert({
