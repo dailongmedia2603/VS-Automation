@@ -17,7 +17,7 @@ import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { GenerationLogDialog } from './GenerationLogDialog';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ConditionLibraryDialog } from './ConditionLibraryDialog';
@@ -181,8 +181,18 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
       });
       
       if (error) {
-        const errorBody = await error.context.json();
-        throw new Error(errorBody.error || error.message);
+        let errorMessage = error.message;
+        if (error.context && typeof error.context.json === 'function') {
+          try {
+            const errorBody = await error.context.json();
+            if (errorBody.error) {
+              errorMessage = errorBody.error;
+            }
+          } catch (e) {
+            // Ignore JSON parsing error, stick with the original message
+          }
+        }
+        throw new Error(errorMessage);
       }
       if (updatedItem.error) throw new Error(updatedItem.error);
       

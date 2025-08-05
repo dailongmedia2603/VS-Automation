@@ -162,8 +162,18 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
       });
       
       if (error) {
-        const errorBody = await error.context.json();
-        throw new Error(errorBody.error || error.message);
+        let errorMessage = error.message;
+        if (error.context && typeof error.context.json === 'function') {
+          try {
+            const errorBody = await error.context.json();
+            if (errorBody.error) {
+              errorMessage = errorBody.error;
+            }
+          } catch (e) {
+            // Ignore JSON parsing error, stick with the original message
+          }
+        }
+        throw new Error(errorMessage);
       }
       if (updatedItem.error) throw new Error(updatedItem.error);
       
