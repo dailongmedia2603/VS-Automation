@@ -493,7 +493,7 @@ const SeedingProjectDetail = () => {
   if (!project) return <main className="flex-1 p-6 sm:p-8 bg-slate-50"><h1>Không tìm thấy dự án</h1></main>;
 
   return (
-    <main className="flex-1 flex flex-col p-6 sm:p-8 bg-slate-50">
+    <main className="flex-1 flex flex-col p-6 sm:p-8 bg-slate-50 min-h-0">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
           <Link to="/check-seeding"><Button variant="outline" size="icon"><ArrowLeft className="h-4 w-4" /></Button></Link>

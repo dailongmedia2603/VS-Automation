@@ -219,7 +219,7 @@ const ProjectDetailContent = () => {
 
   return (
     <>
-      <main className="flex flex-col flex-1 p-6 sm:p-8 bg-slate-50">
+      <main className="flex flex-col flex-1 p-6 sm:p-8 bg-slate-50 min-h-0">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <Link to="/content-ai">
