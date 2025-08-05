@@ -334,7 +334,7 @@ const ProjectDetailContent = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Ngành</Label>
-                    <Select onValueChange={v => handleConfigChange('libraryId', v)}>
+                    <Select onValueChange={v => handleConfigChange('libraryId', Number(v))}>
                       <SelectTrigger><SelectValue placeholder="Chọn thư viện prompt" /></SelectTrigger>
                       <SelectContent>
                         {promptLibraries.map(lib => (
@@ -373,7 +373,7 @@ const ProjectDetailContent = () => {
               <div className="space-y-4 p-4 border rounded-lg bg-slate-50">
                 <div className="space-y-2">
                   <Label>Ngành</Label>
-                  <Select onValueChange={v => handleConfigChange('libraryId', v)}>
+                  <Select onValueChange={v => handleConfigChange('libraryId', Number(v))}>
                     <SelectTrigger><SelectValue placeholder="Chọn thư viện prompt" /></SelectTrigger>
                     <SelectContent>
                       {promptLibraries.map(lib => (

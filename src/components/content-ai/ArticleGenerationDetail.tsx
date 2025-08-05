@@ -349,7 +349,7 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
                       <Label>Ngành</Label>
-                      <Select value={config.libraryId} onValueChange={v => handleConfigChange('libraryId', v)}>
+                      <Select value={config.libraryId} onValueChange={v => handleConfigChange('libraryId', Number(v))}>
                         <SelectTrigger><SelectValue placeholder="Chọn thư viện prompt" /></SelectTrigger>
                         <SelectContent>{promptLibraries.map(lib => (<SelectItem key={lib.id} value={String(lib.id)}>{lib.name}</SelectItem>))}</SelectContent>
                       </Select>
