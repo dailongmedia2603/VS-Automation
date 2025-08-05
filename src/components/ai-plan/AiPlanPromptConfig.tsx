@@ -54,6 +54,8 @@ export const AiPlanPromptConfig = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const activeTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [templateInputFields, setTemplateInputFields] = useState<any[]>([]);
+  const [globalDocuments, setGlobalDocuments] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchPrompt = async () => {
@@ -69,10 +71,8 @@ export const AiPlanPromptConfig = () => {
         
         if (data && data.prompt_structure) {
           if (Array.isArray(data.prompt_structure)) {
-            // Old format, migrate
             setConfig(prev => ({ ...prev, blocks: data.prompt_structure }));
           } else {
-            // New format
             setConfig(prev => ({ ...prev, ...data.prompt_structure }));
           }
         }
@@ -83,6 +83,37 @@ export const AiPlanPromptConfig = () => {
       }
     };
     fetchPrompt();
+
+    const fetchPreviewData = async () => {
+        try {
+            const templatePromise = supabase
+                .from('ai_plan_templates')
+                .select('structure')
+                .eq('id', 1) // Default template
+                .single();
+            
+            const documentsPromise = supabase
+                .from('documents')
+                .select('title, content')
+                .is('project_id', null)
+                .limit(3); // Limit for preview
+
+            const [{ data: templateData, error: templateError }, { data: documentsData, error: documentsError }] = await Promise.all([templatePromise, documentsPromise]);
+
+            if (templateError) console.error("Error fetching template for preview:", templateError);
+            else if (templateData?.structure) {
+                setTemplateInputFields((templateData.structure as any).input_fields || []);
+            }
+
+            if (documentsError) console.error("Error fetching documents for preview:", documentsError);
+            else {
+                setGlobalDocuments(documentsData || []);
+            }
+        } catch (error) {
+            console.error("Failed to fetch data for prompt preview:", error);
+        }
+    };
+    fetchPreviewData();
   }, []);
 
   const handleSave = async () => {
@@ -160,8 +191,31 @@ export const AiPlanPromptConfig = () => {
   };
 
   const previewPrompt = useMemo(() => {
-    return config.blocks.map(block => `### ${block.title.toUpperCase()}\n\n${block.content}`).join('\n\n---\n\n');
-  }, [config.blocks]);
+    let prompt = config.blocks.map(block => `### ${block.title.toUpperCase()}\n\n${block.content}`).join('\n\n---\n\n');
+
+    const inputDescriptions = templateInputFields
+        .map(field => `*   **${field.label}:** (Giá trị người dùng nhập)\n    *   *Mô tả/Hướng dẫn cho AI:* ${field.description || 'Không có.'}`)
+        .join('\n');
+    prompt = prompt.replace(/{{thong_tin_dau_vao}}/g, inputDescriptions || '(Không có thông tin đầu vào.)');
+
+    const documentContext = globalDocuments.length > 0
+        ? globalDocuments.map(doc => `--- TÀI LIỆU: ${doc.title} ---\n${doc.content}`).join('\n\n')
+        : '(Không có tài liệu tham khảo)';
+    prompt = prompt.replace(/{{tai_lieu}}/g, documentContext);
+
+    if (config.useCoT) {
+        let cotPrompt = "Let's think step by step.";
+        if (config.cotFactors && config.cotFactors.length > 0) {
+            const factorsText = config.cotFactors
+                .map(factor => `- ${factor.value}`)
+                .join('\n');
+            cotPrompt += "\n\nHere are the key factors to consider in your thinking process:\n" + factorsText;
+        }
+        prompt += `\n\n---\n\n${cotPrompt}`;
+    }
+
+    return prompt;
+  }, [config, templateInputFields, globalDocuments]);
 
   if (isLoading) {
     return <Card><CardHeader><Skeleton className="h-6 w-1/3" /></CardHeader><CardContent><Skeleton className="h-64 w-full" /></CardContent></Card>;
