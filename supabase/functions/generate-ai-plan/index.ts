@@ -44,15 +44,17 @@ serve(async (req) => {
 
     const { data: promptConfig, error: promptError } = await supabaseAdmin
       .from('ai_plan_prompt_config')
-      .select('prompt_template')
+      .select('prompt_structure')
       .eq('id', 1)
       .single();
 
-    if (promptError || !promptConfig || !promptConfig.prompt_template) {
-      throw new Error("AI Plan prompt template is not configured.");
+    if (promptError || !promptConfig || !promptConfig.prompt_structure || !Array.isArray(promptConfig.prompt_structure)) {
+      throw new Error("AI Plan prompt structure is not configured or is invalid.");
     }
 
-    let prompt = promptConfig.prompt_template;
+    let prompt = (promptConfig.prompt_structure as { title: string, content: string }[])
+      .map(block => `### ${block.title.toUpperCase()}\n\n${block.content}`)
+      .join('\n\n---\n\n');
 
     for (const key in config) {
       const placeholder = `{{${key}}}`;
