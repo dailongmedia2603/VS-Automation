@@ -44,10 +44,9 @@ const PromptLibraryDetail = () => {
         setLibraryName(data.name);
         if (data.config && typeof data.config === 'object') {
           const loadedConfig = { ...initialConfig, ...data.config };
-          // If the saved value is the old default (2048), update it to the new default.
-          // This preserves any custom values the user might have set.
-          if (loadedConfig.maxTokens === 2048) {
-            loadedConfig.maxTokens = 100000;
+          // If the saved value is invalid (too high), reset it to the new safe default.
+          if (loadedConfig.maxTokens > 8192) {
+            loadedConfig.maxTokens = 8192;
           }
           setConfig(loadedConfig);
         } else {

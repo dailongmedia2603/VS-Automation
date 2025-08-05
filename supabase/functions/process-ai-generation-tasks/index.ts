@@ -270,10 +270,18 @@ serve(async (req) => {
 
       const modelToUse = aiSettings.gemini_content_model || 'gemini-pro';
       
+      // Safeguard for maxOutputTokens
+      const GEMINI_MAX_TOKENS = 8192;
+      let maxTokens = library.config.maxTokens ?? 2048;
+      if (maxTokens > GEMINI_MAX_TOKENS) {
+        console.warn(`maxTokens (${maxTokens}) exceeds Gemini's limit. Capping at ${GEMINI_MAX_TOKENS}.`);
+        maxTokens = GEMINI_MAX_TOKENS;
+      }
+
       const generationConfig = {
         temperature: library.config.temperature ?? 0.7,
         topP: library.config.topP ?? 0.95,
-        maxOutputTokens: library.config.maxTokens ?? 2048,
+        maxOutputTokens: maxTokens,
       };
 
       let geminiRes;
