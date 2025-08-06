@@ -312,7 +312,7 @@ export const AiPlanContentView = (props: AiPlanContentViewProps) => {
                     />
                 ) : (
                     <>
-                        {section.display_type === 'content_direction' && isContentDirectionData(section.sectionData) ? (
+                        {section.id === 'Postscan' && section.display_type === 'content_direction' && isContentDirectionData(section.sectionData) ? (
                             <div className="p-4">
                                 <ContentDirectionViewIntegrated data={section.sectionData} />
                             </div>
