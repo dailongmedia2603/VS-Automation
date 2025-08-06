@@ -8,12 +8,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, Edit, Trash2, Loader2, ArrowUp, ArrowDown, Settings } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Loader2, ArrowUp, ArrowDown } from 'lucide-react';
 import { showSuccess, showError } from '@/utils/toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from '../ui/textarea';
 
 type Template = {
   id: number;
@@ -23,13 +25,20 @@ type Template = {
   structure: any;
 };
 
-type StructureField = {
+type OutputField = {
   id: string;
   label: string;
   type: 'text' | 'textarea' | 'dynamic_group';
   icon: string;
   display_type: 'simple' | 'content_direction';
   sub_fields?: { id: string; label: string; type: 'text' | 'textarea' }[];
+};
+
+type InputField = {
+  id: string;
+  label: string;
+  type: 'input' | 'textarea';
+  description: string;
 };
 
 const iconOptions = ['Target', 'Calendar', 'Package', 'Route', 'Megaphone'];
@@ -40,7 +49,8 @@ export const AiPlanTemplateManager = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<Partial<Template> | null>(null);
-  const [structureFields, setStructureFields] = useState<StructureField[]>([]);
+  const [outputFields, setOutputFields] = useState<OutputField[]>([]);
+  const [inputFields, setInputFields] = useState<InputField[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<Template | null>(null);
 
@@ -64,12 +74,15 @@ export const AiPlanTemplateManager = () => {
   const handleOpenDialog = (template: Template | null = null) => {
     if (template) {
       setEditingTemplate(template);
-      const outputFields = (template.structure as any)?.output_fields || template.structure || [];
-      const fieldsWithDefaults = outputFields.map((f: any) => ({ ...f, display_type: f.display_type || 'simple' }));
-      setStructureFields(fieldsWithDefaults);
+      const structure = template.structure || {};
+      const loadedOutputFields = structure.output_fields || [];
+      const fieldsWithDefaults = loadedOutputFields.map((f: any) => ({ ...f, display_type: f.display_type || 'simple' }));
+      setOutputFields(fieldsWithDefaults);
+      setInputFields(structure.input_fields || []);
     } else {
       setEditingTemplate({ name: '' });
-      setStructureFields([]);
+      setOutputFields([]);
+      setInputFields([]);
     }
     setIsDialogOpen(true);
   };
@@ -82,8 +95,8 @@ export const AiPlanTemplateManager = () => {
     setIsSaving(true);
     try {
       const structureToSave = {
-        output_fields: structureFields,
-        input_fields: (editingTemplate.structure as any)?.input_fields || [],
+        output_fields: outputFields,
+        input_fields: inputFields,
       };
 
       if (editingTemplate.id) {
@@ -115,25 +128,33 @@ export const AiPlanTemplateManager = () => {
     setTemplateToDelete(null);
   };
 
-  const handleFieldChange = (id: string, key: keyof StructureField, value: string) => {
-    setStructureFields(prev => prev.map(f => f.id === id ? { ...f, [key]: value } : f));
+  const handleOutputFieldChange = (id: string, key: keyof OutputField, value: string) => {
+    setOutputFields(prev => prev.map(f => f.id === id ? { ...f, [key]: value } : f));
   };
-
-  const addField = () => {
+  const addOutputField = () => {
     const newId = `section_${Date.now()}`;
-    setStructureFields(prev => [...prev, { id: newId, label: 'Mục mới', type: 'textarea', icon: 'Target', display_type: 'simple' }]);
+    setOutputFields(prev => [...prev, { id: newId, label: 'Mục mới', type: 'textarea', icon: 'Target', display_type: 'simple' }]);
   };
-
-  const removeField = (id: string) => {
-    setStructureFields(prev => prev.filter(f => f.id !== id));
+  const removeOutputField = (id: string) => {
+    setOutputFields(prev => prev.filter(f => f.id !== id));
   };
-
-  const moveField = (index: number, direction: 'up' | 'down') => {
-    if ((direction === 'up' && index === 0) || (direction === 'down' && index === structureFields.length - 1)) return;
-    const newFields = [...structureFields];
+  const moveOutputField = (index: number, direction: 'up' | 'down') => {
+    if ((direction === 'up' && index === 0) || (direction === 'down' && index === outputFields.length - 1)) return;
+    const newFields = [...outputFields];
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     [newFields[index], newFields[targetIndex]] = [newFields[targetIndex], newFields[index]];
-    setStructureFields(newFields);
+    setOutputFields(newFields);
+  };
+
+  const handleInputFieldChange = (id: string, key: keyof InputField, value: string) => {
+    setInputFields(prev => prev.map(f => f.id === id ? { ...f, [key]: value } : f));
+  };
+  const addInputField = () => {
+    const newId = `field_${Date.now()}`;
+    setInputFields(prev => [...prev, { id: newId, label: 'Tiêu đề mới', type: 'input', description: '' }]);
+  };
+  const removeInputField = (id: string) => {
+    setInputFields(prev => prev.filter(f => f.id !== id));
   };
 
   return (
@@ -176,36 +197,77 @@ export const AiPlanTemplateManager = () => {
               <Label htmlFor="template-name">Tên mẫu</Label>
               <Input id="template-name" value={editingTemplate?.name || ''} onChange={(e) => setEditingTemplate(t => ({...t, name: e.target.value}))} />
             </div>
-            <div className="space-y-2">
-              <Label>Các mục trong kế hoạch</Label>
-              <div className="space-y-3 max-h-96 overflow-y-auto p-2 border rounded-lg">
-                {structureFields.map((field, index) => (
-                  <div key={field.id} className="p-3 border rounded-md bg-slate-50 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Input placeholder="ID (vd: san_pham)" value={field.id} onChange={e => handleFieldChange(field.id, 'id', e.target.value)} className="font-mono text-xs" />
-                      <Input placeholder="Tiêu đề mục" value={field.label} onChange={e => handleFieldChange(field.id, 'label', e.target.value)} />
-                      <Select value={field.icon} onValueChange={(value) => handleFieldChange(field.id, 'icon', value)}>
-                        <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
-                        <SelectContent>{iconOptions.map(icon => <SelectItem key={icon} value={icon}>{icon}</SelectItem>)}</SelectContent>
-                      </Select>
-                      <Select value={field.display_type || 'simple'} onValueChange={(value: 'simple' | 'content_direction') => handleFieldChange(field.id, 'display_type', value)}>
-                        <SelectTrigger className="w-64"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="simple">Hiển thị đơn giản (văn bản)</SelectItem>
-                          <SelectItem value="content_direction">Hiển thị Định hướng Content</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <div className="flex items-center">
-                        <Button variant="ghost" size="icon" onClick={() => moveField(index, 'up')} disabled={index === 0}><ArrowUp className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => moveField(index, 'down')} disabled={index === structureFields.length - 1}><ArrowDown className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => removeField(field.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+            <Tabs defaultValue="output">
+              <TabsList>
+                <TabsTrigger value="output">Cấu trúc Đầu ra</TabsTrigger>
+                <TabsTrigger value="input">Cấu hình Đầu vào</TabsTrigger>
+              </TabsList>
+              <TabsContent value="output" className="pt-4">
+                <div className="space-y-3 max-h-96 overflow-y-auto p-2 border rounded-lg">
+                  {outputFields.map((field, index) => (
+                    <div key={field.id} className="p-3 border rounded-md bg-slate-50 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Input placeholder="ID (vd: san_pham)" value={field.id} onChange={e => handleOutputFieldChange(field.id, 'id', e.target.value)} className="font-mono text-xs" />
+                        <Input placeholder="Tiêu đề mục" value={field.label} onChange={e => handleOutputFieldChange(field.id, 'label', e.target.value)} />
+                        <Select value={field.icon} onValueChange={(value) => handleOutputFieldChange(field.id, 'icon', value)}>
+                          <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+                          <SelectContent>{iconOptions.map(icon => <SelectItem key={icon} value={icon}>{icon}</SelectItem>)}</SelectContent>
+                        </Select>
+                        <Select value={field.display_type || 'simple'} onValueChange={(value: 'simple' | 'content_direction') => handleOutputFieldChange(field.id, 'display_type', value)}>
+                          <SelectTrigger className="w-64"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="simple">Hiển thị đơn giản (văn bản)</SelectItem>
+                            <SelectItem value="content_direction">Hiển thị Định hướng Content</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <div className="flex items-center">
+                          <Button variant="ghost" size="icon" onClick={() => moveOutputField(index, 'up')} disabled={index === 0}><ArrowUp className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => moveOutputField(index, 'down')} disabled={index === outputFields.length - 1}><ArrowDown className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => removeOutputField(field.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-                <Button variant="outline" className="w-full border-dashed" onClick={addField}><PlusCircle className="mr-2 h-4 w-4" />Thêm mục</Button>
-              </div>
-            </div>
+                  ))}
+                  <Button variant="outline" className="w-full border-dashed" onClick={addOutputField}><PlusCircle className="mr-2 h-4 w-4" />Thêm mục</Button>
+                </div>
+              </TabsContent>
+              <TabsContent value="input" className="pt-4">
+                <div className="space-y-3 max-h-96 overflow-y-auto p-2 border rounded-lg">
+                  {inputFields.map(field => (
+                    <div key={field.id} className="p-3 border rounded-md bg-slate-50 relative">
+                      <Button variant="ghost" size="icon" className="absolute top-2 right-2 h-7 w-7 text-destructive hover:text-destructive" onClick={() => removeInputField(field.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>ID</Label>
+                          <Input value={field.id} onChange={e => handleInputFieldChange(field.id, 'id', e.target.value)} className="font-mono text-xs" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Tiêu đề</Label>
+                          <Input value={field.label} onChange={e => handleInputFieldChange(field.id, 'label', e.target.value)} />
+                        </div>
+                        <div className="col-span-2 space-y-2">
+                          <Label>Loại ô</Label>
+                          <Select value={field.type} onValueChange={(value: 'input' | 'textarea') => handleInputFieldChange(field.id, 'type', value)}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="input">Ô nhỏ (Input)</SelectItem>
+                              <SelectItem value="textarea">Ô rộng (Textarea)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="col-span-2 space-y-2">
+                          <Label>Mô tả (Placeholder)</Label>
+                          <Textarea value={field.description} onChange={e => handleInputFieldChange(field.id, 'description', e.target.value)} />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <Button variant="outline" className="w-full border-dashed" onClick={addInputField}><PlusCircle className="mr-2 h-4 w-4" />Thêm trường</Button>
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Hủy</Button>
