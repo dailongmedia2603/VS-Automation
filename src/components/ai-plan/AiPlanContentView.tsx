@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { showError } from "@/utils/toast";
 import { InputConfigDialog } from "./InputConfigDialog";
+import { SchemaRenderer } from './SchemaRenderer';
 
 // Type Definitions
 type PlanData = { [key: string]: any };
@@ -311,17 +312,31 @@ export const AiPlanContentView = (props: AiPlanContentViewProps) => {
                         onCancel={() => setEditingSectionId?.(null)}
                     />
                 ) : (
-                    <>
-                        {section.display_type === 'content_direction' && isContentDirectionData(section.sectionData) ? (
-                            <div className="p-4">
-                                <ContentDirectionViewIntegrated data={section.sectionData} />
-                            </div>
-                        ) : (
-                            <CardContent className="p-6 prose prose-sm max-w-none prose-slate text-slate-600 leading-relaxed">
-                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{String(section.sectionData)}</ReactMarkdown>
-                            </CardContent>
-                        )}
-                    </>
+                    (() => {
+                      const data = section.sectionData;
+                      if (section.display_type === 'content_direction' && isContentDirectionData(data)) {
+                        return (
+                          <div className="p-4">
+                            <ContentDirectionViewIntegrated data={data} />
+                          </div>
+                        );
+                      }
+                  
+                      if (typeof data === 'object' && data !== null && Array.isArray(data.layout)) {
+                        return (
+                          <CardContent className="p-6 space-y-4">
+                            <SchemaRenderer layout={data.layout} />
+                          </CardContent>
+                        );
+                      }
+                  
+                      // Fallback for old string-based content
+                      return (
+                        <CardContent className="p-6 prose prose-sm max-w-none prose-slate text-slate-600 leading-relaxed">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{String(data)}</ReactMarkdown>
+                        </CardContent>
+                      );
+                    })()
                 )}
               </Card>
             </section>
