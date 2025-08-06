@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Save, Loader2, Info, PlusCircle, Trash2, ArrowUp, ArrowDown, Eye, Code, SlidersHorizontal, BrainCircuit } from 'lucide-react';
+import { Save, Loader2, PlusCircle, Trash2, ArrowUp, ArrowDown, Eye, Code, SlidersHorizontal, BrainCircuit } from 'lucide-react';
 import { showSuccess, showError } from '@/utils/toast';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
