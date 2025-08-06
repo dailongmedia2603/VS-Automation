@@ -8,6 +8,7 @@ import { useMemo, useState, useEffect } from "react";
 import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
 import { showError } from "@/utils/toast";
+import { ContentDirectionView } from './ContentDirectionView';
 
 type PlanData = { [key: string]: any };
 type PlanStructure = {
@@ -114,6 +115,10 @@ const SectionCard = ({
           </div>
         </div>
       );
+    }
+
+    if (section.id === 'dinh_huong_content' && Array.isArray(sectionData)) {
+      return <ContentDirectionView data={sectionData} />;
     }
 
     if (section.type === 'dynamic_group' && Array.isArray(sectionData) && sectionData.length > 0) {
