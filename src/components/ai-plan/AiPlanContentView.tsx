@@ -47,6 +47,20 @@ const iconColorMapping: { [key: string]: string } = {
   default: 'bg-slate-100 text-slate-600',
 };
 
+// Helper function to check if the data matches the structure of "Định hướng Content"
+const isContentDirectionData = (data: any): boolean => {
+  if (!Array.isArray(data) || data.length === 0) {
+    return false;
+  }
+  const firstItem = data[0];
+  if (typeof firstItem !== 'object' || firstItem === null) {
+    return false;
+  }
+  // Check for the presence of characteristic keys
+  const expectedKeys = ['loai_content', 'chu_de', 'van_de', 'content_demo'];
+  return expectedKeys.every(key => key in firstItem);
+};
+
 // --- Sub-component for Content Direction (Master-Detail View) ---
 const ContentDirectionViewIntegrated = ({ data }: { data: ContentItem[] }) => {
   const [selectedItem, setSelectedItem] = useState<ContentItemWithGeneratedName | null>(null);
@@ -285,7 +299,7 @@ export const AiPlanContentView = (props: AiPlanContentViewProps) => {
                     />
                 ) : (
                     <>
-                        {section.id === 'dinh_huong_content' && Array.isArray(section.sectionData) ? (
+                        {isContentDirectionData(section.sectionData) ? (
                             <div className="p-4">
                                 <ContentDirectionViewIntegrated data={section.sectionData} />
                             </div>
