@@ -4,9 +4,9 @@ import remarkGfm from 'remark-gfm';
 import { Target, Calendar, Package, Route, Megaphone, Bot, LayoutList, Newspaper, AlertTriangle, ClipboardList, MessageSquareText, PencilLine, Sparkles, Loader2 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { useMemo, useState, useEffect, useRef } from "react";
-import { Button } from "../ui/button";
-import { ScrollArea } from "../ui/scroll-area";
-import { Textarea } from "../ui/textarea";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 import { showError } from "@/utils/toast";
 
 // Type Definitions
