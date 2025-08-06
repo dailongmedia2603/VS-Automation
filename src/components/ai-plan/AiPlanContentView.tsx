@@ -41,7 +41,7 @@ const iconColorMapping: { [key: string]: string } = {
   default: 'bg-slate-100 text-slate-600',
 };
 
-// Helper to normalize keys from AI response
+// Helper to normalize keys from AI response for flexible matching
 const normalizeKeys = (obj: any) => {
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return obj;
   const newObj: { [key: string]: any } = {};
@@ -57,6 +57,11 @@ const normalizeKeys = (obj: any) => {
   return newObj;
 };
 
+// Helper function to check if the data should be rendered by the special component
+const isContentDirectionData = (data: any): boolean => {
+  return Array.isArray(data);
+};
+
 // --- Sub-component for Content Direction (Master-Detail View) ---
 const ContentDirectionViewIntegrated = ({ data }: { data: any[] }) => {
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
@@ -65,9 +70,9 @@ const ContentDirectionViewIntegrated = ({ data }: { data: any[] }) => {
     if (!Array.isArray(data)) return {};
     
     const groups = data.reduce((acc, item) => {
-      const normalizedItem = normalizeKeys(item);
-      if (normalizedItem) {
-        const key = normalizedItem.loaicontent || 'Chưa phân loại';
+      if (item && typeof item === 'object' && !Array.isArray(item)) {
+        const normalizedItem = normalizeKeys(item);
+        const key = normalizedItem.loaicontent || normalizedItem.posttype || 'Chưa phân loại';
         if (!acc[key]) acc[key] = [];
         acc[key].push(normalizedItem);
       }
@@ -110,7 +115,7 @@ const ContentDirectionViewIntegrated = ({ data }: { data: any[] }) => {
                 <div className="flex flex-col gap-1">
                   {(items as any[]).map((item, index) => (
                     <Button key={`${item.bai_viet_name}-${index}`} variant="ghost" onClick={() => setSelectedItem(item)} className={cn("w-full justify-start h-auto py-2 px-3 text-left", selectedItem === item ? "bg-blue-100 text-blue-700 font-semibold" : "")}>
-                      <span className="truncate">{item.bai_viet_name}: {item.chude}</span>
+                      <span className="truncate">{item.bai_viet_name}: {item.chude || item.topic}</span>
                     </Button>
                   ))}
                 </div>
@@ -122,10 +127,10 @@ const ContentDirectionViewIntegrated = ({ data }: { data: any[] }) => {
           <ScrollArea className="h-full p-6">
             {selectedItem ? (
               <div className="space-y-8">
-                <h2 className="text-2xl font-bold text-slate-900">{selectedItem.chude}</h2>
-                <DetailSection title="Vấn đề / Tình trạng" content={selectedItem.vande} icon={AlertTriangle} iconBg="bg-red-100" iconText="text-red-600" />
-                <DetailSection title="Content Demo" content={selectedItem.contentdemo} icon={ClipboardList} iconBg="bg-green-100" iconText="text-green-600" />
-                <DetailSection title="Định hướng comment" content={selectedItem.dinhhuongcomment} icon={MessageSquareText} iconBg="bg-purple-100" iconText="text-purple-600" />
+                <h2 className="text-2xl font-bold text-slate-900">{selectedItem.chude || selectedItem.topic}</h2>
+                <DetailSection title="Vấn đề / Tình trạng" content={selectedItem.vande || selectedItem.problem} icon={AlertTriangle} iconBg="bg-red-100" iconText="text-red-600" />
+                <DetailSection title="Content Demo" content={selectedItem.contentdemo || selectedItem.demo} icon={ClipboardList} iconBg="bg-green-100" iconText="text-green-600" />
+                <DetailSection title="Định hướng comment" content={selectedItem.dinhhuongcomment || selectedItem.commentdirection} icon={MessageSquareText} iconBg="bg-purple-100" iconText="text-purple-600" />
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-center text-slate-500"><LayoutList className="h-16 w-16 text-slate-300 mb-4" /><h3 className="text-xl font-semibold text-slate-700">Chọn một bài viết để xem chi tiết</h3></div>
@@ -306,7 +311,7 @@ export const AiPlanContentView = (props: AiPlanContentViewProps) => {
                     />
                 ) : (
                     <>
-                        {section.label === 'Định hướng Content' && Array.isArray(section.sectionData) ? (
+                        {section.label === 'Định hướng Content' && isContentDirectionData(section.sectionData) ? (
                             <div className="p-4">
                                 <ContentDirectionViewIntegrated data={section.sectionData} />
                             </div>
