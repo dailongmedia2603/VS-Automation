@@ -69,38 +69,40 @@ export const ContentDirectionView = ({ data }: ContentDirectionViewProps) => {
                 </div>
               </AccordionTrigger>
               <AccordionContent className="px-6 pb-6">
-                <div className="space-y-4">
+                <Accordion type="multiple" className="w-full space-y-2">
                   {items.map((item, index) => (
-                    <Card key={index} className="bg-slate-50/70 rounded-lg shadow-none">
-                      <CardHeader>
-                        <CardTitle className="text-base font-semibold">{item.bai_viet_name}: {item.chu_de}</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        <Section 
-                          title="Vấn đề / Tình trạng" 
-                          content={item.van_de} 
-                          icon={AlertTriangle} 
-                          iconBgColor="bg-red-100" 
-                          iconTextColor="text-red-600" 
-                        />
-                        <Section 
-                          title="Content Demo" 
-                          content={item.content_demo} 
-                          icon={ClipboardList} 
-                          iconBgColor="bg-green-100" 
-                          iconTextColor="text-green-600" 
-                        />
-                        <Section 
-                          title="Định hướng comment" 
-                          content={item.dinh_huong_comment} 
-                          icon={MessageSquareText} 
-                          iconBgColor="bg-purple-100" 
-                          iconTextColor="text-purple-600" 
-                        />
-                      </CardContent>
-                    </Card>
+                    <AccordionItem value={`item-${index}`} key={index} className="border rounded-lg bg-slate-50/70">
+                      <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                        <span className="font-semibold text-base text-slate-800">{item.bai_viet_name}: {item.chu_de}</span>
+                      </AccordionTrigger>
+                      <AccordionContent className="p-4 border-t bg-white">
+                        <div className="space-y-3">
+                          <Section 
+                            title="Vấn đề / Tình trạng" 
+                            content={item.van_de} 
+                            icon={AlertTriangle} 
+                            iconBgColor="bg-red-100" 
+                            iconTextColor="text-red-600" 
+                          />
+                          <Section 
+                            title="Content Demo" 
+                            content={item.content_demo} 
+                            icon={ClipboardList} 
+                            iconBgColor="bg-green-100" 
+                            iconTextColor="text-green-600" 
+                          />
+                          <Section 
+                            title="Định hướng comment" 
+                            content={item.dinh_huong_comment} 
+                            icon={MessageSquareText} 
+                            iconBgColor="bg-purple-100" 
+                            iconTextColor="text-purple-600" 
+                          />
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
                   ))}
-                </div>
+                </Accordion>
               </AccordionContent>
             </Card>
           </AccordionItem>
