@@ -8,8 +8,16 @@ import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
 import { Textarea } from "../ui/textarea";
 import { showError } from "@/utils/toast";
-import { PlanData, PlanStructure } from "@/types/ai-plan";
 
+// Type Definitions
+type PlanData = { [key: string]: any };
+type PlanStructure = {
+  id: string;
+  label: string;
+  type: 'text' | 'textarea' | 'dynamic_group';
+  icon: string;
+  sub_fields?: { id: string; label: string; type: 'text' | 'textarea' }[];
+};
 type ContentItem = {
   loai_content: string;
   chu_de: string;
@@ -29,14 +37,13 @@ interface AiPlanContentViewProps {
   onRegenerateSection?: (sectionId: string, sectionLabel: string) => void;
 }
 
-const iconMapping: { [key: string]: React.ElementType } = { Target, Calendar, Package, Route, Megaphone, Newspaper, default: Target };
+const iconMapping: { [key: string]: React.ElementType } = { Target, Calendar, Package, Route, Megaphone, default: Target };
 const iconColorMapping: { [key: string]: string } = {
   Target: 'bg-blue-100 text-blue-600',
   Calendar: 'bg-red-100 text-red-600',
   Package: 'bg-green-100 text-green-600',
   Route: 'bg-purple-100 text-purple-600',
   Megaphone: 'bg-yellow-100 text-yellow-600',
-  Newspaper: 'bg-indigo-100 text-indigo-600',
   default: 'bg-slate-100 text-slate-600',
 };
 
