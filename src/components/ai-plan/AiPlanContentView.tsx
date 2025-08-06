@@ -52,28 +52,38 @@ const isContentDirectionData = (data: any): boolean => {
   if (!Array.isArray(data) || data.length === 0) {
     return false;
   }
-  const firstItem = data[0];
-  if (typeof firstItem !== 'object' || firstItem === null) {
-    return false;
-  }
-  // Check for the presence of characteristic keys
-  const expectedKeys = ['loai_content', 'chu_de', 'van_de', 'content_demo'];
-  return expectedKeys.every(key => key in firstItem);
+  // Check if at least one item in the array is a valid content object
+  return data.some(item => 
+    item && typeof item === 'object' && 
+    'loai_content' in item && 
+    'chu_de' in item
+  );
 };
 
 // --- Sub-component for Content Direction (Master-Detail View) ---
-const ContentDirectionViewIntegrated = ({ data }: { data: ContentItem[] }) => {
+const ContentDirectionViewIntegrated = ({ data }: { data: any[] }) => {
   const [selectedItem, setSelectedItem] = useState<ContentItemWithGeneratedName | null>(null);
+
+  // Type guard to validate the structure of a content item
+  const isValidContentItem = (item: any): item is ContentItem => {
+    return item &&
+      typeof item === 'object' &&
+      'loai_content' in item &&
+      'chu_de' in item &&
+      'van_de' in item &&
+      'content_demo' in item &&
+      'dinh_huong_comment' in item;
+  };
 
   const groupedData = useMemo(() => {
     if (!Array.isArray(data)) return {};
     
     const groups = data
-      .filter(item => item && typeof item === 'object') // Safely filter for valid objects to prevent crashes
+      .filter(isValidContentItem) // Use the strict type guard to filter for valid items only
       .reduce((acc, item) => {
-        const key = (item as ContentItem).loai_content || 'Chưa phân loại';
+        const key = item.loai_content || 'Chưa phân loại';
         if (!acc[key]) acc[key] = [];
-        acc[key].push(item as ContentItem);
+        acc[key].push(item);
         return acc;
       }, {} as Record<string, ContentItem[]>);
 
