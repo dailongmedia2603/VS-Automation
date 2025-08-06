@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Sparkles, Save, Loader2, FileText, Share, Settings } from 'lucide-react';
+import { ArrowLeft, Sparkles, Save, Loader2, FileText, Share, Settings, PencilLine } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -11,8 +11,10 @@ import { AiPlanLogDialog } from '@/components/ai-plan/AiPlanLogDialog';
 import { AiPlanContentView } from '@/components/ai-plan/AiPlanContentView';
 import { SharePlanDialog } from '@/components/ai-plan/SharePlanDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { InputConfigDialog } from '@/components/ai-plan/InputConfigDialog';
 import { Textarea } from '@/components/ui/textarea';
+import { InputStructureConfigDialog } from '@/components/ai-plan/InputStructureConfigDialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 type Plan = {
   id: number;
@@ -41,12 +43,14 @@ type OutputStructure = {
 
 type TemplateStructure = {
   output_fields: OutputStructure;
+  input_fields: any[];
 };
 
 const AiPlanDetail = () => {
   const { planId } = useParams();
   const [plan, setPlan] = useState<Plan | null>(null);
   const [outputStructure, setOutputStructure] = useState<OutputStructure | null>(null);
+  const [inputStructure, setInputStructure] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -57,7 +61,7 @@ const AiPlanDetail = () => {
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
   const [regenSection, setRegenSection] = useState<{ id: string; label: string } | null>(null);
   const [feedbackText, setFeedbackText] = useState('');
-  const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
+  const [isInputStructureDialogOpen, setIsInputStructureDialogOpen] = useState(false);
 
   useEffect(() => {
     const fetchPlan = async () => {
@@ -97,8 +101,10 @@ const AiPlanDetail = () => {
         if (templateData.structure && typeof templateData.structure === 'object' && !Array.isArray(templateData.structure)) {
           const structure = templateData.structure as TemplateStructure;
           setOutputStructure(structure.output_fields || []);
+          setInputStructure(structure.input_fields || []);
         } else {
           setOutputStructure((templateData.structure as OutputStructure) || []);
+          setInputStructure([]);
         }
 
       } catch (error: any) {
@@ -134,7 +140,7 @@ const AiPlanDetail = () => {
 
   const handleUpdateConfig = async (newConfig: any) => {
     if (!plan) return;
-    
+    setIsSaving(true);
     const { error } = await supabase
       .from('ai_plans')
       .update({ config: newConfig, updated_at: new Date().toISOString() })
@@ -147,6 +153,7 @@ const AiPlanDetail = () => {
       showSuccess("Đã lưu cấu hình!");
       setPlan(prev => prev ? { ...prev, config: newConfig } : null);
     }
+    setIsSaving(false);
   };
 
   const handleGeneratePlan = async () => {
@@ -240,6 +247,45 @@ const AiPlanDetail = () => {
     }
   };
 
+  const handleSaveInputStructure = async (newInputFields: any[]) => {
+    if (!plan || !plan.template_id) return;
+
+    const { data: templateData, error: templateError } = await supabase
+        .from('ai_plan_templates')
+        .select('structure')
+        .eq('id', plan.template_id)
+        .single();
+    
+    if (templateError) throw templateError;
+
+    const currentStructure = templateData.structure || {};
+    const newStructure = {
+        ...currentStructure,
+        input_fields: newInputFields,
+    };
+
+    const { error } = await supabase
+        .from('ai_plan_templates')
+        .update({ structure: newStructure })
+        .eq('id', plan.template_id);
+    
+    if (error) {
+        showError("Lưu cấu trúc thất bại: " + error.message);
+        throw error;
+    } else {
+        showSuccess("Đã cập nhật cấu trúc đầu vào!");
+        setInputStructure(newInputFields);
+    }
+  };
+
+  const handleConfigDataChange = (key: string, value: string) => {
+    setPlan(prev => {
+        if (!prev) return null;
+        const newConfig = { ...(prev.config || {}), [key]: value };
+        return { ...prev, config: newConfig };
+    });
+  };
+
   if (isLoading) {
     return <main className="flex-1 p-6 sm:p-8 bg-slate-50"><Skeleton className="h-full w-full" /></main>;
   }
@@ -291,16 +337,52 @@ const AiPlanDetail = () => {
                       <CardTitle>Thông tin đầu vào</CardTitle>
                       <CardDescription>Nhập thông tin chi tiết về chiến dịch của bạn.</CardDescription>
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => setIsConfigDialogOpen(true)}>
+                    <Button variant="outline" size="sm" onClick={() => setIsInputStructureDialogOpen(true)}>
                       <Settings className="mr-2 h-4 w-4" />
-                      Cấu hình
+                      Cấu hình đầu vào
                     </Button>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-muted-foreground p-4 text-center bg-slate-50 rounded-lg">
-                    Nhấp vào nút "Cấu hình" để chỉnh sửa thông tin đầu vào cho kế hoạch.
-                  </p>
+                  {inputStructure.length > 0 ? (
+                    <div className="space-y-4">
+                      {inputStructure.map(field => (
+                        <Card key={field.id} className="shadow-none border">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-base flex items-center gap-2">
+                              <PencilLine className="h-4 w-4 text-blue-600" />
+                              {field.label}
+                            </CardTitle>
+                            <CardDescription className="text-xs pt-1">{field.description}</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            {field.type === 'input' ? (
+                              <Input
+                                value={plan.config?.[field.id] || ''}
+                                onChange={e => handleConfigDataChange(field.id, e.target.value)}
+                              />
+                            ) : (
+                              <Textarea
+                                value={plan.config?.[field.id] || ''}
+                                onChange={e => handleConfigDataChange(field.id, e.target.value)}
+                                className="min-h-[100px]"
+                              />
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
+                      <div className="flex justify-end mt-4">
+                          <Button onClick={() => handleUpdateConfig(plan.config)} disabled={isSaving}>
+                              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                              Lưu thông tin
+                          </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground p-4 text-center bg-slate-50 rounded-lg">
+                      Nhấp vào "Cấu hình đầu vào" để bắt đầu.
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -360,11 +442,11 @@ const AiPlanDetail = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <InputConfigDialog
-        planConfig={plan.config}
-        onSave={handleUpdateConfig}
-        open={isConfigDialogOpen}
-        onOpenChange={setIsConfigDialogOpen}
+      <InputStructureConfigDialog
+        open={isInputStructureDialogOpen}
+        onOpenChange={setIsInputStructureDialogOpen}
+        initialStructure={inputStructure}
+        onSave={handleSaveInputStructure}
       />
     </>
   );
