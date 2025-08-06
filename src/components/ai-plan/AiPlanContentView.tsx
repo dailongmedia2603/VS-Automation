@@ -42,59 +42,60 @@ const SectionCard = ({ section, sectionData }: { section: PlanStructure, section
   const Icon = iconMapping[section.icon] || iconMapping.default;
   const colorClasses = iconColorMapping[section.icon] || iconColorMapping.default;
   const [iconBg, iconText] = colorClasses.split(' ');
-  const headerBg = iconBg.replace('-100', '-50');
 
-  // Render dynamic groups as tables for a more professional look
-  if (section.type === 'dynamic_group' && Array.isArray(sectionData)) {
+  if (section.type === 'dynamic_group' && Array.isArray(sectionData) && sectionData.length > 0) {
     const headers = section.sub_fields?.map(f => f.label) || [];
     const keys = section.sub_fields?.map(f => f.id) || [];
     return (
-      <Card className="shadow-sm rounded-2xl bg-white overflow-hidden h-full transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
-        <CardHeader className={cn("border-b", headerBg)}>
-          <CardTitle className="flex items-center gap-3 text-lg font-bold text-slate-800">
-            <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center", iconBg)}>
-              <Icon className={cn("h-5 w-5", iconText)} />
+      <Card className="shadow-md rounded-xl bg-white h-full transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border border-slate-200/60">
+        <CardHeader>
+          <div className="flex items-center gap-4">
+            <div className={cn("w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0", iconBg)}>
+              <Icon className={cn("h-6 w-6", iconText)} />
             </div>
-            {section.label}
-          </CardTitle>
+            <CardTitle className="text-xl font-bold text-slate-800">{section.label}</CardTitle>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-slate-50 hover:bg-slate-50">
-                {headers.map(h => <TableHead key={h} className="font-semibold text-slate-600">{h}</TableHead>)}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sectionData.map((item, index) => (
-                <TableRow key={index}>
-                  {keys.map(key => (
-                    <TableCell key={key} className="prose prose-sm max-w-none prose-slate align-top">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{String(item[key] || '')}</ReactMarkdown>
-                    </TableCell>
-                  ))}
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-slate-50 hover:bg-slate-50">
+                  {headers.map(h => <TableHead key={h} className="font-semibold text-slate-600">{h}</TableHead>)}
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {sectionData.map((item, index) => (
+                  <TableRow key={index} className="border-b last:border-b-0">
+                    {keys.map(key => (
+                      <TableCell key={key} className="prose prose-sm max-w-none prose-slate align-top py-4">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{String(item[key] || '')}</ReactMarkdown>
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     );
   }
 
-  // Default card for simple text/textarea
   return (
-    <Card className="shadow-sm rounded-2xl bg-white overflow-hidden h-full transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
-      <CardHeader className={cn("border-b", headerBg)}>
-        <CardTitle className="flex items-center gap-3 text-lg font-bold text-slate-800">
-          <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center", iconBg)}>
-            <Icon className={cn("h-5 w-5", iconText)} />
+    <Card className="shadow-md rounded-xl bg-white h-full transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border border-slate-200/60">
+      <CardHeader>
+        <div className="flex items-center gap-4">
+          <div className={cn("w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0", iconBg)}>
+            <Icon className={cn("h-6 w-6", iconText)} />
           </div>
-          {section.label}
-        </CardTitle>
+          <CardTitle className="text-xl font-bold text-slate-800">{section.label}</CardTitle>
+        </div>
       </CardHeader>
-      <CardContent className="p-6 prose prose-sm max-w-none prose-slate">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{String(sectionData)}</ReactMarkdown>
+      <CardContent className="pt-0">
+        <div className="prose prose-sm max-w-none prose-slate text-slate-600 leading-relaxed">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{String(sectionData)}</ReactMarkdown>
+        </div>
       </CardContent>
     </Card>
   );
@@ -120,7 +121,7 @@ export const AiPlanContentView = ({ planData, planStructure }: AiPlanContentView
     })).filter(s => s.sectionData);
 
     return sectionsWithData.reduce((acc, section) => {
-      const isShort = typeof section.sectionData === 'string' && section.sectionData.length < 150 && !section.sectionData.includes('\n');
+      const isShort = typeof section.sectionData === 'string' && section.sectionData.length < 200 && !section.sectionData.includes('\n');
       const lastGroup = acc[acc.length - 1];
 
       if (isShort && lastGroup && lastGroup.length === 1 && lastGroup[0].isShort) {
