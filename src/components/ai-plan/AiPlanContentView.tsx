@@ -47,6 +47,18 @@ const iconColorMapping: { [key: string]: string } = {
   default: 'bg-slate-100 text-slate-600',
 };
 
+// Helper function to identify the special content direction section
+const isContentDirectionSection = (section: PlanStructure): boolean => {
+  if (section.type !== 'dynamic_group' || !section.sub_fields) {
+    return false;
+  }
+  const expectedSubFieldIds = ['loai_content', 'chu_de', 'van_de', 'content_demo', 'dinh_huong_comment'];
+  const actualSubFieldIds = section.sub_fields.map(sf => sf.id);
+  // Check if all expected fields are present
+  return expectedSubFieldIds.every(id => actualSubFieldIds.includes(id));
+};
+
+
 const SectionCard = ({ 
   section, 
   sectionData,
@@ -117,7 +129,7 @@ const SectionCard = ({
       );
     }
 
-    if (section.id === 'dinh_huong_content' && Array.isArray(sectionData)) {
+    if (isContentDirectionSection(section) && Array.isArray(sectionData)) {
       return <ContentDirectionView data={sectionData} />;
     }
 
