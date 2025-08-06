@@ -114,17 +114,23 @@ serve(async (req) => {
       prompt += `\n\n${cotPrompt}`;
     }
 
-    const jsonStructureDescription = planStructure.map(field => {
-      if (field.type === 'dynamic_group') {
-        const subFields = (field.sub_fields || []).map((sub: any) => `      - "${sub.id}": (string) // ${sub.label}`).join('\n');
-        return `  "${field.id}": [ // An array of objects for ${field.label}
+    const jsonStructureDescription = planStructure.map((field: any) => {
+      if (field.display_type === 'content_direction') {
+        const subFields = [
+          `      "loai_content": "(string) // Loại content, ví dụ: Bài review, Bài đặt câu hỏi"`,
+          `      "chu_de": "(string) // Chủ đề chính của bài viết"`,
+          `      "van_de": "(string) // Vấn đề hoặc tình trạng mà bài viết giải quyết"`,
+          `      "content_demo": "(string) // Một đoạn nội dung mẫu hoặc dàn ý chi tiết"`,
+          `      "dinh_huong_comment": "(string) // Gợi ý các hướng bình luận, tương tác cho bài viết"`
+        ].join(',\n');
+        return `  "${field.id}": [ // Một mảng các đối tượng cho mục '${field.label}'
     {
 ${subFields}
     },
     ...
   ]`;
       } else {
-        return `  "${field.id}": (string) // ${field.label}`;
+        return `  "${field.id}": "(string) // ${field.label}"`;
       }
     }).join(',\n');
 
