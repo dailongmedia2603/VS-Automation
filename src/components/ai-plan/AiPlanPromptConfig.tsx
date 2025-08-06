@@ -13,6 +13,7 @@ import ReactMarkdown from 'react-markdown';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type PromptBlock = {
   id: string;
@@ -32,7 +33,41 @@ type PromptConfig = {
   maxTokens: number;
   useCoT: boolean;
   cotFactors: CotFactor[];
+  output_instruction: string;
 };
+
+const outputInstructionTemplates = [
+  {
+    name: 'Mẫu Kế hoạch Marketing Chuẩn',
+    content: `
+---
+### YÊU CẦU ĐẦU RA (CỰC KỲ QUAN TRỌNG)
+
+Bạn PHẢI trả lời bằng một khối mã JSON duy nhất được bao bọc trong \`\`\`json ... \`\`\`.
+JSON object phải có cấu trúc chính xác như sau (sử dụng các ID đã được định nghĩa trong mẫu kế hoạch):
+\`\`\`json
+{
+  "muc_tieu": "(string) // Mục tiêu chính của kế hoạch",
+  "san_pham": "(string) // Mô tả sản phẩm/dịch vụ",
+  "khach_hang_muc_tieu": "(string) // Phân tích chi tiết khách hàng mục tiêu",
+  "thong_diep_chinh": "(string) // Thông điệp cốt lõi cần truyền tải",
+  "dinh_huong_content": [
+    {
+      "loai_content": "(string)",
+      "chu_de": "(string)",
+      "van_de": "(string)",
+      "content_demo": "(string)",
+      "dinh_huong_comment": "(string)"
+    }
+  ],
+  "chien_luoc_trien_khai": "(string) // Kế hoạch triển khai chi tiết"
+}
+\`\`\`
+- **TUYỆT ĐỐI KHÔNG** thêm bất kỳ văn bản, lời chào, hoặc giải thích nào bên ngoài khối mã JSON.
+- Hãy điền giá trị cho mỗi trường dựa trên thông tin đã được cung cấp và kiến thức của bạn.
+`
+  },
+];
 
 const initialConfig: PromptConfig = {
   blocks: [],
@@ -41,6 +76,7 @@ const initialConfig: PromptConfig = {
   maxTokens: 8192,
   useCoT: false,
   cotFactors: [],
+  output_instruction: outputInstructionTemplates[0].content,
 };
 
 const placeholders = [
@@ -70,11 +106,8 @@ export const AiPlanPromptConfig = () => {
         if (error && error.code !== 'PGRST116') throw error;
         
         if (data && data.prompt_structure) {
-          if (Array.isArray(data.prompt_structure)) {
-            setConfig(prev => ({ ...prev, blocks: data.prompt_structure }));
-          } else {
-            setConfig(prev => ({ ...prev, ...data.prompt_structure }));
-          }
+          const loadedConfig = { ...initialConfig, ...data.prompt_structure };
+          setConfig(loadedConfig);
         }
       } catch (error: any) {
         showError("Không thể tải prompt: " + error.message);
@@ -174,7 +207,7 @@ export const AiPlanPromptConfig = () => {
     }
   };
 
-  const handleConfigChange = (field: keyof Omit<PromptConfig, 'blocks' | 'cotFactors'>, value: any) => {
+  const handleConfigChange = (field: keyof PromptConfig, value: any) => {
     setConfig(prev => ({ ...prev, [field]: value }));
   };
 
@@ -213,6 +246,8 @@ export const AiPlanPromptConfig = () => {
         }
         prompt += `\n\n---\n\n${cotPrompt}`;
     }
+
+    prompt += config.output_instruction || '';
 
     return prompt;
   }, [config, templateInputFields, globalDocuments]);
@@ -327,6 +362,29 @@ export const AiPlanPromptConfig = () => {
           </Card>
         </div>
       </div>
+      <Card className="shadow-sm rounded-2xl bg-white">
+        <CardHeader>
+          <CardTitle>Yêu cầu Đầu ra (JSON)</CardTitle>
+          <CardDescription>Định nghĩa cấu trúc JSON mà AI phải trả về. Sử dụng các mẫu có sẵn hoặc tùy chỉnh.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Select onValueChange={(value) => handleConfigChange('output_instruction', value)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Chọn một mẫu yêu cầu đầu ra..." />
+            </SelectTrigger>
+            <SelectContent>
+              {outputInstructionTemplates.map(template => (
+                <SelectItem key={template.name} value={template.content}>{template.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Textarea
+            value={config.output_instruction || ''}
+            onChange={e => handleConfigChange('output_instruction', e.target.value)}
+            className="min-h-[250px] font-mono text-xs bg-slate-50"
+          />
+        </CardContent>
+      </Card>
       <div className="flex justify-end pt-4">
         <div className="flex items-center gap-2">
           <Button variant="secondary" onClick={() => setIsPreviewOpen(true)}><Eye className="mr-2 h-4 w-4" />Xem trước</Button>
