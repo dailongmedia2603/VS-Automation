@@ -14,6 +14,7 @@ import { AiPlanLogDialog } from '@/components/ai-plan/AiPlanLogDialog';
 import { AiPlanContentView } from '@/components/ai-plan/AiPlanContentView';
 import { SharePlanDialog } from '@/components/ai-plan/SharePlanDialog';
 import { InputConfigDialog, type InputField } from '@/components/ai-plan/InputConfigDialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 type Plan = {
   id: number;
@@ -58,6 +59,9 @@ const AiPlanDetail = () => {
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [isInputConfigOpen, setIsInputConfigOpen] = useState(false);
+  const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
+  const [regenSection, setRegenSection] = useState<{ id: string; label: string } | null>(null);
+  const [feedbackText, setFeedbackText] = useState('');
 
   useEffect(() => {
     const fetchPlan = async () => {
@@ -71,16 +75,15 @@ const AiPlanDetail = () => {
           .single();
         if (error) throw error;
 
-        // If template_id is null, assign a default and update the plan
         if (!data.template_id) {
           const { data: updatedPlan, error: updateError } = await supabase
             .from('ai_plans')
-            .update({ template_id: 1 }) // Default template ID is 1
+            .update({ template_id: 1 })
             .eq('id', planId)
             .select('*')
             .single();
           if (updateError) throw updateError;
-          data = updatedPlan; // Use the updated plan data
+          data = updatedPlan;
         }
         
         setPlan(data);
@@ -188,6 +191,67 @@ const AiPlanDetail = () => {
     setInputStructure(newFields);
   };
 
+  const handleUpdateSection = async (sectionId: string, newContent: any) => {
+    if (!plan) return;
+    
+    const newPlanData = {
+      ...plan.plan_data,
+      [sectionId]: newContent,
+    };
+  
+    setIsSaving(true);
+    const { data, error } = await supabase
+      .from('ai_plans')
+      .update({ plan_data: newPlanData, updated_at: new Date().toISOString() })
+      .eq('id', plan.id)
+      .select()
+      .single();
+    
+    if (error) {
+      showError("Lưu thay đổi thất bại: " + error.message);
+    } else {
+      showSuccess("Đã lưu thay đổi!");
+      setPlan(data);
+      setEditingSectionId(null);
+    }
+    setIsSaving(false);
+  };
+
+  const handleRegenerateSection = async () => {
+    if (!plan || !regenSection || !feedbackText.trim()) return;
+  
+    setIsGenerating(true);
+    const toastId = showLoading(`AI đang tạo lại mục "${regenSection.label}"...`);
+  
+    try {
+      const { data, error } = await supabase.functions.invoke('regenerate-ai-plan-section', {
+        body: {
+          planId: plan.id,
+          sectionId: regenSection.id,
+          planData: plan.plan_data,
+          feedback: feedbackText,
+        }
+      });
+  
+      if (error) {
+        const errorBody = await error.context.json();
+        throw new Error(errorBody.error || error.message);
+      }
+      if (data.error) throw new Error(data.error);
+  
+      setPlan(data);
+      dismissToast(toastId);
+      showSuccess("AI đã tạo lại nội dung thành công!");
+      setRegenSection(null);
+      setFeedbackText('');
+    } catch (err: any) {
+      dismissToast(toastId);
+      showError(`Tạo lại thất bại: ${err.message}`);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   if (isLoading) {
     return <main className="flex-1 p-6 sm:p-8 bg-slate-50"><Skeleton className="h-full w-full" /></main>;
   }
@@ -290,7 +354,15 @@ const AiPlanDetail = () => {
           <ResizableHandle withHandle />
           <ResizablePanel defaultSize={60}>
             <div className="h-full bg-slate-50 p-6 overflow-y-auto">
-              <AiPlanContentView planData={plan.plan_data} planStructure={outputStructure!} />
+              <AiPlanContentView 
+                planData={plan.plan_data} 
+                planStructure={outputStructure!} 
+                isEditable={true}
+                editingSectionId={editingSectionId}
+                setEditingSectionId={setEditingSectionId}
+                onUpdateSection={handleUpdateSection}
+                onRegenerateSection={(id, label) => setRegenSection({ id, label })}
+              />
             </div>
           </ResizablePanel>
         </ResizablePanelGroup>
@@ -317,6 +389,31 @@ const AiPlanDetail = () => {
         outputStructure={outputStructure}
         onSuccess={handleInputConfigSuccess}
       />
+      <Dialog open={!!regenSection} onOpenChange={() => setRegenSection(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Tạo lại: {regenSection?.label}</DialogTitle>
+            <DialogDescription>
+              Nhập feedback của bạn để AI cải thiện nội dung cho phần này.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Textarea 
+              placeholder="Ví dụ: Phần này cần chi tiết hơn về đối thủ cạnh tranh..."
+              value={feedbackText}
+              onChange={(e) => setFeedbackText(e.target.value)}
+              className="min-h-[120px]"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRegenSection(null)}>Hủy</Button>
+            <Button onClick={handleRegenerateSection} disabled={isGenerating}>
+              {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+              Gửi cho AI
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };
