@@ -59,6 +59,7 @@ serve(async (req) => {
       throw new Error("AI Plan template structure is not configured or is invalid.");
     }
     
+    const planStructure = (templateData.structure as any)?.output_fields || templateData.structure as any[];
     const inputStructure = (templateData.structure as any)?.input_fields || [];
 
     const { data: promptConfigData, error: promptError } = await supabaseAdmin
@@ -113,8 +114,40 @@ serve(async (req) => {
       prompt += `\n\n${cotPrompt}`;
     }
 
-    // Append the user-defined output instruction
-    const outputInstruction = promptConfig.output_instruction || '';
+    const jsonStructureDescription = planStructure.map((field: any) => {
+      if (field.display_type === 'content_direction') {
+        const subFields = [
+          `      "loai_content": "(string) // Loại content, ví dụ: Bài review, Bài đặt câu hỏi"`,
+          `      "chu_de": "(string) // Chủ đề chính của bài viết"`,
+          `      "van_de": "(string) // Vấn đề hoặc tình trạng mà bài viết giải quyết"`,
+          `      "content_demo": "(string) // Một đoạn nội dung mẫu hoặc dàn ý chi tiết"`,
+          `      "dinh_huong_comment": "(string) // Gợi ý các hướng bình luận, tương tác cho bài viết"`
+        ].join(',\n');
+        return `  "${field.id}": [ // Một mảng các đối tượng cho mục '${field.label}'
+    {
+${subFields}
+    },
+    ...
+  ]`;
+      } else {
+        return `  "${field.id}": "(string) // ${field.label}"`;
+      }
+    }).join(',\n');
+
+    const outputInstruction = `
+---
+### YÊU CẦU ĐẦU RA (CỰC KỲ QUAN TRỌNG)
+
+Bạn PHẢI trả lời bằng một khối mã JSON duy nhất được bao bọc trong \`\`\`json ... \`\`\`.
+JSON object phải có cấu trúc chính xác như sau:
+\`\`\`json
+{
+${jsonStructureDescription}
+}
+\`\`\`
+- **TUYỆT ĐỐI KHÔNG** thêm bất kỳ văn bản, lời chào, hoặc giải thích nào bên ngoài khối mã JSON.
+- Hãy điền giá trị cho mỗi trường dựa trên thông tin đã được cung cấp và kiến thức của bạn.
+`;
     prompt += outputInstruction;
 
     const modelToUse = aiSettings.gemini_content_model || 'gemini-pro';
