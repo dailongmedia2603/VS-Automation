@@ -105,10 +105,10 @@ const ContentDirectionViewIntegrated = ({ data }: { data: any[] }) => {
   );
 
   return (
-    <div className="border rounded-lg overflow-hidden h-[700px] flex flex-col bg-white">
-      <div className="grid md:grid-cols-[320px_1fr] flex-grow min-h-0">
-        <div className="h-full border-r bg-slate-50/70">
-          <ScrollArea className="h-full p-2">
+    <div className="border rounded-lg overflow-hidden bg-white">
+      <div className="grid md:grid-cols-[320px_1fr]">
+        <div className="border-r bg-slate-50/70">
+          <ScrollArea className="h-[700px] p-2">
             {Object.entries(groupedData).map(([type, items]) => (
               <div key={type} className="mb-2">
                 <h3 className="px-3 py-2 text-sm font-semibold text-slate-500 flex items-center gap-2"><Newspaper className="h-4 w-4" /> {type}</h3>
@@ -123,19 +123,17 @@ const ContentDirectionViewIntegrated = ({ data }: { data: any[] }) => {
             ))}
           </ScrollArea>
         </div>
-        <div className="h-full">
-          <ScrollArea className="h-full p-6">
-            {selectedItem ? (
-              <div className="space-y-8">
-                <h2 className="text-2xl font-bold text-slate-900">{selectedItem.chude || selectedItem.topic}</h2>
-                <DetailSection title="Vấn đề / Tình trạng" content={selectedItem.vande || selectedItem.problem} icon={AlertTriangle} iconBg="bg-red-100" iconText="text-red-600" />
-                <DetailSection title="Content Demo" content={selectedItem.contentdemo || selectedItem.demo} icon={ClipboardList} iconBg="bg-green-100" iconText="text-green-600" />
-                <DetailSection title="Định hướng comment" content={selectedItem.dinhhuongcomment || selectedItem.commentdirection} icon={MessageSquareText} iconBg="bg-purple-100" iconText="text-purple-600" />
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full text-center text-slate-500"><LayoutList className="h-16 w-16 text-slate-300 mb-4" /><h3 className="text-xl font-semibold text-slate-700">Chọn một bài viết để xem chi tiết</h3></div>
-            )}
-          </ScrollArea>
+        <div className="p-6">
+          {selectedItem ? (
+            <div className="space-y-8">
+              <h2 className="text-2xl font-bold text-slate-900">{selectedItem.chude || selectedItem.topic}</h2>
+              <DetailSection title="Vấn đề / Tình trạng" content={selectedItem.vande || selectedItem.problem} icon={AlertTriangle} iconBg="bg-red-100" iconText="text-red-600" />
+              <DetailSection title="Content Demo" content={selectedItem.contentdemo || selectedItem.demo} icon={ClipboardList} iconBg="bg-green-100" iconText="text-green-600" />
+              <DetailSection title="Định hướng comment" content={selectedItem.dinhhuongcomment || selectedItem.commentdirection} icon={MessageSquareText} iconBg="bg-purple-100" iconText="text-purple-600" />
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-center text-slate-500"><LayoutList className="h-16 w-16 text-slate-300 mb-4" /><h3 className="text-xl font-semibold text-slate-700">Chọn một bài viết để xem chi tiết</h3></div>
+          )}
         </div>
       </div>
     </div>
