@@ -1,19 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Sparkles, Save, Loader2, FileText, Share, Compass } from 'lucide-react';
+import { ArrowLeft, Sparkles, Save, Loader2, FileText, Share, Settings } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { AiPlanLogDialog } from '@/components/ai-plan/AiPlanLogDialog';
 import { AiPlanContentView } from '@/components/ai-plan/AiPlanContentView';
 import { SharePlanDialog } from '@/components/ai-plan/SharePlanDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { InputConfigDialog } from '@/components/ai-plan/InputConfigDialog';
+import { Textarea } from '@/components/ui/textarea';
 
 type Plan = {
   id: number;
@@ -58,6 +57,7 @@ const AiPlanDetail = () => {
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
   const [regenSection, setRegenSection] = useState<{ id: string; label: string } | null>(null);
   const [feedbackText, setFeedbackText] = useState('');
+  const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
 
   useEffect(() => {
     const fetchPlan = async () => {
@@ -132,24 +132,21 @@ const AiPlanDetail = () => {
       setIsLogOpen(true);
   };
 
-  const handleConfigChange = (field: string, value: any) => {
-    setPlan(prev => prev ? { ...prev, config: { ...prev.config, [field]: value } } : null);
-  };
-
-  const handleSaveConfig = async () => {
+  const handleUpdateConfig = async (newConfig: any) => {
     if (!plan) return;
-    setIsSaving(true);
+    
     const { error } = await supabase
       .from('ai_plans')
-      .update({ config: plan.config, updated_at: new Date().toISOString() })
+      .update({ config: newConfig, updated_at: new Date().toISOString() })
       .eq('id', plan.id);
     
     if (error) {
       showError("Lưu cấu hình thất bại: " + error.message);
+      throw error;
     } else {
       showSuccess("Đã lưu cấu hình!");
+      setPlan(prev => prev ? { ...prev, config: newConfig } : null);
     }
-    setIsSaving(false);
   };
 
   const handleGeneratePlan = async () => {
@@ -277,10 +274,6 @@ const AiPlanDetail = () => {
               <FileText className="mr-2 h-4 w-4" />
               Log AI
             </Button>
-            <Button variant="outline" onClick={handleSaveConfig} disabled={isSaving} className="bg-white">
-              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              Lưu cấu hình
-            </Button>
             <Button onClick={handleGeneratePlan} disabled={isGenerating} className="bg-purple-600 hover:bg-purple-700 text-white">
               {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
               Tạo kế hoạch
@@ -293,75 +286,21 @@ const AiPlanDetail = () => {
             <div className="h-full p-4 overflow-y-auto">
               <Card className="border-none shadow-none">
                 <CardHeader>
-                  <CardTitle>Thông tin đầu vào</CardTitle>
-                  <CardDescription>Nhập thông tin chi tiết về chiến dịch của bạn.</CardDescription>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Thông tin đầu vào</CardTitle>
+                      <CardDescription>Nhập thông tin chi tiết về chiến dịch của bạn.</CardDescription>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => setIsConfigDialogOpen(true)}>
+                      <Settings className="mr-2 h-4 w-4" />
+                      Cấu hình
+                    </Button>
+                  </div>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-2">
-                    <Label>Thông tin sản phẩm/dịch vụ</Label>
-                    <Textarea 
-                      value={plan.config?.product_info || ''} 
-                      onChange={e => handleConfigChange('product_info', e.target.value)} 
-                      placeholder="Mô tả sản phẩm, điểm nổi bật, giá cả..."
-                      className="min-h-[100px]"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Đối tượng khách hàng mục tiêu</Label>
-                    <Textarea 
-                      value={plan.config?.target_audience || ''} 
-                      onChange={e => handleConfigChange('target_audience', e.target.value)} 
-                      placeholder="Độ tuổi, giới tính, sở thích, vấn đề họ gặp phải..."
-                      className="min-h-[100px]"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Thông điệp chính</Label>
-                    <Input 
-                      value={plan.config?.main_message || ''} 
-                      onChange={e => handleConfigChange('main_message', e.target.value)} 
-                      placeholder="Thông điệp cốt lõi bạn muốn truyền tải"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Tông giọng & Phong cách</Label>
-                    <Input 
-                      value={plan.config?.tone_style || ''} 
-                      onChange={e => handleConfigChange('tone_style', e.target.value)} 
-                      placeholder="VD: Thân thiện, chuyên gia, hài hước..."
-                    />
-                  </div>
-                  
-                  <Card className="shadow-none border rounded-xl bg-slate-50/50">
-                    <CardHeader className="flex flex-row items-center gap-4">
-                      <div className="flex-shrink-0 bg-yellow-100 p-3 rounded-lg"><Compass className="h-6 w-6 text-yellow-600" /></div>
-                      <div>
-                        <CardTitle className="text-lg font-bold text-slate-900">Định hướng</CardTitle>
-                        <CardDescription className="text-sm text-slate-500 pt-1">Cung cấp chỉ dẫn chi tiết và ví dụ cho AI.</CardDescription>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <Label>Định hướng nội dung</Label>
-                        <Textarea 
-                          value={plan.config?.direction || ''} 
-                          onChange={e => handleConfigChange('direction', e.target.value)} 
-                          placeholder="Nhập định hướng chi tiết cho bài viết..." 
-                          className="min-h-[150px] bg-white" 
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Ví dụ tham khảo</Label>
-                        <Textarea 
-                          value={plan.config?.reference_example || ''} 
-                          onChange={e => handleConfigChange('reference_example', e.target.value)} 
-                          placeholder="Dán một bài viết hoặc đoạn văn mẫu vào đây..." 
-                          className="min-h-[150px] bg-white" 
-                        />
-                        <p className="text-xs text-muted-foreground">AI sẽ tham khảo văn phong, cách xưng hô, giọng điệu từ ví dụ này nhưng không sao chép nội dung.</p>
-                      </div>
-                    </CardContent>
-                  </Card>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground p-4 text-center bg-slate-50 rounded-lg">
+                    Nhấp vào nút "Cấu hình" để chỉnh sửa thông tin đầu vào cho kế hoạch.
+                  </p>
                 </CardContent>
               </Card>
             </div>
@@ -405,7 +344,7 @@ const AiPlanDetail = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <Textarea 
+            <Textarea
               placeholder="Ví dụ: Phần này cần chi tiết hơn về đối thủ cạnh tranh..."
               value={feedbackText}
               onChange={(e) => setFeedbackText(e.target.value)}
@@ -421,6 +360,12 @@ const AiPlanDetail = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <InputConfigDialog
+        planConfig={plan.config}
+        onSave={handleUpdateConfig}
+        open={isConfigDialogOpen}
+        onOpenChange={setIsConfigDialogOpen}
+      />
     </>
   );
 };
