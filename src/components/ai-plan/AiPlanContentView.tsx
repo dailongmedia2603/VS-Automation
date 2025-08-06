@@ -55,9 +55,9 @@ const isValidContentItem = (item: any): item is ContentItem => {
   if (!item || typeof item !== 'object') {
     return false;
   }
-  // All required keys must exist and not be null
-  const requiredKeys: (keyof ContentItem)[] = ['loai_content', 'chu_de', 'van_de', 'content_demo', 'dinh_huong_comment'];
-  return requiredKeys.every(key => key in item && item[key] != null);
+  // A content item must at least have a topic ('chu_de').
+  // This is more robust to slight variations in AI output.
+  return 'chu_de' in item;
 };
 
 // Helper function to check if the data matches the structure of "Định hướng Content"
