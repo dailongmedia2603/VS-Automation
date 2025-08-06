@@ -1,13 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Target, Calendar, Package, Route, Megaphone, Bot, PencilLine, Sparkles, Loader2, LayoutList, Newspaper, AlertTriangle, ClipboardList, MessageSquareText } from 'lucide-react';
+import { Target, Calendar, Package, Route, Megaphone, Bot, LayoutList, Newspaper, AlertTriangle, ClipboardList, MessageSquareText, PencilLine, Sparkles, Loader2 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { useMemo, useState, useEffect, useRef } from "react";
 import { Button } from "../ui/button";
+import { ScrollArea } from "../ui/scroll-area";
 import { Textarea } from "../ui/textarea";
 import { showError } from "@/utils/toast";
-import { ScrollArea } from "../ui/scroll-area";
 
 // Type Definitions
 type PlanData = { [key: string]: any };
@@ -38,14 +38,6 @@ interface AiPlanContentViewProps {
 }
 
 const iconMapping: { [key: string]: React.ElementType } = { Target, Calendar, Package, Route, Megaphone, default: Target };
-const iconColorMapping: { [key: string]: string } = {
-  Target: 'bg-blue-100 text-blue-600',
-  Calendar: 'bg-red-100 text-red-600',
-  Package: 'bg-green-100 text-green-600',
-  Route: 'bg-purple-100 text-purple-600',
-  Megaphone: 'bg-yellow-100 text-yellow-600',
-  default: 'bg-slate-100 text-slate-600',
-};
 
 // --- Sub-component for Content Direction (Master-Detail View) ---
 const ContentDirectionViewIntegrated = ({ data }: { data: ContentItem[] }) => {
@@ -122,18 +114,97 @@ const ContentDirectionViewIntegrated = ({ data }: { data: ContentItem[] }) => {
   );
 };
 
+const EditView = ({ sectionData, onSave, onCancel }: { sectionData: any, onSave: (newContent: any) => Promise<void>, onCancel: () => void }) => {
+    const [editedContent, setEditedContent] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => {
+        if (typeof sectionData === 'object' && sectionData !== null) {
+            setEditedContent(JSON.stringify(sectionData, null, 2));
+        } else {
+            setEditedContent(String(sectionData || ''));
+        }
+    }, [sectionData]);
+
+    const handleSave = async () => {
+        setIsSaving(true);
+        try {
+            let contentToSave: any = editedContent;
+            if (typeof sectionData === 'object' && sectionData !== null) {
+                contentToSave = JSON.parse(editedContent);
+            }
+            await onSave(contentToSave);
+            onCancel(); // Close edit mode on success
+        } catch (e) {
+            showError("Nội dung JSON không hợp lệ. Vui lòng kiểm tra lại.");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <Card className="bg-white shadow-sm border-slate-200/60">
+            <CardContent className="p-6">
+                <Textarea 
+                    value={editedContent} 
+                    onChange={(e) => setEditedContent(e.target.value)}
+                    className="min-h-[250px] font-mono text-sm bg-slate-50"
+                />
+                <div className="flex justify-end gap-2 mt-4">
+                    <Button variant="ghost" onClick={onCancel}>Hủy</Button>
+                    <Button onClick={handleSave} disabled={isSaving}>
+                        {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Lưu thay đổi
+                    </Button>
+                </div>
+            </CardContent>
+        </Card>
+    );
+};
+
 // --- Main Component ---
 export const AiPlanContentView = (props: AiPlanContentViewProps) => {
-  const { planData, planStructure, isEditable, editingSectionId, setEditingSectionId, onUpdateSection, onRegenerateSection } = props;
-  const contentRef = useRef<HTMLDivElement>(null);
+  const { planData, planStructure, isEditable = false, editingSectionId, setEditingSectionId, onUpdateSection, onRegenerateSection } = props;
+  const mainContentRef = useRef<HTMLDivElement>(null);
+  const [activeSection, setActiveSection] = useState<string | null>(null);
 
   const sectionsWithData = useMemo(() => {
     return planStructure.map(section => ({ ...section, sectionData: planData[section.id] })).filter(s => s.sectionData);
   }, [planData, planStructure]);
 
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setActiveSection(entry.target.id);
+            break; 
+          }
+        }
+      },
+      { rootMargin: "-30% 0px -70% 0px", threshold: 0 }
+    );
+
+    const sections = mainContentRef.current?.querySelectorAll('section[id]');
+    if (sections) {
+      sections.forEach((section) => observer.observe(section));
+    }
+
+    if (!activeSection && sectionsWithData.length > 0) {
+      setActiveSection(sectionsWithData[0].id);
+    }
+
+    return () => {
+      if (sections) {
+        sections.forEach((section) => observer.unobserve(section));
+      }
+    };
+  }, [sectionsWithData, activeSection]);
+
   const handleNavClick = (sectionId: string) => {
     const sectionElement = document.getElementById(sectionId);
     sectionElement?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setActiveSection(sectionId);
   };
 
   if (!planData || !planStructure) {
@@ -141,54 +212,96 @@ export const AiPlanContentView = (props: AiPlanContentViewProps) => {
       <div className="flex flex-col items-center justify-center h-full text-center text-slate-500 p-8">
         <Bot className="h-16 w-16 text-slate-300 mb-4" />
         <h3 className="text-xl font-semibold text-slate-700">Kế hoạch của bạn đang chờ AI</h3>
-        <p className="mt-2 text-sm max-w-sm">Cung cấp đầy đủ thông tin ở cột bên trái và nhấn "Tạo kế hoạch" để AI bắt đầu làm việc.</p>
+        <p className="mt-2 text-sm max-w-sm">Cung cấp đầy đủ thông tin và tạo kế hoạch để AI bắt đầu làm việc.</p>
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-8 items-start">
+    <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-12 items-start">
       {/* Left Navigation */}
       <aside className="sticky top-24">
-        <h3 className="font-semibold text-slate-800 mb-3 px-2">Nội dung kế hoạch</h3>
+        <h3 className="font-semibold text-slate-900 mb-4 px-4">Nội dung kế hoạch</h3>
         <nav>
-          <ul className="space-y-1">
-            {sectionsWithData.map(section => (
-              <li key={section.id}>
-                <Button variant="ghost" className="w-full justify-start" onClick={() => handleNavClick(section.id)}>
-                  <span className="truncate">{section.label}</span>
-                </Button>
-              </li>
-            ))}
+          <ul className="space-y-2">
+            {sectionsWithData.map(section => {
+              const Icon = iconMapping[section.icon] || iconMapping.default;
+              const isActive = activeSection === section.id;
+              return (
+                <li key={section.id}>
+                  <Button
+                    variant="ghost"
+                    className={cn(
+                      "w-full h-auto justify-start items-center p-3 rounded-lg transition-all duration-200",
+                      isActive
+                        ? "bg-blue-100 text-blue-700 shadow-sm"
+                        : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                    )}
+                    onClick={() => handleNavClick(section.id)}
+                  >
+                    <div className={cn(
+                      "w-9 h-9 rounded-md flex items-center justify-center mr-4 flex-shrink-0 transition-colors duration-200",
+                      isActive ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-500"
+                    )}>
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <span className={cn("font-medium text-sm", isActive && "font-semibold")}>
+                      {section.label}
+                    </span>
+                  </Button>
+                </li>
+              );
+            })}
           </ul>
         </nav>
       </aside>
 
       {/* Right Content */}
-      <main ref={contentRef} className="space-y-12">
+      <main ref={mainContentRef} className="space-y-16">
         {sectionsWithData.map(section => {
           const Icon = iconMapping[section.icon] || iconMapping.default;
-          const colorClasses = iconColorMapping[section.icon] || iconColorMapping.default;
-          const [iconBg, iconText] = colorClasses.split(' ');
-
+          const isEditing = isEditable && editingSectionId === section.id;
           return (
-            <section key={section.id} id={section.id} className="scroll-mt-24">
-              <div className="flex items-center gap-4 mb-4">
-                <div className={cn("w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0", iconBg)}>
-                  <Icon className={cn("h-6 w-6", iconText)} />
+            <section key={section.id} id={section.id} className="scroll-mt-24 group">
+              <div className="flex items-center justify-between gap-4 mb-6">
+                <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center flex-shrink-0">
+                        <Icon className="h-6 w-6 text-slate-500" />
+                    </div>
+                    <h2 className="text-3xl font-bold text-slate-800">{section.label}</h2>
                 </div>
-                <h2 className="text-2xl font-bold text-slate-800">{section.label}</h2>
+                {isEditable && !isEditing && (
+                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button size="sm" variant="outline" className="bg-white" onClick={() => setEditingSectionId?.(section.id)}>
+                            <PencilLine className="h-4 w-4 mr-2" />Sửa
+                        </Button>
+                        <Button size="sm" variant="outline" className="bg-white" onClick={() => onRegenerateSection?.(section.id, section.label)}>
+                            <Sparkles className="h-4 w-4 mr-2" />Tạo lại
+                        </Button>
+                    </div>
+                )}
               </div>
               
-              {/* Conditional Rendering Logic */}
-              {section.id === 'dinh_huong_content' && Array.isArray(section.sectionData) ? (
-                <ContentDirectionViewIntegrated data={section.sectionData} />
+              {isEditing ? (
+                <EditView 
+                    sectionData={section.sectionData}
+                    onSave={async (newContent) => {
+                        await onUpdateSection?.(section.id, newContent);
+                    }}
+                    onCancel={() => setEditingSectionId?.(null)}
+                />
               ) : (
-                <Card className="bg-white shadow-sm border-slate-200/60">
-                  <CardContent className="p-6 prose prose-sm max-w-none prose-slate text-slate-600 leading-relaxed">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{String(section.sectionData)}</ReactMarkdown>
-                  </CardContent>
-                </Card>
+                <>
+                    {section.id === 'dinh_huong_content' && Array.isArray(section.sectionData) ? (
+                        <ContentDirectionViewIntegrated data={section.sectionData} />
+                    ) : (
+                        <Card className="bg-white shadow-sm border-slate-200/60">
+                        <CardContent className="p-6 prose prose-sm max-w-none prose-slate text-slate-600 leading-relaxed">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{String(section.sectionData)}</ReactMarkdown>
+                        </CardContent>
+                        </Card>
+                    )}
+                </>
               )}
             </section>
           );
