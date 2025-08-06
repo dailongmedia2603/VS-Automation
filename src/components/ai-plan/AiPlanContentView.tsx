@@ -49,22 +49,6 @@ const iconColorMapping: { [key: string]: string } = {
   default: 'bg-slate-100 text-slate-600',
 };
 
-// --- Giai đoạn 1: Hàm xác thực chi tiết ---
-const isValidContentItem = (item: any): item is ContentItem => {
-  // Must be a non-null object
-  if (!item || typeof item !== 'object') {
-    return false;
-  }
-  // A content item must at least have a topic ('chu_de').
-  // This is more robust to slight variations in AI output.
-  return 'chu_de' in item;
-};
-
-// Helper function to check if the data matches the structure of "Định hướng Content"
-const isContentDirectionData = (data: any): boolean => {
-  return Array.isArray(data) && data.some(isValidContentItem);
-};
-
 // --- Sub-component for Content Direction (Master-Detail View) ---
 const ContentDirectionViewIntegrated = ({ data }: { data: any[] }) => {
   const [selectedItem, setSelectedItem] = useState<ContentItemWithGeneratedName | null>(null);
@@ -72,15 +56,15 @@ const ContentDirectionViewIntegrated = ({ data }: { data: any[] }) => {
   const groupedData = useMemo(() => {
     if (!Array.isArray(data)) return {};
     
-    // --- Giai đoạn 2.1: Lọc dữ liệu bằng hàm xác thực ---
-    const groups = data
-      .filter(isValidContentItem) // Chỉ xử lý các mục đã được xác thực
-      .reduce((acc, item) => {
+    const groups = data.reduce((acc, item) => {
+      // Ensure item is a processable object to prevent crashes
+      if (item && typeof item === 'object' && !Array.isArray(item)) {
         const key = item.loai_content || 'Chưa phân loại';
         if (!acc[key]) acc[key] = [];
         acc[key].push(item);
-        return acc;
-      }, {} as Record<string, ContentItem[]>);
+      }
+      return acc;
+    }, {} as Record<string, ContentItem[]>);
 
     for (const key in groups) {
       groups[key] = groups[key].map((item, index) => ({ ...item, bai_viet_name: `Bài viết ${index + 1}` }));
@@ -198,7 +182,6 @@ export const AiPlanContentView = (props: AiPlanContentViewProps) => {
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
 
-  // --- Giai đoạn 2.2: Kiểm tra dữ liệu đầu vào của component cha ---
   if (!planData || typeof planData !== 'object' || !planStructure || !Array.isArray(planStructure)) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center text-slate-500 p-8">
@@ -315,7 +298,7 @@ export const AiPlanContentView = (props: AiPlanContentViewProps) => {
                     />
                 ) : (
                     <>
-                        {isContentDirectionData(section.sectionData) ? (
+                        {section.label === 'Định hướng Content' && Array.isArray(section.sectionData) ? (
                             <div className="p-4">
                                 <ContentDirectionViewIntegrated data={section.sectionData} />
                             </div>
