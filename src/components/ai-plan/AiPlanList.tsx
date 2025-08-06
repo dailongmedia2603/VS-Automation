@@ -17,6 +17,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type Project = {
   id: number;
@@ -24,6 +25,11 @@ type Project = {
   updated_at: string;
   color: string;
   items_count: number;
+};
+
+type Template = {
+  id: number;
+  name: string;
 };
 
 const folderColors = [
@@ -42,31 +48,43 @@ const getRandomColor = () => folderColors[Math.floor(Math.random() * folderColor
 export const AiPlanList = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [projects, setProjects] = useState<Project[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [projectName, setProjectName] = useState('');
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(undefined);
   const [isSaving, setIsSaving] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const fetchProjects = async () => {
+  const fetchProjectsAndTemplates = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.rpc('get_ai_plans_with_creator');
-      if (error) throw error;
-      setProjects(data || []);
+      const [projectsRes, templatesRes] = await Promise.all([
+        supabase.rpc('get_ai_plans_with_creator'),
+        supabase.from('ai_plan_templates').select('id, name')
+      ]);
+      
+      if (projectsRes.error) throw projectsRes.error;
+      if (templatesRes.error) throw templatesRes.error;
+
+      setProjects(projectsRes.data || []);
+      setTemplates(templatesRes.data || []);
+      if (templatesRes.data && templatesRes.data.length > 0) {
+        setSelectedTemplateId(String(templatesRes.data[0].id));
+      }
     } catch (error: any) {
-      showError("Không thể tải kế hoạch: " + error.message);
+      showError("Không thể tải dữ liệu: " + error.message);
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchProjects();
+    fetchProjectsAndTemplates();
   }, []);
 
   const stats = useMemo(() => {
@@ -86,6 +104,10 @@ export const AiPlanList = () => {
       showError("Tên kế hoạch không được để trống.");
       return;
     }
+    if (!editingProject && !selectedTemplateId) {
+      showError("Vui lòng chọn một mẫu kế hoạch.");
+      return;
+    }
     setIsSaving(true);
 
     try {
@@ -100,7 +122,7 @@ export const AiPlanList = () => {
         const randomColor = getRandomColor();
         const { data: newProject, error } = await supabase
           .from('ai_plans')
-          .insert({ name: projectName.trim(), creator_id: user.id, color: randomColor, template_id: 1 })
+          .insert({ name: projectName.trim(), creator_id: user.id, color: randomColor, template_id: Number(selectedTemplateId) })
           .select().single();
         if (error) throw error;
         showSuccess("Đã tạo kế hoạch thành công!");
@@ -108,7 +130,7 @@ export const AiPlanList = () => {
       }
       
       setIsProjectDialogOpen(false);
-      fetchProjects();
+      fetchProjectsAndTemplates();
     } catch (error: any) {
       showError(`Lưu kế hoạch thất bại: ${error.message}`);
     } finally {
@@ -128,7 +150,7 @@ export const AiPlanList = () => {
       showError("Xóa thất bại: " + error.message);
     } else {
       showSuccess("Đã xóa kế hoạch!");
-      fetchProjects();
+      fetchProjectsAndTemplates();
     }
     setIsDeleteDialogOpen(false);
   };
@@ -203,13 +225,7 @@ export const AiPlanList = () => {
             <Input placeholder="Tìm kiếm kế hoạch..." className="pl-9 bg-white rounded-lg" />
           </div>
           <div className="flex items-center gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild><Button variant="outline" className="bg-white rounded-lg">Sắp xếp theo <ChevronDown className="ml-2 h-4 w-4" /></Button></DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem>Tên</DropdownMenuItem>
-                <DropdownMenuItem>Ngày sửa đổi</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" className="bg-white rounded-lg">Sắp xếp theo <ChevronDown className="ml-2 h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuItem>Tên</DropdownMenuItem><DropdownMenuItem>Ngày sửa đổi</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
             <div className="flex items-center gap-1 p-1 bg-slate-200/75 rounded-lg">
               <Button size="icon" variant={viewMode === 'grid' ? 'default' : 'ghost'} onClick={() => setViewMode('grid')} className={viewMode === 'grid' ? 'bg-white text-blue-600 shadow-sm rounded-md' : 'text-slate-600'}><LayoutGrid className="h-4 w-4" /></Button>
               <Button size="icon" variant={viewMode === 'list' ? 'default' : 'ghost'} onClick={() => setViewMode('list')} className={viewMode === 'list' ? 'bg-white text-blue-600 shadow-sm rounded-md' : 'text-slate-600'}><List className="h-4 w-4" /></Button>
@@ -223,7 +239,7 @@ export const AiPlanList = () => {
 
         {renderProjectView()}
       </div>
-      <Dialog open={isProjectDialogOpen} onOpenChange={setIsProjectDialogOpen}><DialogContent className="sm:max-w-[425px]"><DialogHeader><DialogTitle className="text-xl font-bold">{editingProject ? 'Sửa kế hoạch' : 'Tạo kế hoạch mới'}</DialogTitle><DialogDescription>{editingProject ? 'Thay đổi tên cho kế hoạch của bạn.' : 'Nhập tên cho kế hoạch mới.'}</DialogDescription></DialogHeader><div className="py-4 space-y-2"><Label htmlFor="project-name">Tên kế hoạch</Label><Input id="project-name" value={projectName} onChange={(e) => setProjectName(e.target.value)} placeholder="VD: Kế hoạch ra mắt sản phẩm X" onKeyDown={(e) => e.key === 'Enter' && handleSaveProject()} className="h-11 bg-slate-100/70 border-slate-200" /></div><DialogFooter><Button variant="outline" onClick={() => setIsProjectDialogOpen(false)} className="rounded-lg">Hủy</Button><Button onClick={handleSaveProject} disabled={isSaving} className="rounded-lg bg-blue-600 hover:bg-blue-700">{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Lưu</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={isProjectDialogOpen} onOpenChange={setIsProjectDialogOpen}><DialogContent className="sm:max-w-[425px]"><DialogHeader><DialogTitle className="text-xl font-bold">{editingProject ? 'Sửa kế hoạch' : 'Tạo kế hoạch mới'}</DialogTitle><DialogDescription>{editingProject ? 'Thay đổi tên cho kế hoạch của bạn.' : 'Nhập tên và chọn mẫu cho kế hoạch mới.'}</DialogDescription></DialogHeader><div className="py-4 space-y-4"><div className="space-y-2"><Label htmlFor="project-name">Tên kế hoạch</Label><Input id="project-name" value={projectName} onChange={(e) => setProjectName(e.target.value)} placeholder="VD: Kế hoạch ra mắt sản phẩm X" onKeyDown={(e) => e.key === 'Enter' && handleSaveProject()} className="h-11 bg-slate-100/70 border-slate-200" /></div>{!editingProject && (<div className="space-y-2"><Label htmlFor="template-select">Chọn mẫu kế hoạch</Label><Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}><SelectTrigger id="template-select"><SelectValue placeholder="Chọn một mẫu" /></SelectTrigger><SelectContent>{templates.map(template => (<SelectItem key={template.id} value={String(template.id)}>{template.name}</SelectItem>))}</SelectContent></Select></div>)}</div><DialogFooter><Button variant="outline" onClick={() => setIsProjectDialogOpen(false)} className="rounded-lg">Hủy</Button><Button onClick={handleSaveProject} disabled={isSaving} className="rounded-lg bg-blue-600 hover:bg-blue-700">{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Lưu</Button></DialogFooter></DialogContent></Dialog>
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Bạn có chắc chắn muốn xóa?</AlertDialogTitle><AlertDialogDescription>Hành động này không thể hoàn tác. Kế hoạch "{projectToDelete?.name}" sẽ bị xóa vĩnh viễn.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="rounded-lg">Hủy</AlertDialogCancel><AlertDialogAction onClick={handleDeleteProject} className="bg-red-600 hover:bg-red-700 rounded-lg">Xóa</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     </>
   );

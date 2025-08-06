@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AiPlanPromptConfig } from '@/components/ai-plan/AiPlanPromptConfig';
 import { AiPlanList } from '@/components/ai-plan/AiPlanList';
 import { AiPlanDocumentsManager } from '@/components/ai-plan/AiPlanDocumentsManager';
+import { AiPlanTemplateManager } from '@/components/ai-plan/AiPlanTemplateManager';
 
 const AiPlan = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -24,11 +25,15 @@ const AiPlan = () => {
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="flex justify-start items-center gap-1 p-0 bg-transparent">
           <TabsTrigger value="plans" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Danh sách kế hoạch</TabsTrigger>
+          <TabsTrigger value="templates" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Quản lý Mẫu</TabsTrigger>
           <TabsTrigger value="prompt-config" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Cấu hình Prompt</TabsTrigger>
           <TabsTrigger value="documents" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Tài liệu</TabsTrigger>
         </TabsList>
         <TabsContent value="plans" className="mt-6">
           <AiPlanList />
+        </TabsContent>
+        <TabsContent value="templates" className="mt-6">
+          <AiPlanTemplateManager />
         </TabsContent>
         <TabsContent value="prompt-config" className="mt-6">
           <AiPlanPromptConfig />
