@@ -1,13 +1,14 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Target, Calendar, Package, Route, Megaphone, Bot, LayoutList, Newspaper, AlertTriangle, ClipboardList, MessageSquareText, PencilLine, Sparkles, Loader2 } from 'lucide-react';
+import { Target, Calendar, Package, Route, Megaphone, Bot, LayoutList, Newspaper, AlertTriangle, ClipboardList, MessageSquareText, PencilLine, Sparkles, Loader2, Settings } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { useMemo, useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { showError } from "@/utils/toast";
+import { InputConfigDialog } from "./InputConfigDialog";
 
 // Type Definitions
 type PlanData = { [key: string]: any };
@@ -35,6 +36,7 @@ interface AiPlanContentViewProps {
   setEditingSectionId?: (id: string | null) => void;
   onUpdateSection?: (sectionId: string, newContent: any) => Promise<void>;
   onRegenerateSection?: (sectionId: string, sectionLabel: string) => void;
+  onUpdateConfig?: (newConfig: any) => Promise<void>;
 }
 
 const iconMapping: { [key: string]: React.ElementType } = { Target, Calendar, Package, Route, Megaphone, default: Target };
@@ -191,9 +193,10 @@ const EditView = ({ sectionData, onSave, onCancel }: { sectionData: any, onSave:
 
 // --- Main Component ---
 export const AiPlanContentView = (props: AiPlanContentViewProps) => {
-  const { planData, planStructure, isEditable = false, editingSectionId, setEditingSectionId, onUpdateSection, onRegenerateSection } = props;
+  const { planData, planStructure, isEditable = false, editingSectionId, setEditingSectionId, onUpdateSection, onRegenerateSection, onUpdateConfig } = props;
   const mainContentRef = useRef<HTMLDivElement>(null);
   const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
 
   // --- Giai đoạn 2.2: Kiểm tra dữ liệu đầu vào của component cha ---
   if (!planData || typeof planData !== 'object' || !planStructure || !Array.isArray(planStructure)) {
@@ -287,6 +290,11 @@ export const AiPlanContentView = (props: AiPlanContentViewProps) => {
                     </div>
                     {isEditable && !isEditing && (
                         <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {section.label === 'Thông tin đầu vào' && onUpdateConfig && (
+                                <Button size="sm" variant="outline" className="bg-white" onClick={() => setIsConfigDialogOpen(true)}>
+                                    <Settings className="h-4 w-4 mr-2" />Cấu hình
+                                </Button>
+                            )}
                             <Button size="sm" variant="outline" className="bg-white" onClick={() => setEditingSectionId?.(section.id)}>
                                 <PencilLine className="h-4 w-4 mr-2" />Sửa
                             </Button>
@@ -323,6 +331,14 @@ export const AiPlanContentView = (props: AiPlanContentViewProps) => {
           );
         })}
       </main>
+      {onUpdateConfig && (
+        <InputConfigDialog
+            planConfig={planData.config}
+            onSave={onUpdateConfig}
+            open={isConfigDialogOpen}
+            onOpenChange={setIsConfigDialogOpen}
+        />
+      )}
     </div>
   );
 };
