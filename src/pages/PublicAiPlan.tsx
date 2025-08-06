@@ -17,6 +17,7 @@ type PlanStructure = {
   label: string;
   type: 'text' | 'textarea' | 'dynamic_group';
   icon: string;
+  sub_fields?: { id: string; label: string; type: 'text' | 'textarea' }[];
 }[];
 
 const PublicAiPlan = () => {
@@ -55,7 +56,14 @@ const PublicAiPlan = () => {
           .single();
         
         if (templateError) throw templateError;
-        setPlanStructure(templateData.structure as PlanStructure);
+        if (!templateData) throw new Error(`Template with ID ${templateId} not found.`);
+
+        if (templateData.structure && typeof templateData.structure === 'object' && !Array.isArray(templateData.structure)) {
+          const structure = templateData.structure as any;
+          setPlanStructure(structure.output_fields || []);
+        } else {
+          setPlanStructure(templateData.structure as PlanStructure);
+        }
 
       } catch (error: any) {
         setError(error.message);
