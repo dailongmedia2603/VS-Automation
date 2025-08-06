@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Sparkles, Save, Loader2, FileText, Share, Settings2, PencilLine } from 'lucide-react';
+import { ArrowLeft, Sparkles, Save, Loader2, FileText, Share, Compass } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,7 +13,6 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { AiPlanLogDialog } from '@/components/ai-plan/AiPlanLogDialog';
 import { AiPlanContentView } from '@/components/ai-plan/AiPlanContentView';
 import { SharePlanDialog } from '@/components/ai-plan/SharePlanDialog';
-import { InputConfigDialog, type InputField } from '@/components/ai-plan/InputConfigDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 type Plan = {
@@ -42,14 +41,12 @@ type OutputStructure = {
 }[];
 
 type TemplateStructure = {
-  input_fields: InputField[];
   output_fields: OutputStructure;
 };
 
 const AiPlanDetail = () => {
   const { planId } = useParams();
   const [plan, setPlan] = useState<Plan | null>(null);
-  const [inputStructure, setInputStructure] = useState<InputField[]>([]);
   const [outputStructure, setOutputStructure] = useState<OutputStructure | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -58,7 +55,6 @@ const AiPlanDetail = () => {
   const [logs, setLogs] = useState<Log[]>([]);
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
-  const [isInputConfigOpen, setIsInputConfigOpen] = useState(false);
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
   const [regenSection, setRegenSection] = useState<{ id: string; label: string } | null>(null);
   const [feedbackText, setFeedbackText] = useState('');
@@ -96,13 +92,12 @@ const AiPlanDetail = () => {
           .single();
         
         if (templateError) throw templateError;
+        if (!templateData) throw new Error(`Template with ID ${templateId} not found.`);
 
         if (templateData.structure && typeof templateData.structure === 'object' && !Array.isArray(templateData.structure)) {
           const structure = templateData.structure as TemplateStructure;
-          setInputStructure(structure.input_fields || []);
           setOutputStructure(structure.output_fields || []);
         } else {
-          setInputStructure([]);
           setOutputStructure((templateData.structure as OutputStructure) || []);
         }
 
@@ -185,10 +180,6 @@ const AiPlanDetail = () => {
 
   const handlePlanUpdate = (updates: Partial<Plan>) => {
     setPlan(prev => prev ? { ...prev, ...updates } : null);
-  };
-
-  const handleInputConfigSuccess = (newFields: InputField[]) => {
-    setInputStructure(newFields);
   };
 
   const handleUpdateSection = async (sectionId: string, newContent: any) => {
@@ -302,51 +293,75 @@ const AiPlanDetail = () => {
             <div className="h-full p-4 overflow-y-auto">
               <Card className="border-none shadow-none">
                 <CardHeader>
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <CardTitle>Thông tin đầu vào</CardTitle>
-                      <CardDescription>Nhập thông tin chi tiết về chiến dịch của bạn.</CardDescription>
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => setIsInputConfigOpen(true)}>
-                      <Settings2 className="mr-2 h-4 w-4" />
-                      Cấu hình đầu vào
-                    </Button>
-                  </div>
+                  <CardTitle>Thông tin đầu vào</CardTitle>
+                  <CardDescription>Nhập thông tin chi tiết về chiến dịch của bạn.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  {inputStructure.map(field => (
-                    <div key={field.id} className="border rounded-xl overflow-hidden bg-white">
-                      <div className="p-3 bg-slate-50 border-b flex items-center gap-3">
-                        <PencilLine className="h-5 w-5 text-blue-600 flex-shrink-0" />
-                        <div className="flex-1">
-                          <Label className="text-base font-semibold text-slate-800">{field.label}</Label>
-                        </div>
+                <CardContent className="space-y-6">
+                  <div className="space-y-2">
+                    <Label>Thông tin sản phẩm/dịch vụ</Label>
+                    <Textarea 
+                      value={plan.config?.product_info || ''} 
+                      onChange={e => handleConfigChange('product_info', e.target.value)} 
+                      placeholder="Mô tả sản phẩm, điểm nổi bật, giá cả..."
+                      className="min-h-[100px]"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Đối tượng khách hàng mục tiêu</Label>
+                    <Textarea 
+                      value={plan.config?.target_audience || ''} 
+                      onChange={e => handleConfigChange('target_audience', e.target.value)} 
+                      placeholder="Độ tuổi, giới tính, sở thích, vấn đề họ gặp phải..."
+                      className="min-h-[100px]"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Thông điệp chính</Label>
+                    <Input 
+                      value={plan.config?.main_message || ''} 
+                      onChange={e => handleConfigChange('main_message', e.target.value)} 
+                      placeholder="Thông điệp cốt lõi bạn muốn truyền tải"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Tông giọng & Phong cách</Label>
+                    <Input 
+                      value={plan.config?.tone_style || ''} 
+                      onChange={e => handleConfigChange('tone_style', e.target.value)} 
+                      placeholder="VD: Thân thiện, chuyên gia, hài hước..."
+                    />
+                  </div>
+                  
+                  <Card className="shadow-none border rounded-xl bg-slate-50/50">
+                    <CardHeader className="flex flex-row items-center gap-4">
+                      <div className="flex-shrink-0 bg-yellow-100 p-3 rounded-lg"><Compass className="h-6 w-6 text-yellow-600" /></div>
+                      <div>
+                        <CardTitle className="text-lg font-bold text-slate-900">Định hướng</CardTitle>
+                        <CardDescription className="text-sm text-slate-500 pt-1">Cung cấp chỉ dẫn chi tiết và ví dụ cho AI.</CardDescription>
                       </div>
-                      <div className="p-4 space-y-2">
-                        {field.description && (
-                          <p className="text-sm text-muted-foreground">{field.description}</p>
-                        )}
-                        {field.type === 'textarea' ? (
-                          <Textarea 
-                            value={plan.config?.[field.id] || ''} 
-                            onChange={e => handleConfigChange(field.id, e.target.value)} 
-                            className="min-h-[120px] bg-white"
-                          />
-                        ) : (
-                          <Input 
-                            value={plan.config?.[field.id] || ''} 
-                            onChange={e => handleConfigChange(field.id, e.target.value)} 
-                            className="bg-white"
-                          />
-                        )}
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <Label>Định hướng nội dung</Label>
+                        <Textarea 
+                          value={plan.config?.direction || ''} 
+                          onChange={e => handleConfigChange('direction', e.target.value)} 
+                          placeholder="Nhập định hướng chi tiết cho bài viết..." 
+                          className="min-h-[150px] bg-white" 
+                        />
                       </div>
-                    </div>
-                  ))}
-                  {inputStructure.length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center py-8">
-                      Chưa có trường đầu vào nào được cấu hình.
-                    </p>
-                  )}
+                      <div className="space-y-2">
+                        <Label>Ví dụ tham khảo</Label>
+                        <Textarea 
+                          value={plan.config?.reference_example || ''} 
+                          onChange={e => handleConfigChange('reference_example', e.target.value)} 
+                          placeholder="Dán một bài viết hoặc đoạn văn mẫu vào đây..." 
+                          className="min-h-[150px] bg-white" 
+                        />
+                        <p className="text-xs text-muted-foreground">AI sẽ tham khảo văn phong, cách xưng hô, giọng điệu từ ví dụ này nhưng không sao chép nội dung.</p>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </CardContent>
               </Card>
             </div>
@@ -380,14 +395,6 @@ const AiPlanDetail = () => {
         onOpenChange={setIsLogOpen}
         logs={logs}
         isLoading={isLoadingLogs}
-      />
-      <InputConfigDialog
-        isOpen={isInputConfigOpen}
-        onOpenChange={setIsInputConfigOpen}
-        initialFields={inputStructure}
-        templateId={plan.template_id!}
-        outputStructure={outputStructure}
-        onSuccess={handleInputConfigSuccess}
       />
       <Dialog open={!!regenSection} onOpenChange={() => setRegenSection(null)}>
         <DialogContent>
