@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Target, Calendar, Package, Route, Megaphone, Bot, LayoutList, Newspaper, AlertTriangle, ClipboardList, MessageSquareText, PencilLine, Sparkles, Loader2, Settings2 } from 'lucide-react';
+import { Target, Calendar, Package, Route, Megaphone, Bot, LayoutList, Newspaper, AlertTriangle, ClipboardList, MessageSquareText, PencilLine, Sparkles, Loader2, Compass } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { useMemo, useState, useEffect, useRef } from "react";
 import { Button } from "../ui/button";
@@ -10,7 +10,6 @@ import { Textarea } from "../ui/textarea";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { showError } from "@/utils/toast";
-import { AiPlanInputConfigDialog, InputFieldStructure } from "./AiPlanInputConfigDialog";
 
 // --- TYPE DEFINITIONS ---
 type PlanData = { [key: string]: any };
@@ -60,47 +59,98 @@ const isContentDirectionData = (data: any): boolean => {
 };
 
 // --- LEFT PANEL: INPUT FORM ---
-const MOCK_INITIAL_INPUT_STRUCTURE: InputFieldStructure[] = [
-    { id: 'muc_tieu', label: 'Mục tiêu Seeding', placeholder: 'Yêu cầu dựa vào mục tiêu seeding...', type: 'textarea' },
-    { id: 'thoi_gian', label: 'Thời gian triển khai', placeholder: 'Dựa vào thời gian triển khai...', type: 'input' },
-    { id: 'san_pham', label: 'Sản phẩm', placeholder: 'Mục tiêu là seeding cho các sản phẩm...', type: 'textarea' },
-];
-
 const AiPlanInputPanel = () => {
-    const [isConfigOpen, setConfigOpen] = useState(false);
-    const [inputStructure, setInputStructure] = useState<InputFieldStructure[]>(MOCK_INITIAL_INPUT_STRUCTURE);
-    const [inputData, setInputData] = useState<{ [key: string]: string }>({ 'muc_tieu': 'Tăng nhận diện thương hiệu', 'thoi_gian': '1 tháng' });
+    const [inputData, setInputData] = useState<{ [key: string]: string }>({});
 
     const handleDataChange = (id: string, value: string) => setInputData(prev => ({ ...prev, [id]: value }));
 
     return (
-        <>
-            <Card className="h-full shadow-lg">
-                <CardHeader className="flex flex-row items-center justify-between border-b">
-                    <div>
-                        <CardTitle>Thông tin đầu vào</CardTitle>
-                        <p className="text-sm text-muted-foreground pt-1">Nhập thông tin chi tiết để AI tạo kế hoạch.</p>
-                    </div>
-                    <Button variant="outline" onClick={() => setConfigOpen(true)}><Settings2 className="mr-2 h-4 w-4" />Cấu hình</Button>
-                </CardHeader>
-                <CardContent className="p-6 space-y-6">
-                    {inputStructure.map(field => (
-                        <div key={field.id} className="space-y-3">
-                            <Label htmlFor={field.id} className="font-semibold flex items-center gap-2"><PencilLine className="h-4 w-4 text-blue-500" />{field.label}</Label>
-                            <p className="text-xs text-muted-foreground ml-6">{field.placeholder}</p>
-                            {field.type === 'input' ? (
-                                <Input id={field.id} value={inputData[field.id] || ''} onChange={(e) => handleDataChange(field.id, e.target.value)} className="ml-6 w-[calc(100%-1.5rem)]" />
-                            ) : (
-                                <Textarea id={field.id} value={inputData[field.id] || ''} onChange={(e) => handleDataChange(field.id, e.target.value)} className="min-h-[100px] ml-6 w-[calc(100%-1.5rem)]" />
-                            )}
+        <Card className="h-full shadow-lg">
+            <CardHeader className="border-b">
+                <CardTitle>Thông tin đầu vào</CardTitle>
+                <p className="text-sm text-muted-foreground pt-1">Nhập thông tin chi tiết về chiến dịch của bạn.</p>
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+                <div className="space-y-2">
+                    <Label htmlFor="san_pham_dich_vu" className="font-semibold">Thông tin sản phẩm/dịch vụ</Label>
+                    <Textarea 
+                        id="san_pham_dich_vu" 
+                        placeholder="Mô tả sản phẩm, điểm nổi bật, giá cả..." 
+                        value={inputData['san_pham_dich_vu'] || ''} 
+                        onChange={(e) => handleDataChange('san_pham_dich_vu', e.target.value)}
+                        className="min-h-[100px]"
+                    />
+                </div>
+
+                <div className="space-y-2">
+                    <Label htmlFor="doi_tuong_khach_hang" className="font-semibold">Đối tượng khách hàng mục tiêu</Label>
+                    <Textarea 
+                        id="doi_tuong_khach_hang" 
+                        placeholder="Độ tuổi, giới tính, sở thích, vấn đề họ gặp phải..." 
+                        value={inputData['doi_tuong_khach_hang'] || ''} 
+                        onChange={(e) => handleDataChange('doi_tuong_khach_hang', e.target.value)}
+                        className="min-h-[100px]"
+                    />
+                </div>
+
+                <div className="space-y-2">
+                    <Label htmlFor="thong_diep_chinh" className="font-semibold">Thông điệp chính</Label>
+                    <Input 
+                        id="thong_diep_chinh" 
+                        placeholder="Thông điệp cốt lõi bạn muốn truyền tải" 
+                        value={inputData['thong_diep_chinh'] || ''} 
+                        onChange={(e) => handleDataChange('thong_diep_chinh', e.target.value)}
+                    />
+                </div>
+
+                <div className="space-y-2">
+                    <Label htmlFor="tong_giong_phong_cach" className="font-semibold">Tổng giọng & Phong cách</Label>
+                    <Input 
+                        id="tong_giong_phong_cach" 
+                        placeholder="VD: Thân thiện, chuyên gia, hài hước..." 
+                        value={inputData['tong_giong_phong_cach'] || ''} 
+                        onChange={(e) => handleDataChange('tong_giong_phong_cach', e.target.value)}
+                    />
+                </div>
+
+                <div className="rounded-lg border bg-slate-50 p-4 space-y-4">
+                    <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center flex-shrink-0">
+                            <Compass className="h-5 w-5 text-yellow-600" />
                         </div>
-                    ))}
-                </CardContent>
-            </Card>
-            <AiPlanInputConfigDialog isOpen={isConfigOpen} onOpenChange={setConfigOpen} initialStructure={inputStructure} onApply={setInputStructure} />
-        </>
+                        <div>
+                            <h4 className="font-semibold">Định hướng</h4>
+                            <p className="text-sm text-muted-foreground">Cung cấp chỉ dẫn chi tiết và ví dụ cho AI.</p>
+                        </div>
+                    </div>
+                    <div className="space-y-4 pl-[3.25rem]">
+                        <div className="space-y-2">
+                            <Label htmlFor="dinh_huong_noi_dung" className="text-sm font-medium">Định hướng nội dung</Label>
+                            <Textarea 
+                                id="dinh_huong_noi_dung" 
+                                placeholder="Ví dụ: Tập trung vào lợi ích cho mẹ và bé..." 
+                                value={inputData['dinh_huong_noi_dung'] || ''} 
+                                onChange={(e) => handleDataChange('dinh_huong_noi_dung', e.target.value)}
+                                className="min-h-[80px]"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="vi_du_tham_khao" className="text-sm font-medium">Ví dụ tham khảo</Label>
+                            <Textarea 
+                                id="vi_du_tham_khao" 
+                                placeholder="Ví dụ: https://community.theasianparent.com/..." 
+                                value={inputData['vi_du_tham_khao'] || ''} 
+                                onChange={(e) => handleDataChange('vi_du_tham_khao', e.target.value)}
+                                className="min-h-[80px]"
+                            />
+                        </div>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
     );
 };
+
 
 // --- RIGHT PANEL: OUTPUT VIEW ---
 const AiPlanOutputPanel = (props: AiPlanContentViewProps) => {
