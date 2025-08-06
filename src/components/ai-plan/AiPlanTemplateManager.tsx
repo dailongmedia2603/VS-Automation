@@ -28,6 +28,7 @@ type StructureField = {
   label: string;
   type: 'text' | 'textarea' | 'dynamic_group';
   icon: string;
+  display_type: 'simple' | 'content_direction';
   sub_fields?: { id: string; label: string; type: 'text' | 'textarea' }[];
 };
 
@@ -64,7 +65,8 @@ export const AiPlanTemplateManager = () => {
     if (template) {
       setEditingTemplate(template);
       const outputFields = (template.structure as any)?.output_fields || template.structure || [];
-      setStructureFields(outputFields);
+      const fieldsWithDefaults = outputFields.map((f: any) => ({ ...f, display_type: f.display_type || 'simple' }));
+      setStructureFields(fieldsWithDefaults);
     } else {
       setEditingTemplate({ name: '' });
       setStructureFields([]);
@@ -81,7 +83,6 @@ export const AiPlanTemplateManager = () => {
     try {
       const structureToSave = {
         output_fields: structureFields,
-        // Giữ lại input_fields nếu có
         input_fields: (editingTemplate.structure as any)?.input_fields || [],
       };
 
@@ -120,7 +121,7 @@ export const AiPlanTemplateManager = () => {
 
   const addField = () => {
     const newId = `section_${Date.now()}`;
-    setStructureFields(prev => [...prev, { id: newId, label: 'Mục mới', type: 'textarea', icon: 'Target' }]);
+    setStructureFields(prev => [...prev, { id: newId, label: 'Mục mới', type: 'textarea', icon: 'Target', display_type: 'simple' }]);
   };
 
   const removeField = (id: string) => {
@@ -165,7 +166,7 @@ export const AiPlanTemplateManager = () => {
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-3xl">
+        <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>{editingTemplate?.id ? 'Sửa mẫu kế hoạch' : 'Tạo mẫu kế hoạch mới'}</DialogTitle>
             <DialogDescription>Tùy chỉnh tên và các mục sẽ có trong kế hoạch AI.</DialogDescription>
@@ -186,6 +187,13 @@ export const AiPlanTemplateManager = () => {
                       <Select value={field.icon} onValueChange={(value) => handleFieldChange(field.id, 'icon', value)}>
                         <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
                         <SelectContent>{iconOptions.map(icon => <SelectItem key={icon} value={icon}>{icon}</SelectItem>)}</SelectContent>
+                      </Select>
+                      <Select value={field.display_type || 'simple'} onValueChange={(value: 'simple' | 'content_direction') => handleFieldChange(field.id, 'display_type', value)}>
+                        <SelectTrigger className="w-64"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="simple">Hiển thị đơn giản (văn bản)</SelectItem>
+                          <SelectItem value="content_direction">Hiển thị Định hướng Content</SelectItem>
+                        </SelectContent>
                       </Select>
                       <div className="flex items-center">
                         <Button variant="ghost" size="icon" onClick={() => moveField(index, 'up')} disabled={index === 0}><ArrowUp className="h-4 w-4" /></Button>

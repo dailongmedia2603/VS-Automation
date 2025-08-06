@@ -12,17 +12,18 @@ import { InputConfigDialog } from "./InputConfigDialog";
 
 // Type Definitions
 type PlanData = { [key: string]: any };
-type PlanStructure = {
+type PlanStructureField = {
   id: string;
   label: string;
   type: 'text' | 'textarea' | 'dynamic_group';
   icon: string;
+  display_type?: 'simple' | 'content_direction';
   sub_fields?: { id: string; label: string; type: 'text' | 'textarea' }[];
 };
 
 interface AiPlanContentViewProps {
   planData: PlanData;
-  planStructure: PlanStructure[];
+  planStructure: PlanStructureField[];
   isEditable?: boolean;
   editingSectionId?: string | null;
   setEditingSectionId?: (id: string | null) => void;
@@ -311,7 +312,7 @@ export const AiPlanContentView = (props: AiPlanContentViewProps) => {
                     />
                 ) : (
                     <>
-                        {section.label === 'Định hướng Content' && isContentDirectionData(section.sectionData) ? (
+                        {section.display_type === 'content_direction' && isContentDirectionData(section.sectionData) ? (
                             <div className="p-4">
                                 <ContentDirectionViewIntegrated data={section.sectionData} />
                             </div>
