@@ -47,39 +47,32 @@ const iconColorMapping: { [key: string]: string } = {
   default: 'bg-slate-100 text-slate-600',
 };
 
-// Helper function to check if the data matches the structure of "Định hướng Content"
-const isContentDirectionData = (data: any): boolean => {
-  if (!Array.isArray(data) || data.length === 0) {
+// --- Giai đoạn 1: Hàm xác thực chi tiết ---
+const isValidContentItem = (item: any): item is ContentItem => {
+  // Must be a non-null object
+  if (!item || typeof item !== 'object') {
     return false;
   }
-  // Check if at least one item in the array is a valid content object
-  return data.some(item => 
-    item && typeof item === 'object' && 
-    'loai_content' in item && 
-    'chu_de' in item
-  );
+  // All required keys must exist and not be null
+  const requiredKeys: (keyof ContentItem)[] = ['loai_content', 'chu_de', 'van_de', 'content_demo', 'dinh_huong_comment'];
+  return requiredKeys.every(key => key in item && item[key] != null);
+};
+
+// Helper function to check if the data matches the structure of "Định hướng Content"
+const isContentDirectionData = (data: any): boolean => {
+  return Array.isArray(data) && data.some(isValidContentItem);
 };
 
 // --- Sub-component for Content Direction (Master-Detail View) ---
 const ContentDirectionViewIntegrated = ({ data }: { data: any[] }) => {
   const [selectedItem, setSelectedItem] = useState<ContentItemWithGeneratedName | null>(null);
 
-  // Type guard to validate the structure of a content item
-  const isValidContentItem = (item: any): item is ContentItem => {
-    return item &&
-      typeof item === 'object' &&
-      'loai_content' in item &&
-      'chu_de' in item &&
-      'van_de' in item &&
-      'content_demo' in item &&
-      'dinh_huong_comment' in item;
-  };
-
   const groupedData = useMemo(() => {
     if (!Array.isArray(data)) return {};
     
+    // --- Giai đoạn 2.1: Lọc dữ liệu bằng hàm xác thực ---
     const groups = data
-      .filter(isValidContentItem) // Use the strict type guard to filter for valid items only
+      .filter(isValidContentItem) // Chỉ xử lý các mục đã được xác thực
       .reduce((acc, item) => {
         const key = item.loai_content || 'Chưa phân loại';
         if (!acc[key]) acc[key] = [];
@@ -202,10 +195,18 @@ export const AiPlanContentView = (props: AiPlanContentViewProps) => {
   const mainContentRef = useRef<HTMLDivElement>(null);
   const [activeSection, setActiveSection] = useState<string | null>(null);
 
+  // --- Giai đoạn 2.2: Kiểm tra dữ liệu đầu vào của component cha ---
+  if (!planData || typeof planData !== 'object' || !planStructure || !Array.isArray(planStructure)) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center text-slate-500 p-8">
+        <Bot className="h-16 w-16 text-slate-300 mb-4" />
+        <h3 className="text-xl font-semibold text-slate-700">Dữ liệu kế hoạch không hợp lệ</h3>
+        <p className="mt-2 text-sm max-w-sm">Không thể hiển thị kế hoạch. Vui lòng kiểm tra lại dữ liệu hoặc thử tạo lại kế hoạch từ đầu.</p>
+      </div>
+    );
+  }
+
   const sectionsWithData = useMemo(() => {
-    if (!planData || typeof planData !== 'object' || !planStructure || !Array.isArray(planStructure)) {
-        return [];
-    }
     return planStructure.map(section => ({ ...section, sectionData: planData[section.id] })).filter(s => s.sectionData);
   }, [planData, planStructure]);
 
@@ -236,16 +237,6 @@ export const AiPlanContentView = (props: AiPlanContentViewProps) => {
     sectionElement?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     setActiveSection(sectionId);
   };
-
-  if (!planData || typeof planData !== 'object' || !planStructure || !Array.isArray(planStructure)) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-center text-slate-500 p-8">
-        <Bot className="h-16 w-16 text-slate-300 mb-4" />
-        <h3 className="text-xl font-semibold text-slate-700">Đang tải hoặc dữ liệu không hợp lệ</h3>
-        <p className="mt-2 text-sm max-w-sm">Nếu bạn thấy thông báo này quá lâu, vui lòng kiểm tra lại dữ liệu kế hoạch hoặc thử tạo lại.</p>
-      </div>
-    );
-  }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-12 items-start">
