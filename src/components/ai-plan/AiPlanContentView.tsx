@@ -9,7 +9,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { showError } from "@/utils/toast";
 import { InputConfigDialog } from "./InputConfigDialog";
-import { SchemaRenderer } from './SchemaRenderer';
 
 // Type Definitions
 type PlanData = { [key: string]: any };
@@ -197,24 +196,19 @@ export const AiPlanContentView = (props: AiPlanContentViewProps) => {
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
 
-  const isNewLayout = planData && Array.isArray(planData.layout);
+  if (!planData || typeof planData !== 'object' || !planStructure || !Array.isArray(planStructure)) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center text-slate-500 p-8">
+        <Bot className="h-16 w-16 text-slate-300 mb-4" />
+        <h3 className="text-xl font-semibold text-slate-700">Dữ liệu kế hoạch không hợp lệ</h3>
+        <p className="mt-2 text-sm max-w-sm">Không thể hiển thị kế hoạch. Vui lòng kiểm tra lại dữ liệu hoặc thử tạo lại kế hoạch từ đầu.</p>
+      </div>
+    );
+  }
 
-  const sectionsForNav = useMemo(() => {
-    if (isNewLayout) {
-      return planData.layout
-        .filter((block: any) => block.component === 'Heading' && block.level === 1)
-        .map((block: any) => ({
-          id: block.content.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-          label: block.content,
-          icon: 'Target',
-        }));
-    }
-    if (!planStructure) return [];
-    return planStructure
-      .map(section => ({ ...section, sectionData: planData?.[section.id] }))
-      .filter(s => s.sectionData)
-      .map(s => ({ id: s.id, label: s.label, icon: s.icon }));
-  }, [planData, planStructure, isNewLayout]);
+  const sectionsWithData = useMemo(() => {
+    return planStructure.map(section => ({ ...section, sectionData: planData[section.id] })).filter(s => s.sectionData);
+  }, [planData, planStructure]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -231,12 +225,12 @@ export const AiPlanContentView = (props: AiPlanContentViewProps) => {
 
     const sections = mainContentRef.current?.querySelectorAll('section[id]');
     if (sections) sections.forEach((section) => observer.observe(section));
-    if (!activeSection && sectionsForNav.length > 0) setActiveSection(sectionsForNav[0].id);
+    if (!activeSection && sectionsWithData.length > 0) setActiveSection(sectionsWithData[0].id);
 
     return () => {
       if (sections) sections.forEach((section) => observer.unobserve(section));
     };
-  }, [sectionsForNav, activeSection]);
+  }, [sectionsWithData, activeSection]);
 
   const handleNavClick = (sectionId: string) => {
     const sectionElement = document.getElementById(sectionId);
@@ -244,23 +238,14 @@ export const AiPlanContentView = (props: AiPlanContentViewProps) => {
     setActiveSection(sectionId);
   };
 
-  if (!planData || typeof planData !== 'object' || !planStructure || !Array.isArray(planStructure)) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-center text-slate-500 p-8">
-        <Bot className="h-16 w-16 text-slate-300 mb-4" />
-        <h3 className="text-xl font-semibold text-slate-700">Chưa có nội dung kế hoạch</h3>
-        <p className="mt-2 text-sm max-w-sm">Cung cấp thông tin và nhấn "Tạo kế hoạch" để bắt đầu.</p>
-      </div>
-    );
-  }
-
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-12 items-start">
+      {/* Left Navigation */}
       <aside className="sticky top-24">
         <h3 className="font-semibold text-slate-900 mb-4 px-4">Nội dung kế hoạch</h3>
         <nav>
           <ul className="space-y-2">
-            {sectionsForNav.map(section => {
+            {sectionsWithData.map(section => {
               const Icon = iconMapping[section.icon] || iconMapping.default;
               const isActive = activeSection === section.id;
               return (
@@ -282,82 +267,66 @@ export const AiPlanContentView = (props: AiPlanContentViewProps) => {
         </nav>
       </aside>
 
+      {/* Right Content */}
       <main ref={mainContentRef} className="space-y-12">
-        {isNewLayout ? (
-          <Card className="bg-white shadow-md rounded-xl overflow-hidden border border-slate-200/60">
-            <CardContent className="p-6 space-y-4">
-              <SchemaRenderer layout={planData.layout} />
-            </CardContent>
-          </Card>
-        ) : sectionsForNav.length > 0 ? (
-          sectionsForNav.map(section => {
-            const Icon = iconMapping[section.icon] || iconMapping.default;
-            const colorClasses = iconColorMapping[section.icon] || iconColorMapping.default;
-            const [iconBg, iconText] = colorClasses.split(' ');
-            const isEditing = isEditable && editingSectionId === section.id;
-            const sectionData = planData[section.id];
+        {sectionsWithData.map(section => {
+          const Icon = iconMapping[section.icon] || iconMapping.default;
+          const colorClasses = iconColorMapping[section.icon] || iconColorMapping.default;
+          const [iconBg, iconText] = colorClasses.split(' ');
+          const isEditing = isEditable && editingSectionId === section.id;
 
-            return (
-              <section key={section.id} id={section.id} className="scroll-mt-24 group">
-                <Card className="bg-white shadow-md rounded-xl overflow-hidden border border-slate-200/60">
-                  <CardHeader className="flex flex-row items-center justify-between p-6 bg-slate-50/50 border-b">
-                      <div className="flex items-center gap-4">
-                          <div className={cn("w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0", iconBg)}>
-                              <Icon className={cn("h-6 w-6", iconText)} />
-                          </div>
-                          <h2 className="text-2xl font-bold text-slate-800">{section.label}</h2>
-                      </div>
-                      {isEditable && !isEditing && (
-                          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                              {section.label === 'Thông tin đầu vào' && onUpdateConfig && (
-                                  <Button size="sm" variant="outline" className="bg-white" onClick={() => setIsConfigDialogOpen(true)}>
-                                      <Settings className="h-4 w-4 mr-2" />Cấu hình
-                                  </Button>
-                              )}
-                              <Button size="sm" variant="outline" className="bg-white" onClick={() => setEditingSectionId?.(section.id)}>
-                                  <PencilLine className="h-4 w-4 mr-2" />Sửa
-                              </Button>
-                              <Button size="sm" variant="outline" className="bg-white" onClick={() => onRegenerateSection?.(section.id, section.label)}>
-                                  <Sparkles className="h-4 w-4 mr-2" />Tạo lại
-                              </Button>
-                          </div>
-                      )}
-                  </CardHeader>
-                  
-                  {isEditing ? (
-                      <EditView 
-                          sectionData={sectionData}
-                          onSave={async (newContent) => {
-                              await onUpdateSection?.(section.id, newContent);
-                          }}
-                          onCancel={() => setEditingSectionId?.(null)}
-                      />
-                  ) : (
-                      (() => {
-                        if (section.display_type === 'content_direction' && isContentDirectionData(sectionData)) {
-                          return (
+          return (
+            <section key={section.id} id={section.id} className="scroll-mt-24 group">
+              <Card className="bg-white shadow-md rounded-xl overflow-hidden border border-slate-200/60">
+                <CardHeader className="flex flex-row items-center justify-between p-6 bg-slate-50/50 border-b">
+                    <div className="flex items-center gap-4">
+                        <div className={cn("w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0", iconBg)}>
+                            <Icon className={cn("h-6 w-6", iconText)} />
+                        </div>
+                        <h2 className="text-2xl font-bold text-slate-800">{section.label}</h2>
+                    </div>
+                    {isEditable && !isEditing && (
+                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {section.label === 'Thông tin đầu vào' && onUpdateConfig && (
+                                <Button size="sm" variant="outline" className="bg-white" onClick={() => setIsConfigDialogOpen(true)}>
+                                    <Settings className="h-4 w-4 mr-2" />Cấu hình
+                                </Button>
+                            )}
+                            <Button size="sm" variant="outline" className="bg-white" onClick={() => setEditingSectionId?.(section.id)}>
+                                <PencilLine className="h-4 w-4 mr-2" />Sửa
+                            </Button>
+                            <Button size="sm" variant="outline" className="bg-white" onClick={() => onRegenerateSection?.(section.id, section.label)}>
+                                <Sparkles className="h-4 w-4 mr-2" />Tạo lại
+                            </Button>
+                        </div>
+                    )}
+                </CardHeader>
+                
+                {isEditing ? (
+                    <EditView 
+                        sectionData={section.sectionData}
+                        onSave={async (newContent) => {
+                            await onUpdateSection?.(section.id, newContent);
+                        }}
+                        onCancel={() => setEditingSectionId?.(null)}
+                    />
+                ) : (
+                    <>
+                        {section.display_type === 'content_direction' && isContentDirectionData(section.sectionData) ? (
                             <div className="p-4">
-                              <ContentDirectionViewIntegrated data={sectionData} />
+                                <ContentDirectionViewIntegrated data={section.sectionData} />
                             </div>
-                          );
-                        }
-                        return (
-                          <CardContent className="p-6 prose prose-sm max-w-none prose-slate text-slate-600 leading-relaxed">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{String(sectionData)}</ReactMarkdown>
-                          </CardContent>
-                        );
-                      })()
-                  )}
-                </Card>
-              </section>
-            );
-          })
-        ) : (
-          <div className="text-center py-16 text-muted-foreground">
-            <p>Chưa có nội dung cho kế hoạch này.</p>
-            <p className="text-sm">Hãy thử nhấn "Tạo kế hoạch".</p>
-          </div>
-        )}
+                        ) : (
+                            <CardContent className="p-6 prose prose-sm max-w-none prose-slate text-slate-600 leading-relaxed">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{String(section.sectionData)}</ReactMarkdown>
+                            </CardContent>
+                        )}
+                    </>
+                )}
+              </Card>
+            </section>
+          );
+        })}
       </main>
       {onUpdateConfig && (
         <InputConfigDialog
