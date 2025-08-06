@@ -113,8 +113,48 @@ serve(async (req) => {
       prompt += `\n\n${cotPrompt}`;
     }
 
-    // Append the user-defined output instruction
-    const outputInstruction = promptConfig.output_instruction || '';
+    const availableComponents = `
+- "Heading": Dùng cho tiêu đề. Props: "level" (1, 2, hoặc 3), "content" (string).
+- "Paragraph": Dùng cho văn bản. Props: "content" (string, hỗ trợ Markdown).
+- "List": Dùng cho danh sách. Props: "items" (mảng các chuỗi), "type" ('ordered' hoặc 'unordered').
+- "Table": Dùng cho bảng. Props: "data" (object có "headers" là mảng và "rows" là mảng 2 chiều).
+- "Quote": Dùng cho trích dẫn. Props: "content" (string), "author" (string, tùy chọn).
+- "Callout": Dùng cho hộp thông báo. Props: "content" (string), "type" ('info', 'warning', hoặc 'success').
+- "Separator": Dùng để tạo đường kẻ ngang. Không cần props.
+`;
+
+    const outputInstruction = `
+---
+### YÊU CẦU ĐẦU RA (CỰC KỲ QUAN TRỌNG)
+
+Bạn PHẢI trả lời bằng một khối mã JSON duy nhất được bao bọc trong \`\`\`json ... \`\`\`.
+JSON object phải có một khóa duy nhất là "plan_data". Giá trị của "plan_data" phải là một object khác chứa một khóa duy nhất là "layout".
+"layout" phải là một MẢNG các đối tượng. Mỗi đối tượng đại diện cho một khối nội dung.
+
+**Các khối nội dung (component) có sẵn và cấu trúc props của chúng:**
+${availableComponents}
+
+**Cấu trúc JSON bắt buộc:**
+\`\`\`json
+{
+  "plan_data": {
+    "layout": [
+      {
+        "component": "Heading",
+        "level": 1,
+        "content": "Tiêu đề chính của kế hoạch"
+      },
+      {
+        "component": "Paragraph",
+        "content": "Đây là đoạn văn mô tả đầu tiên..."
+      }
+    ]
+  }
+}
+\`\`\`
+- **TUYỆT ĐỐI KHÔNG** thêm bất kỳ văn bản, lời chào, hoặc giải thích nào bên ngoài khối mã JSON.
+- Hãy sử dụng các component trên để trình bày kế hoạch một cách logic và đẹp mắt nhất.
+`;
     prompt += outputInstruction;
 
     const modelToUse = aiSettings.gemini_content_model || 'gemini-pro';
@@ -157,6 +197,18 @@ serve(async (req) => {
       throw new Error("AI đã trả về một định dạng JSON không hợp lệ. Vui lòng thử lại.");
     }
 
+    // Validation
+    if (!planData.plan_data || !Array.isArray(planData.plan_data.layout)) {
+      throw new Error("Phản hồi của AI thiếu cấu trúc 'plan_data.layout' bắt buộc.");
+    }
+    const allowedComponents = ['Heading', 'Paragraph', 'List', 'Table', 'Quote', 'Callout', 'Separator'];
+    for (const block of planData.plan_data.layout) {
+        const componentName = block.component?.charAt(0).toUpperCase() + block.component?.slice(1);
+        if (!componentName || !allowedComponents.includes(componentName)) {
+            console.warn(`AI used an invalid or misspelled component: '${block.component}'. Skipping.`);
+        }
+    }
+
     await supabaseAdmin.from('ai_plan_logs').insert({
       plan_id: planId,
       creator_id: user.id,
@@ -166,7 +218,7 @@ serve(async (req) => {
 
     const { data: updatedPlan, error: updateError } = await supabaseAdmin
       .from('ai_plans')
-      .update({ plan_data: planData, updated_at: new Date().toISOString() })
+      .update({ plan_data: planData.plan_data, updated_at: new Date().toISOString() })
       .eq('id', planId)
       .select()
       .single();
