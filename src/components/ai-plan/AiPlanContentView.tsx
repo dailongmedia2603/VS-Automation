@@ -38,6 +38,14 @@ interface AiPlanContentViewProps {
 }
 
 const iconMapping: { [key: string]: React.ElementType } = { Target, Calendar, Package, Route, Megaphone, default: Target };
+const iconColorMapping: { [key: string]: string } = {
+  Target: 'bg-blue-100 text-blue-600',
+  Calendar: 'bg-red-100 text-red-600',
+  Package: 'bg-green-100 text-green-600',
+  Route: 'bg-purple-100 text-purple-600',
+  Megaphone: 'bg-yellow-100 text-yellow-600',
+  default: 'bg-slate-100 text-slate-600',
+};
 
 // --- Sub-component for Content Direction (Master-Detail View) ---
 const ContentDirectionViewIntegrated = ({ data }: { data: ContentItem[] }) => {
@@ -134,7 +142,7 @@ const EditView = ({ sectionData, onSave, onCancel }: { sectionData: any, onSave:
                 contentToSave = JSON.parse(editedContent);
             }
             await onSave(contentToSave);
-            onCancel(); // Close edit mode on success
+            onCancel();
         } catch (e) {
             showError("Nội dung JSON không hợp lệ. Vui lòng kiểm tra lại.");
         } finally {
@@ -143,22 +151,20 @@ const EditView = ({ sectionData, onSave, onCancel }: { sectionData: any, onSave:
     };
 
     return (
-        <Card className="bg-white shadow-sm border-slate-200/60">
-            <CardContent className="p-6">
-                <Textarea 
-                    value={editedContent} 
-                    onChange={(e) => setEditedContent(e.target.value)}
-                    className="min-h-[250px] font-mono text-sm bg-slate-50"
-                />
-                <div className="flex justify-end gap-2 mt-4">
-                    <Button variant="ghost" onClick={onCancel}>Hủy</Button>
-                    <Button onClick={handleSave} disabled={isSaving}>
-                        {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Lưu thay đổi
-                    </Button>
-                </div>
-            </CardContent>
-        </Card>
+        <div className="p-6">
+            <Textarea 
+                value={editedContent} 
+                onChange={(e) => setEditedContent(e.target.value)}
+                className="min-h-[250px] font-mono text-sm bg-slate-50"
+            />
+            <div className="flex justify-end gap-2 mt-4">
+                <Button variant="ghost" onClick={onCancel}>Hủy</Button>
+                <Button onClick={handleSave} disabled={isSaving}>
+                    {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Lưu thay đổi
+                </Button>
+            </div>
+        </div>
     );
 };
 
@@ -186,18 +192,11 @@ export const AiPlanContentView = (props: AiPlanContentViewProps) => {
     );
 
     const sections = mainContentRef.current?.querySelectorAll('section[id]');
-    if (sections) {
-      sections.forEach((section) => observer.observe(section));
-    }
-
-    if (!activeSection && sectionsWithData.length > 0) {
-      setActiveSection(sectionsWithData[0].id);
-    }
+    if (sections) sections.forEach((section) => observer.observe(section));
+    if (!activeSection && sectionsWithData.length > 0) setActiveSection(sectionsWithData[0].id);
 
     return () => {
-      if (sections) {
-        sections.forEach((section) => observer.unobserve(section));
-      }
+      if (sections) sections.forEach((section) => observer.unobserve(section));
     };
   }, [sectionsWithData, activeSection]);
 
@@ -231,23 +230,13 @@ export const AiPlanContentView = (props: AiPlanContentViewProps) => {
                 <li key={section.id}>
                   <Button
                     variant="ghost"
-                    className={cn(
-                      "w-full h-auto justify-start items-center p-3 rounded-lg transition-all duration-200",
-                      isActive
-                        ? "bg-blue-100 text-blue-700 shadow-sm"
-                        : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                    )}
+                    className={cn("w-full h-auto justify-start items-center p-3 rounded-lg transition-all duration-200", isActive ? "bg-blue-100 text-blue-700 shadow-sm" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900")}
                     onClick={() => handleNavClick(section.id)}
                   >
-                    <div className={cn(
-                      "w-9 h-9 rounded-md flex items-center justify-center mr-4 flex-shrink-0 transition-colors duration-200",
-                      isActive ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-500"
-                    )}>
+                    <div className={cn("w-9 h-9 rounded-md flex items-center justify-center mr-4 flex-shrink-0 transition-colors duration-200", isActive ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-500")}>
                       <Icon className="h-5 w-5" />
                     </div>
-                    <span className={cn("font-medium text-sm", isActive && "font-semibold")}>
-                      {section.label}
-                    </span>
+                    <span className={cn("font-medium text-sm", isActive && "font-semibold")}>{section.label}</span>
                   </Button>
                 </li>
               );
@@ -257,52 +246,57 @@ export const AiPlanContentView = (props: AiPlanContentViewProps) => {
       </aside>
 
       {/* Right Content */}
-      <main ref={mainContentRef} className="space-y-16">
+      <main ref={mainContentRef} className="space-y-12">
         {sectionsWithData.map(section => {
           const Icon = iconMapping[section.icon] || iconMapping.default;
+          const colorClasses = iconColorMapping[section.icon] || iconColorMapping.default;
+          const [iconBg, iconText] = colorClasses.split(' ');
           const isEditing = isEditable && editingSectionId === section.id;
+
           return (
             <section key={section.id} id={section.id} className="scroll-mt-24 group">
-              <div className="flex items-center justify-between gap-4 mb-6">
-                <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center flex-shrink-0">
-                        <Icon className="h-6 w-6 text-slate-500" />
+              <Card className="bg-white shadow-md rounded-xl overflow-hidden border border-slate-200/60">
+                <CardHeader className="flex flex-row items-center justify-between p-6 bg-slate-50/50 border-b">
+                    <div className="flex items-center gap-4">
+                        <div className={cn("w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0", iconBg)}>
+                            <Icon className={cn("h-6 w-6", iconText)} />
+                        </div>
+                        <h2 className="text-2xl font-bold text-slate-800">{section.label}</h2>
                     </div>
-                    <h2 className="text-3xl font-bold text-slate-800">{section.label}</h2>
-                </div>
-                {isEditable && !isEditing && (
-                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button size="sm" variant="outline" className="bg-white" onClick={() => setEditingSectionId?.(section.id)}>
-                            <PencilLine className="h-4 w-4 mr-2" />Sửa
-                        </Button>
-                        <Button size="sm" variant="outline" className="bg-white" onClick={() => onRegenerateSection?.(section.id, section.label)}>
-                            <Sparkles className="h-4 w-4 mr-2" />Tạo lại
-                        </Button>
-                    </div>
-                )}
-              </div>
-              
-              {isEditing ? (
-                <EditView 
-                    sectionData={section.sectionData}
-                    onSave={async (newContent) => {
-                        await onUpdateSection?.(section.id, newContent);
-                    }}
-                    onCancel={() => setEditingSectionId?.(null)}
-                />
-              ) : (
-                <>
-                    {section.id === 'dinh_huong_content' && Array.isArray(section.sectionData) ? (
-                        <ContentDirectionViewIntegrated data={section.sectionData} />
-                    ) : (
-                        <Card className="bg-white shadow-sm border-slate-200/60">
-                        <CardContent className="p-6 prose prose-sm max-w-none prose-slate text-slate-600 leading-relaxed">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{String(section.sectionData)}</ReactMarkdown>
-                        </CardContent>
-                        </Card>
+                    {isEditable && !isEditing && (
+                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button size="sm" variant="outline" className="bg-white" onClick={() => setEditingSectionId?.(section.id)}>
+                                <PencilLine className="h-4 w-4 mr-2" />Sửa
+                            </Button>
+                            <Button size="sm" variant="outline" className="bg-white" onClick={() => onRegenerateSection?.(section.id, section.label)}>
+                                <Sparkles className="h-4 w-4 mr-2" />Tạo lại
+                            </Button>
+                        </div>
                     )}
-                </>
-              )}
+                </CardHeader>
+                
+                {isEditing ? (
+                    <EditView 
+                        sectionData={section.sectionData}
+                        onSave={async (newContent) => {
+                            await onUpdateSection?.(section.id, newContent);
+                        }}
+                        onCancel={() => setEditingSectionId?.(null)}
+                    />
+                ) : (
+                    <>
+                        {section.id === 'dinh_huong_content' && Array.isArray(section.sectionData) ? (
+                            <div className="p-4">
+                                <ContentDirectionViewIntegrated data={section.sectionData} />
+                            </div>
+                        ) : (
+                            <CardContent className="p-6 prose prose-sm max-w-none prose-slate text-slate-600 leading-relaxed">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{String(section.sectionData)}</ReactMarkdown>
+                            </CardContent>
+                        )}
+                    </>
+                )}
+              </Card>
             </section>
           );
         })}
