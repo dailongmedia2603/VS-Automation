@@ -67,12 +67,14 @@ const ContentDirectionViewIntegrated = ({ data }: { data: ContentItem[] }) => {
 
   const groupedData = useMemo(() => {
     if (!data) return {};
-    const groups = data.reduce((acc, item) => {
-      const key = item.loai_content || 'Chưa phân loại';
-      if (!acc[key]) acc[key] = [];
-      acc[key].push(item);
-      return acc;
-    }, {} as Record<string, ContentItem[]>);
+    const groups = data
+      .filter(Boolean) // Filter out any null/undefined items to prevent crashes
+      .reduce((acc, item) => {
+        const key = item.loai_content || 'Chưa phân loại';
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(item);
+        return acc;
+      }, {} as Record<string, ContentItem[]>);
     for (const key in groups) {
       groups[key] = groups[key].map((item, index) => ({ ...item, bai_viet_name: `Bài viết ${index + 1}` }));
     }
