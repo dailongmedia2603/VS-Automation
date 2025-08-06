@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Target, Calendar, Package, Route, Megaphone, Bot, LayoutList, Newspaper, AlertTriangle, ClipboardList, MessageSquareText, PencilLine, Sparkles, Loader2, Settings } from 'lucide-react';
+import { Target, Calendar, Package, Route, Megaphone, Bot, LayoutList, Newspaper, AlertTriangle, ClipboardList, MessageSquareText, PencilLine, Sparkles, Loader2, Settings, FileSearch } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { useMemo, useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
@@ -118,7 +118,7 @@ const ContentDirectionViewIntegrated = ({ data }: { data: any[] }) => {
                 <div className="flex flex-col gap-1 mt-1">
                   {(items as any[]).map((item, index) => (
                     <Button key={`${item.bai_viet_name}-${index}`} variant="ghost" onClick={() => setSelectedItem(item)} className={cn("w-full justify-start h-auto py-2 px-3 text-left", selectedItem === item ? "bg-blue-100 text-blue-700 font-semibold" : "")}>
-                      <span className="whitespace-normal">{item.bai_viet_name}: {item.chude || item.topic}</span>
+                      <span className="whitespace-normal">{item.bai_viet_name}: {item.chude || item.topic || item.chudecantim}</span>
                     </Button>
                   ))}
                 </div>
@@ -129,10 +129,10 @@ const ContentDirectionViewIntegrated = ({ data }: { data: any[] }) => {
         <div className="p-6">
           {selectedItem ? (
             <div className="space-y-8">
-              <h2 className="text-2xl font-bold text-slate-900">{selectedItem.chude || selectedItem.topic}</h2>
-              <DetailSection title="Vấn đề / Tình trạng" content={selectedItem.vande || selectedItem.problem} icon={AlertTriangle} iconBg="bg-red-100" iconText="text-red-600" />
-              <DetailSection title="Content Demo" content={selectedItem.contentdemo || selectedItem.demo} icon={ClipboardList} iconBg="bg-green-100" iconText="text-green-600" />
-              <DetailSection title="Định hướng comment" content={selectedItem.dinhhuongcomment || selectedItem.commentdirection} icon={MessageSquareText} iconBg="bg-purple-100" iconText="text-purple-600" />
+              <h2 className="text-2xl font-bold text-slate-900">{selectedItem.chude || selectedItem.topic || selectedItem.chudecantim}</h2>
+              <DetailSection title="Chủ đề cần tìm" content={selectedItem.chudecantim} icon={FileSearch} iconBg="bg-blue-100" iconText="text-blue-600" />
+              <DetailSection title="Content comment demo" content={selectedItem.contentcommentdemo} icon={ClipboardList} iconBg="bg-green-100" iconText="text-green-600" />
+              <DetailSection title="Định hướng comment" content={selectedItem.dinhhuongcomment} icon={MessageSquareText} iconBg="bg-purple-100" iconText="text-purple-600" />
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-center text-slate-500"><LayoutList className="h-16 w-16 text-slate-300 mb-4" /><h3 className="text-xl font-semibold text-slate-700">Chọn một bài viết để xem chi tiết</h3></div>
