@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Target, Calendar, Package, Route, Megaphone, Bot, PencilLine, Sparkles, Save, Loader2 } from 'lucide-react';
+import { Target, Calendar, Package, Route, Megaphone, Bot, PencilLine, Sparkles, Loader2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { useMemo, useState, useEffect } from "react";
