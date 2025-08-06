@@ -49,7 +49,7 @@ const SectionCard = ({ section, sectionData }: { section: PlanStructure, section
     const headers = section.sub_fields?.map(f => f.label) || [];
     const keys = section.sub_fields?.map(f => f.id) || [];
     return (
-      <Card className="shadow-sm rounded-2xl bg-white overflow-hidden h-full">
+      <Card className="shadow-sm rounded-2xl bg-white overflow-hidden h-full transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
         <CardHeader className={cn("border-b", headerBg)}>
           <CardTitle className="flex items-center gap-3 text-lg font-bold text-slate-800">
             <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center", iconBg)}>
@@ -61,8 +61,8 @@ const SectionCard = ({ section, sectionData }: { section: PlanStructure, section
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow>
-                {headers.map(h => <TableHead key={h}>{h}</TableHead>)}
+              <TableRow className="bg-slate-50 hover:bg-slate-50">
+                {headers.map(h => <TableHead key={h} className="font-semibold text-slate-600">{h}</TableHead>)}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -84,7 +84,7 @@ const SectionCard = ({ section, sectionData }: { section: PlanStructure, section
 
   // Default card for simple text/textarea
   return (
-    <Card className="shadow-sm rounded-2xl bg-white overflow-hidden h-full">
+    <Card className="shadow-sm rounded-2xl bg-white overflow-hidden h-full transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
       <CardHeader className={cn("border-b", headerBg)}>
         <CardTitle className="flex items-center gap-3 text-lg font-bold text-slate-800">
           <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center", iconBg)}>
