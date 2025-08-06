@@ -335,11 +335,10 @@ const AiPlanDetail = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <CardTitle>Thông tin đầu vào</CardTitle>
-                      <CardDescription>Nhập thông tin chi tiết về chiến dịch của bạn.</CardDescription>
                     </div>
                     <Button variant="outline" size="sm" onClick={() => setIsInputStructureDialogOpen(true)}>
                       <Settings className="mr-2 h-4 w-4" />
-                      Cấu hình đầu vào
+                      Cấu hình
                     </Button>
                   </div>
                 </CardHeader>
@@ -380,7 +379,7 @@ const AiPlanDetail = () => {
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground p-4 text-center bg-slate-50 rounded-lg">
-                      Nhấp vào "Cấu hình đầu vào" để bắt đầu.
+                      Nhấp vào nút "Cấu hình" để bắt đầu.
                     </p>
                   )}
                 </CardContent>
