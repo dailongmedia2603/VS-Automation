@@ -111,11 +111,13 @@ const ContentDirectionViewIntegrated = ({ data }: { data: any[] }) => {
           <ScrollArea className="h-[700px] p-2">
             {Object.entries(groupedData).map(([type, items]) => (
               <div key={type} className="mb-2">
-                <h3 className="px-3 py-2 text-sm font-semibold text-slate-500 flex items-center gap-2"><Newspaper className="h-4 w-4" /> {type}</h3>
-                <div className="flex flex-col gap-1">
+                <h3 className="px-3 py-2 text-sm font-bold text-slate-800 bg-slate-100 rounded-md flex items-center gap-2">
+                  <Newspaper className="h-4 w-4 text-slate-500" /> {type}
+                </h3>
+                <div className="flex flex-col gap-1 mt-1">
                   {(items as any[]).map((item, index) => (
                     <Button key={`${item.bai_viet_name}-${index}`} variant="ghost" onClick={() => setSelectedItem(item)} className={cn("w-full justify-start h-auto py-2 px-3 text-left", selectedItem === item ? "bg-blue-100 text-blue-700 font-semibold" : "")}>
-                      <span className="truncate">{item.bai_viet_name}: {item.chude || item.topic}</span>
+                      <span className="whitespace-normal">{item.bai_viet_name}: {item.chude || item.topic}</span>
                     </Button>
                   ))}
                 </div>
