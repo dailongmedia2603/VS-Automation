@@ -66,13 +66,17 @@ const ContentDirectionViewIntegrated = ({ data }: { data: ContentItem[] }) => {
   const [selectedItem, setSelectedItem] = useState<ContentItemWithGeneratedName | null>(null);
 
   const groupedData = useMemo(() => {
-    if (!data) return {};
-    const groups = data.reduce((acc, item) => {
-      const key = item.loai_content || 'Chưa phân loại';
-      if (!acc[key]) acc[key] = [];
-      acc[key].push(item);
-      return acc;
-    }, {} as Record<string, ContentItem[]>);
+    if (!Array.isArray(data)) return {};
+    
+    const groups = data
+      .filter(item => item && typeof item === 'object') // Safely filter for valid objects to prevent crashes
+      .reduce((acc, item) => {
+        const key = (item as ContentItem).loai_content || 'Chưa phân loại';
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(item as ContentItem);
+        return acc;
+      }, {} as Record<string, ContentItem[]>);
+
     for (const key in groups) {
       groups[key] = groups[key].map((item, index) => ({ ...item, bai_viet_name: `Bài viết ${index + 1}` }));
     }
@@ -189,6 +193,9 @@ export const AiPlanContentView = (props: AiPlanContentViewProps) => {
   const [activeSection, setActiveSection] = useState<string | null>(null);
 
   const sectionsWithData = useMemo(() => {
+    if (!planData || typeof planData !== 'object' || !planStructure || !Array.isArray(planStructure)) {
+        return [];
+    }
     return planStructure.map(section => ({ ...section, sectionData: planData[section.id] })).filter(s => s.sectionData);
   }, [planData, planStructure]);
 
@@ -220,12 +227,12 @@ export const AiPlanContentView = (props: AiPlanContentViewProps) => {
     setActiveSection(sectionId);
   };
 
-  if (!planData || !planStructure) {
+  if (!planData || typeof planData !== 'object' || !planStructure || !Array.isArray(planStructure)) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center text-slate-500 p-8">
         <Bot className="h-16 w-16 text-slate-300 mb-4" />
-        <h3 className="text-xl font-semibold text-slate-700">Kế hoạch của bạn đang chờ AI</h3>
-        <p className="mt-2 text-sm max-w-sm">Cung cấp đầy đủ thông tin và tạo kế hoạch để AI bắt đầu làm việc.</p>
+        <h3 className="text-xl font-semibold text-slate-700">Đang tải hoặc dữ liệu không hợp lệ</h3>
+        <p className="mt-2 text-sm max-w-sm">Nếu bạn thấy thông báo này quá lâu, vui lòng kiểm tra lại dữ liệu kế hoạch hoặc thử tạo lại.</p>
       </div>
     );
   }
