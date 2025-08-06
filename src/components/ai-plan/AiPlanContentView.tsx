@@ -19,14 +19,6 @@ type PlanStructure = {
   icon: string;
   sub_fields?: { id: string; label: string; type: 'text' | 'textarea' }[];
 };
-type ContentItem = {
-  loai_content: string;
-  chu_de: string;
-  van_de: string;
-  content_demo: string;
-  dinh_huong_comment: string;
-};
-type ContentItemWithGeneratedName = ContentItem & { bai_viet_name: string };
 
 interface AiPlanContentViewProps {
   planData: PlanData;
@@ -49,27 +41,43 @@ const iconColorMapping: { [key: string]: string } = {
   default: 'bg-slate-100 text-slate-600',
 };
 
+// Helper to normalize keys from AI response
+const normalizeKeys = (obj: any) => {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return obj;
+  const newObj: { [key: string]: any } = {};
+  for (const key in obj) {
+    const normalizedKey = key
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // remove diacritics
+      .replace(/đ/g, "d")
+      .replace(/[\s_-]/g, ''); // remove spaces, underscores, hyphens
+    newObj[normalizedKey] = obj[key];
+  }
+  return newObj;
+};
+
 // --- Sub-component for Content Direction (Master-Detail View) ---
 const ContentDirectionViewIntegrated = ({ data }: { data: any[] }) => {
-  const [selectedItem, setSelectedItem] = useState<ContentItemWithGeneratedName | null>(null);
+  const [selectedItem, setSelectedItem] = useState<any | null>(null);
 
   const groupedData = useMemo(() => {
     if (!Array.isArray(data)) return {};
     
     const groups = data.reduce((acc, item) => {
-      // Ensure item is a processable object to prevent crashes
-      if (item && typeof item === 'object' && !Array.isArray(item)) {
-        const key = item.loai_content || 'Chưa phân loại';
+      const normalizedItem = normalizeKeys(item);
+      if (normalizedItem) {
+        const key = normalizedItem.loaicontent || 'Chưa phân loại';
         if (!acc[key]) acc[key] = [];
-        acc[key].push(item);
+        acc[key].push(normalizedItem);
       }
       return acc;
-    }, {} as Record<string, ContentItem[]>);
+    }, {} as Record<string, any[]>);
 
     for (const key in groups) {
       groups[key] = groups[key].map((item, index) => ({ ...item, bai_viet_name: `Bài viết ${index + 1}` }));
     }
-    return groups as Record<string, ContentItemWithGeneratedName[]>;
+    return groups;
   }, [data]);
 
   useEffect(() => {
@@ -100,9 +108,9 @@ const ContentDirectionViewIntegrated = ({ data }: { data: any[] }) => {
               <div key={type} className="mb-2">
                 <h3 className="px-3 py-2 text-sm font-semibold text-slate-500 flex items-center gap-2"><Newspaper className="h-4 w-4" /> {type}</h3>
                 <div className="flex flex-col gap-1">
-                  {items.map((item, index) => (
+                  {(items as any[]).map((item, index) => (
                     <Button key={`${item.bai_viet_name}-${index}`} variant="ghost" onClick={() => setSelectedItem(item)} className={cn("w-full justify-start h-auto py-2 px-3 text-left", selectedItem === item ? "bg-blue-100 text-blue-700 font-semibold" : "")}>
-                      <span className="truncate">{item.bai_viet_name}: {item.chu_de}</span>
+                      <span className="truncate">{item.bai_viet_name}: {item.chude}</span>
                     </Button>
                   ))}
                 </div>
@@ -114,10 +122,10 @@ const ContentDirectionViewIntegrated = ({ data }: { data: any[] }) => {
           <ScrollArea className="h-full p-6">
             {selectedItem ? (
               <div className="space-y-8">
-                <h2 className="text-2xl font-bold text-slate-900">{selectedItem.chu_de}</h2>
-                <DetailSection title="Vấn đề / Tình trạng" content={selectedItem.van_de} icon={AlertTriangle} iconBg="bg-red-100" iconText="text-red-600" />
-                <DetailSection title="Content Demo" content={selectedItem.content_demo} icon={ClipboardList} iconBg="bg-green-100" iconText="text-green-600" />
-                <DetailSection title="Định hướng comment" content={selectedItem.dinh_huong_comment} icon={MessageSquareText} iconBg="bg-purple-100" iconText="text-purple-600" />
+                <h2 className="text-2xl font-bold text-slate-900">{selectedItem.chude}</h2>
+                <DetailSection title="Vấn đề / Tình trạng" content={selectedItem.vande} icon={AlertTriangle} iconBg="bg-red-100" iconText="text-red-600" />
+                <DetailSection title="Content Demo" content={selectedItem.contentdemo} icon={ClipboardList} iconBg="bg-green-100" iconText="text-green-600" />
+                <DetailSection title="Định hướng comment" content={selectedItem.dinhhuongcomment} icon={MessageSquareText} iconBg="bg-purple-100" iconText="text-purple-600" />
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-center text-slate-500"><LayoutList className="h-16 w-16 text-slate-300 mb-4" /><h3 className="text-xl font-semibold text-slate-700">Chọn một bài viết để xem chi tiết</h3></div>
