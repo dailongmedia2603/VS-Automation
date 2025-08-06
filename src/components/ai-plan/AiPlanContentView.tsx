@@ -2,7 +2,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Target, Calendar, Package, Route, Megaphone, Bot } from 'lucide-react';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
+import { useMemo } from "react";
 
 type PlanData = { [key: string]: any };
 type PlanStructure = {
@@ -11,11 +13,11 @@ type PlanStructure = {
   type: 'text' | 'textarea' | 'dynamic_group';
   icon: string;
   sub_fields?: { id: string; label: string; type: 'text' | 'textarea' }[];
-}[];
+};
 
 interface AiPlanContentViewProps {
   planData: PlanData;
-  planStructure: PlanStructure;
+  planStructure: PlanStructure[];
 }
 
 const iconMapping: { [key: string]: React.ElementType } = {
@@ -24,17 +26,77 @@ const iconMapping: { [key: string]: React.ElementType } = {
   Package,
   Route,
   Megaphone,
+  default: Target,
 };
 
-const renderField = (label: string, value: any) => {
-  if (!value) return null;
+const iconColorMapping: { [key: string]: string } = {
+  Target: 'bg-blue-100 text-blue-600',
+  Calendar: 'bg-red-100 text-red-600',
+  Package: 'bg-green-100 text-green-600',
+  Route: 'bg-purple-100 text-purple-600',
+  Megaphone: 'bg-yellow-100 text-yellow-600',
+  default: 'bg-slate-100 text-slate-600',
+};
+
+const SectionCard = ({ section, sectionData }: { section: PlanStructure, sectionData: any }) => {
+  const Icon = iconMapping[section.icon] || iconMapping.default;
+  const colorClasses = iconColorMapping[section.icon] || iconColorMapping.default;
+  const [iconBg, iconText] = colorClasses.split(' ');
+  const headerBg = iconBg.replace('-100', '-50');
+
+  // Render dynamic groups as tables for a more professional look
+  if (section.type === 'dynamic_group' && Array.isArray(sectionData)) {
+    const headers = section.sub_fields?.map(f => f.label) || [];
+    const keys = section.sub_fields?.map(f => f.id) || [];
+    return (
+      <Card className="shadow-sm rounded-2xl bg-white overflow-hidden h-full">
+        <CardHeader className={cn("border-b", headerBg)}>
+          <CardTitle className="flex items-center gap-3 text-lg font-bold text-slate-800">
+            <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center", iconBg)}>
+              <Icon className={cn("h-5 w-5", iconText)} />
+            </div>
+            {section.label}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                {headers.map(h => <TableHead key={h}>{h}</TableHead>)}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sectionData.map((item, index) => (
+                <TableRow key={index}>
+                  {keys.map(key => (
+                    <TableCell key={key} className="prose prose-sm max-w-none prose-slate align-top">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{String(item[key] || '')}</ReactMarkdown>
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Default card for simple text/textarea
   return (
-    <div className="mb-4">
-      <h4 className="font-semibold text-sm text-slate-600 mb-1">{label}</h4>
-      <div className="prose prose-sm max-w-none prose-slate">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{String(value)}</ReactMarkdown>
-      </div>
-    </div>
+    <Card className="shadow-sm rounded-2xl bg-white overflow-hidden h-full">
+      <CardHeader className={cn("border-b", headerBg)}>
+        <CardTitle className="flex items-center gap-3 text-lg font-bold text-slate-800">
+          <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center", iconBg)}>
+            <Icon className={cn("h-5 w-5", iconText)} />
+          </div>
+          {section.label}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-6 prose prose-sm max-w-none prose-slate">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{String(sectionData)}</ReactMarkdown>
+      </CardContent>
+    </Card>
   );
 };
 
@@ -51,49 +113,36 @@ export const AiPlanContentView = ({ planData, planStructure }: AiPlanContentView
     );
   }
 
+  const groupedSections = useMemo(() => {
+    const sectionsWithData = planStructure.map(section => ({
+      ...section,
+      sectionData: planData[section.id],
+    })).filter(s => s.sectionData);
+
+    return sectionsWithData.reduce((acc, section) => {
+      const isShort = typeof section.sectionData === 'string' && section.sectionData.length < 150 && !section.sectionData.includes('\n');
+      const lastGroup = acc[acc.length - 1];
+
+      if (isShort && lastGroup && lastGroup.length === 1 && lastGroup[0].isShort) {
+        lastGroup.push({ ...section, isShort });
+      } else {
+        acc.push([{ ...section, isShort }]);
+      }
+      return acc;
+    }, [] as Array<Array<PlanStructure & { isShort: boolean }>>);
+  }, [planData, planStructure]);
+
   return (
     <div className="space-y-6">
-      {planStructure.map(section => {
-        const Icon = iconMapping[section.icon] || Target;
-        const sectionData = planData[section.id];
-
-        if (!sectionData) return null;
-
-        return (
-          <Card key={section.id} className="shadow-sm rounded-2xl bg-white overflow-hidden">
-            <CardHeader className="bg-slate-50 border-b">
-              <CardTitle className="flex items-center gap-3 text-lg font-bold text-slate-800">
-                <Icon className="h-6 w-6 text-blue-600" />
-                {section.label}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6">
-              {section.type === 'dynamic_group' && Array.isArray(sectionData) ? (
-                <Accordion type="multiple" className="w-full space-y-3">
-                  {sectionData.map((item, index) => (
-                    <AccordionItem key={index} value={`item-${index}`} className="border rounded-lg bg-white shadow-sm">
-                      <AccordionTrigger className="px-4 py-3 font-semibold text-slate-700">
-                        {item.serviceType || `Mục ${index + 1}`}
-                      </AccordionTrigger>
-                      <AccordionContent className="px-4 pb-4 pt-2 border-t">
-                        {section.sub_fields?.map(field => (
-                          <div key={field.id} className="py-2 border-b last:border-b-0">
-                            {renderField(field.label, item[field.id])}
-                          </div>
-                        ))}
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              ) : (
-                <div className="prose prose-sm max-w-none prose-slate">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{String(sectionData)}</ReactMarkdown>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        );
-      })}
+      {groupedSections.map((group, groupIndex) => (
+        <div key={groupIndex} className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
+          {group.map(section => (
+            <div key={section.id} className={cn(group.length === 1 && "md:col-span-2")}>
+              <SectionCard section={section} sectionData={planData[section.id]} />
+            </div>
+          ))}
+        </div>
+      ))}
     </div>
   );
 };
