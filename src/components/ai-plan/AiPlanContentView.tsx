@@ -8,6 +8,7 @@ import { useMemo, useState, useEffect } from "react";
 import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
 import { showError } from "@/utils/toast";
+import { ContentDirectionView } from './ContentDirectionView';
 
 type PlanData = { [key: string]: any };
 type PlanStructure = {
@@ -116,6 +117,11 @@ const SectionCard = ({
       );
     }
 
+    // LOGIC MỚI: Kiểm tra và sử dụng component chuyên dụng
+    if (section.id === 'dinh_huong_content' && Array.isArray(sectionData)) {
+      return <ContentDirectionView data={sectionData} />;
+    }
+
     if (section.type === 'dynamic_group' && Array.isArray(sectionData) && sectionData.length > 0) {
       const headers = section.sub_fields?.map(f => f.label) || [];
       const keys = section.sub_fields?.map(f => f.id) || [];
@@ -166,7 +172,11 @@ const SectionCard = ({
           </div>
         )}
       </CardHeader>
-      <CardContent className={cn(section.type === 'dynamic_group' && !isEditing && "p-0")}>
+      <CardContent className={cn(
+        // Điều chỉnh padding cho component mới
+        section.id === 'dinh_huong_content' && !isEditing ? "p-0" : 
+        section.type === 'dynamic_group' && !isEditing ? "p-0" : ""
+      )}>
         {renderContent()}
       </CardContent>
     </Card>

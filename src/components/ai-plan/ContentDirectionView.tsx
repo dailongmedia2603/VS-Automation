@@ -25,8 +25,8 @@ interface ContentDirectionViewProps {
 const DetailSection = ({ title, content, icon: Icon, iconBgColor, iconTextColor }: { title: string, content: string, icon: React.ElementType, iconBgColor: string, iconTextColor: string }) => (
   <div>
     <div className="flex items-center gap-3 mb-2">
-      <div className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${iconBgColor}`}>
-        <Icon className={`h-5 w-5 ${iconTextColor}`} />
+      <div className={cn("flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center", iconBgColor)}>
+        <Icon className={cn("h-5 w-5", iconTextColor)} />
       </div>
       <h4 className="text-md font-semibold text-slate-800">{title}</h4>
     </div>
@@ -60,7 +60,6 @@ export const ContentDirectionView = ({ data }: ContentDirectionViewProps) => {
   }, [data]);
 
   useEffect(() => {
-    // Automatically select the first item when data loads
     const firstGroupKey = Object.keys(groupedData)[0];
     if (firstGroupKey && groupedData[firstGroupKey].length > 0) {
       setSelectedItem(groupedData[firstGroupKey][0]);
@@ -83,16 +82,14 @@ export const ContentDirectionView = ({ data }: ContentDirectionViewProps) => {
               </AccordionTrigger>
               <AccordionContent className="pt-1 pl-4">
                 <div className="flex flex-col gap-1">
-                  {items.map((item) => (
+                  {items.map((item, index) => (
                     <Button
-                      key={item.bai_viet_name}
+                      key={`${item.bai_viet_name}-${index}`}
                       variant="ghost"
                       onClick={() => setSelectedItem(item)}
                       className={cn(
                         "w-full justify-start h-auto py-2 px-3 text-left",
-                        selectedItem?.bai_viet_name === item.bai_viet_name && selectedItem?.chu_de === item.chu_de
-                          ? "bg-blue-100 text-blue-700 font-semibold"
-                          : ""
+                        selectedItem === item ? "bg-blue-100 text-blue-700 font-semibold" : ""
                       )}
                     >
                       <span className="truncate">{item.bai_viet_name}: {item.chu_de}</span>
@@ -157,15 +154,15 @@ export const ContentDirectionView = ({ data }: ContentDirectionViewProps) => {
   };
 
   return (
-    <Card className="shadow-sm rounded-xl bg-white overflow-hidden h-full">
-      <CardContent className="p-0 grid md:grid-cols-[300px_1fr] h-full">
-        <div className="h-full border-r bg-slate-50/70">
-          <NavigationPanel />
+    <div className="border rounded-lg overflow-hidden h-[600px] flex flex-col">
+        <div className="grid md:grid-cols-[300px_1fr] flex-grow min-h-0">
+            <div className="h-full border-r bg-slate-50/70">
+                <NavigationPanel />
+            </div>
+            <div className="h-full">
+                <DetailPanel />
+            </div>
         </div>
-        <div className="h-full">
-          <DetailPanel />
-        </div>
-      </CardContent>
-    </Card>
+    </div>
   );
 };
