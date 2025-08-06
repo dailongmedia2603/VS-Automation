@@ -211,44 +211,29 @@ export const AiPlanContentView = ({
     );
   }
 
-  const groupedSections = useMemo(() => {
-    const sectionsWithData = planStructure.map(section => ({
-      ...section,
-      sectionData: planData[section.id],
-    })).filter(s => s.sectionData);
-
-    return sectionsWithData.reduce((acc, section) => {
-      const isShort = typeof section.sectionData === 'string' && section.sectionData.length < 200 && !section.sectionData.includes('\n');
-      const lastGroup = acc[acc.length - 1];
-
-      if (isShort && lastGroup && lastGroup.length === 1 && lastGroup[0].isShort) {
-        lastGroup.push({ ...section, isShort });
-      } else {
-        acc.push([{ ...section, isShort }]);
-      }
-      return acc;
-    }, [] as Array<Array<PlanStructure & { isShort: boolean }>>);
+  const sectionsWithData = useMemo(() => {
+    return planStructure
+      .map(section => ({
+        ...section,
+        sectionData: planData[section.id],
+      }))
+      .filter(s => s.sectionData);
   }, [planData, planStructure]);
 
   return (
     <div className="space-y-6">
-      {groupedSections.map((group, groupIndex) => (
-        <div key={groupIndex} className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
-          {group.map(section => (
-            <div key={section.id} className={cn(group.length === 1 && "md:col-span-2")}>
-              <SectionCard 
-                section={section} 
-                sectionData={planData[section.id]}
-                isEditable={isEditable}
-                isEditing={isEditable && editingSectionId === section.id}
-                onStartEdit={() => setEditingSectionId?.(section.id)}
-                onCancelEdit={() => setEditingSectionId?.(null)}
-                onSaveEdit={(newContent) => onUpdateSection!(section.id, newContent)}
-                onRegenerate={() => onRegenerateSection!(section.id, section.label)}
-              />
-            </div>
-          ))}
-        </div>
+      {sectionsWithData.map(section => (
+        <SectionCard 
+          key={section.id}
+          section={section} 
+          sectionData={section.sectionData}
+          isEditable={isEditable}
+          isEditing={isEditable && editingSectionId === section.id}
+          onStartEdit={() => setEditingSectionId?.(section.id)}
+          onCancelEdit={() => setEditingSectionId?.(null)}
+          onSaveEdit={(newContent) => onUpdateSection!(section.id, newContent)}
+          onRegenerate={() => onRegenerateSection!(section.id, section.label)}
+        />
       ))}
     </div>
   );

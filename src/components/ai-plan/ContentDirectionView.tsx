@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -55,59 +54,51 @@ export const ContentDirectionView = ({ data }: ContentDirectionViewProps) => {
   }, [data]);
 
   return (
-    <div className="space-y-4">
-      <Accordion type="multiple" defaultValue={Object.keys(groupedData)} className="w-full space-y-4">
-        {Object.entries(groupedData).map(([type, items]) => (
-          <AccordionItem value={type} key={type} className="border-none">
-            <Card className="shadow-sm rounded-xl bg-white">
-              <AccordionTrigger className="px-6 py-4 text-lg font-semibold hover:no-underline rounded-xl">
-                <div className="flex items-center gap-3">
-                  <div className="flex-shrink-0 bg-blue-100 p-3 rounded-lg">
-                    <Newspaper className="h-6 w-6 text-blue-600" />
-                  </div>
-                  <span>{type} ({items.length} bài viết)</span>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="px-6 pb-6">
-                <Accordion type="multiple" className="w-full space-y-2">
-                  {items.map((item, index) => (
-                    <AccordionItem value={`item-${index}`} key={index} className="border rounded-lg bg-slate-50/70">
-                      <AccordionTrigger className="px-4 py-3 hover:no-underline">
-                        <span className="font-semibold text-base text-slate-800">{item.bai_viet_name}: {item.chu_de}</span>
-                      </AccordionTrigger>
-                      <AccordionContent className="p-4 border-t bg-white">
-                        <div className="space-y-3">
-                          <Section 
-                            title="Vấn đề / Tình trạng" 
-                            content={item.van_de} 
-                            icon={AlertTriangle} 
-                            iconBgColor="bg-red-100" 
-                            iconTextColor="text-red-600" 
-                          />
-                          <Section 
-                            title="Content Demo" 
-                            content={item.content_demo} 
-                            icon={ClipboardList} 
-                            iconBgColor="bg-green-100" 
-                            iconTextColor="text-green-600" 
-                          />
-                          <Section 
-                            title="Định hướng comment" 
-                            content={item.dinh_huong_comment} 
-                            icon={MessageSquareText} 
-                            iconBgColor="bg-purple-100" 
-                            iconTextColor="text-purple-600" 
-                          />
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              </AccordionContent>
-            </Card>
-          </AccordionItem>
-        ))}
-      </Accordion>
+    <div className="space-y-4 p-6">
+      {Object.entries(groupedData).map(([type, items]) => (
+        <Card key={type} className="shadow-sm rounded-xl bg-white overflow-hidden">
+          <CardHeader className="px-6 py-4 bg-slate-50 border-b">
+            <div className="flex items-center gap-3">
+              <div className="flex-shrink-0 bg-blue-100 p-3 rounded-lg">
+                <Newspaper className="h-6 w-6 text-blue-600" />
+              </div>
+              <CardTitle className="text-lg">{type} ({items.length} bài viết)</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="p-6 space-y-4">
+            {items.map((item, index) => (
+              <Card key={index} className="bg-slate-50/70 rounded-lg shadow-none">
+                <CardHeader>
+                  <CardTitle className="text-base font-semibold">{item.bai_viet_name}: {item.chu_de}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Section 
+                    title="Vấn đề / Tình trạng" 
+                    content={item.van_de} 
+                    icon={AlertTriangle} 
+                    iconBgColor="bg-red-100" 
+                    iconTextColor="text-red-600" 
+                  />
+                  <Section 
+                    title="Content Demo" 
+                    content={item.content_demo} 
+                    icon={ClipboardList} 
+                    iconBgColor="bg-green-100" 
+                    iconTextColor="text-green-600" 
+                  />
+                  <Section 
+                    title="Định hướng comment" 
+                    content={item.dinh_huong_comment} 
+                    icon={MessageSquareText} 
+                    iconBgColor="bg-purple-100" 
+                    iconTextColor="text-purple-600" 
+                  />
+                </CardContent>
+              </Card>
+            ))}
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 };
