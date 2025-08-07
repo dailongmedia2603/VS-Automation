@@ -26,39 +26,59 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
+  console.log(`[trigger-post-scan-checks] Function started at ${new Date().toISOString()}`);
+
   try {
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    console.log("[trigger-post-scan-checks] Fetching active post scan projects...");
     const { data: projects, error: fetchError } = await supabaseAdmin
       .from('post_scan_projects')
       .select('id, scan_frequency, last_scanned_at, is_ai_check_active')
       .eq('is_active', true);
 
     if (fetchError) throw new Error(`Failed to fetch projects: ${fetchError.message}`);
+    
+    console.log(`[trigger-post-scan-checks] Found ${projects.length} active projects.`);
 
     const now = new Date();
     const projectsToScan = [];
 
     for (const project of projects) {
+      console.log(`[trigger-post-scan-checks] Checking project ID: ${project.id}`);
       const interval = parseFrequency(project.scan_frequency);
-      if (!interval) continue;
+      if (!interval) {
+        console.log(`  - Project ${project.id} has invalid frequency: ${project.scan_frequency}. Skipping.`);
+        continue;
+      }
 
       const lastScanned = project.last_scanned_at ? new Date(project.last_scanned_at) : null;
+      const timeSinceLastScan = lastScanned ? now.getTime() - lastScanned.getTime() : Infinity;
 
-      if (!lastScanned || (now.getTime() - lastScanned.getTime()) >= interval) {
+      console.log(`  - Interval: ${interval}ms`);
+      console.log(`  - Last scanned: ${lastScanned ? lastScanned.toISOString() : 'Never'}`);
+      console.log(`  - Time since last scan: ${timeSinceLastScan}ms`);
+
+      if (!lastScanned || timeSinceLastScan >= interval) {
+        console.log(`  - Project ${project.id} is DUE for scanning. Adding to queue.`);
         projectsToScan.push(project);
+      } else {
+        console.log(`  - Project ${project.id} is NOT YET due for scanning. Skipping.`);
       }
     }
 
     if (projectsToScan.length === 0) {
+      console.log("[trigger-post-scan-checks] No projects are due for scanning at this time.");
       return new Response(JSON.stringify({ message: "No projects due for scanning." }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       });
     }
+
+    console.log(`[trigger-post-scan-checks] Triggering scans for ${projectsToScan.length} projects: [${projectsToScan.map(p => p.id).join(', ')}]`);
 
     const scanPromises = projectsToScan.map(async (project) => {
       try {
@@ -84,9 +104,10 @@ serve(async (req) => {
           body: { projectId: project.id, posts: finalPosts }
         });
         
+        console.log(`[trigger-post-scan-checks] Successfully processed project ID ${project.id}.`);
         return { id: project.id, status: 'success' };
       } catch (error) {
-        console.error(`Failed to scan project ID ${project.id}:`, error.message);
+        console.error(`[trigger-post-scan-checks] Failed to scan project ID ${project.id}:`, error.message);
         return { id: project.id, status: 'error', message: error.message };
       }
     });
@@ -99,7 +120,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Error in trigger-post-scan-checks function:', error.message);
+    console.error('[trigger-post-scan-checks] CRITICAL ERROR:', error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
