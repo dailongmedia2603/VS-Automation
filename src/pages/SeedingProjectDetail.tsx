@@ -316,12 +316,7 @@ const SeedingProjectDetail = () => {
 
       setActiveTask(taskData);
       dismissToast(toastId);
-      showSuccess("Đã tạo tác vụ! Bắt đầu xử lý...");
-
-      // Immediately trigger the processing task
-      supabase.functions.invoke('process-seeding-tasks').catch(err => {
-        console.warn("Initial task processing trigger failed, but the cron job will take over.", err);
-      });
+      showSuccess("Đã tạo tác vụ! Hệ thống sẽ bắt đầu xử lý trong giây lát.");
 
     } catch (error: any) {
       if (toastId) dismissToast(toastId);

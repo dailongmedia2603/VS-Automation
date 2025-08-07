@@ -36,43 +36,23 @@ serve(async (req) => {
       console.log(`[process-seeding-tasks] Reset ${stuckTasks.length} stuck task(s).`);
     }
 
-    // 2. Find a task to process (prioritize running, then pending)
-    let { data: runningTask, error: runningTaskError } = await supabaseAdmin
-      .from('seeding_tasks')
-      .select('*')
-      .eq('status', 'running')
-      .limit(1)
-      .single();
-
-    if (runningTaskError && runningTaskError.code !== 'PGRST116') throw runningTaskError;
-    task = runningTask;
-
-    if (task) {
-      console.log(`[process-seeding-tasks] Resuming running task ID: ${task.id}`);
-    } else {
-      let { data: pendingTask, error: pendingTaskError } = await supabaseAdmin
-        .from('seeding_tasks')
-        .select('*')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .single();
-      if (pendingTaskError && pendingTaskError.code !== 'PGRST116') throw pendingTaskError;
-      task = pendingTask;
-      if (task) {
-        console.log(`[process-seeding-tasks] Starting new pending task ID: ${task.id}`);
-      }
-    }
+    // 2. Find a single pending task and "claim" it by setting it to 'running' atomically.
+    // This is the core of preventing race conditions.
+    const { data: claimedTask, error: claimError } = await supabaseAdmin.rpc('get_and_claim_seeding_task');
+    if (claimError) throw new Error(`Could not claim a task: ${claimError.message}`);
+    
+    task = claimedTask;
 
     if (!task) {
-      console.log("[process-seeding-tasks] No tasks to process at this time.");
-      return new Response(JSON.stringify({ message: "No tasks to process." }), {
+      console.log("[process-seeding-tasks] No pending tasks to process at this time.");
+      return new Response(JSON.stringify({ message: "No pending tasks to process." }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+    
+    console.log(`[process-seeding-tasks] Claimed and now processing task ID: ${task.id}`);
 
-    // 3. Find the next post to process
-    console.log(`[process-seeding-tasks] Finding next post for project ID: ${task.project_id}`);
+    // 3. Find the next post to process for this task
     const { data: post, error: postError } = await supabaseAdmin
       .from('seeding_posts')
       .select('id, links, type')
@@ -82,44 +62,20 @@ serve(async (req) => {
       .limit(1)
       .single();
 
+    if (postError && postError.code !== 'PGRST116') throw postError;
+
     if (!post) {
-      // Double-check if there are any 'checking' posts left for this project.
-      const { count: remainingCount, error: countCheckError } = await supabaseAdmin
-        .from('seeding_posts')
-        .select('*', { count: 'exact', head: true })
-        .eq('project_id', task.project_id)
-        .eq('status', 'checking');
-
-      if (countCheckError) throw countCheckError;
-
-      if (remainingCount === 0) {
-        // No posts are left to check, so the task is complete regardless of progress count.
-        console.log(`[process-seeding-tasks] No more 'checking' posts found for project ${task.project_id}. Completing task ${task.id}.`);
-        await supabaseAdmin.from('seeding_tasks').update({ status: 'completed', current_post_id: null, updated_at: new Date().toISOString() }).eq('id', task.id);
-        return new Response(JSON.stringify({ message: `Task ${task.id} completed as no posts remain.` }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-      } else {
-        // Posts exist but were not found by the query, which is a genuine error.
-        const errorMessage = `Task ${task.id} failed. It could not find a post to process, but ${remainingCount} 'checking' post(s) still exist for this project.`;
-        console.error(`[process-seeding-tasks] ${errorMessage}`);
-        await supabaseAdmin.from('seeding_tasks').update({ status: 'failed', error_message: errorMessage, updated_at: new Date().toISOString() }).eq('id', task.id);
-        return new Response(JSON.stringify({ message: `Task ${task.id} failed due to an inconsistency.` }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-      }
+      // No more posts to check, the task is considered complete.
+      console.log(`[process-seeding-tasks] No more 'checking' posts found for project ${task.project_id}. Completing task ${task.id}.`);
+      await supabaseAdmin.from('seeding_tasks').update({ status: 'completed', current_post_id: null, updated_at: new Date().toISOString() }).eq('id', task.id);
+      return new Response(JSON.stringify({ message: `Task ${task.id} completed as no posts remain.` }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
-    console.log(`[process-seeding-tasks] Found post ID: ${post.id} to process.`);
-
-    // 4. "Claim" the post and update task status to running
-    await supabaseAdmin.from('seeding_tasks').update({ status: 'running', current_post_id: post.id, updated_at: new Date().toISOString() }).eq('id', task.id);
     
-    const { data: currentTaskStatus } = await supabaseAdmin.from('seeding_tasks').select('status').eq('id', task.id).single();
-    if (currentTaskStatus.status === 'cancelled') {
-        console.log(`[process-seeding-tasks] Task ${task.id} was cancelled. Aborting.`);
-        await supabaseAdmin.from('seeding_tasks').update({ current_post_id: null, updated_at: new Date().toISOString() }).eq('id', task.id);
-        return new Response(JSON.stringify({ message: `Task ${task.id} was cancelled.` }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
+    console.log(`[process-seeding-tasks] Found post ID: ${post.id} to process.`);
+    await supabaseAdmin.from('seeding_tasks').update({ current_post_id: post.id }).eq('id', task.id);
 
-    // 5. Process the post
+    // 4. Process the post
     const logPayload: any = { post_id: post.id, type: post.type };
-    console.log(`[process-seeding-tasks] Starting processing for post ${post.id} of type ${post.type}.`);
     try {
       await supabaseAdmin.from('seeding_posts').update({ last_checked_at: new Date().toISOString() }).eq('id', post.id);
 
@@ -154,7 +110,7 @@ serve(async (req) => {
       await supabaseAdmin.from('logs_check_seeding_cmt_tu_dong').insert(logPayload);
     }
 
-    // 6. Update progress and release the "claim"
+    // 5. Update progress and set task back to pending for the next run
     const newProgress = task.progress_current + 1;
     const isCompleted = newProgress >= task.progress_total;
     console.log(`[process-seeding-tasks] Task ${task.id} progress: ${newProgress}/${task.progress_total}. Completed: ${isCompleted}`);
@@ -163,17 +119,9 @@ serve(async (req) => {
       progress_current: newProgress,
       current_post_id: null,
       updated_at: new Date().toISOString(),
-      status: isCompleted ? 'completed' : 'running'
+      status: isCompleted ? 'completed' : 'pending' // Set back to pending
     };
     await supabaseAdmin.from('seeding_tasks').update(updateData).eq('id', task.id);
-
-    // 7. If the task is not yet complete, trigger the next run immediately.
-    if (!isCompleted) {
-      console.log(`[process-seeding-tasks] Task ${task.id} not complete. Self-invoking for next post.`);
-      supabaseAdmin.functions.invoke('process-seeding-tasks', {}).catch(err => {
-        console.error(`[process-seeding-tasks] Error self-invoking for task ${task.id}:`, err);
-      });
-    }
 
     return new Response(JSON.stringify({ message: `Task ${task.id} processed post ${post.id}.` }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
