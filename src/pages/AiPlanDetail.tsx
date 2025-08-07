@@ -24,6 +24,7 @@ type Plan = {
   is_public: boolean;
   public_id: string | null;
   template_id: number | null;
+  slug: string | null;
 };
 
 type Log = {

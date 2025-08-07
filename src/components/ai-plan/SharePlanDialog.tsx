@@ -12,6 +12,7 @@ type Plan = {
   id: number;
   is_public: boolean;
   public_id: string | null;
+  slug: string | null;
 };
 
 interface SharePlanDialogProps {
@@ -24,7 +25,7 @@ interface SharePlanDialogProps {
 export const SharePlanDialog = ({ isOpen, onOpenChange, plan, onPlanUpdate }: SharePlanDialogProps) => {
   const [isPublic, setIsPublic] = useState(plan.is_public);
   const [isLoading, setIsLoading] = useState(false);
-  const publicUrl = `${window.location.origin}/public/ai-plan/${plan.public_id}`;
+  const publicUrl = `${window.location.origin}/plan/${plan.slug}`;
 
   useEffect(() => {
     setIsPublic(plan.is_public);
@@ -37,7 +38,7 @@ export const SharePlanDialog = ({ isOpen, onOpenChange, plan, onPlanUpdate }: Sh
         .from('ai_plans')
         .update({ is_public: checked, updated_at: new Date().toISOString() })
         .eq('id', plan.id)
-        .select('is_public, public_id')
+        .select('is_public, public_id, slug')
         .single();
       
       if (error) throw error;

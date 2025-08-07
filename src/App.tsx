@@ -49,7 +49,7 @@ const App = () => (
                 <Routes>
                   <Route path="/login" element={<Login />} />
                   <Route path="/register" element={<Register />} />
-                  <Route path="/public/ai-plan/:publicId" element={<PublicAiPlan />} />
+                  <Route path="/plan/:planSlug" element={<PublicAiPlan />} />
                   <Route element={<ProtectedRoute />}>
                     <Route element={<AppLayout />}>
                       <Route path="/" element={<Dashboard />} />

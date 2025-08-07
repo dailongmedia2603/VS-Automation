@@ -28,7 +28,7 @@ type PlanStructure = {
 }[];
 
 const PublicAiPlan = () => {
-  const { publicId } = useParams<{ publicId: string }>();
+  const { planSlug } = useParams<{ planSlug: string }>();
   const [plan, setPlan] = useState<Plan | null>(null);
   const [publicSettings, setPublicSettings] = useState<PublicSettings | null>(null);
   const [planStructure, setPlanStructure] = useState<PlanStructure | null>(null);
@@ -37,8 +37,8 @@ const PublicAiPlan = () => {
 
   useEffect(() => {
     const fetchPlan = async () => {
-      if (!publicId) {
-        setError("Không tìm thấy ID kế hoạch.");
+      if (!planSlug) {
+        setError("Không tìm thấy slug kế hoạch.");
         setIsLoading(false);
         return;
       }
@@ -47,7 +47,7 @@ const PublicAiPlan = () => {
         const planPromise = supabase
           .from('ai_plans')
           .select('id, name, plan_data, template_id')
-          .eq('public_id', publicId)
+          .eq('slug', planSlug)
           .eq('is_public', true)
           .single();
         
@@ -90,7 +90,7 @@ const PublicAiPlan = () => {
       }
     };
     fetchPlan();
-  }, [publicId]);
+  }, [planSlug]);
 
   if (isLoading) {
     return (
