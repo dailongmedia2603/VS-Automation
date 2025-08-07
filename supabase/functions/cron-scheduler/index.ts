@@ -21,10 +21,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    console.log("[cron-scheduler] Triggering all scheduled tasks sequentially.");
-
-    const results = [];
-    let errorOccurred = false;
+    console.log("[cron-scheduler] Triggering all scheduled tasks in parallel.");
 
     const tasksToRun = [
       'trigger-post-scan-checks',
@@ -32,21 +29,23 @@ serve(async (req) => {
       'process-seeding-tasks'
     ];
 
-    for (const taskName of tasksToRun) {
-      try {
-        console.log(`[cron-scheduler] Invoking ${taskName}...`);
-        const { data, error } = await supabaseAdmin.functions.invoke(taskName);
-        results.push({ name: taskName, status: error ? 'error' : 'success', data, error });
-        if (error) {
-          console.error(`[cron-scheduler] Error in ${taskName}:`, error);
-          errorOccurred = true;
-        }
-      } catch (e) {
-        console.error(`[cron-scheduler] Failed to invoke ${taskName}:`, e);
-        results.push({ name: taskName, status: 'invocation_failed', error: e.message });
-        errorOccurred = true;
-      }
-    }
+    const promises = tasksToRun.map(taskName => {
+      console.log(`[cron-scheduler] Invoking ${taskName}...`);
+      return supabaseAdmin.functions.invoke(taskName)
+        .then(({ data, error }) => {
+          if (error) {
+            console.error(`[cron-scheduler] Error in ${taskName}:`, error);
+          }
+          return { name: taskName, status: error ? 'error' : 'success', data, error };
+        })
+        .catch(e => {
+          console.error(`[cron-scheduler] Failed to invoke ${taskName}:`, e);
+          return { name: taskName, status: 'invocation_failed', error: e.message };
+        });
+    });
+
+    const results = await Promise.all(promises);
+    const errorOccurred = results.some(r => r.status !== 'success');
 
     console.log("[cron-scheduler] Scheduled tasks triggered. Results:", results);
 
