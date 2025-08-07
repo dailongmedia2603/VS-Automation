@@ -17,7 +17,7 @@ type PlanStructureField = {
   label: string;
   type: 'text' | 'textarea' | 'dynamic_group';
   icon: string;
-  display_type?: 'simple' | 'content_direction';
+  display_type?: 'simple' | 'content_direction' | 'post_scan';
   sub_fields?: { id: string; label: string; type: 'text' | 'textarea' }[];
 };
 
@@ -137,6 +137,72 @@ const ContentDirectionViewIntegrated = ({ data }: { data: any[] }) => {
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-center text-slate-500"><LayoutList className="h-16 w-16 text-slate-300 mb-4" /><h3 className="text-xl font-semibold text-slate-700">Chọn một bài viết để xem chi tiết</h3></div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- Sub-component for Post Scan (Master-Detail View) ---
+const PostScanViewIntegrated = ({ data }: { data: any[] }) => {
+  const [selectedItem, setSelectedItem] = useState<any | null>(null);
+
+  const processedData = useMemo(() => {
+    if (!Array.isArray(data)) return [];
+    return data.map((item, index) => {
+      if (item && typeof item === 'object' && !Array.isArray(item)) {
+        const normalizedItem = normalizeKeys(item);
+        return {
+          ...normalizedItem,
+          bai_viet_name: `Trường hợp ${index + 1}`,
+        };
+      }
+      return null;
+    }).filter(Boolean);
+  }, [data]);
+
+  useEffect(() => {
+    if (processedData.length > 0) {
+      setSelectedItem(processedData[0]);
+    } else {
+      setSelectedItem(null);
+    }
+  }, [processedData]);
+
+  const DetailSection = ({ title, content, icon: Icon, iconBg, iconText }: { title: string, content: string, icon: React.ElementType, iconBg: string, iconText: string }) => (
+    <div>
+      <div className="flex items-center gap-3 mb-2">
+        <div className={cn("flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center", iconBg)}><Icon className={cn("h-5 w-5", iconText)} /></div>
+        <h4 className="text-md font-semibold text-slate-800">{title}</h4>
+      </div>
+      <div className="prose prose-sm max-w-none prose-slate pl-[52px] text-slate-600"><ReactMarkdown remarkPlugins={[remarkGfm]}>{content || '(Chưa có nội dung)'}</ReactMarkdown></div>
+    </div>
+  );
+
+  return (
+    <div className="border rounded-lg overflow-hidden bg-white">
+      <div className="grid md:grid-cols-[320px_1fr]">
+        <div className="border-r bg-slate-50/70">
+          <ScrollArea className="h-[700px] p-2">
+            <div className="flex flex-col gap-1 mt-1">
+              {(processedData as any[]).map((item, index) => (
+                <Button key={`${item.bai_viet_name}-${index}`} variant="ghost" onClick={() => setSelectedItem(item)} className={cn("w-full justify-start h-auto py-2 px-3 text-left", selectedItem === item ? "bg-blue-100 text-blue-700 font-semibold" : "")}>
+                  <span className="whitespace-normal">{item.bai_viet_name}: {item.chudepostcantim}</span>
+                </Button>
+              ))}
+            </div>
+          </ScrollArea>
+        </div>
+        <div className="p-6">
+          {selectedItem ? (
+            <div className="space-y-8">
+              <h2 className="text-2xl font-bold text-slate-900">{selectedItem.chudepostcantim}</h2>
+              <DetailSection title="Định hướng content comment" content={selectedItem.dinhhuongcontentcomment} icon={MessageSquareText} iconBg="bg-purple-100" iconText="text-purple-600" />
+              <DetailSection title="Demo comment" content={selectedItem.democomment} icon={ClipboardList} iconBg="bg-green-100" iconText="text-green-600" />
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-center text-slate-500"><LayoutList className="h-16 w-16 text-slate-300 mb-4" /><h3 className="text-xl font-semibold text-slate-700">Chọn một trường hợp để xem chi tiết</h3></div>
           )}
         </div>
       </div>
@@ -316,6 +382,10 @@ export const AiPlanContentView = (props: AiPlanContentViewProps) => {
                         {section.display_type === 'content_direction' && isContentDirectionData(section.sectionData) ? (
                             <div className="p-4">
                                 <ContentDirectionViewIntegrated data={section.sectionData} />
+                            </div>
+                        ) : section.display_type === 'post_scan' && Array.isArray(section.sectionData) ? (
+                            <div className="p-4">
+                                <PostScanViewIntegrated data={section.sectionData} />
                             </div>
                         ) : (
                             <CardContent className="p-6 prose prose-sm max-w-none prose-slate text-slate-600 leading-relaxed">

@@ -28,7 +28,7 @@ type StructureField = {
   label: string;
   type: 'text' | 'textarea' | 'dynamic_group';
   icon: string;
-  display_type: 'simple' | 'content_direction';
+  display_type: 'simple' | 'content_direction' | 'post_scan';
   sub_fields?: { id: string; label: string; type: 'text' | 'textarea' }[];
 };
 
@@ -188,11 +188,12 @@ export const AiPlanTemplateManager = () => {
                         <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
                         <SelectContent>{iconOptions.map(icon => <SelectItem key={icon} value={icon}>{icon}</SelectItem>)}</SelectContent>
                       </Select>
-                      <Select value={field.display_type || 'simple'} onValueChange={(value: 'simple' | 'content_direction') => handleFieldChange(field.id, 'display_type', value)}>
+                      <Select value={field.display_type || 'simple'} onValueChange={(value: 'simple' | 'content_direction' | 'post_scan') => handleFieldChange(field.id, 'display_type', value)}>
                         <SelectTrigger className="w-64"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="simple">Hiển thị đơn giản (văn bản)</SelectItem>
                           <SelectItem value="content_direction">Hiển thị Định hướng Content</SelectItem>
+                          <SelectItem value="post_scan">Hiển thị Post Scan</SelectItem>
                         </SelectContent>
                       </Select>
                       <div className="flex items-center">

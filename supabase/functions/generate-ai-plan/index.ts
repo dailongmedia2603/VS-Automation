@@ -144,6 +144,18 @@ ${subFields}
     },
     ...
   ]`;
+      } else if (field.display_type === 'post_scan') {
+        const subFields = [
+          `      "chu_de_post_can_tim": "(string) // Chủ đề post cần tìm"`,
+          `      "dinh_huong_content_comment": "(string) // Định hướng content comment"`,
+          `      "demo_comment": "(string) // Demo comment"`
+        ].join(',\n');
+        return `  "${field.id}": [ // Một mảng các đối tượng cho mục '${field.label}'
+    {
+${subFields}
+    },
+    ...
+  ]`;
       } else {
         return `  "${field.id}": "(string) // ${field.label}"`;
       }
