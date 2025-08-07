@@ -91,7 +91,29 @@ serve(async (req) => {
 
     const allApproved = allGroupsForPost.every(g => g.status === 'approved');
     if (allApproved) {
-      await supabaseAdmin.from('seeding_posts').update({ status: 'completed' }).eq('id', postId);
+      const { error: updatePostError } = await supabaseAdmin.from('seeding_posts').update({ status: 'completed' }).eq('id', postId);
+      if (!updatePostError) {
+        // Send notification on completion
+        try {
+            const { data: settings } = await supabaseAdmin.from('n8n_settings').select('telegram_config_id_for_seeding').eq('id', 1).single();
+            if (settings && settings.telegram_config_id_for_seeding) {
+                const { data: postDetails } = await supabaseAdmin.from('seeding_posts').select('name, project_id, seeding_projects(name)').eq('id', postId).single();
+                const message = `
+✅ <b>Check Duyệt Post Hoàn Thành</b> ✅
+
+📝 <b>Dự án:</b> ${postDetails.seeding_projects.name}
+📄 <b>Post:</b> ${postDetails.name}
+
+Tất cả <b>${allGroupsForPost.length}</b> group đã được duyệt!
+`.trim();
+                await supabaseAdmin.functions.invoke('send-telegram-notification', {
+                    body: { config_id: settings.telegram_config_id_for_seeding, message }
+                });
+            }
+        } catch (notificationError) {
+            console.error(`Failed to send Telegram notification for post ${postId}:`, notificationError.message);
+        }
+      }
     }
 
     const total = allGroupsForPost.length;

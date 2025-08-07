@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { PlusCircle, Edit, Trash2, Loader2, Bot } from 'lucide-react';
 import { showSuccess, showError } from '@/utils/toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type TelegramConfig = {
   id: number;
@@ -28,6 +29,9 @@ const TelegramSettings = () => {
   const [configToDelete, setConfigToDelete] = useState<TelegramConfig | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
+  const [notificationConfigId, setNotificationConfigId] = useState<string | undefined>(undefined);
+  const [isLoadingNotificationConfig, setIsLoadingNotificationConfig] = useState(true);
+  const [isSavingNotificationConfig, setIsSavingNotificationConfig] = useState(false);
 
   const fetchConfigs = async () => {
     setIsLoading(true);
@@ -40,8 +44,25 @@ const TelegramSettings = () => {
     setIsLoading(false);
   };
 
+  const fetchNotificationConfig = async () => {
+    setIsLoadingNotificationConfig(true);
+    const { data, error } = await supabase
+      .from('n8n_settings')
+      .select('telegram_config_id_for_seeding')
+      .eq('id', 1)
+      .single();
+    
+    if (error && error.code !== 'PGRST116') {
+      showError("Không thể tải cài đặt thông báo: " + error.message);
+    } else if (data) {
+      setNotificationConfigId(data.telegram_config_id_for_seeding?.toString());
+    }
+    setIsLoadingNotificationConfig(false);
+  };
+
   useEffect(() => {
     fetchConfigs();
+    fetchNotificationConfig();
   }, []);
 
   const handleOpenDialog = (config: TelegramConfig | null = null) => {
@@ -114,8 +135,22 @@ const TelegramSettings = () => {
     }
   };
 
+  const handleSaveNotificationConfig = async () => {
+    setIsSavingNotificationConfig(true);
+    const { error } = await supabase
+      .from('n8n_settings')
+      .upsert({ id: 1, telegram_config_id_for_seeding: notificationConfigId ? Number(notificationConfigId) : null });
+    
+    if (error) {
+      showError("Lưu cài đặt thông báo thất bại: " + error.message);
+    } else {
+      showSuccess("Đã lưu cài đặt thông báo!");
+    }
+    setIsSavingNotificationConfig(false);
+  };
+
   return (
-    <>
+    <div className="space-y-6">
       <Card className="shadow-sm rounded-2xl bg-white">
         <CardHeader>
           <div className="flex justify-between items-center">
@@ -153,6 +188,37 @@ const TelegramSettings = () => {
               <p className="text-center text-muted-foreground py-8">Chưa có cấu hình nào.</p>
             )}
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-sm rounded-2xl bg-white">
+        <CardHeader>
+          <CardTitle>Thông báo Seeding Hoàn Thành</CardTitle>
+          <CardDescription>Chọn bot Telegram để nhận thông báo khi một mục trong Check Seeding hoàn thành.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {isLoadingNotificationConfig ? (
+            <Skeleton className="h-10 w-full" />
+          ) : (
+            <div className="space-y-2">
+              <Label>Gửi thông báo qua bot</Label>
+              <Select value={notificationConfigId || 'null'} onValueChange={(value) => setNotificationConfigId(value === 'null' ? undefined : value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Không gửi thông báo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="null">Không gửi thông báo</SelectItem>
+                  {configs.map(config => (
+                    <SelectItem key={config.id} value={String(config.id)}>{config.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <Button onClick={handleSaveNotificationConfig} disabled={isSavingNotificationConfig}>
+            {isSavingNotificationConfig && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Lưu cài đặt thông báo
+          </Button>
         </CardContent>
       </Card>
 
@@ -203,7 +269,7 @@ const TelegramSettings = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   );
 };
 

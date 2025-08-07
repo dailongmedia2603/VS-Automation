@@ -18,7 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FacebookApiReference } from "@/components/FacebookApiReference";
-import TelegramSettings from "@/components/TelegramSettings";
+import TelegramSettings from "@/components/settings/TelegramSettings";
 
 const geminiModels = [
   { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },

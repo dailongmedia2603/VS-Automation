@@ -124,6 +124,27 @@ serve(async (req) => {
 
       if (postUpdateError) {
         console.error(`Failed to update post status for postId ${postId}:`, postUpdateError.message);
+      } else {
+        // Send notification on completion
+        try {
+            const { data: settings } = await supabaseAdmin.from('n8n_settings').select('telegram_config_id_for_seeding').eq('id', 1).single();
+            if (settings && settings.telegram_config_id_for_seeding) {
+                const { data: postDetails } = await supabaseAdmin.from('seeding_posts').select('name, project_id, seeding_projects(name)').eq('id', postId).single();
+                const message = `
+✅ <b>Check Comment Hoàn Thành</b> ✅
+
+📝 <b>Dự án:</b> ${postDetails.seeding_projects.name}
+📄 <b>Post:</b> ${postDetails.name}
+
+Tất cả <b>${total}</b> comment đã được tìm thấy!
+`.trim();
+                await supabaseAdmin.functions.invoke('send-telegram-notification', {
+                    body: { config_id: settings.telegram_config_id_for_seeding, message }
+                });
+            }
+        } catch (notificationError) {
+            console.error(`Failed to send Telegram notification for post ${postId}:`, notificationError.message);
+        }
       }
     }
 
