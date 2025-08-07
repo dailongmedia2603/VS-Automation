@@ -21,14 +21,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    let userId = null;
-    const authHeader = req.headers.get('Authorization');
-    if (authHeader) {
-      const jwt = authHeader.replace('Bearer ', '');
-      const { data: { user } } = await supabaseAdmin.auth.getUser(jwt);
-      if (user) userId = user.id;
-    }
-
     // Step 1: Count ONLY the posts that are currently in 'checking' state.
     const { count, error: countError } = await supabaseAdmin
       .from('seeding_posts')
@@ -52,9 +44,9 @@ serve(async (req) => {
       .from('seeding_tasks')
       .insert({
         project_id: projectId,
-        creator_id: userId,
         status: 'pending',
         progress_total: count,
+        progress_current: 0,
       })
       .select()
       .single();
