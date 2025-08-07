@@ -342,6 +342,20 @@ const SeedingProjectDetail = () => {
     }
   };
 
+  const handleAcknowledgeError = async () => {
+    if (!activeTask) return;
+    const { error } = await supabase
+      .from('seeding_tasks')
+      .update({ status: 'cancelled', error_message: `(Acknowledged Error) ${activeTask.error_message}` })
+      .eq('id', activeTask.id);
+    
+    if (error) {
+      showError("Không thể đóng thông báo lỗi: " + error.message);
+    } else {
+      setActiveTask(null);
+    }
+  };
+
   const handleSaveSchedule = async () => {
     if (!projectId) return;
     setIsSavingSchedule(true);
@@ -488,7 +502,7 @@ const SeedingProjectDetail = () => {
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogAction onClick={() => setActiveTask(null)}>Đã hiểu</AlertDialogAction>
+                  <AlertDialogAction onClick={handleAcknowledgeError}>Đã hiểu</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -538,15 +552,11 @@ const SeedingProjectDetail = () => {
           <div className="flex flex-col h-full p-4 overflow-y-auto">
             <Accordion type="multiple" defaultValue={['check-comment', 'approve-post']} className="w-full">
               <AccordionItem value="check-comment">
-                <AccordionTrigger className="text-base font-semibold hover:no-underline">
-                  <div className="flex items-center gap-2"><MessageSquare className="h-5 w-5 text-blue-600" />Check Comment ({commentCheckPosts.length})</div>
-                </AccordionTrigger>
+                <AccordionTrigger className="text-base font-semibold hover:no-underline"><div className="flex items-center gap-2"><MessageSquare className="h-5 w-5 text-blue-600" />Check Comment ({commentCheckPosts.length})</div></AccordionTrigger>
                 <AccordionContent><PostList posts={commentCheckPosts} onSelectPost={setSelectedPost} activeTask={activeTask} /></AccordionContent>
               </AccordionItem>
               <AccordionItem value="approve-post">
-                <AccordionTrigger className="text-base font-semibold hover:no-underline">
-                  <div className="flex items-center gap-2"><FileCheck2 className="h-5 w-5 text-green-600" />Check duyệt post ({postApprovalPosts.length})</div>
-                </AccordionTrigger>
+                <AccordionTrigger className="text-base font-semibold hover:no-underline"><div className="flex items-center gap-2"><FileCheck2 className="h-5 w-5 text-green-600" />Check duyệt post ({postApprovalPosts.length})</div></AccordionTrigger>
                 <AccordionContent><PostList posts={postApprovalPosts} onSelectPost={setSelectedPost} activeTask={activeTask} /></AccordionContent>
               </AccordionItem>
             </Accordion>
