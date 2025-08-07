@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Save, Loader2, PlusCircle, Trash2, ArrowUp, ArrowDown, Eye, Code, SlidersHorizontal, BrainCircuit } from 'lucide-react';
+import { Save, Loader2, PlusCircle, Trash2, ArrowUp, ArrowDown, Eye, Code, SlidersHorizontal, BrainCircuit, HelpCircle } from 'lucide-react';
 import { showSuccess, showError } from '@/utils/toast';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -32,7 +32,23 @@ type PromptConfig = {
   maxTokens: number;
   useCoT: boolean;
   cotFactors: CotFactor[];
+  output_instruction: string;
 };
+
+const DEFAULT_OUTPUT_INSTRUCTION = `
+---
+### YÊU CẦU ĐẦU RA (CỰC KỲ QUAN TRỌNG)
+
+Bạn PHẢI trả lời bằng một khối mã JSON duy nhất được bao bọc trong \`\`\`json ... \`\`\`.
+JSON object phải có cấu trúc chính xác như sau:
+\`\`\`json
+{
+{{json_structure}}
+}
+\`\`\`
+- **TUYỆT ĐỐI KHÔNG** thêm bất kỳ văn bản, lời chào, hoặc giải thích nào bên ngoài khối mã JSON.
+- Hãy điền giá trị cho mỗi trường dựa trên thông tin đã được cung cấp và kiến thức của bạn.
+`;
 
 const initialConfig: Omit<PromptConfig, 'output_instruction'> = {
   blocks: [],
@@ -49,7 +65,8 @@ const placeholders = [
 ];
 
 export const AiPlanPromptConfig = () => {
-  const [config, setConfig] = useState<PromptConfig>(initialConfig as PromptConfig);
+  const [config, setConfig] = useState<Omit<PromptConfig, 'output_instruction'>>(initialConfig);
+  const [outputInstruction, setOutputInstruction] = useState(DEFAULT_OUTPUT_INSTRUCTION);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -71,7 +88,10 @@ export const AiPlanPromptConfig = () => {
         
         if (data && data.prompt_structure) {
           const loadedConfig = { ...initialConfig, ...data.prompt_structure };
-          setConfig(loadedConfig as PromptConfig);
+          setConfig(loadedConfig);
+          setOutputInstruction(loadedConfig.output_instruction || DEFAULT_OUTPUT_INSTRUCTION);
+        } else {
+          setOutputInstruction(DEFAULT_OUTPUT_INSTRUCTION);
         }
       } catch (error: any) {
         showError("Không thể tải prompt: " + error.message);
@@ -116,9 +136,10 @@ export const AiPlanPromptConfig = () => {
   const handleSave = async () => {
     setIsSaving(true);
     try {
+      const configToSave = { ...config, output_instruction: outputInstruction };
       const { error } = await supabase
         .from('ai_plan_prompt_config')
-        .upsert({ id: 1, prompt_structure: config, updated_at: new Date().toISOString() });
+        .upsert({ id: 1, prompt_structure: configToSave, updated_at: new Date().toISOString() });
       
       if (error) throw error;
       showSuccess("Đã lưu prompt thành công!");
@@ -171,7 +192,7 @@ export const AiPlanPromptConfig = () => {
     }
   };
 
-  const handleConfigChange = (field: keyof PromptConfig, value: any) => {
+  const handleConfigChange = (field: keyof Omit<PromptConfig, 'blocks' | 'output_instruction'>, value: any) => {
     setConfig(prev => ({ ...prev, [field]: value }));
   };
 
@@ -211,11 +232,11 @@ export const AiPlanPromptConfig = () => {
         prompt += `\n\n---\n\n${cotPrompt}`;
     }
 
-    // This part is now handled by the edge function
-    prompt += "\n\n--- (YÊU CẦU ĐẦU RA SẼ ĐƯỢC TỰ ĐỘNG THÊM VÀO TẠI ĐÂY) ---";
+    const finalOutputInstruction = outputInstruction.replace(/{{json_structure}}/g, '(Cấu trúc JSON động sẽ được chèn vào đây)');
+    prompt += finalOutputInstruction;
 
     return prompt;
-  }, [config, templateInputFields, globalDocuments]);
+  }, [config, outputInstruction, templateInputFields, globalDocuments]);
 
   if (isLoading) {
     return <Card><CardHeader><Skeleton className="h-6 w-1/3" /></CardHeader><CardContent><Skeleton className="h-64 w-full" /></CardContent></Card>;
@@ -263,6 +284,25 @@ export const AiPlanPromptConfig = () => {
               <div className="pt-2">
                 <Button variant="outline" onClick={addBlock} className="w-full border-dashed"><PlusCircle className="mr-2 h-4 w-4" />Thêm khối</Button>
               </div>
+            </CardContent>
+          </Card>
+          <Card className="shadow-sm rounded-2xl bg-white">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                Yêu cầu đầu ra
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-6 w-6"><HelpCircle className="h-4 w-4 text-muted-foreground" /></Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 text-sm">
+                    <p>Sử dụng biến <code className="font-mono bg-slate-100 p-1 rounded-sm">{`{{json_structure}}`}</code> để chèn cấu trúc JSON động của kế hoạch vào prompt.</p>
+                  </PopoverContent>
+                </Popover>
+              </CardTitle>
+              <CardDescription>Cấu hình phần hướng dẫn AI trả về kết quả theo định dạng mong muốn.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Textarea value={outputInstruction} onChange={e => setOutputInstruction(e.target.value)} className="min-h-[250px] font-mono text-xs" />
             </CardContent>
           </Card>
         </div>

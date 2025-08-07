@@ -7,6 +7,21 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const DEFAULT_OUTPUT_INSTRUCTION = `
+---
+### YÊU CẦU ĐẦU RA (CỰC KỲ QUAN TRỌNG)
+
+Bạn PHẢI trả lời bằng một khối mã JSON duy nhất được bao bọc trong \`\`\`json ... \`\`\`.
+JSON object phải có cấu trúc chính xác như sau:
+\`\`\`json
+{
+{{json_structure}}
+}
+\`\`\`
+- **TUYỆT ĐỐI KHÔNG** thêm bất kỳ văn bản, lời chào, hoặc giải thích nào bên ngoài khối mã JSON.
+- Hãy điền giá trị cho mỗi trường dựa trên thông tin đã được cung cấp và kiến thức của bạn.
+`;
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -132,20 +147,9 @@ ${subFields}
       }
     }).join(',\n');
 
-    const outputInstruction = `
----
-### YÊU CẦU ĐẦU RA (CỰC KỲ QUAN TRỌNG)
-
-Bạn PHẢI trả lời bằng một khối mã JSON duy nhất được bao bọc trong \`\`\`json ... \`\`\`.
-JSON object phải có cấu trúc chính xác như sau:
-\`\`\`json
-{
-${jsonStructureDescription}
-}
-\`\`\`
-- **TUYỆT ĐỐI KHÔNG** thêm bất kỳ văn bản, lời chào, hoặc giải thích nào bên ngoài khối mã JSON.
-- Hãy điền giá trị cho mỗi trường dựa trên thông tin đã được cung cấp và kiến thức của bạn.
-`;
+    const userOutputInstruction = promptConfig.output_instruction || DEFAULT_OUTPUT_INSTRUCTION;
+    const outputInstruction = userOutputInstruction.replace('{{json_structure}}', jsonStructureDescription);
+    
     prompt += outputInstruction;
 
     const modelToUse = aiSettings.gemini_content_model || 'gemini-pro';
