@@ -50,19 +50,24 @@ serve(async (req) => {
     for (const project of projects) {
       console.log(`[trigger-post-scan-checks] Checking project ID: ${project.id}`);
       const interval = parseFrequency(project.scan_frequency);
-      if (!interval) {
+      
+      if (interval === null) {
         console.log(`  - Project ${project.id} has invalid frequency: ${project.scan_frequency}. Skipping.`);
         continue;
       }
 
       const lastScanned = project.last_scanned_at ? new Date(project.last_scanned_at) : null;
       const timeSinceLastScan = lastScanned ? now.getTime() - lastScanned.getTime() : Infinity;
+      const isDue = !lastScanned || timeSinceLastScan >= interval;
 
-      console.log(`  - Interval: ${interval}ms`);
+      // Improved logging for better debugging
       console.log(`  - Last scanned: ${lastScanned ? lastScanned.toISOString() : 'Never'}`);
+      console.log(`  - Interval: ${interval}ms`);
       console.log(`  - Time since last scan: ${timeSinceLastScan}ms`);
+      console.log(`  - Condition check (timeSinceLastScan >= interval): ${timeSinceLastScan >= interval}`);
+      console.log(`  - Is due for scanning? ${isDue}`);
 
-      if (!lastScanned || timeSinceLastScan >= interval) {
+      if (isDue) {
         console.log(`  - Project ${project.id} is DUE for scanning. Adding to queue.`);
         projectsToScan.push(project);
       } else {
@@ -89,7 +94,7 @@ serve(async (req) => {
         const { data: scanData, error: scanError } = await supabaseAdmin.functions.invoke('scan-and-filter-posts', {
           body: { projectId: project.id, timeCheckString }
         });
-        if (scanError || scanData.error) throw new Error(scanError?.message || scanData?.error);
+        if (scanError || scanData.error) throw new Error(scanError?.message || scanData.error);
         
         let finalPosts = scanData.posts;
         if (project.is_ai_check_active && finalPosts.length > 0) {
