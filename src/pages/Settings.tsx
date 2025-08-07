@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FacebookApiReference } from "@/components/FacebookApiReference";
+import TelegramSettings from "@/components/TelegramSettings";
 
 const geminiModels = [
   { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
@@ -300,6 +301,7 @@ const Settings = () => {
           <TabsTrigger value="api-ai-scan" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">API AI Check Scan</TabsTrigger>
           <TabsTrigger value="integrations" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Tích hợp</TabsTrigger>
           <TabsTrigger value="api-facebook" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">API Facebook Graph</TabsTrigger>
+          <TabsTrigger value="telegram" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Telegram</TabsTrigger>
         </TabsList>
         <TabsContent value="api-ai" className="mt-4">
           <Card className="shadow-sm rounded-2xl bg-white">
@@ -578,6 +580,9 @@ const Settings = () => {
           </div>
 
           <FacebookApiReference baseUrl={fbApiUrl} accessToken={fbAccessToken} />
+        </TabsContent>
+        <TabsContent value="telegram" className="mt-4">
+          <TelegramSettings />
         </TabsContent>
       </Tabs>
     </main>
