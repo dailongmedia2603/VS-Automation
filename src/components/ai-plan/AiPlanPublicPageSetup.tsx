@@ -156,7 +156,7 @@ export const AiPlanPublicPageSetup = () => {
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="space-y-2">
-          <Label htmlFor="public-title">Tên kế hoạch</Label>
+          <Label htmlFor="public-title">Tên công ty / Tổ chức</Label>
           <Input
             id="public-title"
             value={settings.company_name || ''}
