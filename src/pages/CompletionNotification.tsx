@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Bell, MessageSquare, FileCheck2, Trash2, Loader2 } from 'lucide-react';
+import { ArrowLeft, Bell, MessageSquare, FileCheck2, Trash2, Loader2, CheckCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
@@ -83,6 +83,7 @@ const CompletionNotification = () => {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isMarkingAsSeen, setIsMarkingAsSeen] = useState(false);
   const { decrementUnreadCount } = useNotification();
 
   const fetchCompletedPosts = async () => {
@@ -151,6 +152,42 @@ const CompletionNotification = () => {
     }
   };
 
+  const handleMarkSelectedAsSeen = async () => {
+    if (selectedIds.length === 0) return;
+
+    setIsMarkingAsSeen(true);
+    const toastId = showLoading(`Đang đánh dấu ${selectedIds.length} thông báo...`);
+
+    const unreadSelectedCount = notifications.filter(n => selectedIds.includes(n.id) && !n.is_notification_seen).length;
+
+    try {
+        const { error } = await supabase
+            .from('seeding_posts')
+            .update({ is_notification_seen: true })
+            .in('id', selectedIds);
+
+        if (error) throw error;
+
+        setNotifications(prev => 
+            prev.map(n => selectedIds.includes(n.id) ? { ...n, is_notification_seen: true } : n)
+        );
+        
+        for (let i = 0; i < unreadSelectedCount; i++) {
+            decrementUnreadCount();
+        }
+
+        setSelectedIds([]);
+        
+        dismissToast(toastId);
+        showSuccess("Đã đánh dấu đã xem thành công!");
+    } catch (error: any) {
+        dismissToast(toastId);
+        showError("Đánh dấu đã xem thất bại: " + error.message);
+    } finally {
+        setIsMarkingAsSeen(false);
+    }
+  };
+
   const handleDeleteSelected = async () => {
     setIsDeleting(true);
     const toastId = showLoading(`Đang xóa ${selectedIds.length} thông báo...`);
@@ -193,7 +230,7 @@ const CompletionNotification = () => {
             <div className="flex items-center gap-3">
               <Checkbox 
                 id="select-all"
-                checked={selectedIds.length > 0 && selectedIds.length === notifications.length}
+                checked={selectedIds.length > 0 && selectedIds.length === notifications.length && notifications.length > 0}
                 onCheckedChange={handleSelectAll}
               />
               <label htmlFor="select-all" className="text-sm font-medium">
@@ -201,10 +238,16 @@ const CompletionNotification = () => {
               </label>
             </div>
             {selectedIds.length > 0 && (
-              <Button variant="destructive" size="sm" onClick={() => setIsDeleteAlertOpen(true)}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                Xóa
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={handleMarkSelectedAsSeen} disabled={isMarkingAsSeen}>
+                  {isMarkingAsSeen ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+                  Đánh dấu đã xem
+                </Button>
+                <Button variant="destructive" size="sm" onClick={() => setIsDeleteAlertOpen(true)}>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Xóa
+                </Button>
+              </div>
             )}
           </div>
         </CardHeader>
