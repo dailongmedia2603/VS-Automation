@@ -26,11 +26,17 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
+  const supabaseAdmin = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  );
+
   try {
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    // Luôn kích hoạt post scan checks để đảm bảo nó chạy định kỳ
+    console.log("Chaining trigger for post-scan-checks from trigger-scheduled-checks.");
+    supabaseAdmin.functions.invoke('trigger-post-scan-checks').catch(err => {
+      console.error("Failed to chain trigger for post-scan-checks:", err.message);
+    });
 
     const { data: posts, error: fetchError } = await supabaseAdmin
       .from('seeding_posts')
