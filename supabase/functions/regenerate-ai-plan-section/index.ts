@@ -34,7 +34,7 @@ serve(async (req) => {
 
     const { data: plan, error: planError } = await supabaseAdmin
       .from('ai_plans')
-      .select('template_id')
+      .select('template_id, config') // Also fetch config for placeholders
       .eq('id', planId)
       .single();
     if (planError) throw planError;
@@ -59,6 +59,7 @@ serve(async (req) => {
     }
     
     const planStructure = (templateData.structure as any)?.output_fields || templateData.structure as any[];
+    const inputStructure = (templateData.structure as any)?.input_fields || [];
     const sectionToRegenerate = planStructure.find((s: any) => s.id === sectionId);
     if (!sectionToRegenerate) {
       throw new Error(`Section with ID "${sectionId}" not found in template.`);
@@ -76,11 +77,40 @@ serve(async (req) => {
     const promptConfig = promptConfigData.prompt_structure;
     const blocks = Array.isArray(promptConfig) ? promptConfig : promptConfig.blocks || [];
 
+    // Build base prompt from config
     let basePrompt = blocks
       .map((block: { title: string, content: string }) => `### ${block.title.toUpperCase()}\n\n${block.content}`)
       .join('\n\n---\n\n');
 
+    // Replace placeholders
+    if (basePrompt.includes('{{thong_tin_dau_vao}}')) {
+      const inputDescriptions = inputStructure
+        .map((field: any) => `*   **${field.label}:** ${plan.config[field.id] || '(không có)'}\n    *   *Mô tả/Hướng dẫn cho AI:* ${field.description || 'Không có.'}`)
+        .join('\n');
+      basePrompt = basePrompt.replace(/{{thong_tin_dau_vao}}/g, inputDescriptions || 'Không có thông tin đầu vào.');
+    }
+
+    if (basePrompt.includes('{{tai_lieu}}')) {
+      let documentContext = '(Không có tài liệu tham khảo)';
+      const { data: globalDocs, error: docsError } = await supabaseAdmin
+          .from('documents')
+          .select('title, content')
+          .is('project_id', null);
+
+      if (docsError) {
+          console.warn("Could not fetch global documents:", docsError.message);
+      } else if (globalDocs && globalDocs.length > 0) {
+          documentContext = globalDocs.map(doc => `--- TÀI LIỆU: ${doc.title} ---\n${doc.content}`).join('\n\n');
+      }
+      basePrompt = basePrompt.replace(/{{tai_lieu}}/g, documentContext);
+    }
+
+    // Build regeneration-specific prompt
     const regenerationPrompt = `
+${basePrompt}
+
+---
+
 ### BỐI CẢNH
 Đây là toàn bộ kế hoạch marketing đã được tạo ra trước đó:
 \`\`\`json
