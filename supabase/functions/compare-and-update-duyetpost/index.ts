@@ -76,7 +76,7 @@ serve(async (req) => {
     if (allGroupsError) throw new Error(`Lỗi kiểm tra lại trạng thái group: ${allGroupsError.message}`);
 
     const allApproved = allGroupsForPost.every(g => g.status === 'approved');
-    if (allApproved && allGroupsForPost.length > 0) {
+    if (allApproved) {
       await supabaseAdmin.from('seeding_posts').update({ status: 'completed' }).eq('id', postId);
     }
 

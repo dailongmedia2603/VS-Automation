@@ -105,8 +105,8 @@ serve(async (req) => {
     const total = expectedComments.length;
     const result = { found: foundCount, notFound: total - foundCount, total };
 
-    // Step 5: Update post status if all comments are found
-    if (result.notFound === 0 && total > 0) {
+    // Step 5: Update post status if all comments are found (or if there are no comments to find)
+    if (result.notFound === 0) {
       const { error: postUpdateError } = await supabaseAdmin
         .from('seeding_posts')
         .update({ status: 'completed' })
