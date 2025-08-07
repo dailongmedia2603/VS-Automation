@@ -109,7 +109,7 @@ serve(async (req) => {
     if (result.notFound === 0 && total > 0) {
       const { error: postUpdateError } = await supabaseAdmin
         .from('seeding_posts')
-        .update({ status: 'completed', is_active: false })
+        .update({ status: 'completed' })
         .eq('id', postId);
 
       if (postUpdateError) {

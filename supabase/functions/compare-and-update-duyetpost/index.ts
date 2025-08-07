@@ -77,7 +77,7 @@ serve(async (req) => {
 
     const allApproved = allGroupsForPost.every(g => g.status === 'approved');
     if (allApproved && allGroupsForPost.length > 0) {
-      await supabaseAdmin.from('seeding_posts').update({ status: 'completed', is_active: false }).eq('id', postId);
+      await supabaseAdmin.from('seeding_posts').update({ status: 'completed' }).eq('id', postId);
     }
 
     const total = allGroupsForPost.length;
