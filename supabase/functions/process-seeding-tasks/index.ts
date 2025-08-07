@@ -83,9 +83,20 @@ serve(async (req) => {
       .single();
 
     if (!post) {
-      console.log(`[process-seeding-tasks] No more posts to check for project ${task.project_id}. Completing task ${task.id}.`);
-      await supabaseAdmin.from('seeding_tasks').update({ status: 'completed', current_post_id: null, updated_at: new Date().toISOString() }).eq('id', task.id);
-      return new Response(JSON.stringify({ message: `Task ${task.id} completed.` }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      // No more posts to check for this project.
+      // If the task has processed all expected posts, it's complete.
+      // Otherwise, it's an error state because it ended prematurely.
+      if (task.progress_current >= task.progress_total) {
+        console.log(`[process-seeding-tasks] Task ${task.id} has processed all ${task.progress_total} posts. Completing.`);
+        await supabaseAdmin.from('seeding_tasks').update({ status: 'completed', current_post_id: null, updated_at: new Date().toISOString() }).eq('id', task.id);
+        return new Response(JSON.stringify({ message: `Task ${task.id} completed.` }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      } else {
+        const errorMessage = `Task ${task.id} ended prematurely. Processed ${task.progress_current}/${task.progress_total} posts, but no more 'checking' posts were found.`;
+        console.warn(`[process-seeding-tasks] ${errorMessage}`);
+        await supabaseAdmin.from('seeding_tasks').update({ status: 'failed', error_message: errorMessage, updated_at: new Date().toISOString() }).eq('id', task.id);
+        // We don't return an error response here, just a normal one, as the function itself didn't fail.
+        return new Response(JSON.stringify({ message: `Task ${task.id} failed due to discrepancy.` }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
     }
     console.log(`[process-seeding-tasks] Found post ID: ${post.id} to process.`);
 
