@@ -18,6 +18,7 @@ import { CommentGenerationDetail } from '@/components/content-ai/CommentGenerati
 import { ArticleGenerationDetail } from '@/components/content-ai/ArticleGenerationDetail';
 import { Badge } from '@/components/ui/badge';
 import { ProjectDetailProvider, useProjectDetail } from '@/contexts/ProjectDetailContext';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 type ProjectItem = {
   id: number;
@@ -306,25 +307,65 @@ const ProjectDetailContent = () => {
             <DialogTitle>Thêm mục mới</DialogTitle>
             <DialogDescription>Điền các thông tin cần thiết để AI tạo nội dung.</DialogDescription>
           </DialogHeader>
-          <div className="py-4 space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="post-name">Tên bài viết</Label>
-              <Input id="post-name" value={newItem.name} onChange={(e) => setNewItem(d => ({...d, name: e.target.value}))} placeholder="VD: Bài viết về sản phẩm A" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="post-type">Loại</Label>
-              <Select value={newItem.type} onValueChange={(v) => handleTypeChange(v as any)}>
-                <SelectTrigger id="post-type"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="article">Viết post</SelectItem>
-                  <SelectItem value="comment">Viết comment</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <ScrollArea className="max-h-[70vh] pr-4">
+            <div className="py-4 space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="post-name">Tên bài viết</Label>
+                <Input id="post-name" value={newItem.name} onChange={(e) => setNewItem(d => ({...d, name: e.target.value}))} placeholder="VD: Bài viết về sản phẩm A" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="post-type">Loại</Label>
+                <Select value={newItem.type} onValueChange={(v) => handleTypeChange(v as any)}>
+                  <SelectTrigger id="post-type"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="article">Viết post</SelectItem>
+                    <SelectItem value="comment">Viết comment</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            {newItem.type === 'article' && (
-              <div className="space-y-4 p-4 border rounded-lg bg-slate-50">
-                <div className="grid grid-cols-2 gap-4">
+              {newItem.type === 'article' && (
+                <div className="space-y-4 p-4 border rounded-lg bg-slate-50">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Ngành</Label>
+                      <Select onValueChange={v => handleConfigChange('libraryId', Number(v))}>
+                        <SelectTrigger><SelectValue placeholder="Chọn thư viện prompt" /></SelectTrigger>
+                        <SelectContent>
+                          {promptLibraries.map(lib => (
+                            <SelectItem key={lib.id} value={String(lib.id)}>{lib.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Dạng bài</Label>
+                      <Select onValueChange={v => handleConfigChange('format', v)}>
+                        <SelectTrigger><SelectValue placeholder="Chọn dạng bài" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="question">Đặt câu hỏi / thảo luận</SelectItem>
+                          <SelectItem value="review">Review</SelectItem>
+                          <SelectItem value="sharing">Chia sẻ</SelectItem>
+                          <SelectItem value="comparison">So sánh</SelectItem>
+                          <SelectItem value="storytelling">Story telling</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Định hướng nội dung</Label>
+                    <Textarea placeholder="Nhập định hướng chi tiết cho AI..." className="min-h-[100px]" onChange={e => handleConfigChange('direction', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Số lượng</Label>
+                    <Input type="number" value={newItemConfig.quantity} onChange={e => handleConfigChange('quantity', e.target.value)} />
+                    <p className="text-xs text-muted-foreground">NÊN CHỌN 1 (Số lượng bài nhiều hơn 1 có thể ảnh hưởng đến chất lượng của bài viết)</p>
+                  </div>
+                </div>
+              )}
+
+              {newItem.type === 'comment' && (
+                <div className="space-y-4 p-4 border rounded-lg bg-slate-50">
                   <div className="space-y-2">
                     <Label>Ngành</Label>
                     <Select onValueChange={v => handleConfigChange('libraryId', Number(v))}>
@@ -337,85 +378,47 @@ const ProjectDetailContent = () => {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Dạng bài</Label>
-                    <Select onValueChange={v => handleConfigChange('format', v)}>
-                      <SelectTrigger><SelectValue placeholder="Chọn dạng bài" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="question">Đặt câu hỏi / thảo luận</SelectItem>
-                        <SelectItem value="review">Review</SelectItem>
-                        <SelectItem value="sharing">Chia sẻ</SelectItem>
-                        <SelectItem value="comparison">So sánh</SelectItem>
-                        <SelectItem value="storytelling">Story telling</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Label>Nội dung Post</Label>
+                    <Textarea placeholder="Dán nội dung bài viết cần bình luận vào đây..." className="min-h-[100px]" onChange={e => handleConfigChange('postContent', e.target.value)} />
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Định hướng nội dung</Label>
-                  <Textarea placeholder="Nhập định hướng chi tiết cho AI..." className="min-h-[100px]" onChange={e => handleConfigChange('direction', e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Số lượng</Label>
-                  <Input type="number" value={newItemConfig.quantity} onChange={e => handleConfigChange('quantity', e.target.value)} />
-                  <p className="text-xs text-muted-foreground">NÊN CHỌN 1 (Số lượng bài nhiều hơn 1 có thể ảnh hưởng đến chất lượng của bài viết)</p>
-                </div>
-              </div>
-            )}
-
-            {newItem.type === 'comment' && (
-              <div className="space-y-4 p-4 border rounded-lg bg-slate-50">
-                <div className="space-y-2">
-                  <Label>Ngành</Label>
-                  <Select onValueChange={v => handleConfigChange('libraryId', Number(v))}>
-                    <SelectTrigger><SelectValue placeholder="Chọn thư viện prompt" /></SelectTrigger>
-                    <SelectContent>
-                      {promptLibraries.map(lib => (
-                        <SelectItem key={lib.id} value={String(lib.id)}>{lib.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Nội dung Post</Label>
-                  <Textarea placeholder="Dán nội dung bài viết cần bình luận vào đây..." className="min-h-[100px]" onChange={e => handleConfigChange('postContent', e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Định hướng comment</Label>
-                  <Textarea placeholder="Nhập định hướng chi tiết cho các bình luận..." className="min-h-[80px]" onChange={e => handleConfigChange('commentDirection', e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Tỉ lệ comment</Label>
                   <div className="space-y-2">
-                    {commentRatios.map((ratio) => (
-                      <div key={ratio.id} className="flex items-center gap-2">
-                        <div className="relative w-24">
-                          <Input type="number" value={ratio.percentage} onChange={(e) => handleRatioChange(ratio.id, 'percentage', e.target.value)} className="pr-6" />
-                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
+                    <Label>Định hướng comment</Label>
+                    <Textarea placeholder="Nhập định hướng chi tiết cho các bình luận..." className="min-h-[80px]" onChange={e => handleConfigChange('commentDirection', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Tỉ lệ comment</Label>
+                    <div className="space-y-2">
+                      {commentRatios.map((ratio) => (
+                        <div key={ratio.id} className="flex items-center gap-2">
+                          <div className="relative w-24">
+                            <Input type="number" value={ratio.percentage} onChange={(e) => handleRatioChange(ratio.id, 'percentage', e.target.value)} className="pr-6" />
+                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
+                          </div>
+                          <Input placeholder="Nội dung định hướng" value={ratio.content} onChange={(e) => handleRatioChange(ratio.id, 'content', e.target.value)} />
+                          <Button variant="ghost" size="icon" onClick={() => handleRemoveRatio(ratio.id)} disabled={commentRatios.length <= 1}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
                         </div>
-                        <Input placeholder="Nội dung định hướng" value={ratio.content} onChange={(e) => handleRatioChange(ratio.id, 'content', e.target.value)} />
-                        <Button variant="ghost" size="icon" onClick={() => handleRemoveRatio(ratio.id)} disabled={commentRatios.length <= 1}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
+                    <div className="flex items-center justify-between mt-2">
+                      <Button variant="outline" size="sm" onClick={handleAddRatio}>
+                        <PlusCircle className="h-4 w-4 mr-2" />
+                        Thêm tỉ lệ
+                      </Button>
+                      {totalPercentage > 100 && (
+                        <p className="text-sm text-destructive font-medium">Tổng tỉ lệ vượt quá 100%!</p>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between mt-2">
-                    <Button variant="outline" size="sm" onClick={handleAddRatio}>
-                      <PlusCircle className="h-4 w-4 mr-2" />
-                      Thêm tỉ lệ
-                    </Button>
-                    {totalPercentage > 100 && (
-                      <p className="text-sm text-destructive font-medium">Tổng tỉ lệ vượt quá 100%!</p>
-                    )}
+                  <div className="space-y-2">
+                    <Label>Số lượng comment</Label>
+                    <Input type="number" value={newItemConfig.quantity} onChange={e => handleConfigChange('quantity', e.target.value)} />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Số lượng comment</Label>
-                  <Input type="number" value={newItemConfig.quantity} onChange={e => handleConfigChange('quantity', e.target.value)} />
-                </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          </ScrollArea>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Hủy</Button>
             <Button onClick={handleAddItem} disabled={isSaving}>{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Thêm</Button>
