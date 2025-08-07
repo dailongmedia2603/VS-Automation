@@ -36,12 +36,13 @@ serve(async (req) => {
       console.log(`[process-seeding-tasks] Reset ${stuckTasks.length} stuck task(s).`);
     }
 
-    // 2. Find a single pending task and "claim" it by setting it to 'running' atomically.
-    // This is the core of preventing race conditions.
-    const { data: claimedTask, error: claimError } = await supabaseAdmin.rpc('get_and_claim_seeding_task');
+    // 2. Find a single pending task and "claim" it.
+    // The RPC returns an array, so we need to handle it correctly.
+    const { data: claimedTasks, error: claimError } = await supabaseAdmin.rpc('get_and_claim_seeding_task');
     if (claimError) throw new Error(`Could not claim a task: ${claimError.message}`);
     
-    task = claimedTask;
+    // **FIX:** Extract the single task object from the returned array.
+    task = claimedTasks && claimedTasks.length > 0 ? claimedTasks[0] : null;
 
     if (!task) {
       console.log("[process-seeding-tasks] No pending tasks to process at this time.");
