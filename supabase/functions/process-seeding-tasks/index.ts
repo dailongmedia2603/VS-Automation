@@ -12,6 +12,8 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
+  console.log(`[process-seeding-tasks] Function started at ${new Date().toISOString()}`);
+
   const supabaseAdmin = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -20,7 +22,21 @@ serve(async (req) => {
   let task = null;
 
   try {
-    // 1. Find a running or pending task
+    // 1. Handle potentially stuck tasks (running for more than 5 minutes)
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const { data: stuckTasks, error: stuckError } = await supabaseAdmin
+      .from('seeding_tasks')
+      .update({ status: 'failed', error_message: 'Task timed out after 5 minutes.' })
+      .eq('status', 'running')
+      .lt('updated_at', fiveMinutesAgo)
+      .select();
+    
+    if (stuckError) console.error("[process-seeding-tasks] Error resetting stuck tasks:", stuckError);
+    if (stuckTasks && stuckTasks.length > 0) {
+      console.log(`[process-seeding-tasks] Reset ${stuckTasks.length} stuck task(s).`);
+    }
+
+    // 2. Find a task to process (prioritize running, then pending)
     let { data: runningTask, error: runningTaskError } = await supabaseAdmin
       .from('seeding_tasks')
       .select('*')
@@ -31,7 +47,9 @@ serve(async (req) => {
     if (runningTaskError && runningTaskError.code !== 'PGRST116') throw runningTaskError;
     task = runningTask;
 
-    if (!task) {
+    if (task) {
+      console.log(`[process-seeding-tasks] Resuming running task ID: ${task.id}`);
+    } else {
       let { data: pendingTask, error: pendingTaskError } = await supabaseAdmin
         .from('seeding_tasks')
         .select('*')
@@ -41,15 +59,20 @@ serve(async (req) => {
         .single();
       if (pendingTaskError && pendingTaskError.code !== 'PGRST116') throw pendingTaskError;
       task = pendingTask;
+      if (task) {
+        console.log(`[process-seeding-tasks] Starting new pending task ID: ${task.id}`);
+      }
     }
 
     if (!task) {
+      console.log("[process-seeding-tasks] No tasks to process at this time.");
       return new Response(JSON.stringify({ message: "No tasks to process." }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // 2. Find the next post to process
+    // 3. Find the next post to process
+    console.log(`[process-seeding-tasks] Finding next post for project ID: ${task.project_id}`);
     const { data: post, error: postError } = await supabaseAdmin
       .from('seeding_posts')
       .select('id, links, type')
@@ -60,25 +83,25 @@ serve(async (req) => {
       .single();
 
     if (!post) {
+      console.log(`[process-seeding-tasks] No more posts to check for project ${task.project_id}. Completing task ${task.id}.`);
       await supabaseAdmin.from('seeding_tasks').update({ status: 'completed', current_post_id: null, updated_at: new Date().toISOString() }).eq('id', task.id);
       return new Response(JSON.stringify({ message: `Task ${task.id} completed.` }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
+    console.log(`[process-seeding-tasks] Found post ID: ${post.id} to process.`);
 
-    // 3. "Claim" the post by updating the task state BEFORE processing
+    // 4. "Claim" the post and update task status to running
     await supabaseAdmin.from('seeding_tasks').update({ status: 'running', current_post_id: post.id, updated_at: new Date().toISOString() }).eq('id', task.id);
     
     const { data: currentTaskStatus } = await supabaseAdmin.from('seeding_tasks').select('status').eq('id', task.id).single();
     if (currentTaskStatus.status === 'cancelled') {
+        console.log(`[process-seeding-tasks] Task ${task.id} was cancelled. Aborting.`);
         await supabaseAdmin.from('seeding_tasks').update({ current_post_id: null, updated_at: new Date().toISOString() }).eq('id', task.id);
         return new Response(JSON.stringify({ message: `Task ${task.id} was cancelled.` }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // 4. Process the post
-    const logPayload: any = {
-      post_id: post.id,
-      type: post.type,
-    };
-
+    // 5. Process the post
+    const logPayload: any = { post_id: post.id, type: post.type };
+    console.log(`[process-seeding-tasks] Starting processing for post ${post.id} of type ${post.type}.`);
     try {
       await supabaseAdmin.from('seeding_posts').update({ last_checked_at: new Date().toISOString() }).eq('id', post.id);
 
@@ -88,9 +111,7 @@ serve(async (req) => {
           try { logPayload.raw_response = fetchData?.rawResponse ? JSON.parse(fetchData.rawResponse) : { content: fetchData.rawResponse }; } catch (e) { logPayload.raw_response = { error: "Failed to parse raw response", content: fetchData.rawResponse }; }
           if (fetchError || fetchData.error) throw new Error(fetchError?.message || fetchData?.error);
           
-          const { data: processData, error: processError } = await supabaseAdmin.functions.invoke('process-and-store-comments', { body: { rawResponse: fetchData.rawResponse, internalPostId: post.id } });
-          if (processError || processData.error) throw new Error(processError?.message || processData?.error);
-          
+          await supabaseAdmin.functions.invoke('process-and-store-comments', { body: { rawResponse: fetchData.rawResponse, internalPostId: post.id } });
           await supabaseAdmin.functions.invoke('compare-and-update-comments', { body: { postId: post.id } });
 
       } else if (post.type === 'post_approval') {
@@ -100,25 +121,25 @@ serve(async (req) => {
           try { logPayload.raw_response = fetchData?.rawResponse ? JSON.parse(fetchData.rawResponse) : { content: fetchData.rawResponse }; } catch (e) { logPayload.raw_response = { error: "Failed to parse raw response", content: fetchData.rawResponse }; }
           if (fetchError || (fetchData && fetchData.error)) throw new Error(fetchError?.message || fetchData?.error);
           
-          const { data: processData, error: processError } = await supabaseAdmin.functions.invoke('process-and-store-duyetpost', { body: { allPosts: fetchData.allPosts, internalPostId: post.id } });
-          if (processError || (processData && processData.error)) throw new Error(processError?.message || processData?.error);
-          
+          await supabaseAdmin.functions.invoke('process-and-store-duyetpost', { body: { allPosts: fetchData.allPosts, internalPostId: post.id } });
           await supabaseAdmin.functions.invoke('compare-and-update-duyetpost', { body: { postId: post.id } });
       }
       
+      console.log(`[process-seeding-tasks] Successfully processed post ${post.id}.`);
       logPayload.status = 'success';
       await supabaseAdmin.from('logs_check_seeding_cmt_tu_dong').insert(logPayload);
 
     } catch (postProcessingError) {
-      console.error(`Error processing post ${post.id}:`, postProcessingError.message);
+      console.error(`[process-seeding-tasks] Error processing post ${post.id}:`, postProcessingError.message);
       logPayload.status = 'error';
       logPayload.error_message = postProcessingError.message;
       await supabaseAdmin.from('logs_check_seeding_cmt_tu_dong').insert(logPayload);
     }
 
-    // 5. Update progress and release the "claim"
+    // 6. Update progress and release the "claim"
     const newProgress = task.progress_current + 1;
     const isCompleted = newProgress >= task.progress_total;
+    console.log(`[process-seeding-tasks] Task ${task.id} progress: ${newProgress}/${task.progress_total}. Completed: ${isCompleted}`);
     
     const updateData = {
       progress_current: newProgress,
@@ -128,20 +149,18 @@ serve(async (req) => {
     };
     await supabaseAdmin.from('seeding_tasks').update(updateData).eq('id', task.id);
 
-    // 6. If the task is not yet complete, trigger the next run immediately.
+    // 7. If the task is not yet complete, trigger the next run immediately.
     if (!isCompleted) {
-      // This is a "fire and forget" call. We don't wait for it to finish.
-      supabaseAdmin.functions.invoke('process-seeding-tasks', {
-        // No body is needed as the function finds the task itself
-      }).catch(err => {
-        // Log the error but don't let it fail the current successful run
-        console.error(`Error self-invoking process-seeding-tasks for task ${task.id}:`, err);
+      console.log(`[process-seeding-tasks] Task ${task.id} not complete. Self-invoking for next post.`);
+      supabaseAdmin.functions.invoke('process-seeding-tasks', {}).catch(err => {
+        console.error(`[process-seeding-tasks] Error self-invoking for task ${task.id}:`, err);
       });
     }
 
     return new Response(JSON.stringify({ message: `Task ${task.id} processed post ${post.id}.` }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error) {
+    console.error(`[process-seeding-tasks] CRITICAL ERROR for task ID ${task?.id}:`, error.message);
     if (task && task.id) {
       await supabaseAdmin.from('seeding_tasks').update({ status: 'failed', error_message: error.message }).eq('id', task.id);
     }
