@@ -366,7 +366,7 @@ const CheckPostScanDetail = () => {
                       </CardHeader>
                       <CardContent className="space-y-4">
                         <div className="flex items-center justify-between"><Label>Kích hoạt quét tự động</Label><Switch checked={isActive} onCheckedChange={setIsActive} /></div>
-                        <div className="space-y-2"><Label>Tần suất chạy lại</Label><div className="flex items-center gap-2"><Input type="number" value={frequencyValue} onChange={e => setFrequencyValue(e.target.value)} className="w-24 bg-slate-50" /><Select value={frequencyUnit} onValueChange={setFrequencyUnit}><SelectTrigger className="bg-slate-50"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="hour">Giờ</SelectItem><SelectItem value="day">Ngày</SelectItem></SelectContent></Select></div></div>
+                        <div className="space-y-2"><Label>Tần suất chạy lại</Label><div className="flex items-center gap-2"><Input type="number" value={frequencyValue} onChange={e => setFrequencyValue(e.target.value)} className="w-24 bg-slate-50" /><Select value={frequencyUnit} onValueChange={setFrequencyUnit}><SelectTrigger className="bg-slate-50"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="minute">Phút</SelectItem><SelectItem value="hour">Giờ</SelectItem><SelectItem value="day">Ngày</SelectItem></SelectContent></Select></div></div>
                       </CardContent>
                     </Card>
                   </div>

@@ -14,6 +14,7 @@ const parseFrequency = (freq) => {
   if (isNaN(numValue)) return null;
 
   switch (unit) {
+    case 'minute': return numValue * 60 * 1000;
     case 'hour': return numValue * 60 * 60 * 1000;
     case 'day': return numValue * 24 * 60 * 60 * 1000;
     default: return null;
