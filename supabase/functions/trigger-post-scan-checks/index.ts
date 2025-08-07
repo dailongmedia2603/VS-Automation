@@ -13,7 +13,10 @@ const parseFrequency = (freq) => {
   const numValue = parseInt(value, 10);
   if (isNaN(numValue)) return null;
 
-  switch (unit) {
+  // Make the unit parsing more robust (handles 'minute' and 'minutes')
+  const normalizedUnit = unit.endsWith('s') ? unit.slice(0, -1) : unit;
+
+  switch (normalizedUnit) {
     case 'minute': return numValue * 60 * 1000;
     case 'hour': return numValue * 60 * 60 * 1000;
     case 'day': return numValue * 24 * 60 * 60 * 1000;
