@@ -14,6 +14,8 @@ type PublicSettings = {
   company_name: string;
   description: string;
   logo_url: string | null;
+  logo_width: number | null;
+  logo_height: number | null;
 };
 
 export const AiPlanPublicPageSetup = () => {
@@ -127,6 +129,8 @@ export const AiPlanPublicPageSetup = () => {
           company_name: settings.company_name,
           description: settings.description,
           logo_url: logoUrl,
+          logo_width: settings.logo_width,
+          logo_height: settings.logo_height,
           updated_at: new Date().toISOString(),
         });
 
@@ -169,7 +173,7 @@ export const AiPlanPublicPageSetup = () => {
         </div>
         <div className="space-y-2">
           <Label>Logo</Label>
-          <div className="flex items-center gap-4">
+          <div className="flex items-start gap-4">
             <div className="w-32 h-32 border rounded-lg flex items-center justify-center bg-slate-50">
               {logoPreview ? (
                 <img src={logoPreview} alt="Logo preview" className="max-w-full max-h-full object-contain" />
@@ -177,18 +181,42 @@ export const AiPlanPublicPageSetup = () => {
                 <span className="text-xs text-muted-foreground">Chưa có logo</span>
               )}
             </div>
-            <div className="flex flex-col gap-2">
-              <input type="file" accept="image/*" ref={fileInputRef} onChange={handleLogoChange} className="hidden" />
-              <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
-                <UploadCloud className="mr-2 h-4 w-4" />
-                Tải ảnh lên
-              </Button>
-              {logoPreview && (
-                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive justify-start p-2 h-auto" onClick={handleRemoveLogo}>
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Xóa logo
+            <div className="flex-1 space-y-2">
+              <div className="flex items-center gap-2">
+                <input type="file" accept="image/*" ref={fileInputRef} onChange={handleLogoChange} className="hidden" />
+                <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
+                  <UploadCloud className="mr-2 h-4 w-4" />
+                  Tải ảnh lên
                 </Button>
-              )}
+                {logoPreview && (
+                  <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={handleRemoveLogo}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Xóa logo
+                  </Button>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-4 pt-2">
+                <div className="space-y-1">
+                  <Label htmlFor="logo-width" className="text-xs">Chiều rộng (px)</Label>
+                  <Input
+                    id="logo-width"
+                    type="number"
+                    placeholder="Tự động"
+                    value={settings.logo_width || ''}
+                    onChange={(e) => setSettings(s => ({ ...s, logo_width: e.target.value ? parseInt(e.target.value, 10) : null }))}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="logo-height" className="text-xs">Chiều cao (px)</Label>
+                  <Input
+                    id="logo-height"
+                    type="number"
+                    placeholder="Tự động"
+                    value={settings.logo_height || ''}
+                    onChange={(e) => setSettings(s => ({ ...s, logo_height: e.target.value ? parseInt(e.target.value, 10) : null }))}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>

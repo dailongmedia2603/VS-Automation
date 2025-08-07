@@ -15,6 +15,8 @@ type PublicSettings = {
   company_name: string;
   description: string;
   logo_url: string | null;
+  logo_width: number | null;
+  logo_height: number | null;
 };
 
 type PlanStructure = {
@@ -51,7 +53,7 @@ const PublicAiPlan = () => {
         
         const settingsPromise = supabase
           .from('public_page_settings')
-          .select('company_name, description, logo_url')
+          .select('company_name, description, logo_url, logo_width, logo_height')
           .eq('id', 1)
           .single();
 
@@ -111,13 +113,28 @@ const PublicAiPlan = () => {
   const headerTitle = publicSettings?.company_name || plan?.name || 'Kế hoạch Marketing';
   const headerDescription = publicSettings?.description || 'Một kế hoạch marketing được tạo bởi AI';
   const logoUrl = publicSettings?.logo_url;
+  const logoWidth = publicSettings?.logo_width;
+  const logoHeight = publicSettings?.logo_height;
+
+  const logoStyle: React.CSSProperties = {};
+  if (logoWidth) logoStyle.width = `${logoWidth}px`;
+  if (logoHeight) logoStyle.height = `${logoHeight}px`;
+  if (!logoWidth && !logoHeight) {
+    logoStyle.maxHeight = '96px';
+    logoStyle.width = 'auto';
+  }
 
   return (
     <main className="p-6 sm:p-8 md:p-12 bg-slate-50 min-h-screen">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8 text-center bg-blue-600 text-white p-8 rounded-2xl shadow-lg">
           {logoUrl && (
-            <img src={logoUrl} alt="Logo" className="max-h-24 w-auto mx-auto mb-4" />
+            <img 
+              src={logoUrl} 
+              alt="Logo" 
+              className="mx-auto mb-4"
+              style={logoStyle}
+            />
           )}
           <h1 className="text-4xl font-bold tracking-tight">{headerTitle}</h1>
           <p className="text-blue-200 mt-2">{headerDescription}</p>
