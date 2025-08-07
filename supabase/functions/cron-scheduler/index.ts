@@ -8,6 +8,9 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  // Log ngay khi function được gọi để xác nhận
+  console.log(`[cron-scheduler] Invoked at ${new Date().toISOString()} with method ${req.method}`);
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -18,12 +21,11 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    console.log("Cron scheduler started. Triggering all scheduled tasks sequentially.");
+    console.log("[cron-scheduler] Triggering all scheduled tasks sequentially.");
 
     const results = [];
     let errorOccurred = false;
 
-    // Reordered tasks: trigger first, then process.
     const tasksToRun = [
       'trigger-post-scan-checks',
       'trigger-scheduled-seeding-tasks',
@@ -32,24 +34,24 @@ serve(async (req) => {
 
     for (const taskName of tasksToRun) {
       try {
-        console.log(`Invoking ${taskName}...`);
+        console.log(`[cron-scheduler] Invoking ${taskName}...`);
         const { data, error } = await supabaseAdmin.functions.invoke(taskName);
         results.push({ name: taskName, status: error ? 'error' : 'success', data, error });
         if (error) {
-          console.error(`Error in ${taskName}:`, error);
+          console.error(`[cron-scheduler] Error in ${taskName}:`, error);
           errorOccurred = true;
         }
       } catch (e) {
-        console.error(`Failed to invoke ${taskName}:`, e);
+        console.error(`[cron-scheduler] Failed to invoke ${taskName}:`, e);
         results.push({ name: taskName, status: 'invocation_failed', error: e.message });
         errorOccurred = true;
       }
     }
 
-    console.log("Scheduled tasks triggered. Results:", results);
+    console.log("[cron-scheduler] Scheduled tasks triggered. Results:", results);
 
     if (errorOccurred) {
-      console.error("One or more scheduled tasks failed.");
+      console.error("[cron-scheduler] One or more scheduled tasks failed.");
     }
 
     return new Response(JSON.stringify({ message: "All scheduled tasks triggered.", results }), {
@@ -58,7 +60,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Error in cron-scheduler function:', error.message);
+    console.error('[cron-scheduler] CRITICAL ERROR:', error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
