@@ -53,6 +53,7 @@ type Schedule = {
   frequency_value: number;
   frequency_unit: string;
   last_triggered_at: string | null;
+  run_count: number;
 };
 
 const initialNewPostState = {
@@ -86,7 +87,7 @@ const SeedingProjectDetail = () => {
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
 
   const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
-  const [schedule, setSchedule] = useState<Partial<Schedule>>({ is_active: false, frequency_value: 6, frequency_unit: 'hour' });
+  const [schedule, setSchedule] = useState<Partial<Schedule>>({ is_active: false, frequency_value: 6, frequency_unit: 'hour', run_count: 0 });
   const [isSavingSchedule, setIsSavingSchedule] = useState(false);
 
   const allPosts = useMemo(() => [...commentCheckPosts, ...postApprovalPosts], [commentCheckPosts, postApprovalPosts]);
@@ -491,10 +492,17 @@ const SeedingProjectDetail = () => {
               Check tất cả
             </Button>
           )}
-          <Button variant="outline" onClick={() => setIsScheduleDialogOpen(true)}>
-            <Clock className="mr-2 h-4 w-4" />
-            Lập lịch
-          </Button>
+          <div className="relative">
+            <Button variant="outline" onClick={() => setIsScheduleDialogOpen(true)}>
+              <Clock className="mr-2 h-4 w-4" />
+              Lập lịch
+            </Button>
+            {schedule && schedule.run_count && schedule.run_count > 0 && (
+              <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center pointer-events-none">
+                {schedule.run_count}
+              </div>
+            )}
+          </div>
           <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}>
             <UploadCloud className="mr-2 h-4 w-4" />
             Import

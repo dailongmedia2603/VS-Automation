@@ -69,10 +69,13 @@ serve(async (req) => {
           body: { projectId: schedule.project_id }
         });
         
-        // Update last_triggered_at to prevent re-triggering
+        // Update last_triggered_at and increment run_count
         await supabaseAdmin
           .from('seeding_project_schedules')
-          .update({ last_triggered_at: new Date().toISOString() })
+          .update({ 
+            last_triggered_at: new Date().toISOString(),
+            run_count: (schedule.run_count || 0) + 1
+          })
           .eq('id', schedule.id);
         
         return { projectId: schedule.project_id, status: 'success' };
