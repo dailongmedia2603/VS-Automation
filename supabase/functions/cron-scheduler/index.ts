@@ -18,27 +18,40 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    console.log("Cron scheduler started. Triggering all scheduled tasks.");
+    console.log("Cron scheduler started. Triggering all scheduled tasks sequentially.");
 
-    // Sử dụng Promise.allSettled để đảm bảo tất cả các hàm đều được gọi,
-    // ngay cả khi một trong hai gặp lỗi.
-    const results = await Promise.allSettled([
-      supabaseAdmin.functions.invoke('trigger-post-scan-checks'),
-      supabaseAdmin.functions.invoke('process-seeding-tasks'), // Kích hoạt worker của seeding (Check tất cả)
-      supabaseAdmin.functions.invoke('trigger-seeding-checks') // Kích hoạt check tự động cho từng post
-    ]);
+    const results = [];
+    let errorOccurred = false;
+
+    const tasksToRun = [
+      'trigger-post-scan-checks',
+      'process-seeding-tasks',
+      'trigger-seeding-checks'
+    ];
+
+    for (const taskName of tasksToRun) {
+      try {
+        console.log(`Invoking ${taskName}...`);
+        const { data, error } = await supabaseAdmin.functions.invoke(taskName);
+        results.push({ name: taskName, status: error ? 'error' : 'success', data, error });
+        if (error) {
+          console.error(`Error in ${taskName}:`, error);
+          errorOccurred = true;
+        }
+      } catch (e) {
+        console.error(`Failed to invoke ${taskName}:`, e);
+        results.push({ name: taskName, status: 'invocation_failed', error: e.message });
+        errorOccurred = true;
+      }
+    }
 
     console.log("Scheduled tasks triggered. Results:", results);
 
-    const errors = results
-      .filter(result => result.status === 'rejected')
-      .map(result => (result as PromiseRejectedResult).reason);
-
-    if (errors.length > 0) {
-      console.error("One or more scheduled tasks failed:", errors);
+    if (errorOccurred) {
+      console.error("One or more scheduled tasks failed.");
     }
 
-    return new Response(JSON.stringify({ message: "All scheduled tasks triggered successfully." }), {
+    return new Response(JSON.stringify({ message: "All scheduled tasks triggered.", results }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
