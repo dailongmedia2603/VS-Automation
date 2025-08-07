@@ -20,11 +20,12 @@ serve(async (req) => {
 
     console.log("Cron scheduler started. Triggering all scheduled tasks.");
 
-    // Sử dụng Promise.allSettled để đảm bảo cả hai hàm đều được gọi,
+    // Sử dụng Promise.allSettled để đảm bảo tất cả các hàm đều được gọi,
     // ngay cả khi một trong hai gặp lỗi.
     const results = await Promise.allSettled([
       supabaseAdmin.functions.invoke('trigger-post-scan-checks'),
-      supabaseAdmin.functions.invoke('process-seeding-tasks') // Kích hoạt trực tiếp worker của seeding
+      supabaseAdmin.functions.invoke('process-seeding-tasks'), // Kích hoạt worker của seeding (Check tất cả)
+      supabaseAdmin.functions.invoke('trigger-seeding-checks') // Kích hoạt check tự động cho từng post
     ]);
 
     console.log("Scheduled tasks triggered. Results:", results);
