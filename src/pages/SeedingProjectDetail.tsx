@@ -6,7 +6,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, MessageSquare, FileCheck2, ChevronRight, ArrowLeft, Edit, Trash2, Loader2, Check, CheckCircle, UploadCloud, PlayCircle, X, AlertTriangle } from 'lucide-react';
+import { PlusCircle, MessageSquare, FileCheck2, ChevronRight, ArrowLeft, Edit, Trash2, Loader2, Check, CheckCircle, UploadCloud, PlayCircle, X, AlertTriangle, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -18,7 +18,6 @@ import { Switch } from '@/components/ui/switch';
 import { CommentCheckDetail } from '@/components/seeding/CommentCheckDetail';
 import { PostApprovalDetail } from '@/components/seeding/PostApprovalDetail';
 import { ImportPostsDialog } from '@/components/seeding/ImportPostsDialog';
-import { subDays } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 
@@ -34,9 +33,6 @@ type Post = {
   content: string | null;
   status: 'checking' | 'completed';
   type: 'comment_check' | 'post_approval';
-  is_active: boolean;
-  check_frequency: string | null;
-  last_checked_at: string | null;
   visible_count: number;
   total_count: number;
 };
@@ -50,14 +46,21 @@ type SeedingTask = {
   error_message: string | null;
 };
 
+type Schedule = {
+  id: number;
+  project_id: number;
+  is_active: boolean;
+  frequency_value: number;
+  frequency_unit: string;
+  last_triggered_at: string | null;
+};
+
 const initialNewPostState = {
   name: '',
   type: 'comment_check' as 'comment_check' | 'post_approval',
   links: '',
   comments: '',
   content: '',
-  check_frequency: '1_hour',
-  is_active: true,
 };
 
 const SeedingProjectDetail = () => {
@@ -82,10 +85,9 @@ const SeedingProjectDetail = () => {
 
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
 
-  // State for auto-check settings
-  const [autoCheckActive, setAutoCheckActive] = useState(false);
-  const [frequencyValue, setFrequencyValue] = useState('1');
-  const [frequencyUnit, setFrequencyUnit] = useState('hour');
+  const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
+  const [schedule, setSchedule] = useState<Partial<Schedule>>({ is_active: false, frequency_value: 6, frequency_unit: 'hour' });
+  const [isSavingSchedule, setIsSavingSchedule] = useState(false);
 
   const allPosts = useMemo(() => [...commentCheckPosts, ...postApprovalPosts], [commentCheckPosts, postApprovalPosts]);
   const currentPostName = useMemo(() => {
@@ -95,75 +97,6 @@ const SeedingProjectDetail = () => {
     }
     return null;
   }, [activeTask?.current_post_id, allPosts]);
-
-  const runInitialCheck = async (post: Post) => {
-    if (!post.is_active) return;
-
-    const toastId = showLoading(`Bắt đầu quét tự động lần đầu cho "${post.name}"...`);
-
-    try {
-        if (post.type === 'comment_check') {
-            if (!post.links) throw new Error("Bài viết thiếu ID để kiểm tra.");
-            
-            const { data: fetchData, error: fetchError } = await supabase.functions.invoke('get-fb-comments', { body: { fbPostId: post.links } });
-            if (fetchError || (fetchData && fetchData.error)) throw new Error(fetchError?.message || fetchData?.error);
-
-            const { data: processData, error: processError } = await supabase.functions.invoke('process-and-store-comments', { body: { rawResponse: fetchData.rawResponse, internalPostId: post.id } });
-            if (processError || (processData && processData.error)) throw new Error(processError?.message || processData?.error);
-
-            const { data: compareResult, error: compareError } = await supabase.functions.invoke('compare-and-update-comments', { body: { postId: post.id } });
-            if (compareError || (compareResult && compareResult.error)) throw new Error(compareError?.message || compareResult?.error);
-            
-            dismissToast(toastId);
-            showSuccess(`Quét lần đầu hoàn tất! Tìm thấy ${compareResult.found}/${compareResult.total} bình luận.`);
-
-        } else if (post.type === 'post_approval') {
-            const timeCheckString = `&since=${subDays(new Date(), 5).toISOString()}&until=${new Date().toISOString()}`;
-            
-            const { data: fetchData, error: fetchError } = await supabase.functions.invoke('get-fb-duyetpost', { body: { postId: post.id, timeCheckString } });
-            if (fetchError || (fetchData && fetchData.error)) throw new Error(fetchError?.message || fetchData?.error);
-
-            const { data: processData, error: processError } = await supabase.functions.invoke('process-and-store-duyetpost', { body: { allPosts: fetchData.allPosts, internalPostId: post.id } });
-            if (processError || (processData && processData.error)) throw new Error(processError?.message || processData?.error);
-
-            const { data: compareResult, error: compareError } = await supabase.functions.invoke('compare-and-update-duyetpost', { body: { postId: post.id } });
-            if (compareError || (compareResult && compareResult.error)) throw new Error(compareError?.message || compareResult?.error);
-
-            dismissToast(toastId);
-            showSuccess(`Quét lần đầu hoàn tất! Duyệt thành công ${compareResult.approved}/${compareResult.total} group.`);
-        }
-    } catch (err: any) {
-        if (toastId) dismissToast(toastId);
-        showError(`Quét tự động lần đầu thất bại: ${err.message}`);
-    }
-  };
-
-  useEffect(() => {
-    if (selectedPost) {
-      setAutoCheckActive(selectedPost.is_active);
-      const [value, unit] = selectedPost.check_frequency?.split('_') || ['1', 'hour'];
-      setFrequencyValue(value);
-      setFrequencyUnit(unit);
-    }
-  }, [selectedPost]);
-
-  const handleSaveAutoCheckSettings = async () => {
-    if (!selectedPost) return;
-    const check_frequency = `${frequencyValue}_${frequencyUnit}`;
-    const toastId = showLoading("Đang lưu cài đặt...");
-    const { error } = await supabase
-      .from('seeding_posts')
-      .update({ is_active: autoCheckActive, check_frequency })
-      .eq('id', selectedPost.id);
-    
-    dismissToast(toastId);
-    if (error) {
-      showError("Lưu cài đặt thất bại: " + error.message);
-    } else {
-      showSuccess("Đã lưu cài đặt tự động!");
-      fetchProjectData();
-    }
-  };
 
   const fetchProjectData = async (isInitialLoad = false) => {
     if (!projectId) return;
@@ -194,8 +127,24 @@ const SeedingProjectDetail = () => {
     }
   };
 
+  const fetchSchedule = async () => {
+    if (!projectId) return;
+    const { data, error } = await supabase
+      .from('seeding_project_schedules')
+      .select('*')
+      .eq('project_id', projectId)
+      .single();
+    
+    if (error && error.code !== 'PGRST116') {
+      showError("Không thể tải lịch trình: " + error.message);
+    } else if (data) {
+      setSchedule(data);
+    }
+  };
+
   useEffect(() => {
     fetchProjectData(true);
+    fetchSchedule();
   }, [projectId]);
 
   useEffect(() => {
@@ -298,10 +247,8 @@ const SeedingProjectDetail = () => {
         project_id: projectId,
         name: newPostData.name,
         type: newPostData.type,
-        is_active: newPostData.is_active,
         links: newPostData.links,
         content: newPostData.content,
-        check_frequency: `${newPostData.check_frequency.split('_')[0]}_${newPostData.check_frequency.split('_')[1] || 'hour'}`,
       };
 
       const { data: newPost, error: postError } = await supabase
@@ -330,10 +277,6 @@ const SeedingProjectDetail = () => {
       
       dismissToast(toastId);
       showSuccess("Đã thêm post thành công!");
-
-      if (newPostData.is_active && newPost) {
-        await runInitialCheck(newPost as Post);
-      }
       
       setIsAddDialogOpen(false);
       setNewPostData(initialNewPostState);
@@ -351,7 +294,6 @@ const SeedingProjectDetail = () => {
     if (!projectId) return;
     const toastId = showLoading("Đang tạo tác vụ quét...");
     try {
-      // Step 1: Create the seeding task
       const { data: taskData, error: createTaskError } = await supabase.functions.invoke('create-seeding-task', {
         body: { projectId }
       });
@@ -359,34 +301,24 @@ const SeedingProjectDetail = () => {
       if (createTaskError) {
         let errorMessage = createTaskError.message;
         try {
-            // Supabase Edge Functions often nest the real error message
             const contextError = await createTaskError.context.json();
             if (contextError.error) errorMessage = contextError.error;
         } catch (e) { /* ignore parsing error */ }
         throw new Error(errorMessage);
       }
       
-      // Case where the function returns a message (e.g., no posts to check)
       if (taskData.message) {
         dismissToast(toastId);
         showSuccess(taskData.message);
         return;
       }
 
-      // A task was successfully created
       setActiveTask(taskData);
       dismissToast(toastId);
-      showSuccess("Đã tạo tác vụ! Bắt đầu xử lý bài viết đầu tiên...");
+      showSuccess("Đã tạo tác vụ! Bắt đầu xử lý...");
 
-      // Step 2: Immediately trigger the first run of the processor function.
-      // This is a "fire and forget" call to kickstart the process instantly.
-      // The cron job will handle subsequent runs.
-      supabase.functions.invoke('process-seeding-tasks').then(({ error: processError }) => {
-        if (processError) {
-          // This is not a critical failure for the user, as the cron job will pick it up.
-          // We can just log it for debugging purposes.
-          console.warn("Initial task processing trigger failed, but the cron job will take over.", processError);
-        }
+      supabase.functions.invoke('process-seeding-tasks').catch(err => {
+        console.warn("Initial task processing trigger failed, but the cron job will take over.", err);
       });
 
     } catch (error: any) {
@@ -408,7 +340,26 @@ const SeedingProjectDetail = () => {
     }
   };
 
-  const commentCount = newPostData.comments.split('\n').filter(line => line.trim() !== '').length;
+  const handleSaveSchedule = async () => {
+    if (!projectId) return;
+    setIsSavingSchedule(true);
+    const { error } = await supabase
+      .from('seeding_project_schedules')
+      .upsert({
+        project_id: projectId,
+        is_active: schedule.is_active,
+        frequency_value: schedule.frequency_value,
+        frequency_unit: schedule.frequency_unit,
+      }, { onConflict: 'project_id' });
+
+    if (error) {
+      showError("Lưu lịch trình thất bại: " + error.message);
+    } else {
+      showSuccess("Đã lưu lịch trình thành công!");
+      setIsScheduleDialogOpen(false);
+    }
+    setIsSavingSchedule(false);
+  };
 
   const PostList = ({ posts, onSelectPost, activeTask }: { posts: Post[], onSelectPost: (post: Post) => void, activeTask: SeedingTask | null }) => {
     const inputRef = useRef<HTMLInputElement>(null);
@@ -540,6 +491,10 @@ const SeedingProjectDetail = () => {
               Check tất cả
             </Button>
           )}
+          <Button variant="outline" onClick={() => setIsScheduleDialogOpen(true)}>
+            <Clock className="mr-2 h-4 w-4" />
+            Lập lịch
+          </Button>
           <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}>
             <UploadCloud className="mr-2 h-4 w-4" />
             Import
@@ -581,26 +536,12 @@ const SeedingProjectDetail = () => {
                   <CommentCheckDetail
                     project={project}
                     post={selectedPost}
-                    autoCheckActive={autoCheckActive}
-                    onAutoCheckChange={setAutoCheckActive}
-                    frequencyValue={frequencyValue}
-                    onFrequencyValueChange={setFrequencyValue}
-                    frequencyUnit={frequencyUnit}
-                    onFrequencyUnitChange={setFrequencyUnit}
-                    onSaveSettings={handleSaveAutoCheckSettings}
                     onCheckComplete={() => fetchProjectData()}
                   />
                 ) : selectedPost.type === 'post_approval' ? (
                   <PostApprovalDetail
                     project={project}
                     post={selectedPost}
-                    autoCheckActive={autoCheckActive}
-                    onAutoCheckChange={setAutoCheckActive}
-                    frequencyValue={frequencyValue}
-                    onFrequencyValueChange={setFrequencyValue}
-                    frequencyUnit={frequencyUnit}
-                    onFrequencyUnitChange={setFrequencyUnit}
-                    onSaveSettings={handleSaveAutoCheckSettings}
                     onCheckComplete={() => fetchProjectData()}
                   />
                 ) : (
@@ -621,14 +562,9 @@ const SeedingProjectDetail = () => {
         isOpen={isImportDialogOpen} 
         onOpenChange={setIsImportDialogOpen}
         projectId={projectId!}
-        onSuccess={(importedPosts) => {
+        onSuccess={() => {
           setIsImportDialogOpen(false);
-          (async () => {
-            for (const post of importedPosts) {
-              await runInitialCheck(post);
-            }
-            await fetchProjectData();
-          })();
+          fetchProjectData();
         }}
       />
 
@@ -661,10 +597,7 @@ const SeedingProjectDetail = () => {
                   <Input id="post-link" value={newPostData.links} onChange={(e) => setNewPostData(d => ({...d, links: e.target.value}))} />
                 </div>
                 <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <Label htmlFor="post-comments">Danh sách comment</Label>
-                    <span className="text-xs font-medium text-slate-500">Số lượng: {commentCount}</span>
-                  </div>
+                  <Label htmlFor="post-comments">Danh sách comment</Label>
                   <Textarea id="post-comments" value={newPostData.comments} onChange={(e) => setNewPostData(d => ({...d, comments: e.target.value}))} className="min-h-[120px]" placeholder="Comment 1..." />
                 </div>
               </div>
@@ -682,17 +615,52 @@ const SeedingProjectDetail = () => {
                 </div>
               </div>
             )}
-            
-            <div className="flex items-center justify-between pt-2">
-              <Label htmlFor="is-active" className="font-medium">Kích hoạt tự động check</Label>
-              <Switch id="is-active" checked={newPostData.is_active} onCheckedChange={(c) => setNewPostData(d => ({...d, is_active: c}))} />
-            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} className="rounded-lg">Hủy</Button>
             <Button onClick={handleAddPost} disabled={isSaving} className="rounded-lg bg-blue-600 hover:bg-blue-700">
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Lưu
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isScheduleDialogOpen} onOpenChange={setIsScheduleDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Lập lịch Check tất cả</DialogTitle>
+            <DialogDescription>
+              Thiết lập tần suất để hệ thống tự động chạy chức năng "Check tất cả" cho toàn bộ dự án này.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-6">
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <Label htmlFor="schedule-active" className="font-medium">Kích hoạt lịch trình</Label>
+              <Switch id="schedule-active" checked={schedule.is_active} onCheckedChange={(checked) => setSchedule(s => ({ ...s, is_active: checked }))} />
+            </div>
+            {schedule.is_active && (
+              <div className="space-y-2">
+                <Label>Tần suất chạy</Label>
+                <div className="flex items-center gap-2">
+                  <Input type="number" value={schedule.frequency_value} onChange={(e) => setSchedule(s => ({ ...s, frequency_value: parseInt(e.target.value, 10) || 1 }))} className="w-24" />
+                  <Select value={schedule.frequency_unit} onValueChange={(value) => setSchedule(s => ({ ...s, frequency_unit: value }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="minute">Phút</SelectItem>
+                      <SelectItem value="hour">Giờ</SelectItem>
+                      <SelectItem value="day">Ngày</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsScheduleDialogOpen(false)}>Hủy</Button>
+            <Button onClick={handleSaveSchedule} disabled={isSavingSchedule}>
+              {isSavingSchedule && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Lưu lịch trình
             </Button>
           </DialogFooter>
         </DialogContent>

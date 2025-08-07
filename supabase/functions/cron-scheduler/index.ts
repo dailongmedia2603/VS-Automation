@@ -26,7 +26,7 @@ serve(async (req) => {
     const tasksToRun = [
       'trigger-post-scan-checks',
       'process-seeding-tasks',
-      'trigger-seeding-checks'
+      'trigger-scheduled-seeding-tasks' // Replaced trigger-seeding-checks
     ];
 
     for (const taskName of tasksToRun) {

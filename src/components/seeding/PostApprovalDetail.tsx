@@ -13,9 +13,7 @@ import { Search, Download, MoreHorizontal, Link as LinkIcon, PlayCircle, CheckCi
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import * as XLSX from 'xlsx';
 import { LogDialog, type ErrorLog } from '@/components/seeding/LogDialog';
@@ -23,6 +21,7 @@ import { DateRange } from "react-day-picker"
 import { format as formatDateFns, startOfDay, endOfDay, subDays } from "date-fns"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
+import { SeedingLogHistoryDialog } from './SeedingLogHistoryDialog';
 
 type Project = {
   id: number;
@@ -60,26 +59,12 @@ type ExportDataRow = {
 interface PostApprovalDetailProps {
   project: Project;
   post: Post;
-  autoCheckActive: boolean;
-  onAutoCheckChange: (checked: boolean) => void;
-  frequencyValue: string;
-  onFrequencyValueChange: (value: string) => void;
-  frequencyUnit: string;
-  onFrequencyUnitChange: (unit: string) => void;
-  onSaveSettings: () => void;
   onCheckComplete: () => void;
 }
 
 export const PostApprovalDetail = ({ 
   project,
   post,
-  autoCheckActive,
-  onAutoCheckChange,
-  frequencyValue,
-  onFrequencyValueChange,
-  frequencyUnit,
-  onFrequencyUnitChange,
-  onSaveSettings,
   onCheckComplete
 }: PostApprovalDetailProps) => {
   const [groups, setGroups] = useState<Group[]>([]);
@@ -90,6 +75,7 @@ export const PostApprovalDetail = ({
   const [checkResult, setCheckResult] = useState<CheckResult | null>(null);
   const [log, setLog] = useState<ErrorLog | null>(null);
   const [isLogOpen, setIsLogOpen] = useState(false);
+  const [isHistoryLogOpen, setIsHistoryLogOpen] = useState(false);
 
   const [postContent, setPostContent] = useState(post.content || '');
   const [isSavingContent, setIsSavingContent] = useState(false);
@@ -337,7 +323,7 @@ export const PostApprovalDetail = ({
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-semibold text-slate-800">Kiểm tra duyệt bài tự động</h3>
+                  <h3 className="font-semibold text-slate-800">Kiểm tra duyệt bài</h3>
                   <p className="text-sm text-slate-500">Quét các group để kiểm tra bài viết đã được duyệt hay chưa.</p>
                 </div>
                 <div className="flex items-center gap-4">
@@ -388,43 +374,15 @@ export const PostApprovalDetail = ({
                         />
                       </PopoverContent>
                     </Popover>
+                    <Button onClick={() => setIsHistoryLogOpen(true)} variant="outline" size="sm">
+                      <FileText className="mr-2 h-4 w-4" />
+                      Lịch sử
+                    </Button>
                     <Button onClick={handleRunCheck} disabled={isChecking} className="bg-blue-600 hover:bg-blue-700 rounded-lg">{isChecking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}{isChecking ? 'Đang chạy...' : 'Chạy Check'}</Button>
                   </div>
                 </div>
               </div>
             </CardContent>
-            <Accordion type="single" collapsible className="w-full px-4 pb-2">
-              <AccordionItem value="settings" className="border-b-0">
-                <AccordionTrigger className="text-sm text-slate-600 hover:no-underline py-2 -mx-2 px-2 rounded-md hover:bg-slate-200/50">
-                  <div className="flex items-center gap-2"><Settings className="h-4 w-4" />Cài đặt tự động</div>
-                </AccordionTrigger>
-                <AccordionContent className="pt-4 space-y-4">
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-white border">
-                    <Label htmlFor="auto-check-switch" className="font-medium text-slate-700">Tự động chạy check</Label>
-                    <Switch id="auto-check-switch" checked={autoCheckActive} onCheckedChange={onAutoCheckChange} />
-                  </div>
-                  {autoCheckActive && (
-                    <div className="space-y-2">
-                      <Label>Tần suất quét lại</Label>
-                      <div className="flex items-center gap-2">
-                        <Input type="number" value={frequencyValue} onChange={(e) => onFrequencyValueChange(e.target.value)} className="w-24 bg-white" />
-                        <Select value={frequencyUnit} onValueChange={onFrequencyUnitChange}>
-                          <SelectTrigger className="w-[120px] bg-white"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="minute">Phút</SelectItem>
-                            <SelectItem value="hour">Giờ</SelectItem>
-                            <SelectItem value="day">Ngày</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  )}
-                  <div className="flex justify-end">
-                    <Button onClick={onSaveSettings} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg">Lưu cài đặt</Button>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
           </Card>
           <div className="flex items-center justify-between gap-4 mb-4">
             <div className="relative flex-grow max-w-xs"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Tìm kiếm group ID..." className="pl-9 rounded-lg bg-slate-100 border-none" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
@@ -459,6 +417,7 @@ export const PostApprovalDetail = ({
         </CardContent>
       </Card>
       <LogDialog isOpen={isLogOpen} onOpenChange={setIsLogOpen} log={log} isError={log?.errorMessage !== 'Không có lỗi'} />
+      <SeedingLogHistoryDialog isOpen={isHistoryLogOpen} onOpenChange={setIsHistoryLogOpen} postId={post.id} />
       <Dialog open={isAddGroupDialogOpen} onOpenChange={setIsAddGroupDialogOpen}><DialogContent><DialogHeader><DialogTitle>Thêm Group mới</DialogTitle><DialogDescription>Nhập danh sách ID group, mỗi ID trên một dòng.</DialogDescription></DialogHeader><div className="py-4"><Textarea placeholder="12345..." value={newGroupIds} onChange={(e) => setNewGroupIds(e.target.value)} className="min-h-[200px]" /></div><DialogFooter><Button variant="outline" onClick={() => setIsAddGroupDialogOpen(false)}>Hủy</Button><Button onClick={handleSaveNewGroups} disabled={isSavingGroups}>{isSavingGroups && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Lưu</Button></DialogFooter></DialogContent></Dialog>
       <Dialog open={!!editingGroup} onOpenChange={() => setEditingGroup(null)}><DialogContent><DialogHeader><DialogTitle>Sửa ID Group</DialogTitle></DialogHeader><div className="py-4"><Input value={editedGroupId} onChange={(e) => setEditedGroupId(e.target.value)} /></div><DialogFooter><Button variant="outline" onClick={() => setEditingGroup(null)}>Hủy</Button><Button onClick={handleUpdateGroup}>Lưu thay đổi</Button></DialogFooter></DialogContent></Dialog>
       <AlertDialog open={!!groupToDelete} onOpenChange={() => setGroupToDelete(null)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Bạn có chắc chắn muốn xóa?</AlertDialogTitle><AlertDialogDescription>Hành động này không thể hoàn tác. Group ID "{groupToDelete?.group_id}" sẽ bị xóa vĩnh viễn.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setGroupToDelete(null)}>Hủy</AlertDialogCancel><AlertDialogAction onClick={handleDeleteGroup} className="bg-red-600 hover:bg-red-700">Xóa</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>

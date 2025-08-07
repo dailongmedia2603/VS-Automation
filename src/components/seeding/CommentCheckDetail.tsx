@@ -13,14 +13,10 @@ import { Search, Download, MoreHorizontal, Link as LinkIcon, MessageCircle, Code
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
+import { SeedingLogHistoryDialog } from './SeedingLogHistoryDialog';
 import { Textarea } from '@/components/ui/textarea';
 import * as XLSX from 'xlsx';
-import { format, addMinutes, addHours, addDays } from 'date-fns';
 import { LogDialog, type ErrorLog } from '@/components/seeding/LogDialog';
-import { SeedingLogHistoryDialog } from './SeedingLogHistoryDialog';
 
 type Project = {
   id: number;
@@ -32,7 +28,6 @@ type Post = {
   name: string;
   links: string | null;
   type: 'comment_check' | 'post_approval';
-  last_checked_at: string | null;
 };
 
 type Comment = {
@@ -54,26 +49,12 @@ interface CheckResult {
 interface CommentCheckDetailProps {
   project: Project;
   post: Post;
-  autoCheckActive: boolean;
-  onAutoCheckChange: (checked: boolean) => void;
-  frequencyValue: string;
-  onFrequencyValueChange: (value: string) => void;
-  frequencyUnit: string;
-  onFrequencyUnitChange: (unit: string) => void;
-  onSaveSettings: () => void;
   onCheckComplete: () => void;
 }
 
 export const CommentCheckDetail = ({ 
   project,
   post,
-  autoCheckActive,
-  onAutoCheckChange,
-  frequencyValue,
-  onFrequencyValueChange,
-  frequencyUnit,
-  onFrequencyUnitChange,
-  onSaveSettings,
   onCheckComplete
 }: CommentCheckDetailProps) => {
   const [comments, setComments] = useState<Comment[]>([]);
@@ -168,7 +149,7 @@ export const CommentCheckDetail = ({
       showSuccess(`Kiểm tra hoàn tất! Tìm thấy ${compareResult.found}/${compareResult.total} bình luận.`);
       
       logToSave.status = 'success';
-      await supabase.from('seeding_logs').insert(logToSave);
+      await supabase.from('logs_check_seeding_cmt_tu_dong').insert(logToSave);
 
       onCheckComplete(); // Notify parent to refetch all data
       fetchComments(); // Refresh comments list
@@ -181,7 +162,7 @@ export const CommentCheckDetail = ({
       
       logToSave.status = 'error';
       logToSave.error_message = errorMessage;
-      await supabase.from('seeding_logs').insert(logToSave);
+      await supabase.from('logs_check_seeding_cmt_tu_dong').insert(logToSave);
     } finally {
       setIsChecking(false);
     }
@@ -300,21 +281,6 @@ export const CommentCheckDetail = ({
 
   const postUrl = post.links ? (post.links.startsWith('http') ? post.links : `https://www.facebook.com/${post.links}`) : '#';
 
-  const nextCheckDate = useMemo(() => {
-    if (!post.last_checked_at) return null;
-    
-    const lastCheckDate = new Date(post.last_checked_at);
-    const value = parseInt(frequencyValue, 10);
-    if (isNaN(value)) return null;
-
-    switch (frequencyUnit) {
-      case 'minute': return addMinutes(lastCheckDate, value);
-      case 'hour': return addHours(lastCheckDate, value);
-      case 'day': return addDays(lastCheckDate, value);
-      default: return null;
-    }
-  }, [post.last_checked_at, frequencyValue, frequencyUnit]);
-
   return (
     <>
       <Card className="w-full h-full shadow-none border-none flex flex-col">
@@ -338,7 +304,7 @@ export const CommentCheckDetail = ({
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-semibold text-slate-800">Kiểm tra bình luận tự động</h3>
+                  <h3 className="font-semibold text-slate-800">Kiểm tra bình luận</h3>
                   <p className="text-sm text-slate-500">Quét bài viết và cập nhật trạng thái các bình luận trong danh sách.</p>
                 </div>
                 <div className="flex items-center gap-4">
@@ -370,6 +336,10 @@ export const CommentCheckDetail = ({
                           {log.errorMessage !== 'Không có lỗi' ? 'Xem Log Lỗi' : 'Xem Log API'}
                       </Button>
                   )}
+                  <Button onClick={() => setIsHistoryLogOpen(true)} variant="outline" size="sm">
+                    <FileText className="mr-2 h-4 w-4" />
+                    Lịch sử
+                  </Button>
                   <Button onClick={handleRunCheck} disabled={isChecking} className="bg-blue-600 hover:bg-blue-700 rounded-lg">
                     {isChecking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
                     {isChecking ? 'Đang chạy...' : 'Chạy Check'}
@@ -377,62 +347,6 @@ export const CommentCheckDetail = ({
                 </div>
               </div>
             </CardContent>
-            <Accordion type="single" collapsible className="w-full px-4 pb-2">
-              <AccordionItem value="settings" className="border-b-0">
-                <AccordionTrigger className="text-sm text-slate-600 hover:no-underline py-2 -mx-2 px-2 rounded-md hover:bg-slate-200/50">
-                  <div className="flex items-center gap-2">
-                    <Settings className="h-4 w-4" />
-                    Cài đặt tự động
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="pt-4 space-y-4">
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-white border">
-                    <Label htmlFor="auto-check-switch" className="font-medium text-slate-700">Tự động chạy check</Label>
-                    <Switch id="auto-check-switch" checked={autoCheckActive} onCheckedChange={onAutoCheckChange} />
-                  </div>
-                  
-                  {autoCheckActive && (
-                    <div className="p-4 rounded-lg bg-white border space-y-4">
-                      <div className="space-y-2">
-                        <Label>Tần suất quét lại</Label>
-                        <div className="flex items-center gap-2">
-                          <Input type="number" value={frequencyValue} onChange={(e) => onFrequencyValueChange(e.target.value)} className="w-24 bg-white" />
-                          <Select value={frequencyUnit} onValueChange={onFrequencyUnitChange}>
-                            <SelectTrigger className="w-full bg-white"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="minute">Phút</SelectItem>
-                              <SelectItem value="hour">Giờ</SelectItem>
-                              <SelectItem value="day">Ngày</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                      <div className="border-t pt-3 space-y-2 text-sm">
-                          <div className="flex justify-between items-center">
-                              <span className="text-slate-600">Lần check gần nhất:</span>
-                              <span className="font-semibold text-red-600">
-                                  {post.last_checked_at ? format(new Date(post.last_checked_at), 'dd/MM/yyyy HH:mm:ss') : 'Chưa có'}
-                              </span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                              <span className="text-slate-600">Lần check tiếp theo:</span>
-                              <span className="font-semibold text-green-600">
-                                  {nextCheckDate ? format(nextCheckDate, 'dd/MM/yyyy HH:mm:ss') : 'Ngay bây giờ'}
-                              </span>
-                          </div>
-                      </div>
-                    </div>
-                  )}
-                  <div className="flex justify-between items-center">
-                    <Button variant="outline" size="sm" onClick={() => setIsHistoryLogOpen(true)}>
-                      <FileText className="mr-2 h-4 w-4" />
-                      Xem lịch sử check
-                    </Button>
-                    <Button onClick={onSaveSettings} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg">Lưu cài đặt</Button>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
           </Card>
           <div className="flex items-center justify-between gap-4 mb-4">
             <div className="relative flex-grow max-w-xs">
