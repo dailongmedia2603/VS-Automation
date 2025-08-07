@@ -130,8 +130,9 @@ const ContentDirectionViewIntegrated = ({ data }: { data: any[] }) => {
           {selectedItem ? (
             <div className="space-y-8">
               <h2 className="text-2xl font-bold text-slate-900">{selectedItem.chude || selectedItem.topic || selectedItem.chudecantim}</h2>
-              <DetailSection title="Chủ đề cần tìm" content={selectedItem.chudecantim} icon={FileSearch} iconBg="bg-blue-100" iconText="text-blue-600" />
-              <DetailSection title="Content comment demo" content={selectedItem.contentcommentdemo} icon={ClipboardList} iconBg="bg-green-100" iconText="text-green-600" />
+              <DetailSection title="Loại bài viết" content={selectedItem.loaicontent} icon={Newspaper} iconBg="bg-indigo-100" iconText="text-indigo-600" />
+              <DetailSection title="Vấn đề" content={selectedItem.vande} icon={AlertTriangle} iconBg="bg-yellow-100" iconText="text-yellow-600" />
+              <DetailSection title="Content demo" content={selectedItem.contentdemo || selectedItem.contentcommentdemo} icon={ClipboardList} iconBg="bg-green-100" iconText="text-green-600" />
               <DetailSection title="Định hướng comment" content={selectedItem.dinhhuongcomment} icon={MessageSquareText} iconBg="bg-purple-100" iconText="text-purple-600" />
             </div>
           ) : (
@@ -312,7 +313,7 @@ export const AiPlanContentView = (props: AiPlanContentViewProps) => {
                     />
                 ) : (
                     <>
-                        {section.id === 'Postscan' && section.display_type === 'content_direction' && isContentDirectionData(section.sectionData) ? (
+                        {section.display_type === 'content_direction' && isContentDirectionData(section.sectionData) ? (
                             <div className="p-4">
                                 <ContentDirectionViewIntegrated data={section.sectionData} />
                             </div>

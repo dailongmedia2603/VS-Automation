@@ -132,9 +132,11 @@ serve(async (req) => {
     const jsonStructureDescription = planStructure.map((field: any) => {
       if (field.display_type === 'content_direction') {
         const subFields = [
-          `      "chu_de_can_tim": "(string) // Chủ đề cần tìm"`,
-          `      "dinh_huong_comment": "(string) // Định hướng comment"`,
-          `      "content_comment_demo": "(string) // Content comment demo"`
+          `      "loai_content": "(string) // Loại bài viết"`,
+          `      "chu_de": "(string) // Chủ đề"`,
+          `      "van_de": "(string) // Vấn đề"`,
+          `      "content_demo": "(string) // Content demo"`,
+          `      "dinh_huong_comment": "(string) // Định hướng comment"`
         ].join(',\n');
         return `  "${field.id}": [ // Một mảng các đối tượng cho mục '${field.label}'
     {
