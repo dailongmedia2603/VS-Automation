@@ -38,12 +38,26 @@ serve(async (req) => {
     // 1. Get expected content
     const { data: post, error: postError } = await supabaseAdmin.from('seeding_posts').select('content').eq('id', postId).single();
     if (postError) throw new Error(`Lỗi lấy nội dung bài viết: ${postError.message}`);
-    if (!post.content) throw new Error("Bài viết không có nội dung để so sánh.");
+    if (!post.content) {
+        // If there's no content to compare, we can consider it completed.
+        await supabaseAdmin.from('seeding_posts').update({ status: 'completed' }).eq('id', postId);
+        return new Response(JSON.stringify({ approved: 0, pending: 0, total: 0 }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
     const normalizedPostContent = normalizeString(post.content);
 
     // 2. Get all groups for this post, including their current status
     const { data: groups, error: groupsError } = await supabaseAdmin.from('seeding_groups').select('id, group_id, status').eq('post_id', postId);
     if (groupsError) throw new Error(`Lỗi lấy danh sách group: ${groupsError.message}`);
+
+    // **NEW LOGIC**: If there are no groups to check, complete the post immediately.
+    if (groups.length === 0) {
+        console.log(`Post ID ${postId} has no groups to check. Marking as completed.`);
+        await supabaseAdmin.from('seeding_posts').update({ status: 'completed' }).eq('id', postId);
+        return new Response(JSON.stringify({ approved: 0, pending: 0, total: 0 }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+        });
+    }
 
     // 3. Get all actual posts from the new table
     const { data: actualPosts, error: actualPostsError } = await supabaseAdmin.from('actual_duyetpost').select('*').eq('post_id', postId);

@@ -39,6 +39,16 @@ serve(async (req) => {
     if (expectedError) throw new Error(`Lỗi lấy comment dự kiến: ${expectedError.message}`);
     const expectedComments = expectedCommentsData || [];
 
+    // **NEW LOGIC**: If there are no comments to check, complete the post immediately.
+    if (expectedComments.length === 0) {
+      console.log(`Post ID ${postId} has no comments to check. Marking as completed.`);
+      await supabaseAdmin.from('seeding_posts').update({ status: 'completed' }).eq('id', postId);
+      return new Response(JSON.stringify({ found: 0, notFound: 0, total: 0 }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
+    }
+
     // Step 2: Fetch actual comments (from actual_comments)
     const { data: actualCommentsData, error: actualError } = await supabaseAdmin
       .from('actual_comments')
