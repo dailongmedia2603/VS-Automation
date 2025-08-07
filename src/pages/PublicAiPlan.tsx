@@ -117,7 +117,7 @@ const PublicAiPlan = () => {
       <div className="max-w-7xl mx-auto">
         <div className="mb-8 text-center bg-blue-600 text-white p-8 rounded-2xl shadow-lg">
           {logoUrl && (
-            <img src={logoUrl} alt="Logo" className="max-w-[24rem] h-auto mx-auto mb-4" />
+            <img src={logoUrl} alt="Logo" className="max-w-xs h-auto mx-auto mb-4" />
           )}
           <h1 className="text-4xl font-bold tracking-tight">{headerTitle}</h1>
           <p className="text-blue-200 mt-2">{headerDescription}</p>
