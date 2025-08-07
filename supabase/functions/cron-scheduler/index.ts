@@ -23,10 +23,11 @@ serve(async (req) => {
     const results = [];
     let errorOccurred = false;
 
+    // Reordered tasks: trigger first, then process.
     const tasksToRun = [
       'trigger-post-scan-checks',
-      'process-seeding-tasks',
-      'trigger-scheduled-seeding-tasks' // Replaced trigger-seeding-checks
+      'trigger-scheduled-seeding-tasks',
+      'process-seeding-tasks'
     ];
 
     for (const taskName of tasksToRun) {
