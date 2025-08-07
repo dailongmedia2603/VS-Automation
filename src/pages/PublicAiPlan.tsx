@@ -95,10 +95,10 @@ const PublicAiPlan = () => {
   return (
     <main className="p-6 sm:p-8 md:p-12 bg-slate-50 min-h-screen">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-8 text-center">
-          <img src={hexaLogo} alt="DAILONG MEDIA Logo" className="w-48 h-auto mx-auto mb-4" />
-          <h1 className="text-4xl font-bold tracking-tight text-slate-900">{plan?.name}</h1>
-          <p className="text-muted-foreground mt-2">Một kế hoạch marketing được tạo bởi AI</p>
+        <div className="mb-8 text-center bg-blue-600 text-white p-8 rounded-2xl shadow-lg">
+          <img src={hexaLogo} alt="DAILONG MEDIA Logo" className="w-48 h-auto mx-auto mb-4 filter brightness-0 invert" />
+          <h1 className="text-4xl font-bold tracking-tight">{plan?.name}</h1>
+          <p className="text-blue-200 mt-2">Một kế hoạch marketing được tạo bởi AI</p>
         </div>
         {plan && planStructure && <AiPlanContentView planData={plan.plan_data} planStructure={planStructure} />}
       </div>
