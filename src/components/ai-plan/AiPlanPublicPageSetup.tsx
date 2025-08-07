@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Loader2, UploadCloud } from 'lucide-react';
+import { Loader2, UploadCloud, Trash2 } from 'lucide-react';
 import { showSuccess, showError } from '@/utils/toast';
 
 type PublicSettings = {
@@ -92,6 +92,15 @@ export const AiPlanPublicPageSetup = () => {
     }
   };
 
+  const handleRemoveLogo = () => {
+    setLogoFile(null);
+    setLogoPreview(null);
+    setSettings(s => ({ ...s, logo_url: null }));
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
@@ -168,11 +177,19 @@ export const AiPlanPublicPageSetup = () => {
                 <span className="text-xs text-muted-foreground">Chưa có logo</span>
               )}
             </div>
-            <input type="file" accept="image/*" ref={fileInputRef} onChange={handleLogoChange} className="hidden" />
-            <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
-              <UploadCloud className="mr-2 h-4 w-4" />
-              Tải ảnh lên
-            </Button>
+            <div className="flex flex-col gap-2">
+              <input type="file" accept="image/*" ref={fileInputRef} onChange={handleLogoChange} className="hidden" />
+              <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
+                <UploadCloud className="mr-2 h-4 w-4" />
+                Tải ảnh lên
+              </Button>
+              {logoPreview && (
+                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive justify-start p-2 h-auto" onClick={handleRemoveLogo}>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Xóa logo
+                </Button>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex justify-end">
