@@ -391,23 +391,18 @@ export const CommentCheckDetail = ({
                   
                   {autoCheckActive && (
                     <div className="p-4 rounded-lg bg-white border space-y-4">
-                      <div className="grid grid-cols-2 gap-4 items-end">
-                        <div className="space-y-2">
-                          <Label>Tần suất quét lại</Label>
-                          <div className="flex items-center gap-2">
-                            <Input type="number" value={frequencyValue} onChange={(e) => onFrequencyValueChange(e.target.value)} className="w-24 bg-white" />
-                            <Select value={frequencyUnit} onValueChange={onFrequencyUnitChange}>
-                              <SelectTrigger className="w-full bg-white"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="minute">Phút</SelectItem>
-                                <SelectItem value="hour">Giờ</SelectItem>
-                                <SelectItem value="day">Ngày</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                        <div className="flex justify-end">
-                          <Button onClick={onSaveSettings} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg">Lưu cài đặt</Button>
+                      <div className="space-y-2">
+                        <Label>Tần suất quét lại</Label>
+                        <div className="flex items-center gap-2">
+                          <Input type="number" value={frequencyValue} onChange={(e) => onFrequencyValueChange(e.target.value)} className="w-24 bg-white" />
+                          <Select value={frequencyUnit} onValueChange={onFrequencyUnitChange}>
+                            <SelectTrigger className="w-full bg-white"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="minute">Phút</SelectItem>
+                              <SelectItem value="hour">Giờ</SelectItem>
+                              <SelectItem value="day">Ngày</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
                       <div className="border-t pt-3 space-y-2 text-sm">
@@ -426,6 +421,9 @@ export const CommentCheckDetail = ({
                       </div>
                     </div>
                   )}
+                  <div className="flex justify-end">
+                    <Button onClick={onSaveSettings} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg">Lưu cài đặt</Button>
+                  </div>
                 </AccordionContent>
               </AccordionItem>
             </Accordion>

@@ -394,7 +394,36 @@ export const PostApprovalDetail = ({
               </div>
             </CardContent>
             <Accordion type="single" collapsible className="w-full px-4 pb-2">
-              <AccordionItem value="settings" className="border-b-0"><AccordionTrigger className="text-sm text-slate-600 hover:no-underline py-2 -mx-2 px-2 rounded-md hover:bg-slate-200/50"><div className="flex items-center gap-2"><Settings className="h-4 w-4" />Cài đặt tự động</div></AccordionTrigger><AccordionContent className="pt-4 space-y-4"><div className="flex items-center justify-between p-3 rounded-lg bg-white border"><Label htmlFor="auto-check-switch" className="font-medium text-slate-700">Tự động chạy check</Label><Switch id="auto-check-switch" checked={autoCheckActive} onCheckedChange={onAutoCheckChange} /></div><div className="grid grid-cols-3 gap-4 items-end"><div className="col-span-2 space-y-2"><Label>Tần suất quét lại</Label><div className="flex items-center gap-2"><Input type="number" value={frequencyValue} onChange={(e) => onFrequencyValueChange(e.target.value)} className="w-24 bg-white" /><Select value={frequencyUnit} onValueChange={onFrequencyUnitChange}><SelectTrigger className="w-[120px] bg-white"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="minute">Phút</SelectItem><SelectItem value="hour">Giờ</SelectItem><SelectItem value="day">Ngày</SelectItem></SelectContent></Select></div></div><div className="flex justify-end"><Button onClick={onSaveSettings} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg">Lưu cài đặt</Button></div></div></AccordionContent></AccordionItem>
+              <AccordionItem value="settings" className="border-b-0">
+                <AccordionTrigger className="text-sm text-slate-600 hover:no-underline py-2 -mx-2 px-2 rounded-md hover:bg-slate-200/50">
+                  <div className="flex items-center gap-2"><Settings className="h-4 w-4" />Cài đặt tự động</div>
+                </AccordionTrigger>
+                <AccordionContent className="pt-4 space-y-4">
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-white border">
+                    <Label htmlFor="auto-check-switch" className="font-medium text-slate-700">Tự động chạy check</Label>
+                    <Switch id="auto-check-switch" checked={autoCheckActive} onCheckedChange={onAutoCheckChange} />
+                  </div>
+                  {autoCheckActive && (
+                    <div className="space-y-2">
+                      <Label>Tần suất quét lại</Label>
+                      <div className="flex items-center gap-2">
+                        <Input type="number" value={frequencyValue} onChange={(e) => onFrequencyValueChange(e.target.value)} className="w-24 bg-white" />
+                        <Select value={frequencyUnit} onValueChange={onFrequencyUnitChange}>
+                          <SelectTrigger className="w-[120px] bg-white"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="minute">Phút</SelectItem>
+                            <SelectItem value="hour">Giờ</SelectItem>
+                            <SelectItem value="day">Ngày</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex justify-end">
+                    <Button onClick={onSaveSettings} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg">Lưu cài đặt</Button>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
             </Accordion>
           </Card>
           <div className="flex items-center justify-between gap-4 mb-4">
