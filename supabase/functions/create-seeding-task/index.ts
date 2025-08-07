@@ -29,21 +29,7 @@ serve(async (req) => {
       if (user) userId = user.id;
     }
 
-    // Step 1: Reset the status of all posts in the project to 'checking'
-    // This ensures that "Check All" re-checks everything.
-    console.log(`[create-seeding-task] Resetting posts for project ${projectId}...`);
-    const { error: updateError } = await supabaseAdmin
-      .from('seeding_posts')
-      .update({ status: 'checking' })
-      .eq('project_id', projectId);
-
-    if (updateError) {
-      console.error(`[create-seeding-task] Error resetting posts:`, updateError);
-      throw new Error(`Failed to reset posts for checking: ${updateError.message}`);
-    }
-    console.log(`[create-seeding-task] Posts reset successfully.`);
-
-    // Step 2: Count the posts that are now ready for checking.
+    // Step 1: Count ONLY the posts that are currently in 'checking' state.
     const { count, error: countError } = await supabaseAdmin
       .from('seeding_posts')
       .select('*', { count: 'exact', head: true })
@@ -61,7 +47,7 @@ serve(async (req) => {
       });
     }
 
-    // Step 3: Create the new task.
+    // Step 2: Create the new task with the correct count.
     const { data: newTask, error: insertError } = await supabaseAdmin
       .from('seeding_tasks')
       .insert({

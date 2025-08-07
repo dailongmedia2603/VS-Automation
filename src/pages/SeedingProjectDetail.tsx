@@ -6,7 +6,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PlusCircle, MessageSquare, FileCheck2, ChevronRight, ArrowLeft, Edit, Trash2, Loader2, Check, CheckCircle, UploadCloud, PlayCircle, X, AlertTriangle, Clock } from 'lucide-react';
+import { PlusCircle, MessageSquare, FileCheck2, ChevronRight, ArrowLeft, Edit, Trash2, Loader2, Check, CheckCircle, UploadCloud, PlayCircle, X, AlertTriangle, Clock, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -318,6 +318,7 @@ const SeedingProjectDetail = () => {
       dismissToast(toastId);
       showSuccess("Đã tạo tác vụ! Bắt đầu xử lý...");
 
+      // Immediately trigger the processing task
       supabase.functions.invoke('process-seeding-tasks').catch(err => {
         console.warn("Initial task processing trigger failed, but the cron job will take over.", err);
       });
@@ -360,6 +361,20 @@ const SeedingProjectDetail = () => {
       setIsScheduleDialogOpen(false);
     }
     setIsSavingSchedule(false);
+  };
+
+  const handleRecheckPost = async (postId: number) => {
+    const { error } = await supabase
+      .from('seeding_posts')
+      .update({ status: 'checking' })
+      .eq('id', postId);
+    
+    if (error) {
+      showError("Không thể đưa vào hàng đợi: " + error.message);
+    } else {
+      showSuccess("Đã đưa bài viết vào hàng đợi để check lại.");
+      fetchProjectData();
+    }
   };
 
   const PostList = ({ posts, onSelectPost, activeTask }: { posts: Post[], onSelectPost: (post: Post) => void, activeTask: SeedingTask | null }) => {
@@ -423,6 +438,11 @@ const SeedingProjectDetail = () => {
                       </Badge>
                     )}
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
+                      {post.status === 'completed' && (
+                        <Button variant="ghost" size="icon" className="h-6 w-6" title="Check lại" onClick={(e) => { e.stopPropagation(); handleRecheckPost(post.id); }}>
+                          <RefreshCw className="h-3 w-3" />
+                        </Button>
+                      )}
                       <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setEditingPostId(post.id); setEditingName(post.name); }}>
                         <Edit className="h-3 w-3" />
                       </Button>
