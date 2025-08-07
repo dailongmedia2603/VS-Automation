@@ -21,13 +21,16 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Get user from Authorization header
+    // Allow task creation without a user, for automated cron jobs
+    let userId = null;
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) throw new Error("Missing Authorization header");
-    const jwt = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(jwt);
-    if (userError) throw userError;
-    if (!user) throw new Error("User not authenticated.");
+    if (authHeader) {
+      const jwt = authHeader.replace('Bearer ', '');
+      const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(jwt);
+      if (userError) throw userError;
+      if (!user) throw new Error("User not authenticated.");
+      userId = user.id;
+    }
 
     const { count, error: countError } = await supabaseAdmin
       .from('seeding_posts')
@@ -47,7 +50,7 @@ serve(async (req) => {
       .from('seeding_tasks')
       .insert({
         project_id: projectId,
-        creator_id: user.id,
+        creator_id: userId, // Can be null for automated tasks
         status: 'pending',
         progress_total: count,
       })
