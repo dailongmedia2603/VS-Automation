@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Sparkles, Save, Loader2, FileText, Share, Settings, PencilLine } from 'lucide-react';
+import { ArrowLeft, Sparkles, Loader2, FileText, Share, Settings, PencilLine } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,7 +14,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Textarea } from '@/components/ui/textarea';
 import { InputStructureConfigDialog } from '@/components/ai-plan/InputStructureConfigDialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 
 type Plan = {
   id: number;

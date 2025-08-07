@@ -33,7 +33,7 @@ export const InputConfigDialog = ({ planConfig, onSave, open, onOpenChange }: In
     }, [planConfig, open]);
 
     const handleChange = (key: string, value: string) => {
-        setConfig(prev => ({ ...prev, [key]: value }));
+        setConfig((prev: any) => ({ ...prev, [key]: value }));
     };
 
     const handleSave = async () => {

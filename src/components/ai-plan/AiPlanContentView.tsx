@@ -1,7 +1,7 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Target, Calendar, Package, Route, Megaphone, Bot, LayoutList, Newspaper, AlertTriangle, ClipboardList, MessageSquareText, PencilLine, Sparkles, Loader2, Settings, FileSearch } from 'lucide-react';
+import { Target, Calendar, Package, Route, Megaphone, Bot, LayoutList, Newspaper, AlertTriangle, ClipboardList, MessageSquareText, PencilLine, Sparkles, Loader2, Settings } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { useMemo, useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
@@ -70,7 +70,7 @@ const ContentDirectionViewIntegrated = ({ data }: { data: any[] }) => {
   const groupedData = useMemo(() => {
     if (!Array.isArray(data)) return {};
     
-    const groups = data.reduce((acc, item) => {
+    const groups = data.reduce((acc: Record<string, any[]>, item: any) => {
       if (item && typeof item === 'object' && !Array.isArray(item)) {
         const normalizedItem = normalizeKeys(item);
         const key = normalizedItem.loaicontent || normalizedItem.posttype || 'Chưa phân loại';
@@ -81,7 +81,7 @@ const ContentDirectionViewIntegrated = ({ data }: { data: any[] }) => {
     }, {} as Record<string, any[]>);
 
     for (const key in groups) {
-      groups[key] = groups[key].map((item, index) => ({ ...item, bai_viet_name: `Bài viết ${index + 1}` }));
+      groups[key] = groups[key].map((item: any, index: number) => ({ ...item, bai_viet_name: `Bài viết ${index + 1}` }));
     }
     return groups;
   }, [data]);
