@@ -108,7 +108,7 @@ const PublicAiPlan = () => {
     );
   }
 
-  const headerTitle = publicSettings?.company_name || 'DAILONG MEDIA AGENCY';
+  const headerTitle = publicSettings?.company_name || plan?.name || 'Kế hoạch Marketing';
   const headerDescription = publicSettings?.description || 'Một kế hoạch marketing được tạo bởi AI';
   const logoUrl = publicSettings?.logo_url;
 
@@ -116,12 +116,10 @@ const PublicAiPlan = () => {
     <main className="p-6 sm:p-8 md:p-12 bg-slate-50 min-h-screen">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8 text-center bg-blue-600 text-white p-8 rounded-2xl shadow-lg">
-          {logoUrl ? (
+          {logoUrl && (
             <img src={logoUrl} alt="Logo" className="max-w-[24rem] h-auto mx-auto mb-4" />
-          ) : (
-            <h2 className="text-2xl font-bold tracking-tight mb-4">{headerTitle}</h2>
           )}
-          <h1 className="text-4xl font-bold tracking-tight">{plan?.name}</h1>
+          <h1 className="text-4xl font-bold tracking-tight">{headerTitle}</h1>
           <p className="text-blue-200 mt-2">{headerDescription}</p>
         </div>
         {plan && planStructure && <AiPlanContentView planData={plan.plan_data} planStructure={planStructure} />}
