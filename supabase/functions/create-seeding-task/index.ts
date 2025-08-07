@@ -21,17 +21,29 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Allow task creation without a user, for automated cron jobs
     let userId = null;
     const authHeader = req.headers.get('Authorization');
     if (authHeader) {
       const jwt = authHeader.replace('Bearer ', '');
-      const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(jwt);
-      if (userError) throw userError;
-      if (!user) throw new Error("User not authenticated.");
-      userId = user.id;
+      const { data: { user } } = await supabaseAdmin.auth.getUser(jwt);
+      if (user) userId = user.id;
     }
 
+    // Step 1: Reset the status of all posts in the project to 'checking'
+    // This ensures that "Check All" re-checks everything.
+    console.log(`[create-seeding-task] Resetting posts for project ${projectId}...`);
+    const { error: updateError } = await supabaseAdmin
+      .from('seeding_posts')
+      .update({ status: 'checking' })
+      .eq('project_id', projectId);
+
+    if (updateError) {
+      console.error(`[create-seeding-task] Error resetting posts:`, updateError);
+      throw new Error(`Failed to reset posts for checking: ${updateError.message}`);
+    }
+    console.log(`[create-seeding-task] Posts reset successfully.`);
+
+    // Step 2: Count the posts that are now ready for checking.
     const { count, error: countError } = await supabaseAdmin
       .from('seeding_posts')
       .select('*', { count: 'exact', head: true })
@@ -39,6 +51,9 @@ serve(async (req) => {
       .eq('status', 'checking');
 
     if (countError) throw countError;
+    
+    console.log(`[create-seeding-task] Found ${count} posts to check.`);
+
     if (count === 0) {
       return new Response(JSON.stringify({ message: "Không có bài viết nào cần quét." }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -46,11 +61,12 @@ serve(async (req) => {
       });
     }
 
+    // Step 3: Create the new task.
     const { data: newTask, error: insertError } = await supabaseAdmin
       .from('seeding_tasks')
       .insert({
         project_id: projectId,
-        creator_id: userId, // Can be null for automated tasks
+        creator_id: userId,
         status: 'pending',
         progress_total: count,
       })
@@ -58,6 +74,8 @@ serve(async (req) => {
       .single();
 
     if (insertError) throw insertError;
+    
+    console.log(`[create-seeding-task] Created new task with ID: ${newTask.id}`);
 
     return new Response(JSON.stringify(newTask), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -65,6 +83,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
+    console.error(`[create-seeding-task] CRITICAL ERROR:`, error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
