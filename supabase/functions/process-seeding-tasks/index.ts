@@ -107,13 +107,13 @@ serve(async (req) => {
       }
       
       logPayload.status = 'success';
-      await supabaseAdmin.from('seeding_logs').insert(logPayload);
+      await supabaseAdmin.from('logs_check_seeding_cmt_tu_dong').insert(logPayload);
 
     } catch (postProcessingError) {
       console.error(`Error processing post ${post.id}:`, postProcessingError.message);
       logPayload.status = 'error';
       logPayload.error_message = postProcessingError.message;
-      await supabaseAdmin.from('seeding_logs').insert(logPayload);
+      await supabaseAdmin.from('logs_check_seeding_cmt_tu_dong').insert(logPayload);
     }
 
     // 5. Update progress and release the "claim"

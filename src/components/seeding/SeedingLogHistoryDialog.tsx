@@ -35,7 +35,7 @@ export const SeedingLogHistoryDialog = ({ isOpen, onOpenChange, postId }: Seedin
       const fetchLogs = async () => {
         setIsLoading(true);
         const { data, error } = await supabase
-          .from('seeding_logs')
+          .from('logs_check_seeding_cmt_tu_dong')
           .select('*')
           .eq('post_id', postId)
           .order('created_at', { ascending: false });
