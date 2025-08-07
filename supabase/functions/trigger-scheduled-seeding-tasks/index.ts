@@ -77,6 +77,18 @@ serve(async (req) => {
 
     const runPromises = schedulesToRun.map(async (schedule) => {
       try {
+        // NEW STEP: Reset all posts to 'checking' for this project
+        console.log(`  - Resetting posts for project ${schedule.project_id}...`);
+        const { error: resetError } = await supabaseAdmin
+          .from('seeding_posts')
+          .update({ status: 'checking' })
+          .eq('project_id', schedule.project_id);
+        
+        if (resetError) {
+          throw new Error(`Failed to reset posts for project ${schedule.project_id}: ${resetError.message}`);
+        }
+        console.log(`  - Posts reset successfully for project ${schedule.project_id}.`);
+
         console.log(`  - Invoking create-seeding-task for project ${schedule.project_id}...`);
         await supabaseAdmin.functions.invoke('create-seeding-task', {
           body: { projectId: schedule.project_id }
@@ -104,6 +116,9 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('[trigger-scheduled-seeding-tasks] CRITICAL ERROR:', error.message);
-    return new Response(JSON.stringify({ error: error.message }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 });
+    return new Response(JSON.stringify({ error: error.message }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500,
+    });
   }
 })
