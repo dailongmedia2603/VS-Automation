@@ -115,7 +115,7 @@ serve(async (req) => {
     }
 
     const jsonStructureDescription = planStructure.map((field: any) => {
-      if (field.id === 'Postscan' && field.display_type === 'content_direction') {
+      if (field.display_type === 'content_direction') {
         const subFields = [
           `      "chu_de_can_tim": "(string) // Chủ đề cần tìm"`,
           `      "dinh_huong_comment": "(string) // Định hướng comment"`,
