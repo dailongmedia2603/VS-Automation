@@ -74,25 +74,46 @@ serve(async (req) => {
     }
 
     // 4. Process the post
+    const logPayload: any = {
+      post_id: post.id,
+      type: post.type,
+    };
+
     try {
       await supabaseAdmin.from('seeding_posts').update({ last_checked_at: new Date().toISOString() }).eq('id', post.id);
 
       if (post.type === 'comment_check') {
           const { data: fetchData, error: fetchError } = await supabaseAdmin.functions.invoke('get-fb-comments', { body: { fbPostId: post.links } });
+          logPayload.request_url = fetchData?.requestUrl;
+          try { logPayload.raw_response = fetchData?.rawResponse ? JSON.parse(fetchData.rawResponse) : { content: fetchData.rawResponse }; } catch (e) { logPayload.raw_response = { error: "Failed to parse raw response", content: fetchData.rawResponse }; }
           if (fetchError || fetchData.error) throw new Error(fetchError?.message || fetchData?.error);
+          
           const { data: processData, error: processError } = await supabaseAdmin.functions.invoke('process-and-store-comments', { body: { rawResponse: fetchData.rawResponse, internalPostId: post.id } });
           if (processError || processData.error) throw new Error(processError?.message || processData?.error);
+          
           await supabaseAdmin.functions.invoke('compare-and-update-comments', { body: { postId: post.id } });
+
       } else if (post.type === 'post_approval') {
           const timeCheckString = `&since=${new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()}&until=${new Date().toISOString()}`;
           const { data: fetchData, error: fetchError } = await supabaseAdmin.functions.invoke('get-fb-duyetpost', { body: { postId: post.id, timeCheckString } });
+          logPayload.request_url = fetchData?.requestUrl;
+          try { logPayload.raw_response = fetchData?.rawResponse ? JSON.parse(fetchData.rawResponse) : { content: fetchData.rawResponse }; } catch (e) { logPayload.raw_response = { error: "Failed to parse raw response", content: fetchData.rawResponse }; }
           if (fetchError || (fetchData && fetchData.error)) throw new Error(fetchError?.message || fetchData?.error);
+          
           const { data: processData, error: processError } = await supabaseAdmin.functions.invoke('process-and-store-duyetpost', { body: { allPosts: fetchData.allPosts, internalPostId: post.id } });
           if (processError || (processData && processData.error)) throw new Error(processError?.message || processData?.error);
+          
           await supabaseAdmin.functions.invoke('compare-and-update-duyetpost', { body: { postId: post.id } });
       }
+      
+      logPayload.status = 'success';
+      await supabaseAdmin.from('seeding_logs').insert(logPayload);
+
     } catch (postProcessingError) {
       console.error(`Error processing post ${post.id}:`, postProcessingError.message);
+      logPayload.status = 'error';
+      logPayload.error_message = postProcessingError.message;
+      await supabaseAdmin.from('seeding_logs').insert(logPayload);
     }
 
     // 5. Update progress and release the "claim"

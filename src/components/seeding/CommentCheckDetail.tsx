@@ -20,6 +20,7 @@ import { Textarea } from '@/components/ui/textarea';
 import * as XLSX from 'xlsx';
 import { format, addMinutes, addHours, addDays } from 'date-fns';
 import { LogDialog, type ErrorLog } from '@/components/seeding/LogDialog';
+import { SeedingLogHistoryDialog } from './SeedingLogHistoryDialog';
 
 type Project = {
   id: number;
@@ -83,6 +84,7 @@ export const CommentCheckDetail = ({
   const [checkResult, setCheckResult] = useState<CheckResult | null>(null);
   const [log, setLog] = useState<ErrorLog | null>(null);
   const [isLogOpen, setIsLogOpen] = useState(false);
+  const [isHistoryLogOpen, setIsHistoryLogOpen] = useState(false);
   
   const [isAddCommentDialogOpen, setIsAddCommentDialogOpen] = useState(false);
   const [newCommentsText, setNewCommentsText] = useState('');
@@ -126,6 +128,7 @@ export const CommentCheckDetail = ({
     setCheckResult(null);
     setLog(null);
     let toastId;
+    let logToSave: any = { post_id: post.id, type: 'comment_check' };
 
     try {
       // Step 1: Fetch raw data
@@ -133,16 +136,12 @@ export const CommentCheckDetail = ({
       const { data: fetchData, error: fetchError } = await supabase.functions.invoke('get-fb-comments', {
         body: { fbPostId: post.links }
       });
+      logToSave.request_url = fetchData?.requestUrl;
+      try { logToSave.raw_response = fetchData?.rawResponse ? JSON.parse(fetchData.rawResponse) : null; } catch (e) { logToSave.raw_response = { error: "Failed to parse raw response", content: fetchData.rawResponse }; }
       if (fetchError || fetchData.error) {
-        throw { step: 'Lấy dữ liệu', error: fetchError || fetchData, logData: fetchData };
+        throw { step: 'Lấy dữ liệu', error: fetchError || fetchData };
       }
-      
-      setLog({
-          step: 'Lấy dữ liệu thành công',
-          errorMessage: 'Không có lỗi',
-          requestUrl: fetchData.requestUrl,
-          rawResponse: fetchData.rawResponse
-      });
+      setLog({ step: 'Lấy dữ liệu thành công', errorMessage: 'Không có lỗi', requestUrl: fetchData.requestUrl, rawResponse: fetchData.rawResponse });
 
       // Step 2: Process and store data
       dismissToast(toastId);
@@ -151,7 +150,7 @@ export const CommentCheckDetail = ({
         body: { rawResponse: fetchData.rawResponse, internalPostId: post.id }
       });
       if (processError || processData.error) {
-        throw { step: 'Xử lý dữ liệu', error: processError || processData, logData: fetchData };
+        throw { step: 'Xử lý dữ liệu', error: processError || processData };
       }
 
       // Step 3: Compare and update
@@ -161,25 +160,28 @@ export const CommentCheckDetail = ({
         body: { postId: post.id }
       });
       if (compareError || compareResult.error) {
-        throw { step: 'So sánh dữ liệu', error: compareError || compareResult, logData: fetchData };
+        throw { step: 'So sánh dữ liệu', error: compareError || compareResult };
       }
 
       dismissToast(toastId);
       setCheckResult(compareResult);
       showSuccess(`Kiểm tra hoàn tất! Tìm thấy ${compareResult.found}/${compareResult.total} bình luận.`);
+      
+      logToSave.status = 'success';
+      await supabase.from('seeding_logs').insert(logToSave);
+
       onCheckComplete(); // Notify parent to refetch all data
       fetchComments(); // Refresh comments list
 
     } catch (e: any) {
       if (toastId) dismissToast(toastId);
       const errorMessage = e.error?.message || 'Đã xảy ra lỗi không xác định.';
-      setLog({
-          step: e.step || 'Không xác định',
-          errorMessage: errorMessage,
-          requestUrl: e.logData?.requestUrl,
-          rawResponse: e.logData?.rawResponse,
-      });
+      setLog(prev => ({ ...prev, step: e.step || 'Không xác định', errorMessage: errorMessage }));
       showError(`Kiểm tra thất bại ở bước: ${e.step}.`);
+      
+      logToSave.status = 'error';
+      logToSave.error_message = errorMessage;
+      await supabase.from('seeding_logs').insert(logToSave);
     } finally {
       setIsChecking(false);
     }
@@ -421,7 +423,11 @@ export const CommentCheckDetail = ({
                       </div>
                     </div>
                   )}
-                  <div className="flex justify-end">
+                  <div className="flex justify-between items-center">
+                    <Button variant="outline" size="sm" onClick={() => setIsHistoryLogOpen(true)}>
+                      <FileText className="mr-2 h-4 w-4" />
+                      Xem lịch sử check
+                    </Button>
                     <Button onClick={onSaveSettings} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg">Lưu cài đặt</Button>
                   </div>
                 </AccordionContent>
@@ -551,6 +557,7 @@ export const CommentCheckDetail = ({
         </CardContent>
       </Card>
       <LogDialog isOpen={isLogOpen} onOpenChange={setIsLogOpen} log={log} isError={log?.errorMessage !== 'Không có lỗi'} />
+      <SeedingLogHistoryDialog isOpen={isHistoryLogOpen} onOpenChange={setIsHistoryLogOpen} postId={post.id} />
       <Dialog open={isAddCommentDialogOpen} onOpenChange={setIsAddCommentDialogOpen}>
         <DialogContent>
             <DialogHeader>
