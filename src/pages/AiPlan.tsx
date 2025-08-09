@@ -2,7 +2,6 @@ import { useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AiPlanPromptConfig } from '@/components/ai-plan/AiPlanPromptConfig';
 import { AiPlanList } from '@/components/ai-plan/AiPlanList';
-import { AiPlanDocumentsManager } from '@/components/ai-plan/AiPlanDocumentsManager';
 import { AiPlanTemplateManager } from '@/components/ai-plan/AiPlanTemplateManager';
 import { AiPlanPublicPageSetup } from '@/components/ai-plan/AiPlanPublicPageSetup';
 
@@ -28,7 +27,6 @@ const AiPlan = () => {
           <TabsTrigger value="plans" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Danh sách kế hoạch</TabsTrigger>
           <TabsTrigger value="templates" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Quản lý Mẫu</TabsTrigger>
           <TabsTrigger value="prompt-config" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Cấu hình Prompt</TabsTrigger>
-          <TabsTrigger value="documents" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Tài liệu</TabsTrigger>
           <TabsTrigger value="public-setup" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Setup url public</TabsTrigger>
         </TabsList>
         <TabsContent value="plans" className="mt-6">
@@ -39,9 +37,6 @@ const AiPlan = () => {
         </TabsContent>
         <TabsContent value="prompt-config" className="mt-6">
           <AiPlanPromptConfig />
-        </TabsContent>
-        <TabsContent value="documents" className="mt-6">
-          <AiPlanDocumentsManager />
         </TabsContent>
         <TabsContent value="public-setup" className="mt-6">
           <AiPlanPublicPageSetup />

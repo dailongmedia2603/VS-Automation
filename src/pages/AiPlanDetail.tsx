@@ -15,6 +15,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { InputStructureConfigDialog } from '@/components/ai-plan/InputStructureConfigDialog';
 import { Input } from '@/components/ui/input';
 import * as XLSX from 'xlsx';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AiPlanProjectDocumentsManager } from '@/components/ai-plan/AiPlanProjectDocumentsManager';
 
 type Plan = {
   id: number;
@@ -413,80 +415,91 @@ const AiPlanDetail = () => {
           </div>
         </div>
 
-        <ResizablePanelGroup direction="horizontal" className="flex-1 rounded-2xl border bg-white shadow-sm overflow-hidden">
-          <ResizablePanel defaultSize={40} minSize={30}>
-            <div className="h-full p-4 overflow-y-auto">
-              <Card className="border-none shadow-none">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle>Thông tin đầu vào</CardTitle>
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => setIsInputStructureDialogOpen(true)}>
-                      <Settings className="mr-2 h-4 w-4" />
-                      Cấu hình
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {inputStructure.length > 0 ? (
-                    <div className="space-y-4">
-                      {inputStructure.map(field => (
-                        <Card key={field.id} className="shadow-none border">
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-base flex items-center gap-2">
-                              <PencilLine className="h-4 w-4 text-blue-600" />
-                              {field.label}
-                            </CardTitle>
-                            <CardDescription className="text-xs pt-1">{field.description}</CardDescription>
-                          </CardHeader>
-                          <CardContent>
-                            {field.type === 'input' ? (
-                              <Input
-                                value={plan.config?.[field.id] || ''}
-                                onChange={e => handleConfigDataChange(field.id, e.target.value)}
-                              />
-                            ) : (
-                              <Textarea
-                                value={plan.config?.[field.id] || ''}
-                                onChange={e => handleConfigDataChange(field.id, e.target.value)}
-                                className="min-h-[100px]"
-                              />
-                            )}
-                          </CardContent>
-                        </Card>
-                      ))}
-                      <div className="flex justify-end mt-4">
-                          <Button onClick={() => handleUpdateConfig(plan.config)} disabled={isSaving}>
-                              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                              Lưu thông tin
-                          </Button>
+        <Tabs defaultValue="plan" className="flex-1 flex flex-col min-h-0">
+          <TabsList className="mb-4 self-start bg-transparent p-0">
+            <TabsTrigger value="plan" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Kế hoạch</TabsTrigger>
+            <TabsTrigger value="documents" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Tài liệu</TabsTrigger>
+          </TabsList>
+          <TabsContent value="plan" className="flex-1 min-h-0">
+            <ResizablePanelGroup direction="horizontal" className="h-full rounded-2xl border bg-white shadow-sm overflow-hidden">
+              <ResizablePanel defaultSize={40} minSize={30}>
+                <div className="h-full p-4 overflow-y-auto">
+                  <Card className="border-none shadow-none">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle>Thông tin đầu vào</CardTitle>
+                        </div>
+                        <Button variant="outline" size="sm" onClick={() => setIsInputStructureDialogOpen(true)}>
+                          <Settings className="mr-2 h-4 w-4" />
+                          Cấu hình
+                        </Button>
                       </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground p-4 text-center bg-slate-50 rounded-lg">
-                      Nhấp vào nút "Cấu hình" để bắt đầu.
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </ResizablePanel>
-          <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={60}>
-            <div className="h-full bg-slate-50 p-6 overflow-y-auto">
-              <AiPlanContentView 
-                planData={plan.plan_data} 
-                planStructure={outputStructure!} 
-                isEditable={true}
-                editingSectionId={editingSectionId}
-                setEditingSectionId={setEditingSectionId}
-                onUpdateSection={handleUpdateSection}
-                onRegenerateSection={(id, label) => setRegenSection({ id, label })}
-              />
-            </div>
-          </ResizablePanel>
-        </ResizablePanelGroup>
+                    </CardHeader>
+                    <CardContent>
+                      {inputStructure.length > 0 ? (
+                        <div className="space-y-4">
+                          {inputStructure.map(field => (
+                            <Card key={field.id} className="shadow-none border">
+                              <CardHeader className="pb-2">
+                                <CardTitle className="text-base flex items-center gap-2">
+                                  <PencilLine className="h-4 w-4 text-blue-600" />
+                                  {field.label}
+                                </CardTitle>
+                                <CardDescription className="text-xs pt-1">{field.description}</CardDescription>
+                              </CardHeader>
+                              <CardContent>
+                                {field.type === 'input' ? (
+                                  <Input
+                                    value={plan.config?.[field.id] || ''}
+                                    onChange={e => handleConfigDataChange(field.id, e.target.value)}
+                                  />
+                                ) : (
+                                  <Textarea
+                                    value={plan.config?.[field.id] || ''}
+                                    onChange={e => handleConfigDataChange(field.id, e.target.value)}
+                                    className="min-h-[100px]"
+                                  />
+                                )}
+                              </CardContent>
+                            </Card>
+                          ))}
+                          <div className="flex justify-end mt-4">
+                              <Button onClick={() => handleUpdateConfig(plan.config)} disabled={isSaving}>
+                                  {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                  Lưu thông tin
+                              </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground p-4 text-center bg-slate-50 rounded-lg">
+                          Nhấp vào nút "Cấu hình" để bắt đầu.
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              </ResizablePanel>
+              <ResizableHandle withHandle />
+              <ResizablePanel defaultSize={60}>
+                <div className="h-full bg-slate-50 p-6 overflow-y-auto">
+                  <AiPlanContentView 
+                    planData={plan.plan_data} 
+                    planStructure={outputStructure!} 
+                    isEditable={true}
+                    editingSectionId={editingSectionId}
+                    setEditingSectionId={setEditingSectionId}
+                    onUpdateSection={handleUpdateSection}
+                    onRegenerateSection={(id, label) => setRegenSection({ id, label })}
+                  />
+                </div>
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          </TabsContent>
+          <TabsContent value="documents" className="flex-1 overflow-y-auto p-1">
+            <AiPlanProjectDocumentsManager planId={planId!} />
+          </TabsContent>
+        </Tabs>
       </main>
       {plan && (
         <SharePlanDialog

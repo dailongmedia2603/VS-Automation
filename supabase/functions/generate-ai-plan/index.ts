@@ -105,15 +105,15 @@ serve(async (req) => {
     // Replace {{tai_lieu}} placeholder
     if (prompt.includes('{{tai_lieu}}')) {
       let documentContext = '(Không có tài liệu tham khảo)';
-      const { data: globalDocs, error: docsError } = await supabaseAdmin
+      const { data: planDocs, error: docsError } = await supabaseAdmin
           .from('documents')
           .select('title, content')
-          .is('project_id', null);
+          .eq('ai_plan_id', planId);
 
       if (docsError) {
-          console.warn("Could not fetch global documents:", docsError.message);
-      } else if (globalDocs && globalDocs.length > 0) {
-          documentContext = globalDocs.map(doc => `--- TÀI LIỆU: ${doc.title} ---\n${doc.content}`).join('\n\n');
+          console.warn(`Could not fetch documents for plan ${planId}:`, docsError.message);
+      } else if (planDocs && planDocs.length > 0) {
+          documentContext = planDocs.map(doc => `--- TÀI LIỆU: ${doc.title} ---\n${doc.content}`).join('\n\n');
       }
       prompt = prompt.replace(/{{tai_lieu}}/g, documentContext);
     }

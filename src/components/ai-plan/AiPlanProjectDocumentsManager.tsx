@@ -146,7 +146,7 @@ const DocumentCard = ({ document, onSelect, isSelected, onEdit, onDelete, onView
   );
 };
 
-export const AiPlanDocumentsManager = () => {
+export const AiPlanProjectDocumentsManager = ({ planId }: { planId: string }) => {
   const { user } = useAuth();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -160,14 +160,14 @@ export const AiPlanDocumentsManager = () => {
 
   const fetchDocuments = useCallback(async () => {
     setIsLoading(true);
-    const { data, error } = await supabase.from('documents').select('*').is('project_id', null).order('created_at', { ascending: false });
+    const { data, error } = await supabase.from('documents').select('*').eq('ai_plan_id', planId).order('created_at', { ascending: false });
     if (error) {
       showError("Không thể tải tài liệu: " + error.message);
     } else {
       setDocuments(data as Document[]);
     }
     setIsLoading(false);
-  }, []);
+  }, [planId]);
 
   useEffect(() => {
     fetchDocuments();
@@ -189,7 +189,7 @@ export const AiPlanDocumentsManager = () => {
       if (functionError || embeddingData.error) throw new Error(functionError?.message || embeddingData.error);
       if (!embeddingData.embedding) throw new Error("Không nhận được vector embedding.");
 
-      const documentToSave = { ...doc, embedding: embeddingData.embedding, project_id: null };
+      const documentToSave = { ...doc, embedding: embeddingData.embedding, ai_plan_id: planId };
       
       if (documentToSave.id) {
         const { error } = await supabase.from('documents').update(documentToSave).eq('id', documentToSave.id);
@@ -263,7 +263,7 @@ export const AiPlanDocumentsManager = () => {
         <Lightbulb className="h-4 w-4 !text-yellow-600" />
         <AlertTitle className="font-semibold !text-yellow-900">Gợi ý</AlertTitle>
         <AlertDescription className="text-yellow-700">
-          Các tài liệu ở đây sẽ được sử dụng chung cho tất cả các kế hoạch AI.
+          Các tài liệu ở đây sẽ được sử dụng riêng cho kế hoạch AI này.
         </AlertDescription>
       </Alert>
 
@@ -290,7 +290,7 @@ export const AiPlanDocumentsManager = () => {
           <div className="text-center py-16 text-muted-foreground">
             <FileText className="mx-auto h-12 w-12" />
             <h3 className="mt-4 text-lg font-semibold">Chưa có tài liệu nào</h3>
-            <p className="mt-1 text-sm">Hãy bắt đầu bằng cách thêm tài liệu cho AI Plan.</p>
+            <p className="mt-1 text-sm">Hãy bắt đầu bằng cách thêm tài liệu cho kế hoạch này.</p>
           </div>
         )}
       </div>
