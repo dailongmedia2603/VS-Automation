@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Sparkles, Loader2, FileText, Share, Settings, PencilLine } from 'lucide-react';
+import { ArrowLeft, Sparkles, Loader2, FileText, Share, Settings, PencilLine, Download } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Textarea } from '@/components/ui/textarea';
 import { InputStructureConfigDialog } from '@/components/ai-plan/InputStructureConfigDialog';
 import { Input } from '@/components/ui/input';
+import * as XLSX from 'xlsx';
 
 type Plan = {
   id: number;
@@ -38,6 +39,7 @@ type OutputStructure = {
   label: string;
   type: 'text' | 'textarea' | 'dynamic_group';
   icon: string;
+  display_type?: 'simple' | 'content_direction' | 'post_scan';
   sub_fields?: { id: string; label: string; type: 'text' | 'textarea' }[];
 }[];
 
@@ -182,6 +184,50 @@ const AiPlanDetail = () => {
     }
   };
 
+  const handleExportExcel = () => {
+    if (!plan || !plan.plan_data || !outputStructure) {
+      showError("Không có dữ liệu kế hoạch để xuất.");
+      return;
+    }
+
+    try {
+      const workbook = XLSX.utils.book_new();
+
+      const mainSheetData: { 'Mục': string; 'Nội dung': string }[] = [];
+      
+      outputStructure.forEach(section => {
+        const sectionData = plan.plan_data[section.id];
+        if (!sectionData) return;
+
+        if ((section.display_type === 'content_direction' || section.display_type === 'post_scan') && Array.isArray(sectionData) && sectionData.length > 0) {
+          const worksheet = XLSX.utils.json_to_sheet(sectionData);
+          XLSX.utils.book_append_sheet(workbook, worksheet, section.label.substring(0, 31));
+        } else if (typeof sectionData === 'string' || typeof sectionData === 'number') {
+          mainSheetData.push({
+            'Mục': section.label,
+            'Nội dung': String(sectionData),
+          });
+        }
+      });
+
+      if (mainSheetData.length > 0) {
+        const mainWorksheet = XLSX.utils.json_to_sheet(mainSheetData);
+        XLSX.utils.book_append_sheet(workbook, mainWorksheet, "Tổng quan kế hoạch");
+      }
+
+      if (workbook.SheetNames.length === 0) {
+        showError("Không có dữ liệu để xuất.");
+        return;
+      }
+
+      XLSX.writeFile(workbook, `${plan.name || 'ke-hoach-ai'}.xlsx`);
+      showSuccess("Đã xuất file Excel thành công!");
+    } catch (error) {
+      console.error("Export to Excel failed:", error);
+      showError("Đã xảy ra lỗi khi xuất file Excel.");
+    }
+  };
+
   const handlePlanUpdate = (updates: Partial<Plan>) => {
     setPlan(prev => prev ? { ...prev, ...updates } : null);
   };
@@ -315,6 +361,10 @@ const AiPlanDetail = () => {
             <Button variant="outline" onClick={() => setIsShareDialogOpen(true)} className="bg-white">
               <Share className="mr-2 h-4 w-4" />
               Chia sẻ
+            </Button>
+            <Button variant="outline" onClick={handleExportExcel} className="bg-white">
+              <Download className="mr-2 h-4 w-4" />
+              Xuất Excel
             </Button>
             <Button variant="outline" onClick={handleOpenLogDialog} className="bg-white">
               <FileText className="mr-2 h-4 w-4" />
