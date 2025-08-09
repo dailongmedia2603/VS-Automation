@@ -20,19 +20,24 @@ type Role = { id: number; name: string; description: string | null; };
 type Permission = { id: number; action: string; description: string | null; };
 type RolePermission = { role_id: number; permission_id: number; };
 
-const featureMapping: Record<string, string> = {
+const featureNameMapping: Record<string, string> = {
   dashboard: 'Dashboard',
-  projects: 'Dự án',
   reports: 'Báo cáo',
-  training_documents: 'Tài liệu đào tạo',
-  training_chatbot: 'Training Chatbot',
   content_ai: 'Content AI',
+  training_chatbot: 'Training Chatbot',
+  training_documents: 'Tài liệu đào tạo',
   check_seeding: 'Check Seeding',
   tools: 'Công cụ chung',
   keyword_check: 'Công cụ - Keyword Check',
   post_scan: 'Công cụ - Post Scan',
+  ai_plan: 'AI Plan',
   staff: 'Nhân sự',
   settings: 'Cài đặt chung',
+  other: 'Khác',
+};
+
+const getFeatureDisplayName = (key: string) => {
+  return featureNameMapping[key] || key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 };
 
 const RolesManager = () => {
@@ -167,16 +172,24 @@ const RolesManager = () => {
   }, [roles, permissions, rolePermissions]);
 
   const groupedPermissions = useMemo(() => {
-    return permissions.reduce((acc, p) => {
-      const featureKey = Object.keys(featureMapping).find(key => p.action.includes(key));
-      if (featureKey) {
-        if (!acc[featureKey]) {
-          acc[featureKey] = [];
+    const groups: Record<string, Permission[]> = {};
+    
+    permissions.forEach(p => {
+        const parts = p.action.split('_');
+        const featureKey = parts.length > 1 ? parts.slice(1).join('_') : 'other';
+        
+        if (!groups[featureKey]) {
+            groups[featureKey] = [];
         }
-        acc[featureKey].push(p);
-      }
-      return acc;
-    }, {} as Record<string, Permission[]>);
+        groups[featureKey].push(p);
+    });
+
+    return Object.entries(groups)
+      .sort(([keyA], [keyB]) => getFeatureDisplayName(keyA).localeCompare(getFeatureDisplayName(keyB)))
+      .reduce((acc, [key, value]) => {
+        acc[key] = value;
+        return acc;
+      }, {} as Record<string, Permission[]>);
   }, [permissions]);
 
   if (isLoadingPermissions) {
@@ -275,12 +288,13 @@ const RolesManager = () => {
                     <Accordion type="multiple" className="w-full space-y-2">
                       {Object.entries(groupedPermissions).map(([key, perms]) => {
                         const allInGroupSelected = perms.every(p => selectedPermissions.has(p.id));
+                        const groupName = getFeatureDisplayName(key);
                         return (
                           <AccordionItem value={key} key={key} className="border rounded-lg px-4 bg-slate-50/50">
                             <AccordionTrigger className="hover:no-underline py-3">
                               <div className="flex items-center gap-3 w-full" onClick={(e) => e.stopPropagation()}>
-                                <Checkbox id={`select-all-${key}`} checked={allInGroupSelected} onCheckedChange={(checked) => handleSelectAllForGroup(perms, !!checked)} aria-label={`Select all for ${featureMapping[key]}`} />
-                                <Label htmlFor={`select-all-${key}`} className="font-semibold text-slate-800 cursor-pointer">{featureMapping[key] || key}</Label>
+                                <Checkbox id={`select-all-${key}`} checked={allInGroupSelected} onCheckedChange={(checked) => handleSelectAllForGroup(perms, !!checked)} aria-label={`Select all for ${groupName}`} />
+                                <Label htmlFor={`select-all-${key}`} className="font-semibold text-slate-800 cursor-pointer">{groupName}</Label>
                               </div>
                             </AccordionTrigger>
                             <AccordionContent className="pt-2 pb-4">
