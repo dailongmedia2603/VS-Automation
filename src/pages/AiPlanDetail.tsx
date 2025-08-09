@@ -192,32 +192,68 @@ const AiPlanDetail = () => {
 
     try {
       const workbook = XLSX.utils.book_new();
+      const mainSheetData: { 'Mục': string; 'Nội dung': any }[] = [];
 
-      const mainSheetData: { 'Mục': string; 'Nội dung': string }[] = [];
-      
+      // Iterate through the defined structure to maintain order
       outputStructure.forEach(section => {
         const sectionData = plan.plan_data[section.id];
-        if (!sectionData) return;
+        
+        // Skip if there's no data for this section
+        if (sectionData === null || typeof sectionData === 'undefined') {
+          return;
+        }
 
-        if ((section.display_type === 'content_direction' || section.display_type === 'post_scan') && Array.isArray(sectionData) && sectionData.length > 0) {
+        // Handle complex array data by creating separate sheets
+        if (Array.isArray(sectionData) && sectionData.length > 0 && typeof sectionData[0] === 'object' && sectionData[0] !== null) {
+          // Sanitize sheet name
+          const sheetName = section.label.replace(/[\/\\?*\[\]]/g, '').substring(0, 31);
           const worksheet = XLSX.utils.json_to_sheet(sectionData);
-          XLSX.utils.book_append_sheet(workbook, worksheet, section.label.substring(0, 31));
-        } else if (typeof sectionData === 'string' || typeof sectionData === 'number') {
+          XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+        } 
+        // Handle simple arrays (of strings/numbers)
+        else if (Array.isArray(sectionData)) {
+            mainSheetData.push({
+                'Mục': section.label,
+                'Nội dung': sectionData.join('\n'),
+            });
+        }
+        // Handle simple values (string, number, boolean)
+        else if (typeof sectionData !== 'object') {
           mainSheetData.push({
             'Mục': section.label,
             'Nội dung': String(sectionData),
           });
+        } 
+        // Handle simple objects by stringifying them
+        else if (typeof sectionData === 'object' && sectionData !== null) {
+            mainSheetData.push({
+                'Mục': section.label,
+                'Nội dung': JSON.stringify(sectionData, null, 2),
+            });
         }
       });
 
+      // Create the main summary sheet if it has data
       if (mainSheetData.length > 0) {
         const mainWorksheet = XLSX.utils.json_to_sheet(mainSheetData);
+        // Set column widths for better readability
+        mainWorksheet['!cols'] = [{ wch: 30 }, { wch: 80 }];
         XLSX.utils.book_append_sheet(workbook, mainWorksheet, "Tổng quan kế hoạch");
       }
 
       if (workbook.SheetNames.length === 0) {
         showError("Không có dữ liệu để xuất.");
         return;
+      }
+
+      // Ensure "Tổng quan kế hoạch" is the first sheet if it exists
+      if (workbook.SheetNames.includes("Tổng quan kế hoạch")) {
+        const overviewIndex = workbook.SheetNames.indexOf("Tổng quan kế hoạch");
+        if (overviewIndex > 0) {
+          // Move sheet to the beginning
+          const sheetName = workbook.SheetNames.splice(overviewIndex, 1)[0];
+          workbook.SheetNames.unshift(sheetName);
+        }
       }
 
       XLSX.writeFile(workbook, `${plan.name || 'ke-hoach-ai'}.xlsx`);
