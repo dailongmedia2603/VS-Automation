@@ -52,9 +52,7 @@ const buildRegenerationPrompt = (basePrompt, config, existingComments, feedback)
     .map(r => `- Loại: ${r.type || 'Chung'}, Tỉ lệ: ${r.percentage}%, Định hướng: ${r.content}`)
     .join('\n');
 
-  const conditionsText = (config.mandatoryConditions || [])
-    .map(c => `- ${c.content}`)
-    .join('\n');
+  const conditionsText = (config.mandatoryConditions || []).map(c => `- ${c.content}`).join('\n');
   
   const existingCommentsText = existingComments.map((c, i) => `${i + 1}. [${c.type}] ${c.content}`).join('\n');
 
@@ -160,9 +158,9 @@ serve(async (req) => {
   );
 
   try {
-    const { itemId, feedback, existingComments } = await req.json();
-    if (!itemId || !feedback || !existingComments) {
-      throw new Error("Thiếu thông tin cần thiết (itemId, feedback, existingComments).");
+    const { itemId, feedback } = await req.json();
+    if (!itemId || !feedback) {
+      throw new Error("Thiếu thông tin cần thiết (itemId, feedback).");
     }
 
     const authHeader = req.headers.get('Authorization');
@@ -175,10 +173,11 @@ serve(async (req) => {
     if (userError) throw userError;
     if (!user) throw new Error("User not authenticated.");
 
-    const { data: item, error: itemError } = await supabaseAdmin.from('content_ai_items').select('config').eq('id', itemId).single();
+    const { data: item, error: itemError } = await supabaseAdmin.from('content_ai_items').select('config, content').eq('id', itemId).single();
     if (itemError) throw itemError;
     if (!item) throw new Error("Không tìm thấy mục tương ứng.");
 
+    const existingComments = JSON.parse(item.content || '[]');
     const { config } = item;
     const { libraryId } = config;
     if (!libraryId) throw new Error("Config is missing libraryId.");

@@ -154,10 +154,24 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
     if (!config.direction) { showError("Vui lòng nhập 'Định hướng nội dung'."); return; }
 
     setIsGenerating(true);
-    const toastId = showLoading("AI đang xử lý, vui lòng chờ...");
+    let toastId = showLoading("Đang lưu cấu hình và gửi yêu cầu...");
     try {
+      const configToSave = { ...config, mandatoryConditions };
+      const { data: savedItem, error: saveError } = await supabase
+        .from('content_ai_items')
+        .update({ config: configToSave, updated_at: new Date().toISOString() })
+        .eq('id', item.id)
+        .select()
+        .single();
+
+      if (saveError) throw saveError;
+      onSave(savedItem as ProjectItem);
+
+      dismissToast(toastId);
+      toastId = showLoading("AI đang xử lý, vui lòng chờ...");
+      
       const { data: updatedItem, error } = await supabase.functions.invoke('generate-ai-content', {
-        body: { itemId: item.id, config: { ...config, mandatoryConditions, projectId: project.id } }
+        body: { itemId: item.id }
       });
       
       if (error) {
@@ -165,12 +179,8 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
         if (error.context && typeof error.context.json === 'function') {
           try {
             const errorBody = await error.context.json();
-            if (errorBody.error) {
-              errorMessage = errorBody.error;
-            }
-          } catch (e) {
-            // Ignore JSON parsing error, stick with the original message
-          }
+            if (errorBody.error) errorMessage = errorBody.error;
+          } catch (e) {}
         }
         throw new Error(errorMessage);
       }
@@ -181,7 +191,7 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
       onSave(updatedItem);
 
     } catch (err: any) {
-      dismissToast(toastId);
+      if(toastId) dismissToast(toastId);
       showError(`Không thể tạo nội dung: ${err.message}`);
     } finally {
       setIsGenerating(false);
@@ -205,7 +215,6 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
         body: {
           itemId: item.id,
           feedback: feedbackText,
-          existingArticles: results,
           articleIdsToRegenerate: articlesToRegenerate,
         }
       });
@@ -571,15 +580,7 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
         <CardContent>
           <div className="border rounded-lg overflow-hidden">
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12"><Checkbox checked={selectedIds.length > 0 && selectedIds.length === filteredResults.length && filteredResults.length > 0} onCheckedChange={(checked) => handleSelectAll(!!checked)} /></TableHead>
-                  <TableHead>STT</TableHead>
-                  <TableHead>Nội dung bài viết</TableHead>
-                  <TableHead>Dạng bài</TableHead>
-                  <TableHead className="text-right">Thao tác</TableHead>
-                </TableRow>
-              </TableHeader>
+              <TableHeader><TableRow><TableHead className="w-12"><Checkbox checked={selectedIds.length > 0 && selectedIds.length === filteredResults.length && filteredResults.length > 0} onCheckedChange={(checked) => handleSelectAll(!!checked)} /></TableHead><TableHead>STT</TableHead><TableHead>Nội dung bài viết</TableHead><TableHead>Dạng bài</TableHead><TableHead className="text-right">Thao tác</TableHead></TableRow></TableHeader>
               <TableBody>
                 {isGenerating && (
                   <TableRow>

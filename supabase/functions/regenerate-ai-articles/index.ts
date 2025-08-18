@@ -109,8 +109,8 @@ serve(async (req) => {
   const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
 
   try {
-    const { itemId, feedback, existingArticles, articleIdsToRegenerate } = await req.json();
-    if (!itemId || !feedback || !existingArticles || !articleIdsToRegenerate) {
+    const { itemId, feedback, articleIdsToRegenerate } = await req.json();
+    if (!itemId || !feedback || !articleIdsToRegenerate) {
       throw new Error("Thiếu thông tin cần thiết.");
     }
 
@@ -120,9 +120,10 @@ serve(async (req) => {
     const { data: { user } } = await createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_ANON_KEY') ?? '').auth.getUser(jwt);
     if (!user) throw new Error("User not authenticated.");
 
-    const { data: item, error: itemError } = await supabaseAdmin.from('content_ai_items').select('config').eq('id', itemId).single();
+    const { data: item, error: itemError } = await supabaseAdmin.from('content_ai_items').select('config, content').eq('id', itemId).single();
     if (itemError || !item) throw new Error("Không tìm thấy mục tương ứng.");
 
+    const existingArticles = JSON.parse(item.content || '[]');
     const { config } = item;
     const { libraryId } = config;
     if (!libraryId) throw new Error("Config is missing libraryId.");

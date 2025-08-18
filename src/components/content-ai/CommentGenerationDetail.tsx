@@ -173,10 +173,24 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
     if (!config.postContent) { showError("Vui lòng nhập 'Nội dung Post'."); return; }
 
     setIsGenerating(true);
-    const toastId = showLoading("AI đang xử lý, vui lòng chờ...");
+    let toastId = showLoading("Đang lưu cấu hình và gửi yêu cầu...");
     try {
+      const configToSave = { ...config, mandatoryConditions };
+      const { data: savedItem, error: saveError } = await supabase
+        .from('content_ai_items')
+        .update({ config: configToSave, updated_at: new Date().toISOString() })
+        .eq('id', item.id)
+        .select()
+        .single();
+      
+      if (saveError) throw saveError;
+      onSave(savedItem as ProjectItem);
+
+      dismissToast(toastId);
+      toastId = showLoading("AI đang xử lý, vui lòng chờ...");
+      
       const { data: updatedItem, error } = await supabase.functions.invoke('generate-ai-content', {
-        body: { itemId: item.id, config: { ...config, mandatoryConditions, projectId: project.id } }
+        body: { itemId: item.id }
       });
       
       if (error) {
@@ -184,12 +198,8 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
         if (error.context && typeof error.context.json === 'function') {
           try {
             const errorBody = await error.context.json();
-            if (errorBody.error) {
-              errorMessage = errorBody.error;
-            }
-          } catch (e) {
-            // Ignore JSON parsing error, stick with the original message
-          }
+            if (errorBody.error) errorMessage = errorBody.error;
+          } catch (e) {}
         }
         throw new Error(errorMessage);
       }
@@ -200,7 +210,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
       onSave(updatedItem);
 
     } catch (err: any) {
-      dismissToast(toastId);
+      if(toastId) dismissToast(toastId);
       showError(`Không thể tạo nội dung: ${err.message}`);
     } finally {
       setIsGenerating(false);
@@ -220,7 +230,6 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
         body: {
           itemId: item.id,
           feedback: feedbackText,
-          existingComments: results
         }
       });
 
