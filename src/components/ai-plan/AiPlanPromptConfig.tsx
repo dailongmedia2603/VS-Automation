@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Save, Loader2, PlusCircle, Trash2, ArrowUp, ArrowDown, Eye, Code, SlidersHorizontal, BrainCircuit, HelpCircle } from 'lucide-react';
+import { Save, Loader2, PlusCircle, Trash2, ArrowUp, ArrowDown, Eye, Code, SlidersHorizontal, BrainCircuit, HelpCircle, Shield } from 'lucide-react';
 import { showSuccess, showError } from '@/utils/toast';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -33,6 +33,7 @@ type PromptConfig = {
   useCoT: boolean;
   cotFactors: CotFactor[];
   output_instruction: string;
+  safety_instruction: string;
 };
 
 const DEFAULT_OUTPUT_INSTRUCTION = `
@@ -50,7 +51,9 @@ JSON object phải có cấu trúc chính xác như sau:
 - Hãy điền giá trị cho mỗi trường dựa trên thông tin đã được cung cấp và kiến thức của bạn.
 `;
 
-const initialConfig: Omit<PromptConfig, 'output_instruction'> = {
+const DEFAULT_SAFETY_INSTRUCTION = `Bạn là một trợ lý AI chuyên nghiệp, hữu ích và an toàn. Hãy tập trung vào việc tạo ra nội dung marketing chất lượng cao, phù hợp với ngữ cảnh được cung cấp. TUYỆT ĐỐI TRÁNH các chủ đề nhạy cảm, gây tranh cãi, hoặc có thể bị hiểu lầm là tiêu cực. Luôn duy trì một thái độ tích cực và chuyên nghiệp.`;
+
+const initialConfig: Omit<PromptConfig, 'output_instruction' | 'safety_instruction'> = {
   blocks: [],
   temperature: 0.7,
   topP: 0.95,
@@ -65,8 +68,9 @@ const placeholders = [
 ];
 
 export const AiPlanPromptConfig = () => {
-  const [config, setConfig] = useState<Omit<PromptConfig, 'output_instruction'>>(initialConfig);
+  const [config, setConfig] = useState<Omit<PromptConfig, 'output_instruction' | 'safety_instruction'>>(initialConfig);
   const [outputInstruction, setOutputInstruction] = useState(DEFAULT_OUTPUT_INSTRUCTION);
+  const [safetyInstruction, setSafetyInstruction] = useState(DEFAULT_SAFETY_INSTRUCTION);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -90,8 +94,10 @@ export const AiPlanPromptConfig = () => {
           const loadedConfig = { ...initialConfig, ...data.prompt_structure };
           setConfig(loadedConfig);
           setOutputInstruction(loadedConfig.output_instruction || DEFAULT_OUTPUT_INSTRUCTION);
+          setSafetyInstruction(loadedConfig.safety_instruction || DEFAULT_SAFETY_INSTRUCTION);
         } else {
           setOutputInstruction(DEFAULT_OUTPUT_INSTRUCTION);
+          setSafetyInstruction(DEFAULT_SAFETY_INSTRUCTION);
         }
       } catch (error: any) {
         showError("Không thể tải prompt: " + error.message);
@@ -136,7 +142,7 @@ export const AiPlanPromptConfig = () => {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const configToSave = { ...config, output_instruction: outputInstruction };
+      const configToSave = { ...config, output_instruction: outputInstruction, safety_instruction: safetyInstruction };
       const { error } = await supabase
         .from('ai_plan_prompt_config')
         .upsert({ id: 1, prompt_structure: configToSave, updated_at: new Date().toISOString() });
@@ -192,7 +198,7 @@ export const AiPlanPromptConfig = () => {
     }
   };
 
-  const handleConfigChange = (field: keyof Omit<PromptConfig, 'blocks' | 'output_instruction'>, value: any) => {
+  const handleConfigChange = (field: keyof Omit<PromptConfig, 'blocks' | 'output_instruction' | 'safety_instruction'>, value: any) => {
     setConfig(prev => ({ ...prev, [field]: value }));
   };
 
@@ -209,7 +215,7 @@ export const AiPlanPromptConfig = () => {
   };
 
   const previewPrompt = useMemo(() => {
-    let prompt = config.blocks.map(block => `### ${block.title.toUpperCase()}\n\n${block.content}`).join('\n\n---\n\n');
+    let prompt = `### CHỈ THỊ AN TOÀN\n\n${safetyInstruction}\n\n---\n\n` + config.blocks.map(block => `### ${block.title.toUpperCase()}\n\n${block.content}`).join('\n\n---\n\n');
 
     const inputDescriptions = templateInputFields
         .map(field => `*   **${field.label}:** (Giá trị người dùng nhập)\n    *   *Mô tả/Hướng dẫn cho AI:* ${field.description || 'Không có.'}`)
@@ -236,7 +242,7 @@ export const AiPlanPromptConfig = () => {
     prompt += finalOutputInstruction;
 
     return prompt;
-  }, [config, outputInstruction, templateInputFields, globalDocuments]);
+  }, [config, outputInstruction, safetyInstruction, templateInputFields, globalDocuments]);
 
   if (isLoading) {
     return <Card><CardHeader><Skeleton className="h-6 w-1/3" /></CardHeader><CardContent><Skeleton className="h-64 w-full" /></CardContent></Card>;
@@ -246,6 +252,24 @@ export const AiPlanPromptConfig = () => {
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         <div className="lg:col-span-2 space-y-4">
+          <Card className="shadow-sm rounded-2xl bg-white">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-6 w-6 text-green-600" />
+                Chỉ thị An toàn
+              </CardTitle>
+              <CardDescription>
+                Thêm một chỉ thị chung vào đầu mỗi prompt để hướng dẫn AI tránh các bộ lọc an toàn.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Textarea 
+                value={safetyInstruction} 
+                onChange={e => setSafetyInstruction(e.target.value)} 
+                className="min-h-[120px] font-mono text-xs bg-green-50/50 border-green-200" 
+              />
+            </CardContent>
+          </Card>
           <Card className="shadow-sm rounded-2xl bg-white">
             <CardHeader>
               <CardTitle>Cấu trúc Prompt</CardTitle>
