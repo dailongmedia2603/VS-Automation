@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Trash2, BrainCircuit, Info, Palette, SlidersHorizontal } from 'lucide-react';
+import { PlusCircle, Trash2, BrainCircuit, Info, Palette, SlidersHorizontal, Shield } from 'lucide-react';
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -37,6 +37,7 @@ export type TrainingConfig = {
   topP: number;
   maxTokens: number;
   useCoT: boolean;
+  safety_instruction: string;
   cotFactors: TrainingItem[];
 };
 
@@ -59,6 +60,7 @@ export const initialConfig: TrainingConfig = {
   topP: 0.95,
   maxTokens: 8192,
   useCoT: false,
+  safety_instruction: 'Bạn là một trợ lý AI chuyên nghiệp, hữu ích và an toàn. Hãy tập trung vào việc tạo ra nội dung marketing chất lượng cao, phù hợp với ngữ cảnh được cung cấp. TUYỆT ĐỐI TRÁNH các chủ đề nhạy cảm, gây tranh cãi, hoặc có thể bị hiểu lầm là tiêu cực. Luôn duy trì một thái độ tích cực và chuyên nghiệp.',
   cotFactors: [],
 };
 
@@ -152,6 +154,24 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({ config, setConfig })
         </div>
 
         <div className="space-y-8">
+          <Card className="bg-white rounded-2xl shadow-sm border border-slate-200/80">
+            <CardHeader className="p-6 flex flex-row items-center gap-4">
+              <div className="flex-shrink-0 bg-green-100 p-3 rounded-lg">
+                <Shield className="h-6 w-6 text-green-600" />
+              </div>
+              <div>
+                <CardTitle className="text-xl font-bold text-slate-900">Chỉ thị An toàn</CardTitle>
+                <CardDescription className="text-sm text-slate-500 pt-1">Hướng dẫn AI "né" bộ lọc an toàn. Chỉ thị này sẽ được thêm vào đầu mỗi prompt.</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 pt-0">
+              <Textarea
+                value={config.safety_instruction || ''}
+                onChange={(e) => handleFieldChange('safety_instruction', e.target.value)}
+                className="min-h-[150px] font-mono text-xs bg-green-50/50 border-green-200"
+              />
+            </CardContent>
+          </Card>
           <Card className="bg-white rounded-2xl shadow-sm border border-slate-200/80">
             <CardHeader className="p-6 flex flex-row items-center gap-4">
               <div className="flex-shrink-0 bg-green-100 p-3 rounded-lg">

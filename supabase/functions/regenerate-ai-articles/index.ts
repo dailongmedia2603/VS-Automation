@@ -17,6 +17,11 @@ const formatMapping: Record<string, string> = {
 
 const buildBasePrompt = (libraryConfig, documentContext) => {
   const config = libraryConfig || {};
+  
+  const safetyInstructionBlock = config.safety_instruction 
+    ? { title: 'CHỈ THỊ AN TOÀN (ƯU TIÊN CAO NHẤT)', content: config.safety_instruction }
+    : null;
+
   const trainingInfoContent = [
     `- **Vai trò của bạn:** ${config.role || '(Chưa cung cấp)'}`,
     `- **Lĩnh vực kinh doanh:** ${config.industry || '(Chưa cung cấp)'}`,
@@ -25,12 +30,18 @@ const buildBasePrompt = (libraryConfig, documentContext) => {
     `- **Ngôn ngữ:** ${config.language || '(Chưa cung cấp)'}`,
     `- **Mục tiêu cần đạt:** ${config.goal || '(Chưa cung cấp)'}`
   ].join('\n');
-  const promptStructure = [
+  
+  let promptStructure = [
     { title: 'YÊU CẦU VIẾT NỘI DUNG TỰ NHIÊN NHƯ NGƯỜI THẬT', content: 'Bạn là một trợ lý AI viết nội dung bài viết / comment tự nhiên như người dùng thật. Hãy dựa vào các thông tin dưới đây để xây dựng nội dung chất lượng và tự nhiên nhé.' },
     { title: 'THÔNG TIN HUẤN LUYỆN CHUNG', content: trainingInfoContent },
     { title: 'TÀI LIỆU NỘI BỘ THAM KHẢO', content: '{{document_context}}' },
     { title: 'HÀNH ĐỘNG', content: 'Dựa vào TOÀN BỘ thông tin, hãy tạo nội dung đúng yêu cầu, tự nhiên như người thật, không được có dấu hiệu máy móc, khô cứng, seeding' }
   ];
+
+  if (safetyInstructionBlock) {
+    promptStructure.unshift(safetyInstructionBlock);
+  }
+
   const dataMap = {
     '{{document_context}}': documentContext || '(Không có tài liệu tham khảo liên quan)',
   };
