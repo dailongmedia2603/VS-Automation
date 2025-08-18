@@ -7,7 +7,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Settings, Save, Loader2, Trash2, FileText, Sparkles, Bot, ShieldCheck, MessageSquarePlus, PlusCircle, Copy, ChevronDown, Search, Download, MoreHorizontal, Edit, Library, LayoutTemplate, FileInput, ListOrdered, Compass, Check } from 'lucide-react';
+import { Settings, Save, Loader2, Trash2, FileText, Sparkles, Bot, ShieldCheck, MessageSquarePlus, PlusCircle, Copy, ChevronDown, Search, Download, MoreHorizontal, Edit, Library, LayoutTemplate, FileInput, ListOrdered, Compass, Check, AlertCircle } from 'lucide-react';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
 import { GenerationLogDialog } from './GenerationLogDialog';
 import ReactMarkdown from 'react-markdown';
@@ -23,9 +23,10 @@ import { ConditionLibraryDialog } from './ConditionLibraryDialog';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from '@/lib/utils';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 type Project = { id: number; name: string; };
-type ProjectItem = { id: number; name: string; type: 'article' | 'comment'; content: string | null; config: any; };
+type ProjectItem = { id: number; name: string; type: 'article' | 'comment'; content: string | null; config: any; generation_status?: 'idle' | 'generating' | 'failed'; generation_error?: string | null; };
 type PromptLibrary = { id: number; name: string; };
 type GeneratedArticle = { id: string; content: string; type: string; };
 type Log = { id: number; created_at: string; prompt: string; response: any; };
@@ -42,12 +43,12 @@ interface ArticleGenerationDetailProps {
 }
 
 export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave }: ArticleGenerationDetailProps) => {
+  const [currentItem, setCurrentItem] = useState<ProjectItem>(item);
   const [config, setConfig] = useState<any>({});
   const [mandatoryConditions, setMandatoryConditions] = useState<MandatoryCondition[]>([]);
   const [results, setResults] = useState<GeneratedArticle[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingConditions, setIsSavingConditions] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
   const [isLogOpen, setIsLogOpen] = useState(false);
   const [logs, setLogs] = useState<Log[]>([]);
   const [isLoadingLogs, setIsLoadingLogs] = useState(true);
@@ -65,6 +66,7 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
   const [projectDocuments, setProjectDocuments] = useState<Document[]>([]);
 
   useEffect(() => {
+    setCurrentItem(item);
     const itemConfig = item.config || {};
     setConfig(itemConfig);
     setMandatoryConditions(itemConfig.mandatoryConditions || []);
@@ -74,7 +76,34 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
     } catch {
       setResults([]);
     }
+  }, [item]);
 
+  useEffect(() => {
+    const channel = supabase
+      .channel(`content_ai_item_${item.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'content_ai_items',
+        filter: `id=eq.${item.id}`
+      }, (payload) => {
+        const updatedItem = payload.new as ProjectItem;
+        if (updatedItem.generation_status === 'idle' && currentItem.generation_status === 'generating') {
+          showSuccess("AI đã tạo xong nội dung!");
+        } else if (updatedItem.generation_status === 'failed' && currentItem.generation_status === 'generating') {
+          showError(`Tạo nội dung thất bại: ${updatedItem.generation_error || 'Lỗi không xác định'}`);
+        }
+        setCurrentItem(updatedItem);
+        onSave(updatedItem);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [item.id, onSave, currentItem.generation_status]);
+
+  useEffect(() => {
     const fetchLogs = async () => {
         setIsLoadingLogs(true);
         const { data, error } = await supabase.from('content_ai_logs').select('*').eq('item_id', item.id).order('created_at', { ascending: false });
@@ -109,7 +138,7 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
       }
     };
     fetchProjectDocuments();
-  }, [item, project]);
+  }, [item.id, project]);
 
   const structuresInSelectedLibrary = useMemo(() => {
     if (!config.structureLibraryId) return [];
@@ -153,48 +182,32 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
     if (!config.libraryId) { showError("Vui lòng chọn một 'Ngành' (thư viện prompt)."); return; }
     if (!config.direction) { showError("Vui lòng nhập 'Định hướng nội dung'."); return; }
 
-    setIsGenerating(true);
-    let toastId = showLoading("Đang lưu cấu hình và gửi yêu cầu...");
     try {
       const configToSave = { ...config, mandatoryConditions };
       const { data: savedItem, error: saveError } = await supabase
         .from('content_ai_items')
-        .update({ config: configToSave, updated_at: new Date().toISOString() })
+        .update({ 
+          config: configToSave, 
+          updated_at: new Date().toISOString(),
+          generation_status: 'generating',
+          generation_error: null
+        })
         .eq('id', item.id)
         .select()
         .single();
 
       if (saveError) throw saveError;
       onSave(savedItem as ProjectItem);
-
-      dismissToast(toastId);
-      toastId = showLoading("AI đang xử lý, vui lòng chờ...");
       
-      const { data: updatedItem, error } = await supabase.functions.invoke('generate-ai-content', {
+      const { error: invokeError } = await supabase.functions.invoke('generate-ai-content', {
         body: { itemId: item.id }
       });
       
-      if (error) {
-        let errorMessage = error.message;
-        if (error.context && typeof error.context.json === 'function') {
-          try {
-            const errorBody = await error.context.json();
-            if (errorBody.error) errorMessage = errorBody.error;
-          } catch (e) {}
-        }
-        throw new Error(errorMessage);
-      }
-      if (updatedItem.error) throw new Error(updatedItem.error);
-      
-      dismissToast(toastId);
-      showSuccess("Đã tạo nội dung thành công!");
-      onSave(updatedItem);
+      if (invokeError) throw invokeError;
 
     } catch (err: any) {
-      if(toastId) dismissToast(toastId);
-      showError(`Không thể tạo nội dung: ${err.message}`);
-    } finally {
-      setIsGenerating(false);
+      showError(`Không thể bắt đầu tạo nội dung: ${err.message}`);
+      await supabase.from('content_ai_items').update({ generation_status: 'failed', generation_error: err.message }).eq('id', item.id);
     }
   };
 
@@ -207,11 +220,22 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
       showError("Vui lòng chọn ít nhất một bài viết để tạo lại.");
       return;
     }
-    setIsGenerating(true);
     setIsFeedbackDialogOpen(false);
-    const toastId = showLoading("AI đang tiếp nhận feedback và tạo lại...");
     try {
-      const { data: updatedItem, error } = await supabase.functions.invoke('regenerate-ai-articles', {
+      const { data: savedItem, error: saveError } = await supabase
+        .from('content_ai_items')
+        .update({ 
+          generation_status: 'generating',
+          generation_error: null
+        })
+        .eq('id', item.id)
+        .select()
+        .single();
+      
+      if (saveError) throw saveError;
+      onSave(savedItem as ProjectItem);
+
+      const { error: invokeError } = await supabase.functions.invoke('regenerate-ai-articles', {
         body: {
           itemId: item.id,
           feedback: feedbackText,
@@ -219,29 +243,14 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
         }
       });
 
-      if (error) {
-        let errorMessage = error.message;
-        if (error.context && typeof error.context.json === 'function') {
-          try {
-            const errorBody = await error.context.json();
-            if (errorBody.error) errorMessage = errorBody.error;
-          } catch (e) { /* Ignore parsing error */ }
-        }
-        throw new Error(errorMessage);
-      }
-      if (updatedItem.error) throw new Error(updatedItem.error);
+      if (invokeError) throw invokeError;
 
       setHighlightedIds(articlesToRegenerate);
-      onSave(updatedItem);
-      dismissToast(toastId);
-      showSuccess("Đã tạo lại bài viết theo feedback!");
       setFeedbackText('');
       setArticlesToRegenerate([]);
     } catch (err: any) {
-      dismissToast(toastId);
       showError(`Tạo lại thất bại: ${err.message}`);
-    } finally {
-      setIsGenerating(false);
+      await supabase.from('content_ai_items').update({ generation_status: 'failed', generation_error: err.message }).eq('id', item.id);
     }
   };
 
@@ -342,14 +351,24 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-slate-900">{item.name}</h2>
         <div className="flex items-center gap-4">
-          {isGenerating && <p className="text-sm text-slate-500 animate-pulse">AI đang xử lý...</p>}
-          <Button onClick={handleGenerate} disabled={isGenerating} className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg">
-            {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-            {isGenerating ? 'Đang tạo...' : 'Tạo bài viết'}
+          {currentItem.generation_status === 'generating' && <p className="text-sm text-slate-500 animate-pulse">AI đang xử lý...</p>}
+          <Button onClick={handleGenerate} disabled={currentItem.generation_status === 'generating'} className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg">
+            {currentItem.generation_status === 'generating' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+            {currentItem.generation_status === 'generating' ? 'Đang tạo...' : 'Tạo bài viết'}
           </Button>
         </div>
       </div>
       
+      {currentItem.generation_status === 'failed' && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Tạo nội dung thất bại</AlertTitle>
+          <AlertDescription>
+            {currentItem.generation_error || "Đã xảy ra lỗi không xác định. Vui lòng thử lại."}
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Accordion type="single" collapsible defaultValue="item-1" className="w-full">
         <AccordionItem value="item-1" className="border rounded-2xl bg-blue-50 shadow-sm">
           <AccordionTrigger className="px-6 py-4 text-lg font-semibold hover:no-underline">
@@ -570,7 +589,7 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
               )}
               <Button variant="outline" size="icon" onClick={handleExportExcel}><Download className="h-4 w-4" /></Button>
               <Button variant="outline" size="icon" onClick={() => setIsLogOpen(true)}><FileText className="h-4 w-4" /></Button>
-              <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setIsFeedbackDialogOpen(true)} disabled={isGenerating || results.length === 0}>
+              <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setIsFeedbackDialogOpen(true)} disabled={currentItem.generation_status === 'generating' || results.length === 0}>
                 <MessageSquarePlus className="mr-2 h-4 w-4" />
                 Feedback & Tạo lại
               </Button>
@@ -582,7 +601,7 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
             <Table>
               <TableHeader><TableRow><TableHead className="w-12"><Checkbox checked={selectedIds.length > 0 && selectedIds.length === filteredResults.length && filteredResults.length > 0} onCheckedChange={(checked) => handleSelectAll(!!checked)} /></TableHead><TableHead>STT</TableHead><TableHead>Nội dung bài viết</TableHead><TableHead>Dạng bài</TableHead><TableHead className="text-right">Thao tác</TableHead></TableRow></TableHeader>
               <TableBody>
-                {isGenerating && (
+                {currentItem.generation_status === 'generating' && (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center p-4">
                       <div className="flex items-center justify-center gap-3 text-slate-500">
@@ -618,7 +637,7 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
                       </DropdownMenu>
                     </TableCell>
                   </TableRow>
-                )) : !isGenerating && (<TableRow><TableCell colSpan={5} className="text-center h-24">Chưa có kết quả nào.</TableCell></TableRow>)}
+                )) : currentItem.generation_status !== 'generating' && (<TableRow><TableCell colSpan={5} className="text-center h-24">Chưa có kết quả nào.</TableCell></TableRow>)}
               </TableBody>
             </Table>
           </div>
@@ -707,8 +726,8 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsFeedbackDialogOpen(false)}>Hủy</Button>
-            <Button onClick={handleRegenerateWithFeedback} disabled={isGenerating} className="bg-blue-600 hover:bg-blue-700">
-              {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+            <Button onClick={handleRegenerateWithFeedback} disabled={currentItem.generation_status === 'generating'} className="bg-blue-600 hover:bg-blue-700">
+              {currentItem.generation_status === 'generating' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
               Gửi Feedback & Tạo lại
             </Button>
           </DialogFooter>

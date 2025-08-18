@@ -106,14 +106,14 @@ ${config.referenceExample}`;
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
+  const { itemId, feedback, articleIdsToRegenerate } = await req.json();
+  if (!itemId || !feedback || !articleIdsToRegenerate) {
+    return new Response(JSON.stringify({ error: "Thiếu thông tin cần thiết." }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  }
+
   const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
 
   try {
-    const { itemId, feedback, articleIdsToRegenerate } = await req.json();
-    if (!itemId || !feedback || !articleIdsToRegenerate) {
-      throw new Error("Thiếu thông tin cần thiết.");
-    }
-
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) throw new Error("Missing Authorization header");
     const jwt = authHeader.replace('Bearer ', '');
@@ -215,18 +215,27 @@ serve(async (req) => {
       return regenerated || article;
     });
 
-    const { data: updatedItem, error: updateError } = await supabaseAdmin
+    await supabaseAdmin
       .from('content_ai_items')
-      .update({ content: JSON.stringify(newResults), updated_at: new Date().toISOString() })
-      .eq('id', itemId)
-      .select()
-      .single();
+      .update({ 
+        content: JSON.stringify(newResults), 
+        updated_at: new Date().toISOString(),
+        generation_status: 'idle',
+        generation_error: null
+      })
+      .eq('id', itemId);
     
-    if (updateError) throw updateError;
-
-    return new Response(JSON.stringify(updatedItem), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+    return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
 
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 });
+    await supabaseAdmin
+      .from('content_ai_items')
+      .update({
+        generation_status: 'failed',
+        generation_error: error.message
+      })
+      .eq('id', itemId);
+
+    return new Response(JSON.stringify({ error: error.message }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
   }
 });

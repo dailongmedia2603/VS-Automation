@@ -152,17 +152,17 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
+  const { itemId, feedback } = await req.json();
+  if (!itemId || !feedback) {
+    return new Response(JSON.stringify({ error: "Thiếu thông tin cần thiết (itemId, feedback)." }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  }
+
   const supabaseAdmin = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
 
   try {
-    const { itemId, feedback } = await req.json();
-    if (!itemId || !feedback) {
-      throw new Error("Thiếu thông tin cần thiết (itemId, feedback).");
-    }
-
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) throw new Error("Missing Authorization header");
     const jwt = authHeader.replace('Bearer ', '');
@@ -283,27 +283,36 @@ serve(async (req) => {
         };
       });
 
-    const { data: updatedItem, error: updateError } = await supabaseAdmin
+    await supabaseAdmin
       .from('content_ai_items')
-      .update({ content: JSON.stringify(newComments), updated_at: new Date().toISOString() })
-      .eq('id', itemId)
-      .select()
-      .single();
+      .update({ 
+        content: JSON.stringify(newComments), 
+        updated_at: new Date().toISOString(),
+        generation_status: 'idle',
+        generation_error: null
+      })
+      .eq('id', itemId);
     
-    if (updateError) throw updateError;
-
     await supabaseAdmin.from('content_ai_logs').insert({ item_id: itemId, creator_id: user.id, prompt: finalPrompt, response: geminiData });
 
-    return new Response(JSON.stringify(updatedItem), { 
+    return new Response(JSON.stringify({ success: true }), { 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200 
     });
 
   } catch (error) {
     console.error("Error in regeneration function:", error.message, error.stack);
+    await supabaseAdmin
+      .from('content_ai_items')
+      .update({
+        generation_status: 'failed',
+        generation_error: error.message
+      })
+      .eq('id', itemId);
+      
     return new Response(JSON.stringify({ error: error.message }), { 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500 
+      status: 200 
     });
   }
 });
