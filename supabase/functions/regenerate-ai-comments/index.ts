@@ -156,7 +156,6 @@ serve(async (req) => {
       throw new Error("Thiếu thông tin cần thiết (itemId, feedback, existingComments).");
     }
 
-    // Get user from Authorization header to find the creator_id
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) throw new Error("Missing Authorization header");
     const jwt = authHeader.replace('Bearer ', '');
@@ -219,11 +218,14 @@ serve(async (req) => {
       maxOutputTokens: library.config.maxTokens ?? 8192,
     };
 
-    let geminiRes;
+    let geminiData;
     const maxRetries = 3;
-    const retryDelay = 2000;
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${aiSettings.google_gemini_api_key}`, {
+    const retryDelay = 1000;
+    let attempt = 0;
+
+    while (attempt < maxRetries) {
+      attempt++;
+      const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${aiSettings.google_gemini_api_key}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
@@ -231,18 +233,29 @@ serve(async (req) => {
             generationConfig: generationConfig
           }),
       });
-      if (geminiRes.ok) break;
-      if (geminiRes.status >= 500 && attempt < maxRetries) {
-        console.warn(`Attempt ${attempt} failed with status ${geminiRes.status}. Retrying in ${retryDelay}ms...`);
+      
+      geminiData = await geminiRes.json();
+
+      if (!geminiRes.ok) {
+        if (geminiRes.status >= 500 && attempt < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          continue;
+        }
+        throw new Error(geminiData?.error?.message || `Lỗi API với mã trạng thái ${geminiRes.status}`);
+      }
+
+      const hasContent = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (hasContent) {
+        break;
+      }
+
+      if (attempt < maxRetries) {
         await new Promise(resolve => setTimeout(resolve, retryDelay));
       } else {
-        break;
+        throw new Error("AI đã từ chối tạo nội dung, có thể do bộ lọc an toàn.");
       }
     }
 
-    const geminiData = await geminiRes.json();
-    if (!geminiRes.ok) throw new Error(geminiData?.error?.message || 'Lỗi gọi API Gemini.');
-    
     geminiData.model_used = modelToUse;
 
     const rawContent = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
@@ -257,7 +270,7 @@ serve(async (req) => {
         return { 
           id: crypto.randomUUID(), 
           content: line, 
-          type: 'N/A', // Type will be parsed on the frontend
+          type: 'N/A',
           metConditionIds: allConditionIds
         };
       });

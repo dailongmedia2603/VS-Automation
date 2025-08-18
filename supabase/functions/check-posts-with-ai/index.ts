@@ -33,7 +33,6 @@ serve(async (req) => {
     if (settingsError) throw new Error("Chưa cấu hình AI.");
 
     if (!aiSettings.google_gemini_api_key || !project.post_scan_ai_prompt) {
-      // If AI is not configured, just return the posts as they are.
       return new Response(JSON.stringify({ posts }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
@@ -46,18 +45,39 @@ serve(async (req) => {
       let aiDetails = null;
 
       try {
-        const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${aiSettings.google_gemini_api_key}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: geminiPrompt }] }] }),
-        });
-        
-        geminiData = await geminiRes.json();
+        const maxRetries = 3;
+        const retryDelay = 1000;
+        let attempt = 0;
 
-        if (geminiRes.ok) {
-          aiResult = geminiData.candidates?.[0]?.content?.parts?.[0]?.text.trim() || 'Không';
-        } else {
-          aiResult = `Lỗi: ${geminiData?.error?.message || 'Không rõ'}`;
+        while (attempt < maxRetries) {
+          attempt++;
+          const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${aiSettings.google_gemini_api_key}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ parts: [{ text: geminiPrompt }] }] }),
+          });
+          
+          geminiData = await geminiRes.json();
+
+          if (!geminiRes.ok) {
+            if (geminiRes.status >= 500 && attempt < maxRetries) {
+              await new Promise(resolve => setTimeout(resolve, retryDelay));
+              continue;
+            }
+            throw new Error(geminiData?.error?.message || `Lỗi API với mã trạng thái ${geminiRes.status}`);
+          }
+
+          const hasContent = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (hasContent) {
+            aiResult = hasContent.trim();
+            break;
+          }
+
+          if (attempt < maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+          } else {
+            throw new Error("AI từ chối tạo nội dung (có thể do bộ lọc an toàn).");
+          }
         }
       } catch (e) {
         aiResult = `Lỗi: ${e.message}`;

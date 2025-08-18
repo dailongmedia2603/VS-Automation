@@ -152,26 +152,43 @@ serve(async (req) => {
 
       const finalPrompt = buildRegenerationPrompt(basePrompt, config, originalArticle, feedback);
       
-      let geminiRes;
+      let geminiData;
       const maxRetries = 3;
-      const retryDelay = 2000;
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${aiSettings.google_gemini_api_key}`, {
+      const retryDelay = 1000;
+      let attempt = 0;
+
+      while (attempt < maxRetries) {
+        attempt++;
+        const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${aiSettings.google_gemini_api_key}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ contents: [{ parts: [{ text: finalPrompt }] }], generationConfig }),
         });
-        if (geminiRes.ok) break;
-        if (geminiRes.status >= 500 && attempt < maxRetries) {
-          console.warn(`Attempt ${attempt} failed with status ${geminiRes.status}. Retrying in ${retryDelay}ms...`);
-          await new Promise(resolve => setTimeout(resolve, retryDelay));
-        } else {
+        
+        geminiData = await geminiRes.json();
+
+        if (!geminiRes.ok) {
+          if (geminiRes.status >= 500 && attempt < maxRetries) {
+            console.warn(`Attempt ${attempt} failed with status ${geminiRes.status}. Retrying in ${retryDelay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+            continue;
+          }
+          throw new Error(geminiData?.error?.message || `Lỗi API với mã trạng thái ${geminiRes.status}`);
+        }
+
+        const hasContent = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (hasContent) {
           break;
         }
-      }
 
-      const geminiData = await geminiRes.json();
-      if (!geminiRes.ok) throw new Error(geminiData?.error?.message || 'Lỗi gọi API Gemini.');
+        if (attempt < maxRetries) {
+          console.warn(`[regenerate-ai-articles] Received empty response on attempt ${attempt}. Retrying...`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+        } else {
+          console.error(`[regenerate-ai-articles] Received empty response after ${maxRetries} attempts.`);
+          throw new Error("AI đã từ chối tạo nội dung, có thể do bộ lọc an toàn.");
+        }
+      }
       
       await supabaseAdmin.from('content_ai_logs').insert({ item_id: itemId, creator_id: user.id, prompt: finalPrompt, response: geminiData });
       
@@ -180,7 +197,6 @@ serve(async (req) => {
     });
 
     const regeneratedArticles = (await Promise.all(regenerationPromises)).filter(Boolean);
-    const regeneratedIds = new Set(regeneratedArticles.map(a => a.id));
 
     const newResults = existingArticles.map((article: any) => {
       const regenerated = regeneratedArticles.find(r => r.id === article.id);
