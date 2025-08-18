@@ -57,6 +57,7 @@ export const AiPlanList = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -86,6 +87,12 @@ export const AiPlanList = () => {
   useEffect(() => {
     fetchProjectsAndTemplates();
   }, []);
+
+  const filteredProjects = useMemo(() => {
+    return projects.filter(p => 
+      p.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [projects, searchTerm]);
 
   const stats = useMemo(() => {
     return [
@@ -159,11 +166,11 @@ export const AiPlanList = () => {
     if (isLoading) {
       return <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-48 w-full rounded-2xl" />)}</div>;
     }
-    if (projects.length === 0) {
+    if (filteredProjects.length === 0) {
       return <div className="text-center py-16 text-muted-foreground col-span-full"><Folder className="mx-auto h-12 w-12" /><h3 className="mt-4 text-lg font-semibold">Chưa có kế hoạch nào</h3><p className="mt-1 text-sm">Hãy bắt đầu bằng cách tạo một kế hoạch mới.</p></div>;
     }
     const projectActions = (project: Project) => ({ onEdit: () => handleOpenDialog(project), onShare: () => {}, onDelete: () => handleOpenDeleteDialog(project) });
-    const displayProjects = projects.map(p => ({
+    const displayProjects = filteredProjects.map(p => ({
       ...p,
       files: p.items_count,
       modified: formatDistanceToNow(new Date(p.updated_at), { addSuffix: true, locale: vi })
@@ -222,7 +229,7 @@ export const AiPlanList = () => {
         <div className="flex items-center justify-between gap-4">
           <div className="relative flex-grow max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Tìm kiếm kế hoạch..." className="pl-9 bg-white rounded-lg" />
+            <Input placeholder="Tìm kiếm kế hoạch..." className="pl-9 bg-white rounded-lg" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
           </div>
           <div className="flex items-center gap-2">
             <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" className="bg-white rounded-lg">Sắp xếp theo <ChevronDown className="ml-2 h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuItem>Tên</DropdownMenuItem><DropdownMenuItem>Ngày sửa đổi</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
