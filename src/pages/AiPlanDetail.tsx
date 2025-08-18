@@ -165,8 +165,11 @@ const AiPlanDetail = () => {
     setIsGenerating(true);
     const toastId = showLoading("AI đang xây dựng kế hoạch...");
     try {
+      // First, ensure the latest config is saved
+      await handleUpdateConfig(plan.config);
+
       const { data, error } = await supabase.functions.invoke('generate-ai-plan', {
-        body: { planId: plan.id, config: plan.config }
+        body: { planId: plan.id }
       });
 
       if (error) {
@@ -307,7 +310,6 @@ const AiPlanDetail = () => {
         body: {
           planId: plan.id,
           sectionId: regenSection.id,
-          planData: plan.plan_data,
           feedback: feedbackText,
         }
       });

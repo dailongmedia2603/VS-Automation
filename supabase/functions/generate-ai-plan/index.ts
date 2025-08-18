@@ -28,9 +28,9 @@ serve(async (req) => {
   }
 
   try {
-    const { planId, config } = await req.json();
-    if (!planId || !config) {
-      throw new Error("Plan ID and config are required.");
+    const { planId } = await req.json();
+    if (!planId) {
+      throw new Error("Plan ID is required.");
     }
 
     const supabaseAdmin = createClient(
@@ -49,10 +49,12 @@ serve(async (req) => {
 
     const { data: plan, error: planError } = await supabaseAdmin
       .from('ai_plans')
-      .select('template_id')
+      .select('template_id, config')
       .eq('id', planId)
       .single();
     if (planError) throw planError;
+
+    const config = plan.config || {};
 
     const { data: aiSettings, error: settingsError } = await supabaseAdmin
       .from('ai_settings')
