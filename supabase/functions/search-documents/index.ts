@@ -8,7 +8,7 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  console.log("--- search-documents function started ---");
+  console.log("--- search-documents function started (v2 - Gemini) ---");
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -25,38 +25,35 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    // Use Google Gemini API key for consistency
     const { data: aiSettings, error: settingsError } = await supabaseAdmin
       .from('ai_settings')
-      .select('api_url, api_key, embedding_model_name')
+      .select('google_gemini_api_key')
       .eq('id', 1)
       .single()
 
-    if (settingsError || !aiSettings || !aiSettings.api_key || !aiSettings.api_url) {
+    if (settingsError || !aiSettings || !aiSettings.google_gemini_api_key) {
       console.error("AI settings error:", settingsError);
-      throw new Error('Vui lòng cấu hình API trong trang Cài đặt API AI.')
+      throw new Error('Vui lòng cấu hình API Google Gemini trong trang Cài đặt API AI.')
     }
-    console.log("AI settings loaded successfully.");
+    console.log("Gemini AI settings loaded successfully.");
     
-    const { data: proxyResponse, error: proxyError } = await supabaseAdmin.functions.invoke('multi-ai-proxy', {
-        body: {
-            input: query,
-            apiUrl: aiSettings.api_url,
-            apiKey: aiSettings.api_key,
-            embeddingModelName: aiSettings.embedding_model_name,
-        }
+    // Directly call the embed-document function to get the embedding
+    const { data: embeddingResponse, error: embeddingError } = await supabaseAdmin.functions.invoke('embed-document', {
+        body: { textToEmbed: query }
     });
 
-    if (proxyError) {
-        const errorBody = await proxyError.context.json();
-        throw new Error(`Lỗi gọi AI Proxy: ${errorBody.error || proxyError.message}`);
+    if (embeddingError) {
+        const errorBody = await embeddingError.context.json();
+        throw new Error(`Lỗi gọi embed-document: ${errorBody.error || embeddingError.message}`);
     }
-    if (proxyResponse.error) throw new Error(`Lỗi từ AI Proxy: ${proxyResponse.error}`);
-    if (!proxyResponse.data || !proxyResponse.data[0] || !proxyResponse.data[0].embedding) {
-        console.error("Invalid response from proxy:", proxyResponse);
-        throw new Error('Phản hồi từ proxy không chứa embedding hợp lệ.');
+    if (embeddingResponse.error) throw new Error(`Lỗi từ embed-document: ${embeddingResponse.error}`);
+    if (!embeddingResponse.embedding) {
+        console.error("Invalid response from embed-document:", embeddingResponse);
+        throw new Error('Phản hồi từ embed-document không chứa embedding hợp lệ.');
     }
 
-    const queryEmbedding = proxyResponse.data[0].embedding;
+    const queryEmbedding = embeddingResponse.embedding;
     console.log("Successfully got query embedding.");
 
     const { data: documents, error: matchError } = await supabaseAdmin.rpc('match_documents', {
