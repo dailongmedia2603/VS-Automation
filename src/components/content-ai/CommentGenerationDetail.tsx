@@ -28,17 +28,21 @@ type Project = { id: number; name: string; };
 type ProjectItem = { id: number; name: string; type: 'article' | 'comment'; content: string | null; config: any; generation_status?: 'idle' | 'generating' | 'failed'; generation_error?: string | null; };
 type PromptLibrary = { id: number; name: string; };
 type CommentRatio = { id: string; type: string; percentage: number; content: string; };
-type GeneratedComment = { id: string; content: string; type: string; metConditionIds: string[]; };
+type GeneratedComment = { 
+  id: string; 
+  content: string; 
+  type: string; 
+  metConditionIds: string[];
+  stt: number;
+  person: number;
+  reply_to: number | null;
+};
 type Log = { id: number; created_at: string; prompt: string; response: any; };
 type MandatoryCondition = { id: string; content: string; };
 type Document = { id: number; title: string; };
 
 type CommentWithMeta = GeneratedComment & {
-    stt: number;
-    parentStt: number | null;
-    cleanContent: string;
-    type: string;
-    person: number | null;
+    level: number;
     children?: CommentWithMeta[];
 };
 
@@ -269,47 +273,17 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
   const threadedResults = useMemo(() => {
     if (!results || results.length === 0) return [];
 
-    const commentsWithMeta: CommentWithMeta[] = results.map((comment, index) => {
-        const stt = index + 1;
-        let currentContent = comment.content.trim();
-
-        // 0. Strip leading number (e.g., "10. ")
-        const leadingNumberMatch = currentContent.match(/^\d+\.\s*(.*)$/s);
-        if (leadingNumberMatch) {
-            currentContent = leadingNumberMatch[1].trim();
-        }
-
-        // 1. Extract Type
-        const typeMatch = currentContent.match(/^\[(.*?)\]\s*(.*)$/s);
-        const type = typeMatch ? typeMatch[1] : 'N/A';
-        currentContent = typeMatch ? typeMatch[2].trim() : currentContent;
-
-        // 2. Extract Reply Info
-        const replyMatch = currentContent.match(/^(?:\d+\s*reply\s*->\s*(\d+)\.\s*)?(.*)$/s);
-        const parentStt = replyMatch && replyMatch[1] ? parseInt(replyMatch[1], 10) : null;
-        currentContent = replyMatch && replyMatch[2] ? replyMatch[2].trim() : currentContent;
-
-        // 3. Extract Person Number
-        const personMatch = currentContent.match(/(.*)\s*\((\d+)\)$/s);
-        const person = personMatch ? parseInt(personMatch[2], 10) : null;
-        const cleanContent = personMatch ? personMatch[1].trim() : currentContent;
-
-        return {
-            ...comment,
-            stt,
-            parentStt,
-            cleanContent,
-            type,
-            person,
-        };
-    });
+    const commentsWithMeta: CommentWithMeta[] = results.map(comment => ({
+      ...comment,
+      level: 0, // This will be overwritten by flatten
+    }));
 
     const commentMap = new Map<number, CommentWithMeta>(commentsWithMeta.map(c => [c.stt, c]));
     const rootComments: CommentWithMeta[] = [];
 
     commentsWithMeta.forEach(comment => {
-        if (comment.parentStt && commentMap.has(comment.parentStt)) {
-            const parent = commentMap.get(comment.parentStt)!;
+        if (comment.reply_to && commentMap.has(comment.reply_to)) {
+            const parent = commentMap.get(comment.reply_to)!;
             if (!parent.children) {
                 parent.children = [];
             }
@@ -334,7 +308,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
   }, [results]);
 
   const filteredResults = useMemo(() => {
-    return threadedResults.filter(r => r.cleanContent.toLowerCase().includes(searchTerm.toLowerCase()));
+    return threadedResults.filter(r => r.content.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [threadedResults, searchTerm]);
 
   const handleSelectAll = (checked: boolean) => {
@@ -356,7 +330,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
         if (r.level > 0) {
           formattedContent += '\t';
         }
-        formattedContent += r.cleanContent;
+        formattedContent += r.content;
         if (r.person !== null) {
           formattedContent += `\t(${r.person})`;
         }
@@ -395,7 +369,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
       return { 
         'STT': r.stt,
         'Người': r.person,
-        'Nội dung Comment': `${' '.repeat(r.level * 4)}${r.cleanContent}`,
+        'Nội dung Comment': `${' '.repeat(r.level * 4)}${r.content}`,
         'Loại comment': r.type, 
         'Điều kiện': conditionDisplay 
       };
@@ -420,25 +394,13 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
 
   const handleOpenEditDialog = (comment: any) => {
     setEditingComment(comment);
-    setEditedContent(comment.cleanContent);
+    setEditedContent(comment.content);
   };
 
   const handleUpdateComment = async () => {
     if (!editingComment) return;
 
-    const originalCommentMeta = results.map((c, i) => ({...c, stt: i+1})).find(c => c.id === editingComment.id);
-    if (!originalCommentMeta) {
-        showError("Không tìm thấy bình luận gốc để cập nhật.");
-        return;
-    }
-
-    let newFullContent = editedContent;
-    const replyMatch = originalCommentMeta.content.match(/^(?:\d+\s*reply\s*->\s*(\d+)\.\s*)/s);
-    if (replyMatch) {
-        newFullContent = `${replyMatch[0]}${editedContent}`;
-    }
-
-    const newResults = results.map(r => r.id === editingComment.id ? { ...r, content: newFullContent } : r);
+    const newResults = results.map(r => r.id === editingComment.id ? { ...r, content: editedContent } : r);
     
     setResults(newResults);
     setEditingComment(null);
@@ -809,7 +771,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                           {result.level > 0 && (
                             <CornerDownRight className="h-4 w-4 text-slate-400 mr-2 mt-1 flex-shrink-0" />
                           )}
-                          <span>{result.cleanContent}</span>
+                          <span>{result.content}</span>
                         </div>
                       </TableCell>
                       <TableCell><Badge variant="outline">{result.type}</Badge></TableCell>
