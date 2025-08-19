@@ -275,7 +275,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
 
     const commentsWithMeta: CommentWithMeta[] = results.map(comment => ({
       ...comment,
-      level: 0, // This will be overwritten by flatten
+      level: 0,
     }));
 
     const commentMap = new Map<number, CommentWithMeta>(commentsWithMeta.map(c => [c.stt, c]));
@@ -400,7 +400,11 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
   const handleUpdateComment = async () => {
     if (!editingComment) return;
 
-    const newResults = results.map(r => r.id === editingComment.id ? { ...r, content: editedContent } : r);
+    const newResults = results.map(r => 
+      r.id === editingComment.id 
+        ? { ...r, content: editedContent } 
+        : r
+    );
     
     setResults(newResults);
     setEditingComment(null);
@@ -408,7 +412,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
     const { error } = await supabase.from('content_ai_items').update({ content: JSON.stringify(newResults) }).eq('id', item.id);
     if (error) {
       showError("Cập nhật thất bại: " + error.message);
-      setResults(results);
+      setResults(results); // Revert on error
     } else {
       showSuccess("Đã cập nhật bình luận!");
       onSave({ ...item, content: JSON.stringify(newResults) });
@@ -753,16 +757,21 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                   const totalConditions = mandatoryConditions.length;
                   const metCount = result.metConditionIds?.length ?? totalConditions;
                   const allConditionsMet = totalConditions > 0 && metCount === totalConditions;
-                  const isPartOfThread = result.level > 0 || (result.children && result.children.length > 0);
 
                   return (
                     <TableRow key={result.id}>
                       <TableCell><Checkbox checked={selectedIds.includes(result.id)} onCheckedChange={() => handleSelectRow(result.id)} /></TableCell>
                       <TableCell>{result.stt}</TableCell>
                       <TableCell>
-                        {result.person !== null && isPartOfThread ? (
-                          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 text-slate-600 font-semibold text-sm">
-                            {result.person}
+                        {result.person !== null ? (
+                          <div className="flex items-center justify-center px-2 py-1 rounded-full bg-slate-100 text-slate-600 font-semibold text-sm whitespace-nowrap">
+                            <span>{result.person}</span>
+                            {result.reply_to !== null && (
+                              <>
+                                <span className="text-slate-400 font-normal mx-1.5 text-xs">reply →</span>
+                                <span>{result.reply_to}</span>
+                              </>
+                            )}
                           </div>
                         ) : null}
                       </TableCell>
