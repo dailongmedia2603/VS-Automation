@@ -335,9 +335,9 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
         line += `${r.stt}. `;
 
         if (r.person !== null) {
-          line += `(${r.person}`;
+          line += `(Người ${r.person}`;
           if (r.reply_to !== null) {
-            line += ` reply -> ${r.reply_to}`;
+            line += ` reply → ${r.reply_to}`;
           }
           line += ') ';
         }
@@ -771,7 +771,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                       <TableCell>
                         {result.person !== null ? (
                           <div className="flex items-center justify-center px-2 py-1 rounded-full bg-slate-100 text-slate-600 font-semibold text-sm whitespace-nowrap">
-                            <span>{result.person}</span>
+                            <span>Người {result.person}</span>
                             {result.reply_to !== null && (
                               <>
                                 <span className="text-slate-400 font-normal mx-1.5 text-xs">reply →</span>
