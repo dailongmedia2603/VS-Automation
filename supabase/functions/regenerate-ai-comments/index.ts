@@ -58,60 +58,15 @@ const buildRegenerationPrompt = (basePrompt, config, existingComments, feedback)
 
   const replyQuantity = Number(config.replyQuantity) || 0;
   const totalQuantity = Number(config.quantity) || 10;
-  const parentQuantity = totalQuantity - replyQuantity;
 
-  let replyInstruction = '';
-  let numberingAndExampleInstruction = '';
-
-  if (replyQuantity > 0) {
-      const replyDirectionText = config.replyDirection 
-        ? `- **Định hướng cho reply:** ${config.replyDirection}` 
-        : '';
-
-      replyInstruction = `
----
-**QUY TẮC REPLY (CỰC KỲ QUAN TRỌNG):**
-- Trong tổng số ${totalQuantity} bình luận, phải có chính xác **${replyQuantity} bình luận là reply**.
-- Các reply PHẢI trả lời các bình luận gốc (từ 1 đến ${parentQuantity}).
-- Cú pháp reply BẮT BUỘC: \`[STT reply] reply -> [STT comment gốc]. [Nội dung]\`.
-- Ví dụ: \`1 reply -> 5. Đúng rồi đó mom...\`
-${replyDirectionText}
-- **TUYỆT ĐỐI KHÔNG** sử dụng các định dạng khác như \`(reply)\` hay bất kỳ định dạng nào khác.
----
-`;
-      numberingAndExampleInstruction = `
-**CỰC KỲ QUAN TRỌNG:**
-1.  Mỗi bình luận PHẢI bắt đầu bằng tên loại trong dấu ngoặc vuông, ví dụ: "[Tên Loại] Nội dung bình luận.".
-2.  **QUY TẮC ĐÁNH SỐ NGƯỜI (CỰC KỲ QUAN TRỌNG):**
-    - **Quy tắc Vàng:** Việc đánh số người \`(1)\`, \`(2)\`... **CHỈ** được áp dụng cho những bình luận là một phần của **chuỗi hội thoại**.
-    - **Định nghĩa chuỗi hội thoại:** Một chuỗi hội thoại bao gồm một bình luận gốc (không phải là reply) và tất cả các bình luận trả lời nó.
-    - **Bình luận đơn lẻ:** Những bình luận không có ai trả lời và cũng không trả lời ai thì **TUYỆT ĐỐI KHÔNG** được đánh số người.
-    - **Quy tắc bắt đầu:** Bình luận gốc của **bất kỳ** chuỗi hội thoại nào **LUÔN LUÔN** được đánh số là \`(1)\`.
-    - **Quy tắc tiếp diễn:** Các reply trong chuỗi hội thoại đó có thể là của người \`(2)\`, \`(3)\`,... hoặc người \`(1)\` trả lời lại.
-    - **Quy tắc reset:** Khi một chuỗi hội thoại kết thúc và một chuỗi hội thoại **mới** bắt đầu (với một bình luận gốc khác), việc đánh số sẽ được **reset** và bắt đầu lại từ \`(1)\`.
-- **VÍ DỤ MINH HỌA HOÀN CHỈNH:**
-  \`1. [Tương tác] Sữa này tốt thật.\`
-  \`2. [Hỏi lại] Sữa này vị ngọt không mom? (1)\`
-  \`3. [Tương tác] Ui y chang nhà mình luôn.\`
-  \`4. [Tương tác] 2 reply -> 2. Vị thanh mát dễ uống lắm mom ạ. (2)\`
-  \`5. [Hỏi lại] Bé nhà mình 7 tháng uống được không? (1)\`
-  \`6. [Tương tác] 3 reply -> 2. Cảm ơn mom nhé. (1)\`
-  \`7. [Tương tác] 5 reply -> 5. Được đó mom, bé nhà mình cũng 7 tháng. (2)\`
-- Chỉ trả về danh sách các bình luận, KHÔNG thêm bất kỳ lời chào, câu giới thiệu, hay dòng phân cách nào.
-`;
-  } else {
-      numberingAndExampleInstruction = `
-**CỰC KỲ QUAN TRỌNG:**
-1.  Mỗi bình luận PHẢI bắt đầu bằng tên loại trong dấu ngoặc vuông, ví dụ: "[Tên Loại] Nội dung bình luận".
-2.  Tất cả các bình luận phải là các bình luận độc lập, không trả lời nhau.
-3.  **TUYỆT ĐỐI KHÔNG** sử dụng cú pháp reply (\`reply ->\`) hoặc đánh số người \`(1)\`, \`(2)\`...
-- **VÍ DỤ MINH HỌA:**
-  \`[Tương tác] Sữa này tốt thật.\`
-  \`[Hỏi lại] Sữa này vị ngọt không mom?\`
-  \`[Tương tác] Ui y chang nhà mình luôn.\`
-- Chỉ trả về danh sách các bình luận, KHÔNG thêm bất kỳ lời chào, câu giới thiệu, hay dòng phân cách nào.
-`;
-  }
+  const jsonStructure = `
+{
+  "stt": "(number) // Số thứ tự của bình luận, bắt đầu từ 1.",
+  "person": "(number) // Số định danh người bình luận (ví dụ: 1, 2, 3...). Người bình luận gốc của một chuỗi hội thoại luôn là 1.",
+  "type": "(string) // Loại bình luận dựa trên danh sách tỉ lệ đã cho.",
+  "reply_to": "(number | null) // STT của bình luận gốc mà bình luận này đang trả lời. Nếu là bình luận gốc, giá trị là null.",
+  "content": "(string) // Nội dung chi tiết của bình luận."
+}`;
 
   const finalPrompt = `
     ${basePrompt}
@@ -134,15 +89,30 @@ ${replyDirectionText}
 
     **Tỉ lệ và loại bình luận cần tạo:**
     ${ratiosText || 'Không có'}
-    ${replyInstruction}
+    
+    **Số lượng replies cần tạo:** ${replyQuantity} trên tổng số ${totalQuantity} bình luận.
+    **Định hướng cho replies (nếu có):** ${config.replyDirection || 'Không có'}
     ---
     **ĐIỀU KIỆN BẮT BUỘC (QUAN TRỌNG NHẤT):**
     AI phải tuân thủ TUYỆT ĐỐI tất cả các điều kiện sau đây cho MỌI bình luận được tạo ra:
     ${conditionsText || 'Không có điều kiện nào.'}
     ---
-
-    **YÊU CẦU MỚI:** Dựa vào **FEEDBACK TỪ NGƯỜI DÙNG** và toàn bộ thông tin trên, hãy **VIẾT LẠI TOÀN BỘ** danh sách gồm ${config.quantity || 10} bình luận mới tốt hơn. Mỗi bình luận trên một dòng.
-    ${numberingAndExampleInstruction}
+    **YÊU CẦU ĐẦU RA (CỰC KỲ QUAN TRỌNG):**
+    Dựa vào **FEEDBACK TỪ NGƯỜI DÙNG** và toàn bộ thông tin trên, hãy **VIẾT LẠI TOÀN BỘ** danh sách gồm ${totalQuantity} bình luận mới tốt hơn.
+    Bạn PHẢI trả lời bằng một khối mã JSON duy nhất được bao bọc trong \`\`\`json ... \`\`\`.
+    JSON object phải là một MẢNG (array) chứa các đối tượng (object), mỗi đối tượng đại diện cho một bình luận và có cấu trúc chính xác như sau:
+    \`\`\`json
+    [
+      ${jsonStructure},
+      ...
+    ]
+    \`\`\`
+    - **QUY TẮC REPLY:** Nếu một bình luận là reply, trường "reply_to" phải chứa "stt" của bình luận gốc. Nếu không phải reply, "reply_to" phải là null.
+    - **QUY TẮC ĐÁNH SỐ NGƯỜI:**
+        - Bình luận gốc của một chuỗi hội thoại luôn có "person" là 1.
+        - Các reply trong chuỗi đó có thể là của người 2, 3,... hoặc người 1 trả lời lại.
+        - Khi bắt đầu một chuỗi hội thoại mới (một bình luận gốc mới), việc đánh số người sẽ được reset và bắt đầu lại từ 1.
+    - **TUYỆT ĐỐI KHÔNG** thêm bất kỳ văn bản, lời chào, hay giải thích nào bên ngoài khối mã JSON.
   `;
   return finalPrompt;
 };
@@ -271,17 +241,26 @@ serve(async (req) => {
     const mandatoryConditions = config.mandatoryConditions || [];
     const allConditionIds = mandatoryConditions.map((c) => c.id);
 
-    const newComments = rawContent.split('\n')
-      .map(line => line.trim())
-      .filter(line => line)
-      .map(line => {
-        return { 
-          id: crypto.randomUUID(), 
-          content: line, 
-          type: 'N/A',
-          metConditionIds: allConditionIds
-        };
-      });
+    let jsonString = '';
+    const jsonMatch = rawContent.match(/```json\n([\s\S]*?)\n```/);
+    if (jsonMatch && jsonMatch[1]) {
+      jsonString = jsonMatch[1];
+    } else {
+      jsonString = rawContent;
+    }
+    
+    let newComments;
+    try {
+      const parsedComments = JSON.parse(jsonString);
+      newComments = parsedComments.map((comment: any) => ({
+        id: crypto.randomUUID(),
+        ...comment,
+        metConditionIds: allConditionIds
+      }));
+    } catch (e) {
+      console.error("Failed to parse JSON from AI comment response. Raw content:", rawContent);
+      throw new Error("AI đã trả về một định dạng JSON không hợp lệ cho bình luận.");
+    }
 
     await supabaseAdmin
       .from('content_ai_items')

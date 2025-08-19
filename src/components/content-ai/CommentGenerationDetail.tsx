@@ -326,15 +326,25 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
     const contentToCopy = threadedResults
       .filter(r => selectedIds.includes(r.id))
       .map(r => {
-        let formattedContent = '';
+        let line = '';
+        
         if (r.level > 0) {
-          formattedContent += '\t';
+          line += '\t'.repeat(r.level);
         }
-        formattedContent += r.content;
+
+        line += `${r.stt}. `;
+
         if (r.person !== null) {
-          formattedContent += `\t(${r.person})`;
+          line += `(${r.person}`;
+          if (r.reply_to !== null) {
+            line += ` reply -> ${r.reply_to}`;
+          }
+          line += ') ';
         }
-        return formattedContent;
+
+        line += r.content;
+        
+        return line;
       })
       .join('\n');
     
@@ -400,11 +410,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
   const handleUpdateComment = async () => {
     if (!editingComment) return;
 
-    const newResults = results.map(r => 
-      r.id === editingComment.id 
-        ? { ...r, content: editedContent } 
-        : r
-    );
+    const newResults = results.map(r => r.id === editingComment.id ? { ...r, content: editedContent } : r);
     
     setResults(newResults);
     setEditingComment(null);
