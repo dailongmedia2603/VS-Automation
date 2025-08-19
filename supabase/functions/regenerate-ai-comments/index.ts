@@ -109,9 +109,11 @@ const buildRegenerationPrompt = (basePrompt, config, existingComments, feedback)
     \`\`\`
     - **QUY TẮC REPLY:** Nếu một bình luận là reply, trường "reply_to" phải chứa "stt" của bình luận gốc. Nếu không phải reply, "reply_to" phải là null.
     - **QUY TẮC ĐÁNH SỐ NGƯỜI:**
-        - Bình luận gốc của một chuỗi hội thoại luôn có "person" là 1.
-        - Các reply trong chuỗi đó có thể là của người 2, 3,... hoặc người 1 trả lời lại.
-        - Khi bắt đầu một chuỗi hội thoại mới (một bình luận gốc mới), việc đánh số người sẽ được reset và bắt đầu lại từ 1.
+        - Một chuỗi hội thoại (một bình luận gốc và các trả lời của nó) nên được giới hạn trong một số lượng nhỏ người tham gia (thường là 2-3 người) để giữ tính tự nhiên.
+        - Bình luận gốc của một chuỗi hội thoại **LUÔN LUÔN** là \`person: 1\`.
+        - Người trả lời đầu tiên thường là \`person: 2\`.
+        - Các bình luận tiếp theo trong cùng chuỗi hội thoại nên luân phiên giữa \`person: 1\` và \`person: 2\`. Chỉ giới thiệu \`person: 3\` nếu thực sự cần thiết cho ngữ cảnh.
+        - Khi một chuỗi hội thoại mới bắt đầu (một bình luận gốc mới), việc đánh số người sẽ được **reset** và bắt đầu lại từ \`person: 1\`.
     - **TUYỆT ĐỐI KHÔNG** thêm bất kỳ văn bản, lời chào, hay giải thích nào bên ngoài khối mã JSON.
   `;
   return finalPrompt;
