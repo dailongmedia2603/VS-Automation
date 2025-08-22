@@ -47,28 +47,57 @@ serve(async (req) => {
     }
 
     const url = new URL(template.replace(/{postId}/g, fbPostId));
-    const simplifiedFields = 'message,from,permalink_url,created_time,comments';
+    const simplifiedFields = 'message,from,permalink_url,created_time,comments{message,from,permalink_url,created_time}';
     url.searchParams.set('fields', simplifiedFields);
+    url.searchParams.set('limit', '100'); // Set a limit for pagination
     if (!url.searchParams.has('access_token') && dbAccessToken) {
         url.searchParams.set('access_token', dbAccessToken);
     }
     requestUrl = url.toString();
 
-    const response = await fetch(requestUrl);
-    const responseText = await response.text();
+    let allComments = [];
+    let nextUrl: string | null = requestUrl;
+    let firstRawResponse: string | null = null;
+    const MAX_PAGES = 5; // Limit to prevent infinite loops
+    let pagesFetched = 0;
 
-    if (!response.ok) {
-        let errorData;
-        try {
-            errorData = JSON.parse(responseText);
-        } catch(e) {
-            errorData = { error: { message: responseText }};
-        }
-        const errorMessage = errorData?.error?.message || `Yêu cầu API thất bại với mã trạng thái ${response.status}.`;
-        throw new Error(errorMessage);
+    while (nextUrl && pagesFetched < MAX_PAGES) {
+      pagesFetched++;
+      const response = await fetch(nextUrl);
+      const responseText = await response.text();
+
+      if (firstRawResponse === null) {
+        firstRawResponse = responseText;
+      }
+
+      if (!response.ok) {
+          let errorData;
+          try {
+              errorData = JSON.parse(responseText);
+          } catch(e) {
+              errorData = { error: { message: responseText }};
+          }
+          const errorMessage = errorData?.error?.message || `Yêu cầu API thất bại với mã trạng thái ${response.status}.`;
+          // If one page fails, we still return what we have so far.
+          console.warn(`API error on page ${pagesFetched}: ${errorMessage}`);
+          break; 
+      }
+
+      const pageData = JSON.parse(responseText);
+      
+      // Handle both direct response and proxy-wrapped response
+      const commentsOnPage = pageData?.data?.data || pageData?.data || [];
+      allComments.push(...commentsOnPage);
+
+      // Handle both direct response and proxy-wrapped response for paging
+      const paging = pageData?.data?.paging || pageData?.paging;
+      nextUrl = paging?.next || null;
     }
 
-    return new Response(JSON.stringify({ rawResponse: responseText, requestUrl }), {
+    // The final raw response should be a JSON object containing an array of all comments
+    const finalRawResponse = JSON.stringify({ data: allComments });
+
+    return new Response(JSON.stringify({ rawResponse: finalRawResponse, requestUrl }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
