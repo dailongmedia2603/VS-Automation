@@ -138,6 +138,7 @@ const PublicPostScan = () => {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Scan Results");
     XLSX.writeFile(workbook, `export_${project?.name || 'scan'}.xlsx`);
+    showSuccess("Đã xuất file Excel thành công!");
     setIsExporting(false);
   };
 
