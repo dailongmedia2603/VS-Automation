@@ -1,0 +1,1 @@
+ALTER TABLE public.post_scan_results ADD COLUMN post_created_at TIMESTAMP WITH TIME ZONE;

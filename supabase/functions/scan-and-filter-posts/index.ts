@@ -73,6 +73,7 @@ serve(async (req) => {
             post_author_id: post.from?.id,
             group_id: groupId,
             found_keywords: foundKeywords,
+            post_created_at: post.created_time,
           });
         }
       }

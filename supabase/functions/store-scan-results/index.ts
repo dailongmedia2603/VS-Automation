@@ -36,6 +36,7 @@ serve(async (req) => {
           found_keywords: p.found_keywords,
           ai_check_result: p.ai_check_result,
           ai_check_details: p.ai_check_details,
+          post_created_at: p.post_created_at,
         }));
 
       if (resultsToInsert.length > 0) {

@@ -47,6 +47,7 @@ type ScanResult = {
   group_id: string;
   ai_check_result: string | null;
   ai_check_details: { prompt: string; response: any; } | null;
+  post_created_at: string | null;
 };
 
 type ScanLog = {
@@ -248,6 +249,7 @@ const CheckPostScanDetail = () => {
       'Từ khóa': result.found_keywords.join(', '),
       'Nội dung bài viết': result.post_content,
       'Link': result.post_link,
+      'Ngày đăng': result.post_created_at ? format(new Date(result.post_created_at), 'dd/MM/yyyy HH:mm', { locale: vi }) : '',
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
@@ -454,6 +456,7 @@ const CheckPostScanDetail = () => {
                   <TableHead>Link</TableHead>
                   <TableHead>Từ khóa</TableHead>
                   <TableHead>ID Group</TableHead>
+                  <TableHead>Ngày đăng</TableHead>
                   <TableHead>Ngày check</TableHead>
                 </TableRow>
               </TableHeader>
@@ -476,9 +479,10 @@ const CheckPostScanDetail = () => {
                     <TableCell><a href={result.post_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Xem bài viết</a></TableCell>
                     <TableCell><div className="flex flex-wrap gap-1">{result.found_keywords.map(kw => <Badge key={kw} variant="secondary">{kw}</Badge>)}</div></TableCell>
                     <TableCell>{result.group_id}</TableCell>
+                    <TableCell>{result.post_created_at ? format(new Date(result.post_created_at), 'dd/MM/yyyy HH:mm', { locale: vi }) : 'N/A'}</TableCell>
                     <TableCell>{format(new Date(result.scanned_at), 'dd/MM/yyyy HH:mm', { locale: vi })}</TableCell>
                   </TableRow>
-                )) : (<TableRow><TableCell colSpan={6} className="text-center h-24 text-slate-500">Chưa có kết quả.</TableCell></TableRow>)}
+                )) : (<TableRow><TableCell colSpan={7} className="text-center h-24 text-slate-500">Chưa có kết quả.</TableCell></TableRow>)}
               </TableBody>
             </Table>
           </div>
