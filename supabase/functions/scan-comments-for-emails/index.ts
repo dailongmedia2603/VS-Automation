@@ -14,15 +14,22 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
+  const { projectId } = await req.json();
+  if (!projectId) {
+    return new Response(JSON.stringify({ error: "Project ID is required." }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 400,
+    });
+  }
+
+  const supabaseAdmin = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  );
+
+  const logPayload: any = { project_id: projectId };
+
   try {
-    const { projectId } = await req.json();
-    if (!projectId) throw new Error("Project ID is required.");
-
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
     // 1. Get project details
     const { data: project, error: projectError } = await supabaseAdmin
       .from('email_scan_projects')
@@ -36,6 +43,14 @@ serve(async (req) => {
     const { data: commentsData, error: commentsError } = await supabaseAdmin.functions.invoke('get-fb-comments', {
       body: { fbPostId: project.fb_post_id }
     });
+    
+    logPayload.request_url = commentsData?.requestUrl;
+    try { 
+        logPayload.raw_response = commentsData?.rawResponse ? JSON.parse(commentsData.rawResponse) : null; 
+    } catch (e) { 
+        logPayload.raw_response = { error: "Failed to parse raw response", content: commentsData.rawResponse }; 
+    }
+
     if (commentsError || commentsData.error) throw new Error(commentsError?.message || commentsData.error);
     
     const rawResponse = JSON.parse(commentsData.rawResponse);
@@ -77,11 +92,9 @@ serve(async (req) => {
     }
 
     // 4. Store results
-    // Clear old results first
     await supabaseAdmin.from('email_scan_results').delete().eq('project_id', projectId);
 
     if (foundEmails.length > 0) {
-      // Remove duplicate emails before inserting
       const uniqueEmails = Array.from(new Map(foundEmails.map(item => [item['email'], item])).values());
       const { error: insertError } = await supabaseAdmin.from('email_scan_results').insert(uniqueEmails);
       if (insertError) throw insertError;
@@ -90,6 +103,9 @@ serve(async (req) => {
     // 5. Update project's last_scanned_at
     await supabaseAdmin.from('email_scan_projects').update({ last_scanned_at: new Date().toISOString() }).eq('id', projectId);
 
+    logPayload.status = 'success';
+    await supabaseAdmin.from('log_email_scan').insert(logPayload);
+
     return new Response(JSON.stringify({ success: true, count: foundEmails.length }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
@@ -97,6 +113,10 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in scan-comments-for-emails function:', error.message);
+    logPayload.status = 'error';
+    logPayload.error_message = error.message;
+    await supabaseAdmin.from('log_email_scan').insert(logPayload);
+    
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,

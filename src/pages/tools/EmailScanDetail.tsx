@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Save, PlayCircle, Loader2, Download, Trash2, Settings } from 'lucide-react';
+import { ArrowLeft, Save, PlayCircle, Loader2, Download, Trash2, Settings, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,6 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
+import { EmailScanLogDialog } from '@/components/tools/EmailScanLogDialog';
 
 type Project = {
   id: number;
@@ -42,6 +43,7 @@ const EmailScanDetail = () => {
   const [selectedResultIds, setSelectedResultIds] = useState<number[]>([]);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isLogOpen, setIsLogOpen] = useState(false);
 
   // Form state
   const [fbPostId, setFbPostId] = useState('');
@@ -214,6 +216,10 @@ const EmailScanDetail = () => {
                   Xóa ({selectedResultIds.length})
                 </Button>
               )}
+              <Button variant="outline" className="bg-white" onClick={() => setIsLogOpen(true)}>
+                <FileText className="mr-2 h-4 w-4" />
+                Log
+              </Button>
               <Button variant="outline" className="bg-white" onClick={handleExportExcel} disabled={isExporting}>
                 {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
                 Xuất Excel
@@ -264,6 +270,12 @@ const EmailScanDetail = () => {
           </div>
         </CardContent>
       </Card>
+
+      <EmailScanLogDialog 
+        isOpen={isLogOpen} 
+        onOpenChange={setIsLogOpen} 
+        projectId={project.id} 
+      />
 
       <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
         <AlertDialogContent>
