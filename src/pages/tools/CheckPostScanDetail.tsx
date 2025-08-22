@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Save, PlayCircle, Loader2, Calendar as CalendarIcon, FileText, Download, Trash2, Settings } from 'lucide-react';
+import { ArrowLeft, Save, PlayCircle, Loader2, Calendar as CalendarIcon, FileText, Download, Trash2, Settings, Share } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -25,6 +25,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import * as XLSX from 'xlsx';
 import { AiLogDialog } from '@/components/tools/AiLogDialog';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { SharePostScanDialog } from '@/components/tools/SharePostScanDialog';
 
 type Project = {
   id: number;
@@ -36,6 +37,8 @@ type Project = {
   is_active: boolean;
   is_ai_check_active: boolean;
   post_scan_ai_prompt: string | null;
+  is_public: boolean;
+  public_id: string | null;
 };
 
 type ScanResult = {
@@ -73,6 +76,7 @@ const CheckPostScanDetail = () => {
   const [selectedResultIds, setSelectedResultIds] = useState<number[]>([]);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
 
   // Form state
   const [keywords, setKeywords] = useState('');
@@ -319,10 +323,16 @@ const CheckPostScanDetail = () => {
             </p>
           </div>
         </div>
-        <Button onClick={handleSave} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
-          {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-          Lưu thay đổi
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" className="bg-white" onClick={() => setIsShareDialogOpen(true)}>
+            <Share className="mr-2 h-4 w-4" />
+            Chia sẻ
+          </Button>
+          <Button onClick={handleSave} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
+            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+            Lưu thay đổi
+          </Button>
+        </div>
       </div>
 
       <Card className="shadow-sm rounded-2xl bg-white">
@@ -577,6 +587,14 @@ const CheckPostScanDetail = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {project && (
+        <SharePostScanDialog
+          isOpen={isShareDialogOpen}
+          onOpenChange={setIsShareDialogOpen}
+          project={project}
+          onProjectUpdate={(updates) => setProject(p => p ? { ...p, ...updates } : null)}
+        />
+      )}
     </main>
   );
 };

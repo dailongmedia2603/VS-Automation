@@ -33,6 +33,7 @@ import Reports from "./pages/Reports";
 import AiPlan from "./pages/AiPlan";
 import AiPlanDetail from "./pages/AiPlanDetail";
 import PublicAiPlan from "./pages/PublicAiPlan";
+import PublicPostScan from "./pages/PublicPostScan";
 
 const queryClient = new QueryClient();
 
@@ -50,6 +51,7 @@ const App = () => (
                   <Route path="/login" element={<Login />} />
                   <Route path="/register" element={<Register />} />
                   <Route path="/plan/:planSlug" element={<PublicAiPlan />} />
+                  <Route path="/public/post-scan/:publicId" element={<PublicPostScan />} />
                   <Route element={<ProtectedRoute />}>
                     <Route element={<AppLayout />}>
                       <Route path="/" element={<Dashboard />} />
