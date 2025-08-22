@@ -58,6 +58,12 @@ const Settings = () => {
   const [newFeature, setNewFeature] = useState('comment_check');
   const [newUrl, setNewUrl] = useState('');
 
+  const featureDisplayNames: { [key: string]: string } = {
+    comment_check: 'Check Comment',
+    post_approval: 'Check Duyệt Post',
+    email_scan: 'Check Email'
+  };
+
   // Effect for AI API settings
   useEffect(() => {
     setLocalSettings(settings);
@@ -100,7 +106,7 @@ const Settings = () => {
     }
     setUrlTemplates(prev => ({ ...prev, [newFeature]: newUrl }));
     setNewUrl('');
-    showSuccess(`Đã cập nhật URL cho tính năng: ${newFeature}`);
+    showSuccess(`Đã cập nhật URL cho tính năng: ${featureDisplayNames[newFeature] || newFeature}`);
   };
 
   const handleDeleteFeatureUrl = (featureKey: string) => {
@@ -537,6 +543,7 @@ const Settings = () => {
                       <SelectContent>
                         <SelectItem value="comment_check">Check Comment</SelectItem>
                         <SelectItem value="post_approval">Check Duyệt Post</SelectItem>
+                        <SelectItem value="email_scan">Check Email</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -556,7 +563,7 @@ const Settings = () => {
                     {Object.entries(urlTemplates).map(([key, value]) => (
                       <div key={key} className="flex items-center justify-between p-3 border-b last:border-b-0">
                         <div>
-                          <p className="font-semibold text-slate-700">{key === 'comment_check' ? 'Check Comment' : key === 'post_approval' ? 'Check Duyệt Post' : key}</p>
+                          <p className="font-semibold text-slate-700">{featureDisplayNames[key] || key}</p>
                           <p className="text-xs text-muted-foreground font-mono">{value}</p>
                         </div>
                         <Button variant="ghost" size="icon" onClick={() => handleDeleteFeatureUrl(key)} className="text-destructive hover:text-destructive">

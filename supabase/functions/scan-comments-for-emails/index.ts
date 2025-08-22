@@ -41,7 +41,7 @@ serve(async (req) => {
 
     // 2. Get comments from Facebook
     const { data: commentsData, error: commentsError } = await supabaseAdmin.functions.invoke('get-fb-comments', {
-      body: { fbPostId: project.fb_post_id }
+      body: { fbPostId: project.fb_post_id, templateKey: 'email_scan' }
     });
     
     logPayload.request_url = commentsData?.requestUrl;

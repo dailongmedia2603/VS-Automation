@@ -17,7 +17,7 @@ serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
 
-  const { fbPostId } = await req.json();
+  const { fbPostId, templateKey } = await req.json();
   if (!fbPostId) {
     return new Response(JSON.stringify({ error: "ID bài viết Facebook là bắt buộc." }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -39,13 +39,14 @@ serve(async (req) => {
     }
 
     const { url_templates: urlTemplates, api_key: dbAccessToken } = fbSettings;
-    const commentCheckTemplate = urlTemplates?.comment_check;
+    const keyToUse = templateKey || 'comment_check';
+    const template = urlTemplates?.[keyToUse];
 
-    if (!commentCheckTemplate) {
-        throw new Error("Chưa cấu hình URL cho tính năng Check Comment.");
+    if (!template) {
+        throw new Error(`Chưa cấu hình URL cho tính năng: ${keyToUse}.`);
     }
 
-    const url = new URL(commentCheckTemplate.replace(/{postId}/g, fbPostId));
+    const url = new URL(template.replace(/{postId}/g, fbPostId));
     const simplifiedFields = 'message,from,permalink_url,created_time,comments';
     url.searchParams.set('fields', simplifiedFields);
     if (!url.searchParams.has('access_token') && dbAccessToken) {
