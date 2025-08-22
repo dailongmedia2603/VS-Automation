@@ -34,6 +34,8 @@ import AiPlan from "./pages/AiPlan";
 import AiPlanDetail from "./pages/AiPlanDetail";
 import PublicAiPlan from "./pages/PublicAiPlan";
 import PublicPostScan from "./pages/PublicPostScan";
+import EmailScan from "./pages/tools/EmailScan";
+import EmailScanDetail from "./pages/tools/EmailScanDetail";
 
 const queryClient = new QueryClient();
 
@@ -72,6 +74,8 @@ const App = () => (
                       <Route path="/tools/check-keyword-comment/:projectId" element={<CheckKeywordCommentDetail />} />
                       <Route path="/tools/check-post-scan" element={<CheckPostScan />} />
                       <Route path="/tools/check-post-scan/:projectId" element={<CheckPostScanDetail />} />
+                      <Route path="/tools/email-scan" element={<EmailScan />} />
+                      <Route path="/tools/email-scan/:projectId" element={<EmailScanDetail />} />
                       <Route path="/ai-plan" element={<AiPlan />} />
                       <Route path="/ai-plan/:planId" element={<AiPlanDetail />} />
                     </Route>

@@ -1,5 +1,5 @@
 import { ToolCard } from "@/components/ToolCard";
-import { MessageSquareQuote, ScanSearch } from "lucide-react";
+import { MessageSquareQuote, ScanSearch, MailSearch } from "lucide-react";
 
 const tools = [
   {
@@ -15,6 +15,13 @@ const tools = [
     icon: ScanSearch,
     href: "/tools/check-post-scan",
     color: "bg-green-100 text-green-600",
+  },
+  {
+    title: "Quét Email",
+    description: "Quét bình luận từ bài viết Facebook để tự động thu thập email khách hàng.",
+    icon: MailSearch,
+    href: "/tools/email-scan",
+    color: "bg-red-100 text-red-600",
   },
 ];
 
