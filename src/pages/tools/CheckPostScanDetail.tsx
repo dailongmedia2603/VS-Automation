@@ -19,13 +19,13 @@ import { vi } from 'date-fns/locale';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import * as XLSX from 'xlsx';
 import { AiLogDialog } from '@/components/tools/AiLogDialog';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { SharePostScanDialog } from '@/components/tools/SharePostScanDialog';
+import { ComprehensiveScanLogDialog } from '@/components/tools/ComprehensiveScanLogDialog';
 
 type Project = {
   id: number;
@@ -65,18 +65,16 @@ const CheckPostScanDetail = () => {
   const [project, setProject] = useState<Project | null>(null);
   const [results, setResults] = useState<ScanResult[]>([]);
   const [logs, setLogs] = useState<ScanLog[]>([]);
-  const [lastScanLog, setLastScanLog] = useState<ScanLog | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
-  const [isManualScanLogOpen, setIsManualScanLogOpen] = useState(false);
-  const [isHistoryLogOpen, setIsHistoryLogOpen] = useState(false);
   const [isAiLogOpen, setIsAiLogOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [selectedResultIds, setSelectedResultIds] = useState<number[]>([]);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [isComprehensiveLogOpen, setIsComprehensiveLogOpen] = useState(false);
 
   // Form state
   const [keywords, setKeywords] = useState('');
@@ -222,10 +220,7 @@ const CheckPostScanDetail = () => {
       dismissToast(toastId);
       showSuccess(`Quét hoàn tất! Tìm thấy ${finalPosts.filter((p: any) => p.ai_check_result !== 'Có').length} bài viết mới.`);
       
-      const { data: newLogsData, error: newLogsError } = await supabase.from('log_post_scan').select('*').eq('project_id', projectId).order('created_at', { ascending: false });
-      if (newLogsError) throw newLogsError;
-      setLogs(newLogsData || []);
-      setLastScanLog(newLogsData?.[0] || null);
+      fetchProjectData();
 
     } catch (error: any) {
       if (toastId) dismissToast(toastId);
@@ -369,12 +364,8 @@ const CheckPostScanDetail = () => {
                       </CardContent>
                     </Card>
                     <Card className="shadow-none border">
-                      <CardHeader className="flex flex-row items-center justify-between">
+                      <CardHeader>
                         <CardTitle>Cấu hình tự động</CardTitle>
-                        <Button variant="outline" size="sm" onClick={() => setIsHistoryLogOpen(true)}>
-                          <FileText className="mr-2 h-4 w-4" />
-                          Log
-                        </Button>
                       </CardHeader>
                       <CardContent className="space-y-4">
                         <div className="flex items-center justify-between"><Label>Kích hoạt quét tự động</Label><Switch checked={isActive} onCheckedChange={setIsActive} /></div>
@@ -423,6 +414,10 @@ const CheckPostScanDetail = () => {
                 {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
                 Xuất Excel
               </Button>
+              <Button variant="outline" className="bg-white" onClick={() => setIsComprehensiveLogOpen(true)}>
+                <FileText className="mr-2 h-4 w-4" />
+                Log
+              </Button>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant={"outline"} className={cn("w-[280px] justify-start text-left font-normal bg-white", !scanDateRange && "text-muted-foreground")}>
@@ -434,10 +429,6 @@ const CheckPostScanDetail = () => {
                   <Calendar initialFocus mode="range" defaultMonth={scanDateRange?.from} selected={scanDateRange} onSelect={setScanDateRange} numberOfMonths={2} />
                 </PopoverContent>
               </Popover>
-              <Button variant="outline" className="bg-white" onClick={() => setIsManualScanLogOpen(true)} disabled={!lastScanLog}>
-                <FileText className="mr-2 h-4 w-4" />
-                Log
-              </Button>
               <Button onClick={handleRunScan} disabled={isScanning} className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
                 {isScanning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
                 Chạy quét
@@ -499,70 +490,12 @@ const CheckPostScanDetail = () => {
         </CardContent>
       </Card>
 
-      <Dialog open={isManualScanLogOpen} onOpenChange={setIsManualScanLogOpen}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Nhật ký quét API (Thủ công)</DialogTitle>
-            <DialogDescription>
-              Đây là danh sách các URL đã được sử dụng trong lần quét thủ công gần nhất.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4 max-h-[60vh] overflow-y-auto pr-4">
-            {lastScanLog && lastScanLog.request_urls && lastScanLog.request_urls.length > 0 ? (
-              <div className="space-y-2">
-                <p className="text-sm text-slate-500">Quét lúc: {format(new Date(lastScanLog.created_at), 'dd/MM/yyyy HH:mm:ss', { locale: vi })}</p>
-                <div className="p-3 bg-slate-100 rounded-md text-slate-900 font-mono text-xs space-y-2">
-                  {lastScanLog.request_urls.map((url, index) => (
-                    <div key={index} className="break-all">{url}</div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <p className="text-slate-500">Chưa có log nào được ghi lại.</p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button onClick={() => setIsManualScanLogOpen(false)}>Đóng</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isHistoryLogOpen} onOpenChange={setIsHistoryLogOpen}>
-        <DialogContent className="sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Lịch sử quét</DialogTitle>
-            <DialogDescription>
-              Danh sách các lần quét đã được thực hiện cho dự án này.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4 max-h-[60vh] overflow-y-auto pr-4">
-            {logs.length > 0 ? (
-              <Accordion type="single" collapsible className="w-full space-y-2">
-                {logs.map((logItem, index) => (
-                  <AccordionItem value={`item-${index}`} key={logItem.id} className="border rounded-lg px-4">
-                    <AccordionTrigger>
-                      Quét lúc: {format(new Date(logItem.created_at), 'dd/MM/yyyy HH:mm:ss', { locale: vi })}
-                    </AccordionTrigger>
-                    <AccordionContent className="space-y-2 pt-2">
-                      <h4 className="font-semibold text-sm">URL đã sử dụng:</h4>
-                      <div className="p-3 bg-slate-100 rounded-md text-slate-900 font-mono text-xs space-y-2">
-                        {logItem.request_urls.map((url, urlIndex) => (
-                          <div key={urlIndex} className="break-all">{url}</div>
-                        ))}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-            ) : (
-              <p className="text-slate-500 text-center py-8">Chưa có lịch sử quét nào.</p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button onClick={() => setIsHistoryLogOpen(false)}>Đóng</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ComprehensiveScanLogDialog
+        isOpen={isComprehensiveLogOpen}
+        onOpenChange={setIsComprehensiveLogOpen}
+        projectId={project.id}
+        logs={logs}
+      />
 
       <AiLogDialog 
         isOpen={isAiLogOpen} 
