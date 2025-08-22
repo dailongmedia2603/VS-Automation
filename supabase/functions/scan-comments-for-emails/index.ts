@@ -39,7 +39,7 @@ serve(async (req) => {
     if (projectError || !project) throw new Error("Project not found.");
     if (!project.fb_post_id) throw new Error("Facebook Post ID is not configured for this project.");
 
-    // 2. Get comments from Facebook
+    // 2. Get comments from Facebook, specifying the correct template key
     const { data: commentsData, error: commentsError } = await supabaseAdmin.functions.invoke('get-fb-comments', {
       body: { fbPostId: project.fb_post_id, templateKey: 'email_scan' }
     });
