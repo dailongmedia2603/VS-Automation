@@ -59,15 +59,6 @@ const buildRegenerationPrompt = (basePrompt, config, existingComments, feedback)
   const replyQuantity = Number(config.replyQuantity) || 0;
   const totalQuantity = Number(config.quantity) || 10;
 
-  const jsonStructure = `
-{
-  "stt": "(number) // Số thứ tự của bình luận, bắt đầu từ 1.",
-  "person": "(number) // Số định danh người bình luận (ví dụ: 1, 2, 3...). Người bình luận gốc của một chuỗi hội thoại luôn là 1.",
-  "type": "(string) // Loại bình luận dựa trên danh sách tỉ lệ đã cho.",
-  "reply_to": "(number | null) // STT của bình luận gốc mà bình luận này đang trả lời. Nếu là bình luận gốc, giá trị là null.",
-  "content": "(string) // Nội dung chi tiết của bình luận."
-}`;
-
   const finalPrompt = `
     ${basePrompt}
 
@@ -100,11 +91,31 @@ const buildRegenerationPrompt = (basePrompt, config, existingComments, feedback)
     **YÊU CẦU ĐẦU RA (CỰC KỲ QUAN TRỌNG):**
     Dựa vào **FEEDBACK TỪ NGƯỜI DÙNG** và toàn bộ thông tin trên, hãy **VIẾT LẠI TOÀN BỘ** danh sách gồm ${totalQuantity} bình luận mới tốt hơn.
     Bạn PHẢI trả lời bằng một khối mã JSON duy nhất được bao bọc trong \`\`\`json ... \`\`\`.
-    JSON object phải là một MẢNG (array) chứa các đối tượng (object), mỗi đối tượng đại diện cho một bình luận và có cấu trúc chính xác như sau:
+    JSON object phải là một MẢNG (array) chứa các đối tượng (object), mỗi đối tượng đại diện cho một bình luận.
+    Mỗi object trong mảng phải có cấu trúc sau:
+    - \`stt\`: (number) Số thứ tự của bình luận, bắt đầu từ 1.
+    - \`person\`: (number) Số định danh người bình luận (ví dụ: 1, 2, 3...).
+    - \`type\`: (string) Loại bình luận dựa trên danh sách tỉ lệ đã cho.
+    - \`reply_to\`: (number | null) STT của bình luận gốc mà bình luận này đang trả lời. Nếu là bình luận gốc, giá trị là null.
+    - \`content\`: (string) Nội dung chi tiết của bình luận.
+
+    Ví dụ về định dạng JSON:
     \`\`\`json
     [
-      ${jsonStructure},
-      ...
+      {
+        "stt": 1,
+        "person": 1,
+        "type": "Hỏi đáp",
+        "reply_to": null,
+        "content": "Sản phẩm này có tốt không ạ?"
+      },
+      {
+        "stt": 2,
+        "person": 2,
+        "type": "Tư vấn",
+        "reply_to": 1,
+        "content": "Chào bạn, sản phẩm này rất tốt và được nhiều người tin dùng ạ."
+      }
     ]
     \`\`\`
     - **QUY TẮC REPLY:** Nếu một bình luận là reply, trường "reply_to" phải chứa "stt" của bình luận gốc. Nếu không phải reply, "reply_to" phải là null.
