@@ -181,22 +181,19 @@ export const AiPlanProjectDocumentsManager = ({ planId }: { planId: string }) =>
   }, [documents, searchQuery]);
 
   const handleSave = async (doc: Partial<Document>) => {
-    const toastId = showLoading("Đang xử lý và nhúng dữ liệu...");
+    const toastId = showLoading("Đang lưu tài liệu...");
     try {
-      const textToEmbed = `Tiêu đề: ${doc.title || ''}\nMục đích: ${doc.purpose || ''}\nNội dung: ${doc.content || ''}`.trim();
-      const { data: embeddingData, error: functionError } = await supabase.functions.invoke('embed-document', { body: { textToEmbed } });
-
-      if (functionError || embeddingData.error) throw new Error(functionError?.message || embeddingData.error);
-      if (!embeddingData.embedding) throw new Error("Không nhận được vector embedding.");
-
-      const documentToSave = { ...doc, embedding: embeddingData.embedding, ai_plan_id: planId };
+      const documentToSave = { ...doc, ai_plan_id: planId };
       
-      if (documentToSave.id) {
-        const { error } = await supabase.from('documents').update(documentToSave).eq('id', documentToSave.id);
+      // Remove embedding logic
+      const { embedding, ...dataToSave } = documentToSave;
+
+      if (dataToSave.id) {
+        const { error } = await supabase.from('documents').update(dataToSave).eq('id', dataToSave.id);
         if (error) throw error;
       } else {
-        const { id, ...docWithoutId } = documentToSave;
-        const { error } = await supabase.from('documents').insert(docWithoutId);
+        const { id, ...insertData } = dataToSave;
+        const { error } = await supabase.from('documents').insert(insertData);
         if (error) throw error;
       }
 
@@ -208,7 +205,7 @@ export const AiPlanProjectDocumentsManager = ({ planId }: { planId: string }) =>
 
     } catch (err: any) {
       dismissToast(toastId);
-      showError(`Lỗi huấn luyện: ${err.message}`);
+      showError(`Lỗi lưu tài liệu: ${err.message}`);
     }
   };
 
