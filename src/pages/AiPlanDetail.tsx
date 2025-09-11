@@ -173,8 +173,18 @@ const AiPlanDetail = () => {
       });
 
       if (error) {
-        const errorBody = await error.context.json();
-        throw new Error(errorBody.error || error.message);
+        let errorMessage = error.message;
+        if (error.context && typeof error.context.json === 'function') {
+          try {
+            const errorBody = await error.context.json();
+            if (errorBody.error) {
+              errorMessage = errorBody.error;
+            }
+          } catch (e) {
+            // Ignore JSON parsing error
+          }
+        }
+        throw new Error(errorMessage);
       }
       if (data.error) throw new Error(data.error);
 
@@ -315,8 +325,18 @@ const AiPlanDetail = () => {
       });
   
       if (error) {
-        const errorBody = await error.context.json();
-        throw new Error(errorBody.error || error.message);
+        let errorMessage = error.message;
+        if (error.context && typeof error.context.json === 'function') {
+          try {
+            const errorBody = await error.context.json();
+            if (errorBody.error) {
+              errorMessage = errorBody.error;
+            }
+          } catch (e) {
+            // Ignore JSON parsing error
+          }
+        }
+        throw new Error(errorMessage);
       }
       if (data.error) throw new Error(data.error);
   
