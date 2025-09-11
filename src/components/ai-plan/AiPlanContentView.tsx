@@ -318,7 +318,7 @@ export const AiPlanContentView = (props: AiPlanContentViewProps) => {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-12 items-start">
       {/* Left Navigation */}
-      <aside className="sticky top-24">
+      <aside className="lg:sticky top-24">
         <h3 className="font-semibold text-slate-900 mb-4 px-4">Nội dung kế hoạch</h3>
         <nav>
           <ul className="space-y-2">
