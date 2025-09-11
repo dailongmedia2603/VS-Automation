@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Folder, PlusCircle, Search, List, LayoutGrid, ChevronDown, Loader2, Camera, Image } from 'lucide-react';
+import { Folder, PlusCircle, Search, List, LayoutGrid, ChevronDown, Loader2, Image } from 'lucide-react';
 import { StatWidget } from '@/components/content-ai/StatWidget';
 import { ProjectFolder } from '@/components/ProjectFolder';
 import { ProjectListItem } from '@/components/ProjectListItem';
@@ -27,15 +27,6 @@ type Project = {
   creator_email: string | null;
   results_count: number;
 };
-
-const folderColors = [
-  'bg-cyan-100 text-cyan-600',
-  'bg-sky-100 text-sky-600',
-  'bg-blue-100 text-blue-600',
-  'bg-indigo-100 text-indigo-600',
-];
-
-const getRandomColor = () => folderColors[Math.floor(Math.random() * folderColors.length)];
 
 const ReportScreenshot = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
