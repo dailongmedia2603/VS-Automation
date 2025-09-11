@@ -29,7 +29,7 @@ interface AiPlanContentViewProps {
   editingSectionId?: string | null;
   setEditingSectionId?: (id: string | null) => void;
   onUpdateSection?: (sectionId: string, newContent: any) => Promise<void>;
-  onRegenerateSection?: (sectionId: string, sectionLabel: string) => void;
+  onRegenerateSection?: (sectionId: string, sectionLabel: string, itemToRegenerate?: any) => void;
   onUpdateConfig?: (newConfig: any) => Promise<void>;
 }
 
@@ -65,7 +65,7 @@ const isContentDirectionData = (data: any): boolean => {
 };
 
 // --- Sub-component for Content Direction (Master-Detail View) ---
-const ContentDirectionViewIntegrated = ({ data }: { data: any[] }) => {
+const ContentDirectionViewIntegrated = ({ data, onRegenerateItem }: { data: any[], onRegenerateItem?: (item: any) => void }) => {
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
 
   const groupedData = useMemo(() => {
@@ -130,7 +130,15 @@ const ContentDirectionViewIntegrated = ({ data }: { data: any[] }) => {
         <div className="p-6">
           {selectedItem ? (
             <div className="space-y-8">
-              <h2 className="text-2xl font-bold text-slate-900">{selectedItem.chude || selectedItem.topic || selectedItem.chudecantim}</h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-slate-900">{selectedItem.chude || selectedItem.topic || selectedItem.chudecantim}</h2>
+                {onRegenerateItem && (
+                  <Button variant="outline" size="sm" onClick={() => onRegenerateItem(selectedItem)}>
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Tạo lại
+                  </Button>
+                )}
+              </div>
               <DetailSection title="Loại bài viết" content={selectedItem.loaicontent} icon={Newspaper} iconBg="bg-indigo-100" iconText="text-indigo-600" />
               <DetailSection title="Vấn đề" content={selectedItem.vande} icon={AlertTriangle} iconBg="bg-yellow-100" iconText="text-yellow-600" />
               <DetailSection title="Content demo" content={selectedItem.contentdemo || selectedItem.contentcommentdemo} icon={ClipboardList} iconBg="bg-green-100" iconText="text-green-600" />
@@ -383,7 +391,10 @@ export const AiPlanContentView = (props: AiPlanContentViewProps) => {
                     <>
                         {section.display_type === 'content_direction' && isContentDirectionData(section.sectionData) ? (
                             <div className="p-4">
-                                <ContentDirectionViewIntegrated data={section.sectionData} />
+                                <ContentDirectionViewIntegrated 
+                                  data={section.sectionData} 
+                                  onRegenerateItem={isEditable ? (item) => onRegenerateSection?.(section.id, section.label, item) : undefined}
+                                />
                             </div>
                         ) : section.display_type === 'post_scan' && Array.isArray(section.sectionData) ? (
                             <div className="p-4">

@@ -63,7 +63,7 @@ const AiPlanDetail = () => {
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
-  const [regenSection, setRegenSection] = useState<{ id: string; label: string } | null>(null);
+  const [regenSection, setRegenSection] = useState<{ id: string; label: string; item?: any } | null>(null);
   const [feedbackText, setFeedbackText] = useState('');
   const [isInputStructureDialogOpen, setIsInputStructureDialogOpen] = useState(false);
 
@@ -321,6 +321,7 @@ const AiPlanDetail = () => {
           planId: plan.id,
           sectionId: regenSection.id,
           feedback: feedbackText,
+          itemToRegenerate: regenSection.item,
         }
       });
   
@@ -512,7 +513,7 @@ const AiPlanDetail = () => {
                     editingSectionId={editingSectionId}
                     setEditingSectionId={setEditingSectionId}
                     onUpdateSection={handleUpdateSection}
-                    onRegenerateSection={(id, label) => setRegenSection({ id, label })}
+                    onRegenerateSection={(sectionId, sectionLabel, item) => setRegenSection({ id: sectionId, label: sectionLabel, item })}
                   />
                 </div>
               </ResizablePanel>
@@ -540,7 +541,14 @@ const AiPlanDetail = () => {
       <Dialog open={!!regenSection} onOpenChange={() => setRegenSection(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Tạo lại: {regenSection?.label}</DialogTitle>
+            <DialogTitle>
+              Tạo lại: {regenSection?.label}
+              {regenSection?.item && (
+                <span className="block text-base font-normal text-muted-foreground mt-1">
+                  Mục: {regenSection.item.chude || regenSection.item.topic || regenSection.item.bai_viet_name}
+                </span>
+              )}
+            </DialogTitle>
             <DialogDescription>
               Nhập feedback của bạn để AI cải thiện nội dung cho phần này.
             </DialogDescription>
