@@ -134,8 +134,34 @@ Dựa vào **TOÀN BỘ KẾ HOẠCH** và **FEEDBACK CỦA NGƯỜI DÙNG**, h�
 `;
 
     let jsonStructureDescription;
-    if (sectionToRegenerate.type === 'dynamic_group') {
-      const subFields = (sectionToRegenerate.sub_fields || []).map((sub: any) => `      - "${sub.id}": (string) // ${sub.label}`).join('\n');
+    if (sectionToRegenerate.display_type === 'content_direction') {
+      const subFields = [
+        `      "loai_content": "(string) // Loại bài viết"`,
+        `      "chu_de": "(string) // Chủ đề"`,
+        `      "van_de": "(string) // Vấn đề"`,
+        `      "content_demo": "(string) // Content demo"`,
+        `      "dinh_huong_comment": "(string) // Định hướng comment"`
+      ].join(',\n');
+      jsonStructureDescription = `[ // An array of objects
+  {
+${subFields}
+  },
+  ...
+]`;
+    } else if (sectionToRegenerate.display_type === 'post_scan') {
+      const subFields = [
+        `      "chu_de_post_can_tim": "(string) // Chủ đề post cần tìm"`,
+        `      "dinh_huong_content_comment": "(string) // Định hướng content comment"`,
+        `      "demo_comment": "(string) // Demo comment"`
+      ].join(',\n');
+      jsonStructureDescription = `[ // An array of objects
+  {
+${subFields}
+  },
+  ...
+]`;
+    } else if (sectionToRegenerate.type === 'dynamic_group') {
+      const subFields = (sectionToRegenerate.sub_fields || []).map((sub: any) => `      - "${sub.id}": "(string) // ${sub.label}`).join('\n');
       jsonStructureDescription = `[ // An array of objects
   {
 ${subFields}
