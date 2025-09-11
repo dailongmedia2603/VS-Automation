@@ -36,6 +36,7 @@ import PublicAiPlan from "./pages/PublicAiPlan";
 import PublicPostScan from "./pages/PublicPostScan";
 import EmailScan from "./pages/tools/EmailScan";
 import EmailScanDetail from "./pages/tools/EmailScanDetail";
+import ReportScreenshot from "./pages/ReportScreenshot";
 
 const queryClient = new QueryClient();
 
@@ -78,6 +79,7 @@ const App = () => (
                       <Route path="/tools/email-scan/:projectId" element={<EmailScanDetail />} />
                       <Route path="/ai-plan" element={<AiPlan />} />
                       <Route path="/ai-plan/:planId" element={<AiPlanDetail />} />
+                      <Route path="/report-screenshot" element={<ReportScreenshot />} />
                     </Route>
                   </Route>
                   <Route path="*" element={<NotFound />} />

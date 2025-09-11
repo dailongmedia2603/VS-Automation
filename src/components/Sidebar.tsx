@@ -10,6 +10,7 @@ import {
   Sparkles,
   CheckCircle,
   Wrench,
+  Camera,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link, useLocation } from "react-router-dom";
@@ -50,6 +51,7 @@ const navSections = [
     title: "Seeder",
     items: [
       { name: "Check Seeding", icon: CheckCircle, href: "/check-seeding", permission: "view_check_seeding" },
+      { name: "Chụp ảnh Report", icon: Camera, href: "/report-screenshot", permission: "view_report_screenshot" },
     ],
   },
   {
