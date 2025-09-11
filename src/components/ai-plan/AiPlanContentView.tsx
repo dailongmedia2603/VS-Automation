@@ -18,6 +18,7 @@ type PlanStructureField = {
   type: 'text' | 'textarea' | 'dynamic_group';
   icon: string;
   display_type?: 'simple' | 'content_direction' | 'post_scan';
+  is_active?: boolean;
   sub_fields?: { id: string; label: string; type: 'text' | 'textarea' }[];
 };
 
@@ -274,7 +275,8 @@ export const AiPlanContentView = (props: AiPlanContentViewProps) => {
   }
 
   const sectionsWithData = useMemo(() => {
-    return planStructure.map(section => ({ ...section, sectionData: planData[section.id] })).filter(s => s.sectionData);
+    const activeStructure = planStructure.filter(section => section.is_active !== false);
+    return activeStructure.map(section => ({ ...section, sectionData: planData[section.id] })).filter(s => s.sectionData);
   }, [planData, planStructure]);
 
   useEffect(() => {

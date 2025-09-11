@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 
 type Template = {
   id: number;
@@ -29,6 +30,7 @@ type StructureField = {
   type: 'text' | 'textarea' | 'dynamic_group';
   icon: string;
   display_type: 'simple' | 'content_direction' | 'post_scan';
+  is_active?: boolean;
   sub_fields?: { id: string; label: string; type: 'text' | 'textarea' }[];
 };
 
@@ -65,7 +67,7 @@ export const AiPlanTemplateManager = () => {
     if (template) {
       setEditingTemplate(template);
       const outputFields = (template.structure as any)?.output_fields || template.structure || [];
-      const fieldsWithDefaults = outputFields.map((f: any) => ({ ...f, display_type: f.display_type || 'simple' }));
+      const fieldsWithDefaults = outputFields.map((f: any) => ({ ...f, display_type: f.display_type || 'simple', is_active: f.is_active ?? true }));
       setStructureFields(fieldsWithDefaults);
     } else {
       setEditingTemplate({ name: '' });
@@ -115,13 +117,13 @@ export const AiPlanTemplateManager = () => {
     setTemplateToDelete(null);
   };
 
-  const handleFieldChange = (id: string, key: keyof StructureField, value: string) => {
+  const handleFieldChange = (id: string, key: keyof StructureField, value: string | boolean) => {
     setStructureFields(prev => prev.map(f => f.id === id ? { ...f, [key]: value } : f));
   };
 
   const addField = () => {
     const newId = `section_${Date.now()}`;
-    setStructureFields(prev => [...prev, { id: newId, label: 'Mục mới', type: 'textarea', icon: 'Target', display_type: 'simple' }]);
+    setStructureFields(prev => [...prev, { id: newId, label: 'Mục mới', type: 'textarea', icon: 'Target', display_type: 'simple', is_active: true }]);
   };
 
   const removeField = (id: string) => {
@@ -168,7 +170,7 @@ export const AiPlanTemplateManager = () => {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
-            <DialogTitle>{editingTemplate?.id ? 'Sửa mẫu kế hoạch' : 'Tạo mẫu kế hoạch mới'}</DialogTitle>
+            <DialogTitle className="text-xl font-bold">{editingTemplate?.id ? 'Sửa mẫu kế hoạch' : 'Tạo mẫu kế hoạch mới'}</DialogTitle>
             <DialogDescription>Tùy chỉnh tên và các mục sẽ có trong kế hoạch AI.</DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4">
@@ -182,6 +184,7 @@ export const AiPlanTemplateManager = () => {
                 {structureFields.map((field, index) => (
                   <div key={field.id} className="p-3 border rounded-md bg-slate-50 space-y-2">
                     <div className="flex items-center gap-2">
+                      <Switch checked={field.is_active ?? true} onCheckedChange={(checked) => handleFieldChange(field.id, 'is_active', checked)} />
                       <Input placeholder="ID (vd: san_pham)" value={field.id} onChange={e => handleFieldChange(field.id, 'id', e.target.value)} className="font-mono text-xs" />
                       <Input placeholder="Tiêu đề mục" value={field.label} onChange={e => handleFieldChange(field.id, 'label', e.target.value)} />
                       <Select value={field.icon} onValueChange={(value) => handleFieldChange(field.id, 'icon', value)}>
@@ -216,10 +219,7 @@ export const AiPlanTemplateManager = () => {
       </Dialog>
 
       <AlertDialog open={!!templateToDelete} onOpenChange={() => setTemplateToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Bạn có chắc chắn?</AlertDialogTitle><AlertDialogDescription>Hành động này sẽ xóa mẫu "{templateToDelete?.name}".</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>Hủy</AlertDialogCancel><AlertDialogAction onClick={handleDeleteTemplate} className="bg-red-600">Xóa</AlertDialogAction></AlertDialogFooter>
-        </AlertDialogContent>
+        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Bạn có chắc chắn?</AlertDialogTitle><AlertDialogDescription>Hành động này sẽ xóa mẫu "{templateToDelete?.name}".</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Hủy</AlertDialogCancel><AlertDialogAction onClick={handleDeleteTemplate} className="bg-red-600">Xóa</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
     </>
   );
