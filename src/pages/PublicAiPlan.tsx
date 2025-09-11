@@ -24,6 +24,7 @@ type PlanStructure = {
   label: string;
   type: 'text' | 'textarea' | 'dynamic_group';
   icon: string;
+  display_type?: 'simple' | 'content_direction' | 'post_scan';
   sub_fields?: { id: string; label: string; type: 'text' | 'textarea' }[];
 }[];
 
@@ -110,7 +111,7 @@ const PublicAiPlan = () => {
     );
   }
 
-  const headerTitle = publicSettings?.company_name || plan?.name || 'Kế hoạch Marketing';
+  const headerTitle = `KẾ HOẠCH SEEDING "${plan?.name}"`;
   const headerDescription = publicSettings?.description || 'Một kế hoạch marketing được tạo bởi AI';
   const logoUrl = publicSettings?.logo_url;
   const logoWidth = publicSettings?.logo_width;
