@@ -1,0 +1,1 @@
+DELETE FROM public.chatwoot_messages WHERE is_private = true;
