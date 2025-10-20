@@ -1,1 +1,0 @@
-ALTER TABLE public.ai_reply_logs DISABLE ROW LEVEL SECURITY;

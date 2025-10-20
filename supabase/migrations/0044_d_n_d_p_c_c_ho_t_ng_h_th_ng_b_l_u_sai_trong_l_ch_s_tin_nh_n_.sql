@@ -1,1 +1,0 @@
-DELETE FROM public.chatwoot_messages WHERE message_type = 2;
