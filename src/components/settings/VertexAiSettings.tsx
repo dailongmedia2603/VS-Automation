@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -7,10 +7,49 @@ import { showSuccess, showError } from '@/utils/toast';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Terminal } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+
+const geminiModels = [
+  { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+  { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
+  { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
+  { value: 'gemini-pro', label: 'Gemini 1.0 Pro (Legacy)' },
+];
 
 const VertexAiSettings = () => {
   const [status, setStatus] = useState<'idle' | 'testing' | 'success' | 'error'>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [scanModel, setScanModel] = useState('gemini-2.5-flash');
+  const [contentModel, setContentModel] = useState('gemini-2.5-pro');
+  const [isLoadingModels, setIsLoadingModels] = useState(true);
+  const [isSavingModels, setIsSavingModels] = useState(false);
+
+  useEffect(() => {
+    const fetchModels = async () => {
+      setIsLoadingModels(true);
+      const { data, error } = await supabase.from('ai_settings').select('gemini_scan_model, gemini_content_model').eq('id', 1).single();
+      if (data) {
+        setScanModel(data.gemini_scan_model || 'gemini-2.5-flash');
+        setContentModel(data.gemini_content_model || 'gemini-2.5-pro');
+      }
+      setIsLoadingModels(false);
+    };
+    fetchModels();
+  }, []);
+
+  const handleSaveModels = async () => {
+    setIsSavingModels(true);
+    const { error } = await supabase.from('ai_settings').upsert({ id: 1, gemini_scan_model: scanModel, gemini_content_model: contentModel });
+    if (error) {
+      showError("Lưu cấu hình model thất bại: " + error.message);
+    } else {
+      showSuccess("Đã lưu cấu hình model!");
+    }
+    setIsSavingModels(false);
+  };
 
   const handleTestConnection = async () => {
     setStatus("testing");
@@ -42,9 +81,9 @@ const VertexAiSettings = () => {
   return (
     <Card className="shadow-sm rounded-2xl bg-white">
       <CardHeader>
-        <CardTitle>Kết nối API Gemini qua Vertex AI</CardTitle>
+        <CardTitle>Kết nối API Gemini qua Google Cloud Vertex AI</CardTitle>
         <CardDescription>
-          Quản lý và kiểm tra trạng thái kết nối đến Google Cloud Vertex AI bằng Service Account.
+          Quản lý xác thực qua Service Account và chọn model cho các tính năng AI.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -78,6 +117,40 @@ const VertexAiSettings = () => {
               <p className="font-bold">Chi tiết lỗi:</p>
               <p className="font-mono break-all">{error}</p>
             </div>
+          )}
+        </div>
+        <div className="border-t pt-6">
+          <CardTitle className="text-lg">Cấu hình Model</CardTitle>
+          <CardDescription className="mb-4">Chọn model Gemini sẽ được sử dụng cho các tính năng khác nhau.</CardDescription>
+          {isLoadingModels ? (
+            <Skeleton className="h-24 w-full" />
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="scan-model">Model cho Check content post scan</Label>
+                  <Select value={scanModel} onValueChange={setScanModel}>
+                    <SelectTrigger id="scan-model"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {geminiModels.map(model => <SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="content-model">Model cho Content AI</Label>
+                  <Select value={contentModel} onValueChange={setContentModel}>
+                    <SelectTrigger id="content-model"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {geminiModels.map(model => <SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <Button onClick={handleSaveModels} disabled={isSavingModels} className="mt-4 rounded-lg">
+                {isSavingModels && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Lưu cấu hình Model
+              </Button>
+            </>
           )}
         </div>
       </CardContent>

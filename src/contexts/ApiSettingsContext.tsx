@@ -6,7 +6,6 @@ interface ApiSettings {
   apiUrl: string;
   apiKey: string;
   embeddingModelName: string;
-  googleGeminiApiKey: string;
   geminiScanModel: string;
   geminiContentModel: string;
 }
@@ -24,8 +23,7 @@ export const ApiSettingsProvider = ({ children }: { children: ReactNode }) => {
     apiUrl: '',
     apiKey: '',
     embeddingModelName: 'text-embedding-3-small',
-    googleGeminiApiKey: '',
-    geminiScanModel: 'gemini-pro',
+    geminiScanModel: 'gemini-2.5-flash',
     geminiContentModel: 'gemini-2.5-pro',
   });
   const [isLoading, setIsLoading] = useState(true);
@@ -36,7 +34,7 @@ export const ApiSettingsProvider = ({ children }: { children: ReactNode }) => {
       try {
         const { data, error } = await supabase
           .from('ai_settings')
-          .select('api_url, api_key, embedding_model_name, google_gemini_api_key, gemini_scan_model, gemini_content_model')
+          .select('api_url, api_key, embedding_model_name, gemini_scan_model, gemini_content_model')
           .eq('id', 1)
           .single();
 
@@ -49,8 +47,7 @@ export const ApiSettingsProvider = ({ children }: { children: ReactNode }) => {
             apiUrl: data.api_url || '',
             apiKey: data.api_key || '',
             embeddingModelName: data.embedding_model_name || 'text-embedding-3-small',
-            googleGeminiApiKey: data.google_gemini_api_key || '',
-            geminiScanModel: data.gemini_scan_model || 'gemini-pro',
+            geminiScanModel: data.gemini_scan_model || 'gemini-2.5-flash',
             geminiContentModel: data.gemini_content_model || 'gemini-2.5-pro',
           };
           setSettings(formattedSettings);

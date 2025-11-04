@@ -21,14 +21,6 @@ import { FacebookApiReference } from "@/components/FacebookApiReference";
 import TelegramSettings from "@/components/settings/TelegramSettings";
 import VertexAiSettings from "@/components/settings/VertexAiSettings";
 
-const geminiModels = [
-  { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
-  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-  { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
-  { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
-  { value: 'gemini-pro', label: 'Gemini 1.0 Pro (Legacy)' },
-];
-
 const Settings = () => {
   // AI API Settings state
   const { settings, setSettings, isLoading: isLoadingApi } = useApiSettings();
@@ -36,8 +28,6 @@ const Settings = () => {
   const [isSavingApi, setIsSavingApi] = useState(false);
   const [status, setStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
-  const [geminiStatus, setGeminiStatus] = useState<'idle' | 'testing' | 'success' | 'error'>("idle");
-  const [geminiError, setGeminiError] = useState<string | null>(null);
 
   // Integrations state
   const [webhookUrl, setWebhookUrl] = useState('');
@@ -125,9 +115,6 @@ const Settings = () => {
         api_url: localSettings.apiUrl,
         api_key: localSettings.apiKey,
         embedding_model_name: localSettings.embeddingModelName,
-        google_gemini_api_key: localSettings.googleGeminiApiKey,
-        gemini_scan_model: localSettings.geminiScanModel,
-        gemini_content_model: localSettings.geminiContentModel,
       };
       const { error } = await supabase.from('ai_settings').upsert(dataToSave);
       if (error) throw error;
@@ -187,30 +174,6 @@ const Settings = () => {
       const errorMessage = err.message || "Đã xảy ra lỗi không xác định.";
       setError(errorMessage);
       showError(`Kiểm tra thất bại: ${errorMessage}`);
-    }
-  };
-
-  const handleTestGeminiConnection = async () => {
-    setGeminiStatus("testing");
-    setGeminiError(null);
-    try {
-        const { data, error } = await supabase.functions.invoke('test-gemini-api', {
-            body: { apiKey: localSettings.googleGeminiApiKey }
-        });
-
-        if (error) {
-            const errorBody = await error.context.json();
-            throw new Error(errorBody.error || error.message);
-        }
-        if (data.error) throw new Error(data.error);
-
-        setGeminiStatus("success");
-        showSuccess("Kết nối API Google Gemini thành công!");
-    } catch (err: any) {
-        setGeminiStatus("error");
-        const errorMessage = err.message || "Đã xảy ra lỗi không xác định.";
-        setGeminiError(errorMessage);
-        showError(`Kiểm tra thất bại: ${errorMessage}`);
     }
   };
 
@@ -303,7 +266,6 @@ const Settings = () => {
       <Tabs defaultValue="api-facebook">
         <TabsList className="flex justify-start items-center gap-1 p-0 bg-transparent">
           <TabsTrigger value="api-ai" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Cài đặt API AI</TabsTrigger>
-          <TabsTrigger value="api-ai-scan" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">API AI Check Scan</TabsTrigger>
           <TabsTrigger value="vertex-ai" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Gemini Vertex AI</TabsTrigger>
           <TabsTrigger value="integrations" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Tích hợp</TabsTrigger>
           <TabsTrigger value="api-facebook" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">API Facebook Graph</TabsTrigger>
@@ -375,71 +337,6 @@ const Settings = () => {
                   <div className="mt-4 text-sm text-destructive p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
                     <p className="font-bold">Chi tiết lỗi:</p>
                     <p className="font-mono break-all">{error}</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="api-ai-scan" className="mt-4">
-          <Card className="shadow-sm rounded-2xl bg-white">
-            <CardHeader>
-              <CardTitle>API AI Check Scan</CardTitle>
-              <CardDescription>Cấu hình API từ Google AI Studio (Gemini) để sử dụng cho các tính năng AI.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="google-api-key">Google AI Studio API Key</Label>
-                <Input
-                  id="google-api-key"
-                  type="password"
-                  value={localSettings.googleGeminiApiKey}
-                  onChange={(e) => setLocalSettings({ ...localSettings, googleGeminiApiKey: e.target.value })}
-                  className="bg-slate-100 border-none rounded-lg"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="scan-model">Model cho Check content post scan</Label>
-                  <Select value={localSettings.geminiScanModel} onValueChange={(value) => setLocalSettings(s => ({...s, geminiScanModel: value}))}>
-                    <SelectTrigger id="scan-model"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {geminiModels.map(model => <SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="content-model">Model cho Content AI</Label>
-                  <Select value={localSettings.geminiContentModel} onValueChange={(value) => setLocalSettings(s => ({...s, geminiContentModel: value}))}>
-                    <SelectTrigger id="content-model"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {geminiModels.map(model => <SelectItem key={model.value} value={model.value}>{model.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button onClick={handleSaveApi} disabled={isSavingApi} className="rounded-lg bg-blue-600 hover:bg-blue-700">
-                  {isSavingApi && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {isSavingApi ? "Đang lưu..." : "Lưu thay đổi"}
-                </Button>
-                <Button onClick={handleTestGeminiConnection} disabled={geminiStatus === "testing"} variant="outline" className="rounded-lg">
-                  {geminiStatus === "testing" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Kiểm tra kết nối
-                </Button>
-              </div>
-              <div className="border-t pt-6">
-                <div className="flex items-center justify-between">
-                    <p className="font-medium">Trạng thái kết nối</p>
-                    {geminiStatus === "idle" && <Badge variant="outline">Chưa kiểm tra</Badge>}
-                    {geminiStatus === "testing" && <Badge variant="secondary">Đang kiểm tra...</Badge>}
-                    {geminiStatus === "success" && <Badge variant="default" className="bg-green-100 text-green-800">Thành công</Badge>}
-                    {geminiStatus === "error" && <Badge variant="destructive">Thất bại</Badge>}
-                </div>
-                {geminiError && (
-                  <div className="mt-4 text-sm text-destructive p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-                    <p className="font-bold">Chi tiết lỗi:</p>
-                    <p className="font-mono break-all">{geminiError}</p>
                   </div>
                 )}
               </div>
