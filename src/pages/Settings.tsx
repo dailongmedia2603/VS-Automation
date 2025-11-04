@@ -24,11 +24,9 @@ import VertexAiSettings from "@/components/settings/VertexAiSettings";
 const geminiModels = [
   { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
   { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-  { value: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite' },
-  { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
-  { value: 'gemini-2.0-flash-preview-image-generation', label: 'Gemini 2.0 Flash Preview Image Generation' },
-  { value: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash-Lite' },
-  { value: 'gemini-pro', label: 'Gemini Pro' },
+  { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
+  { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
+  { value: 'gemini-pro', label: 'Gemini 1.0 Pro (Legacy)' },
 ];
 
 const Settings = () => {
