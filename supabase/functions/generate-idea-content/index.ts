@@ -14,7 +14,7 @@ async function getGcpAccessToken(credentialsJson: string) {
 
   const pemHeader = "-----BEGIN PRIVATE KEY-----";
   const pemFooter = "-----END PRIVATE KEY-----";
-  const pemContents = privateKeyPem.substring(pemHeader.length, privateKeyPem.length - pemFooter.length).replace(/\s/g, '');
+  const pemContents = privateKeyPem.substring(pemHeader.length, privateKeyPem.length - pemFooter.length).replace(/\\n/g, '').replace(/\s/g, '');
   const binaryDer = atob(pemContents);
   const keyBuffer = new Uint8Array(binaryDer.length).map((_, i) => binaryDer.charCodeAt(i)).buffer;
 
