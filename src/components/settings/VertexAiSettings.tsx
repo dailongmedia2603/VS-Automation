@@ -30,11 +30,12 @@ const VertexAiSettings = () => {
   useEffect(() => {
     const fetchModels = async () => {
       setIsLoadingModels(true);
-      const { data, error } = await supabase.from('ai_settings').select('gemini_scan_model, gemini_content_model').eq('id', 1).single();
+      const { data, error: _error } = await supabase.from('ai_settings').select('gemini_scan_model, gemini_content_model').eq('id', 1).single();
       if (data) {
         setScanModel(data.gemini_scan_model || 'gemini-2.5-flash');
         setContentModel(data.gemini_content_model || 'gemini-2.5-pro');
       }
+      // We are not handling the error here, so we can ignore it.
       setIsLoadingModels(false);
     };
     fetchModels();
