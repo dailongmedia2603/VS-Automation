@@ -1,7 +1,5 @@
-import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useNotificationSound } from '@/hooks/useNotificationSound';
-import { SoundPermissionBanner } from '@/components/SoundPermissionBanner';
 
 interface NotificationContextType {
   unreadCount: number;
@@ -12,8 +10,6 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 
 export const NotificationProvider = ({ children }: { children: ReactNode }) => {
   const [unreadCount, setUnreadCount] = useState(0);
-  const { playNotificationSound, grantPermission, permission } = useNotificationSound('/sounds/notificationnew.mp3');
-  const previousCountRef = useRef(0);
 
   useEffect(() => {
     const fetchUnreadCount = async () => {
@@ -25,7 +21,6 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
       
       if (!error && count !== null) {
         setUnreadCount(count);
-        previousCountRef.current = count;
       }
     };
 
@@ -36,13 +31,6 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    if (unreadCount > previousCountRef.current) {
-      playNotificationSound();
-    }
-    previousCountRef.current = unreadCount;
-  }, [unreadCount, playNotificationSound]);
-
   const decrementUnreadCount = () => {
     setUnreadCount(prev => Math.max(0, prev - 1));
   };
@@ -52,7 +40,6 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
   return (
     <NotificationContext.Provider value={value}>
       {children}
-      {permission === 'prompt' && <SoundPermissionBanner onGrantPermission={grantPermission} />}
     </NotificationContext.Provider>
   );
 };
