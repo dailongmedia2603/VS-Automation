@@ -239,7 +239,7 @@ const ProjectDetailContent = () => {
         <ResizablePanelGroup direction="horizontal" className="flex-1 rounded-2xl border bg-white shadow-sm overflow-hidden">
           <ResizablePanel defaultSize={20} minSize={20} maxSize={40}>
             <div className="flex flex-col h-full p-4">
-              <div className="p-2">
+              <div className="p-2 flex-shrink-0">
                 <button
                   onClick={() => handleSelectView('documents')}
                   className={cn(
@@ -253,16 +253,18 @@ const ProjectDetailContent = () => {
                   Tài liệu
                 </button>
               </div>
-              <Accordion type="multiple" defaultValue={['articles', 'comments']} className="w-full">
-                <AccordionItem value="articles">
-                  <AccordionTrigger className="text-base font-semibold hover:no-underline"><div className="flex items-center gap-2"><FileText className="h-5 w-5 text-blue-600" /><span>Viết post ({articles.length})</span></div></AccordionTrigger>
-                  <AccordionContent><ItemList items={articles} newlyUpdatedIds={newlyUpdatedItemIds} /></AccordionContent>
-                </AccordionItem>
-                <AccordionItem value="comments">
-                  <AccordionTrigger className="text-base font-semibold hover:no-underline"><div className="flex items-center gap-2"><MessageSquare className="h-5 w-5 text-green-600" /><span>Viết comment ({comments.length})</span></div></AccordionTrigger>
-                  <AccordionContent><ItemList items={comments} newlyUpdatedIds={newlyUpdatedItemIds} /></AccordionContent>
-                </AccordionItem>
-              </Accordion>
+              <ScrollArea className="flex-1">
+                <Accordion type="multiple" defaultValue={['articles', 'comments']} className="w-full">
+                  <AccordionItem value="articles">
+                    <AccordionTrigger className="text-base font-semibold hover:no-underline"><div className="flex items-center gap-2"><FileText className="h-5 w-5 text-blue-600" /><span>Viết post ({articles.length})</span></div></AccordionTrigger>
+                    <AccordionContent><ItemList items={articles} newlyUpdatedIds={newlyUpdatedItemIds} /></AccordionContent>
+                  </AccordionItem>
+                  <AccordionItem value="comments">
+                    <AccordionTrigger className="text-base font-semibold hover:no-underline"><div className="flex items-center gap-2"><MessageSquare className="h-5 w-5 text-green-600" /><span>Viết comment ({comments.length})</span></div></AccordionTrigger>
+                    <AccordionContent><ItemList items={comments} newlyUpdatedIds={newlyUpdatedItemIds} /></AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+              </ScrollArea>
             </div>
           </ResizablePanel>
           <ResizableHandle withHandle />
