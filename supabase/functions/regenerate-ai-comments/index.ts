@@ -291,7 +291,7 @@ serve(async (req) => {
             'Content-Type': 'application/json' 
           },
           body: JSON.stringify({ 
-            contents: [{ parts: [{ text: finalPrompt }] }],
+            contents: [{ role: "user", parts: [{ text: finalPrompt }] }],
             generationConfig: generationConfig
           }),
       });

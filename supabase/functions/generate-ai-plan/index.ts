@@ -1,10 +1,67 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { create } from "https://deno.land/x/djwt@v2.8/mod.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+async function getGcpAccessToken(credentialsJson: string) {
+  const credentials = JSON.parse(credentialsJson);
+  const privateKeyPem = credentials.private_key;
+  const clientEmail = credentials.client_email;
+
+  const pemHeader = "-----BEGIN PRIVATE KEY-----";
+  const pemFooter = "-----END PRIVATE KEY-----";
+  
+  const pemContents = privateKeyPem
+    .replace(pemHeader, '')
+    .replace(pemFooter, '')
+    .replace(/\\n/g, '')
+    .replace(/\s/g, '');
+
+  const binaryDer = atob(pemContents);
+  const keyBuffer = new Uint8Array(binaryDer.length).map((_, i) => binaryDer.charCodeAt(i)).buffer;
+
+  const privateKey = await crypto.subtle.importKey(
+    "pkcs8",
+    keyBuffer,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    true,
+    ["sign"]
+  );
+
+  const now = Math.floor(Date.now() / 1000);
+  const jwt = await create(
+    { alg: "RS256", typ: "JWT" },
+    {
+      iss: clientEmail,
+      sub: clientEmail,
+      aud: "https://oauth2.googleapis.com/token",
+      iat: now,
+      exp: now + 3600,
+      scope: "https://www.googleapis.com/auth/cloud-platform",
+    },
+    privateKey
+  );
+
+  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion: jwt,
+    }),
+  });
+
+  const tokenData = await tokenRes.json();
+  if (!tokenRes.ok) {
+    throw new Error(`Failed to get access token: ${tokenData.error_description || 'Unknown error'}`);
+  }
+
+  return tokenData.access_token;
 }
 
 const DEFAULT_OUTPUT_INSTRUCTION = `
@@ -18,7 +75,7 @@ JSON object phải có cấu trúc chính xác như sau:
 {{json_structure}}
 }
 \`\`\`
-- **TUYỆT ĐỐI KHÔNG** thêm bất kỳ văn bản, lời chào, hoặc giải thích nào bên ngoài khối mã JSON.
+- **TUYỆT ĐỐI KHÔNG** thêm bất kỳ văn bản, lời chào, hay giải thích nào bên ngoài khối mã JSON.
 - Hãy điền giá trị cho mỗi trường dựa trên thông tin đã được cung cấp và kiến thức của bạn.
 `;
 
@@ -58,12 +115,17 @@ serve(async (req) => {
 
     const { data: aiSettings, error: settingsError } = await supabaseAdmin
       .from('ai_settings')
-      .select('google_gemini_api_key, gemini_content_model')
+      .select('gemini_content_model')
       .eq('id', 1)
       .single();
 
-    if (settingsError || !aiSettings.google_gemini_api_key) {
-      throw new Error("Google Gemini API key is not configured in settings.");
+    if (settingsError) {
+      throw new Error("Chưa cấu hình AI model trong trang Cài đặt.");
+    }
+
+    const credentialsJson = Deno.env.get("GOOGLE_CREDENTIALS_JSON");
+    if (!credentialsJson) {
+      throw new Error("Secret 'GOOGLE_CREDENTIALS_JSON' not found in Supabase Vault.");
     }
 
     const templateId = plan.template_id || 1;
@@ -177,18 +239,27 @@ ${subFields}
       maxOutputTokens: promptConfig.maxTokens ?? 8192,
     };
 
-    const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${aiSettings.google_gemini_api_key}`, {
+    const credentials = JSON.parse(credentialsJson);
+    const cloudProjectId = credentials.project_id;
+    const region = "us-central1";
+    const accessToken = await getGcpAccessToken(credentialsJson);
+    const vertexAiUrl = `https://${region}-aiplatform.googleapis.com/v1/projects/${cloudProjectId}/locations/${region}/publishers/google/models/${modelToUse}:generateContent`;
+
+    const geminiRes = await fetch(vertexAiUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        "Authorization": `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({ 
-        contents: [{ parts: [{ text: prompt }] }],
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
         generationConfig: generationConfig
       }),
     });
 
     const geminiData = await geminiRes.json();
     if (!geminiRes.ok) {
-      throw new Error(geminiData?.error?.message || 'Failed to call Gemini API.');
+      throw new Error(geminiData?.error?.message || 'Failed to call Vertex AI API.');
     }
 
     const rawContent = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';

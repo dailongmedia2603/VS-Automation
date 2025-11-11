@@ -245,7 +245,7 @@ serve(async (req) => {
             'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json' 
           },
-          body: JSON.stringify({ contents: [{ parts: [{ text: finalPrompt }] }], generationConfig }),
+          body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: finalPrompt }] }], generationConfig }),
         });
         
         geminiData = await geminiRes.json();
