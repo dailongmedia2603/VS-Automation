@@ -1,10 +1,67 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { create } from "https://deno.land/x/djwt@v2.8/mod.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+async function getGcpAccessToken(credentialsJson: string) {
+  const credentials = JSON.parse(credentialsJson);
+  const privateKeyPem = credentials.private_key;
+  const clientEmail = credentials.client_email;
+
+  const pemHeader = "-----BEGIN PRIVATE KEY-----";
+  const pemFooter = "-----END PRIVATE KEY-----";
+  
+  const pemContents = privateKeyPem
+    .replace(pemHeader, '')
+    .replace(pemFooter, '')
+    .replace(/\\n/g, '')
+    .replace(/\s/g, '');
+
+  const binaryDer = atob(pemContents);
+  const keyBuffer = new Uint8Array(binaryDer.length).map((_, i) => binaryDer.charCodeAt(i)).buffer;
+
+  const privateKey = await crypto.subtle.importKey(
+    "pkcs8",
+    keyBuffer,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    true,
+    ["sign"]
+  );
+
+  const now = Math.floor(Date.now() / 1000);
+  const jwt = await create(
+    { alg: "RS256", typ: "JWT" },
+    {
+      iss: clientEmail,
+      sub: clientEmail,
+      aud: "https://oauth2.googleapis.com/token",
+      iat: now,
+      exp: now + 3600,
+      scope: "https://www.googleapis.com/auth/cloud-platform",
+    },
+    privateKey
+  );
+
+  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion: jwt,
+    }),
+  });
+
+  const tokenData = await tokenRes.json();
+  if (!tokenRes.ok) {
+    throw new Error(`Failed to get access token: ${tokenData.error_description || 'Unknown error'}`);
+  }
+
+  return tokenData.access_token;
 }
 
 const formatMapping: Record<string, string> = {
@@ -201,8 +258,13 @@ serve(async (req) => {
     const { libraryId } = config;
     if (!libraryId) throw new Error("Config is missing libraryId.");
 
-    const { data: aiSettings, error: settingsError } = await supabaseAdmin.from('ai_settings').select('*').eq('id', 1).single();
-    if (settingsError || !aiSettings.google_gemini_api_key) throw new Error("Chưa cấu hình API Google Gemini.");
+    const { data: aiSettings, error: settingsError } = await supabaseAdmin.from('ai_settings').select('gemini_content_model').eq('id', 1).single();
+    if (settingsError) throw new Error("Chưa cấu hình AI model.");
+
+    const credentialsJson = Deno.env.get("GOOGLE_CREDENTIALS_JSON");
+    if (!credentialsJson) {
+      throw new Error("Secret 'GOOGLE_CREDENTIALS_JSON' not found in Supabase Vault.");
+    }
 
     const { data: library, error: libraryError } = await supabaseAdmin.from('prompt_libraries').select('config').eq('id', libraryId).single();
     if (libraryError || !library || !library.config) throw new Error("Không thể tải thư viện prompt hoặc thư viện chưa được cấu hình.");
@@ -249,6 +311,12 @@ serve(async (req) => {
       maxOutputTokens: library.config.maxTokens ?? 8192,
     };
 
+    const credentials = JSON.parse(credentialsJson);
+    const projectId = credentials.project_id;
+    const region = "us-central1";
+    const accessToken = await getGcpAccessToken(credentialsJson);
+    const vertexAiUrl = `https://${region}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${region}/publishers/google/models/${modelToUse}:generateContent`;
+
     let geminiData;
     const maxRetries = 3;
     const retryDelay = 1000;
@@ -256,11 +324,14 @@ serve(async (req) => {
 
     while (attempt < maxRetries) {
       attempt++;
-      console.log(`[generate-ai-content] Attempt ${attempt}/${maxRetries} to call Gemini API.`);
+      console.log(`[generate-ai-content] Attempt ${attempt}/${maxRetries} to call Vertex AI.`);
       
-      const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${aiSettings.google_gemini_api_key}`, {
+      const geminiRes = await fetch(vertexAiUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json' 
+          },
           body: JSON.stringify({ 
             contents: [{ parts: [{ text: finalPrompt }] }],
             generationConfig: generationConfig
@@ -271,11 +342,11 @@ serve(async (req) => {
 
       if (!geminiRes.ok) {
         if (geminiRes.status >= 500 && attempt < maxRetries) {
-          console.warn(`[generate-ai-content] Gemini API returned status ${geminiRes.status}. Retrying in ${retryDelay}ms...`);
+          console.warn(`[generate-ai-content] Vertex AI returned status ${geminiRes.status}. Retrying in ${retryDelay}ms...`);
           await new Promise(resolve => setTimeout(resolve, retryDelay));
           continue;
         }
-        throw new Error(geminiData?.error?.message || `Lỗi gọi API Gemini với mã trạng thái ${geminiRes.status}.`);
+        throw new Error(geminiData?.error?.message || `Lỗi gọi API Vertex AI với mã trạng thái ${geminiRes.status}.`);
       }
 
       const hasContent = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -285,7 +356,7 @@ serve(async (req) => {
       }
 
       if (attempt < maxRetries) {
-        console.warn(`[generate-ai-content] Received empty response from Gemini on attempt ${attempt}. Retrying...`);
+        console.warn(`[generate-ai-content] Received empty response from Vertex AI on attempt ${attempt}. Retrying...`);
         await new Promise(resolve => setTimeout(resolve, retryDelay));
       } else {
         console.error(`[generate-ai-content] Received empty response after ${maxRetries} attempts. Aborting.`);
