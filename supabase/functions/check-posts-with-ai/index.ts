@@ -89,7 +89,7 @@ serve(async (req) => {
     const { data: aiSettings, error: settingsError } = await supabaseAdmin.from('ai_settings').select('gemini_scan_model').eq('id', 1).single();
     if (settingsError) throw new Error("Chưa cấu hình AI model.");
 
-    const credentialsJson = Deno.env.get("GOOGLE_CREDENTIALS_JSON");
+    const credentialsJson = Deno.env.get("GOOGLE_CREDENTIALS_JSON\n\n");
     if (!credentialsJson || !project.post_scan_ai_prompt) {
       return new Response(JSON.stringify({ posts }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }

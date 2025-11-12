@@ -261,7 +261,7 @@ serve(async (req) => {
     const { data: aiSettings, error: settingsError } = await supabaseAdmin.from('ai_settings').select('gemini_content_model').eq('id', 1).single();
     if (settingsError) throw new Error("Chưa cấu hình AI model.");
 
-    const credentialsJson = Deno.env.get("GOOGLE_CREDENTIALS_JSON");
+    const credentialsJson = Deno.env.get("GOOGLE_CREDENTIALS_JSON\n\n");
     if (!credentialsJson) {
       throw new Error("Secret 'GOOGLE_CREDENTIALS_JSON' not found in Supabase Vault.");
     }

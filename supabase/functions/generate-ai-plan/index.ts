@@ -123,7 +123,7 @@ serve(async (req) => {
       throw new Error("Chưa cấu hình AI model trong trang Cài đặt.");
     }
 
-    const credentialsJson = Deno.env.get("GOOGLE_CREDENTIALS_JSON");
+    const credentialsJson = Deno.env.get("GOOGLE_CREDENTIALS_JSON\n\n");
     if (!credentialsJson) {
       throw new Error("Secret 'GOOGLE_CREDENTIALS_JSON' not found in Supabase Vault.");
     }
@@ -221,6 +221,14 @@ ${subFields}
     },
     ...
   ]`;
+      } else if (field.type === 'dynamic_group') {
+        const subFields = (field.sub_fields || []).map((sub: any) => `      - "${sub.id}": "(string) // ${sub.label}`).join('\n');
+        return `  "${field.id}": [ // Một mảng các đối tượng
+  {
+${subFields}
+  },
+  ...
+]`;
       } else {
         return `  "${field.id}": "(string) // ${field.label}"`;
       }

@@ -69,7 +69,7 @@ serve(async (req) => {
   }
 
   try {
-    const credentialsJson = Deno.env.get("GOOGLE_CREDENTIALS_JSON");
+    const credentialsJson = Deno.env.get("GOOGLE_CREDENTIALS_JSON\n\n");
     if (!credentialsJson) {
       throw new Error("Secret 'GOOGLE_CREDENTIALS_JSON' not found in Supabase Vault. Please configure it in your project settings.");
     }

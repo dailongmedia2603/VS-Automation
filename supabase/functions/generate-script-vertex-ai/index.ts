@@ -73,7 +73,7 @@ serve(async (req) => {
     if (!prompt) throw new Error("Prompt is required.");
     if (!model) throw new Error("Model is required.");
 
-    const credentialsJson = Deno.env.get("GOOGLE_CREDENTIALS_JSON");
+    const credentialsJson = Deno.env.get("GOOGLE_CREDENTIALS_JSON\n\n");
     if (!credentialsJson) {
       throw new Error("Secret 'GOOGLE_CREDENTIALS_JSON' not found in Supabase Vault.");
     }
