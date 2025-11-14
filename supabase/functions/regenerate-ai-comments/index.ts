@@ -218,17 +218,24 @@ serve(async (req) => {
       body: formData,
     });
 
-    const rawContent = await apiResponse.text();
+    const responseText = await apiResponse.text();
     if (!apiResponse.ok) {
-      throw new Error(`Lỗi API Gemini Custom: ${rawContent}`);
+      throw new Error(`Lỗi API Gemini Custom: ${responseText}`);
     }
     
-    let responseForLog;
+    let responseData;
     try {
-        responseForLog = JSON.parse(rawContent);
+        responseData = JSON.parse(responseText);
     } catch (e) {
-        responseForLog = rawContent;
+        throw new Error(`Phản hồi từ API không phải là JSON hợp lệ: ${responseText}`);
     }
+
+    if (!responseData.success || typeof responseData.answer === 'undefined') {
+        throw new Error(`API trả về lỗi hoặc định dạng không mong đợi: ${responseData.message || responseText}`);
+    }
+
+    const rawContent = responseData.answer;
+    const responseForLog = responseData;
 
     const mandatoryConditions = config.mandatoryConditions || [];
     const allConditionIds = mandatoryConditions.map((c) => c.id);
@@ -250,7 +257,7 @@ serve(async (req) => {
         metConditionIds: allConditionIds
       }));
     } catch (e) {
-      console.error("Failed to parse JSON from AI comment response. Raw content:", rawContent);
+      console.error("Failed to parse JSON from AI comment response. Raw content from 'answer' field:", rawContent);
       throw new Error("AI đã trả về một định dạng JSON không hợp lệ cho bình luận.");
     }
 

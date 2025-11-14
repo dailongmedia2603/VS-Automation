@@ -175,17 +175,24 @@ serve(async (req) => {
         body: formData,
       });
 
-      const rawContent = await apiResponse.text();
+      const responseText = await apiResponse.text();
       if (!apiResponse.ok) {
-        throw new Error(`Lỗi API Gemini Custom: ${rawContent}`);
+        throw new Error(`Lỗi API Gemini Custom: ${responseText}`);
       }
-      
-      let responseForLog;
+
+      let responseData;
       try {
-          responseForLog = JSON.parse(rawContent);
+          responseData = JSON.parse(responseText);
       } catch (e) {
-          responseForLog = rawContent;
+          throw new Error(`Phản hồi từ API không phải là JSON hợp lệ: ${responseText}`);
       }
+
+      if (!responseData.success || typeof responseData.answer === 'undefined') {
+          throw new Error(`API trả về lỗi hoặc định dạng không mong đợi: ${responseData.message || responseText}`);
+      }
+
+      const rawContent = responseData.answer;
+      const responseForLog = responseData;
       
       await supabaseAdmin.from('content_ai_logs').insert({ item_id: itemId, creator_id: user.id, prompt: finalPrompt, response: responseForLog });
       
