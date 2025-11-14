@@ -20,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FacebookApiReference } from "@/components/FacebookApiReference";
 import TelegramSettings from "@/components/settings/TelegramSettings";
 import VertexAiSettings from "@/components/settings/VertexAiSettings";
+import GeminiCustomSettings from "@/components/settings/GeminiCustomSettings";
 
 const Settings = () => {
   // AI API Settings state
@@ -267,6 +268,7 @@ const Settings = () => {
         <TabsList className="flex justify-start items-center gap-1 p-0 bg-transparent">
           <TabsTrigger value="api-ai" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Cài đặt API AI</TabsTrigger>
           <TabsTrigger value="vertex-ai" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Gemini Vertex AI</TabsTrigger>
+          <TabsTrigger value="gemini-custom" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">API Gemini Custom</TabsTrigger>
           <TabsTrigger value="integrations" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Tích hợp</TabsTrigger>
           <TabsTrigger value="api-facebook" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">API Facebook Graph</TabsTrigger>
           <TabsTrigger value="telegram" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Telegram</TabsTrigger>
@@ -345,6 +347,9 @@ const Settings = () => {
         </TabsContent>
         <TabsContent value="vertex-ai" className="mt-4">
           <VertexAiSettings />
+        </TabsContent>
+        <TabsContent value="gemini-custom" className="mt-4">
+          <GeminiCustomSettings />
         </TabsContent>
         <TabsContent value="integrations" className="mt-4">
           <Card className="shadow-sm rounded-2xl bg-white">
