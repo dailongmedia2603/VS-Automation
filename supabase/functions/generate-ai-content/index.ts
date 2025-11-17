@@ -1,10 +1,67 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { create } from "https://deno.land/x/djwt@v2.8/mod.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+async function getGcpAccessToken(credentialsJson: string) {
+  const credentials = JSON.parse(credentialsJson);
+  const privateKeyPem = credentials.private_key;
+  const clientEmail = credentials.client_email;
+
+  const pemHeader = "-----BEGIN PRIVATE KEY-----";
+  const pemFooter = "-----END PRIVATE KEY-----";
+  
+  const pemContents = privateKeyPem
+    .replace(pemHeader, '')
+    .replace(pemFooter, '')
+    .replace(/\\n/g, '')
+    .replace(/\s/g, '');
+
+  const binaryDer = atob(pemContents);
+  const keyBuffer = new Uint8Array(binaryDer.length).map((_, i) => binaryDer.charCodeAt(i)).buffer;
+
+  const privateKey = await crypto.subtle.importKey(
+    "pkcs8",
+    keyBuffer,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    true,
+    ["sign"]
+  );
+
+  const now = Math.floor(Date.now() / 1000);
+  const jwt = await create(
+    { alg: "RS256", typ: "JWT" },
+    {
+      iss: clientEmail,
+      sub: clientEmail,
+      aud: "https://oauth2.googleapis.com/token",
+      iat: now,
+      exp: now + 3600,
+      scope: "https://www.googleapis.com/auth/cloud-platform",
+    },
+    privateKey
+  );
+
+  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion: jwt,
+    }),
+  });
+
+  const tokenData = await tokenRes.json();
+  if (!tokenRes.ok) {
+    throw new Error(`Failed to get access token: ${tokenData.error_description || 'Unknown error'}`);
+  }
+
+  return tokenData.access_token;
 }
 
 const formatMapping: Record<string, string> = {
@@ -203,15 +260,13 @@ serve(async (req) => {
 
     const { data: aiSettings, error: settingsError } = await supabaseAdmin
       .from('ai_settings')
-      .select('custom_gemini_api_url, custom_gemini_api_key')
+      .select('custom_gemini_api_url, custom_gemini_api_key, gemini_content_model')
       .eq('id', 1)
       .single();
 
-    if (settingsError || !aiSettings || !aiSettings.custom_gemini_api_url || !aiSettings.custom_gemini_api_key) {
-      throw new Error("API Gemini Custom chưa được cấu hình trong Cài đặt chung.");
+    if (settingsError) {
+      throw new Error("Chưa cấu hình AI trong trang Cài đặt.");
     }
-
-    const { custom_gemini_api_url: apiUrl, custom_gemini_api_key: token } = aiSettings;
 
     const { data: library, error: libraryError } = await supabaseAdmin.from('prompt_libraries').select('config').eq('id', libraryId).single();
     if (libraryError || !library || !library.config) throw new Error("Không thể tải thư viện prompt hoặc thư viện chưa được cấu hình.");
@@ -250,38 +305,84 @@ serve(async (req) => {
       finalPrompt += `\n\n${cotPrompt}`;
     }
 
-    const body = new URLSearchParams();
-    body.append('prompt', finalPrompt);
-    body.append('token', token);
+    let rawContent;
+    let responseForLog;
 
-    const apiResponse = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: body,
-    });
-
-    const responseText = await apiResponse.text();
-
-    if (!apiResponse.ok) {
-      throw new Error(`Lỗi API Gemini Custom: ${responseText}`);
-    }
-    
-    let responseData;
+    // --- Primary API: Gemini Custom ---
     try {
-        responseData = JSON.parse(responseText);
-    } catch (e) {
-        throw new Error(`Phản hồi từ API không phải là JSON hợp lệ: ${responseText}`);
-    }
+      console.log("Attempting to use primary API: Gemini Custom");
+      if (!aiSettings.custom_gemini_api_url || !aiSettings.custom_gemini_api_key) {
+        throw new Error("API Gemini Custom chưa được cấu hình.");
+      }
+      const { custom_gemini_api_url: apiUrl, custom_gemini_api_key: token } = aiSettings;
+      
+      const body = new URLSearchParams();
+      body.append('prompt', finalPrompt);
+      body.append('token', token);
 
-    if (!responseData.success || typeof responseData.answer === 'undefined') {
+      const apiResponse = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body,
+      });
+
+      const responseText = await apiResponse.text();
+      if (!apiResponse.ok) throw new Error(`Lỗi API Gemini Custom: ${responseText}`);
+      
+      const responseData = JSON.parse(responseText);
+      if (!responseData.success || typeof responseData.answer === 'undefined') {
         throw new Error(`API trả về lỗi hoặc định dạng không mong đợi: ${responseData.message || responseText}`);
+      }
+
+      rawContent = responseData.answer;
+      responseForLog = responseData;
+      console.log("Primary API call successful.");
+
+    } catch (customApiError) {
+      console.warn("Primary API (Gemini Custom) failed:", customApiError.message);
+      console.log("Attempting to use fallback API: Vertex AI");
+
+      // --- Fallback API: Vertex AI ---
+      const credentialsJson = Deno.env.get("GOOGLE_CREDENTIALS_JSON\n\n");
+      if (!credentialsJson) {
+        throw new Error("Cả API Custom và Vertex AI đều không được cấu hình. Vui lòng kiểm tra Cài đặt.");
+      }
+
+      const credentials = JSON.parse(credentialsJson);
+      const cloudProjectId = credentials.project_id;
+      const region = "us-central1";
+      const accessToken = await getGcpAccessToken(credentialsJson);
+      const modelToUse = aiSettings.gemini_content_model || 'gemini-pro';
+      const generationConfig = {
+        temperature: library.config.temperature ?? 0.7,
+        topP: library.config.topP ?? 0.95,
+        maxOutputTokens: library.config.maxTokens ?? 8192,
+      };
+
+      const vertexAiUrl = `https://${region}-aiplatform.googleapis.com/v1/projects/${cloudProjectId}/locations/${region}/publishers/google/models/${modelToUse}:generateContent`;
+
+      const vertexRes = await fetch(vertexAiUrl, {
+        method: 'POST',
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ 
+          contents: [{ role: "user", parts: [{ text: finalPrompt }] }],
+          generationConfig: generationConfig
+        }),
+      });
+
+      const vertexData = await vertexRes.json();
+      if (!vertexRes.ok) {
+        throw new Error(vertexData?.error?.message || 'Lỗi gọi API Vertex AI.');
+      }
+
+      rawContent = vertexData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      responseForLog = vertexData;
+      console.log("Fallback API (Vertex AI) call successful.");
     }
 
-    const rawContent = responseData.answer;
-    const responseForLog = responseData;
-    
     let newContent = [];
     if (item.type === 'article') {
       newContent = rawContent.split('--- ARTICLE SEPARATOR ---').map(c => c.trim()).filter(Boolean).map(c => ({ id: crypto.randomUUID(), content: c, type: config.format || 'Bài viết' }));
@@ -303,7 +404,7 @@ serve(async (req) => {
           metConditionIds: allConditionIds
         }));
       } catch (e) {
-        console.error("Failed to parse JSON from AI comment response. Raw content from 'answer' field:", rawContent);
+        console.error("Failed to parse JSON from AI comment response. Raw content:", rawContent);
         throw new Error("AI đã trả về một định dạng JSON không hợp lệ cho bình luận.");
       }
     }
