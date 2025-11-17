@@ -250,13 +250,16 @@ serve(async (req) => {
       finalPrompt += `\n\n${cotPrompt}`;
     }
 
-    const formData = new FormData();
-    formData.append('prompt', finalPrompt);
-    formData.append('token', token);
+    const body = new URLSearchParams();
+    body.append('prompt', finalPrompt);
+    body.append('token', token);
 
     const apiResponse = await fetch(apiUrl, {
       method: 'POST',
-      body: formData,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: body,
     });
 
     const responseText = await apiResponse.text();
