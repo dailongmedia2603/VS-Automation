@@ -12,8 +12,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 
 const geminiModels = [
-  { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
-  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
   { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
   { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
   { value: 'gemini-pro', label: 'Gemini 1.0 Pro (Legacy)' },
@@ -22,8 +20,8 @@ const geminiModels = [
 const VertexAiSettings = () => {
   const [status, setStatus] = useState<'idle' | 'testing' | 'success' | 'error'>("idle");
   const [error, setError] = useState<string | null>(null);
-  const [scanModel, setScanModel] = useState('gemini-2.5-flash');
-  const [contentModel, setContentModel] = useState('gemini-2.5-pro');
+  const [scanModel, setScanModel] = useState('gemini-1.5-flash');
+  const [contentModel, setContentModel] = useState('gemini-1.5-pro');
   const [isLoadingModels, setIsLoadingModels] = useState(true);
   const [isSavingModels, setIsSavingModels] = useState(false);
 
@@ -32,8 +30,8 @@ const VertexAiSettings = () => {
       setIsLoadingModels(true);
       const { data, error: _error } = await supabase.from('ai_settings').select('gemini_scan_model, gemini_content_model').eq('id', 1).single();
       if (data) {
-        setScanModel(data.gemini_scan_model || 'gemini-2.5-flash');
-        setContentModel(data.gemini_content_model || 'gemini-2.5-pro');
+        setScanModel(data.gemini_scan_model || 'gemini-1.5-flash');
+        setContentModel(data.gemini_content_model || 'gemini-1.5-pro');
       }
       // We are not handling the error here, so we can ignore it.
       setIsLoadingModels(false);
