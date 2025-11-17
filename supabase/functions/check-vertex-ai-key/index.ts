@@ -77,7 +77,7 @@ serve(async (req) => {
     const credentials = JSON.parse(credentialsJson);
     const projectId = credentials.project_id;
     const region = "us-central1";
-    const model = "gemini-1.5-pro"; // Using a valid and stable model ID for connection test
+    const model = "gemini-2.5-pro"; // Using the user-specified model for connection test
 
     const accessToken = await getGcpAccessToken(credentialsJson);
 
