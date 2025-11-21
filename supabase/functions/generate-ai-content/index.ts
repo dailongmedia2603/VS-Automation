@@ -307,9 +307,10 @@ serve(async (req) => {
 
     let rawContent;
     let responseForLog;
+    let primaryApiError: Error | null = null;
 
-    // --- Primary API: Gemini Custom ---
     try {
+      // --- Primary API: Gemini Custom ---
       console.log("Attempting to use primary API: Gemini Custom");
       if (!aiSettings.custom_gemini_api_url || !aiSettings.custom_gemini_api_key) {
         throw new Error("API Gemini Custom chưa được cấu hình.");
@@ -339,48 +340,57 @@ serve(async (req) => {
       console.log("Primary API call successful.");
 
     } catch (customApiError) {
+      primaryApiError = customApiError;
       console.warn("Primary API (Gemini Custom) failed:", customApiError.message);
       console.log("Attempting to use fallback API: Vertex AI");
 
       // --- Fallback API: Vertex AI ---
-      const credentialsJson = Deno.env.get("GOOGLE_CREDENTIALS_JSON\n\n");
-      if (!credentialsJson) {
-        throw new Error("Cả API Custom và Vertex AI đều không được cấu hình. Vui lòng kiểm tra Cài đặt.");
+      try {
+        const credentialsJson = Deno.env.get("GOOGLE_CREDENTIALS_JSON\n\n");
+        if (!credentialsJson) {
+          throw new Error("Cả API Custom và Vertex AI đều không được cấu hình. Vui lòng kiểm tra Cài đặt.");
+        }
+
+        const credentials = JSON.parse(credentialsJson);
+        const cloudProjectId = credentials.project_id;
+        const region = "us-central1";
+        const accessToken = await getGcpAccessToken(credentialsJson);
+        const modelToUse = aiSettings.gemini_content_model || 'gemini-pro';
+        const generationConfig = {
+          temperature: library.config.temperature ?? 0.7,
+          topP: library.config.topP ?? 0.95,
+          maxOutputTokens: library.config.maxTokens ?? 8192,
+        };
+
+        const vertexAiUrl = `https://${region}-aiplatform.googleapis.com/v1/projects/${cloudProjectId}/locations/${region}/publishers/google/models/${modelToUse}:generateContent`;
+
+        const vertexRes = await fetch(vertexAiUrl, {
+          method: 'POST',
+          headers: {
+            "Authorization": `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ 
+            contents: [{ role: "user", parts: [{ text: finalPrompt }] }],
+            generationConfig: generationConfig
+          }),
+        });
+
+        const vertexData = await vertexRes.json();
+        if (!vertexRes.ok) {
+          throw new Error(vertexData?.error?.message || 'Lỗi gọi API Vertex AI.');
+        }
+
+        rawContent = vertexData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        responseForLog = vertexData;
+        console.log("Fallback API (Vertex AI) call successful.");
+      } catch (fallbackError) {
+        let finalErrorMessage = `Lỗi API dự phòng (Vertex AI): ${fallbackError.message}`;
+        if (primaryApiError) {
+            finalErrorMessage = `Lỗi API chính (Custom): ${primaryApiError.message}. ${finalErrorMessage}`;
+        }
+        throw new Error(finalErrorMessage);
       }
-
-      const credentials = JSON.parse(credentialsJson);
-      const cloudProjectId = credentials.project_id;
-      const region = "us-central1";
-      const accessToken = await getGcpAccessToken(credentialsJson);
-      const modelToUse = aiSettings.gemini_content_model || 'gemini-pro';
-      const generationConfig = {
-        temperature: library.config.temperature ?? 0.7,
-        topP: library.config.topP ?? 0.95,
-        maxOutputTokens: library.config.maxTokens ?? 8192,
-      };
-
-      const vertexAiUrl = `https://${region}-aiplatform.googleapis.com/v1/projects/${cloudProjectId}/locations/${region}/publishers/google/models/${modelToUse}:generateContent`;
-
-      const vertexRes = await fetch(vertexAiUrl, {
-        method: 'POST',
-        headers: {
-          "Authorization": `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ 
-          contents: [{ role: "user", parts: [{ text: finalPrompt }] }],
-          generationConfig: generationConfig
-        }),
-      });
-
-      const vertexData = await vertexRes.json();
-      if (!vertexRes.ok) {
-        throw new Error(vertexData?.error?.message || 'Lỗi gọi API Vertex AI.');
-      }
-
-      rawContent = vertexData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      responseForLog = vertexData;
-      console.log("Fallback API (Vertex AI) call successful.");
     }
 
     let newContent = [];

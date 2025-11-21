@@ -197,7 +197,7 @@ serve(async (req) => {
 
     const { data: library, error: libraryError } = await supabaseAdmin.from('prompt_libraries').select('config').eq('id', libraryId).single();
     if (libraryError || !library || !library.config) throw new Error("Không thể tải thư viện prompt.");
-
+    
     let documentContext = '';
     const { relatedDocumentIds } = config;
 
@@ -224,6 +224,7 @@ serve(async (req) => {
       
       let rawContent;
       let responseForLog;
+      let primaryApiError = null;
 
       try {
         console.log(`Attempting to use primary API for article ${articleId}`);
@@ -255,43 +256,52 @@ serve(async (req) => {
         console.log(`Primary API call successful for article ${articleId}`);
 
       } catch (customApiError) {
+        primaryApiError = customApiError;
         console.warn(`Primary API failed for article ${articleId}:`, customApiError.message);
         console.log(`Attempting to use fallback API for article ${articleId}`);
 
-        const credentialsJson = Deno.env.get("GOOGLE_CREDENTIALS_JSON\n\n");
-        if (!credentialsJson) throw new Error("Cả API Custom và Vertex AI đều không được cấu hình.");
+        try {
+          const credentialsJson = Deno.env.get("GOOGLE_CREDENTIALS_JSON\n\n");
+          if (!credentialsJson) throw new Error("Cả API Custom và Vertex AI đều không được cấu hình.");
 
-        const credentials = JSON.parse(credentialsJson);
-        const cloudProjectId = credentials.project_id;
-        const region = "us-central1";
-        const accessToken = await getGcpAccessToken(credentialsJson);
-        const modelToUse = aiSettings.gemini_content_model || 'gemini-pro';
-        const generationConfig = {
-          temperature: library.config.temperature ?? 0.7,
-          topP: library.config.topP ?? 0.95,
-          maxOutputTokens: library.config.maxTokens ?? 8192,
-        };
+          const credentials = JSON.parse(credentialsJson);
+          const cloudProjectId = credentials.project_id;
+          const region = "us-central1";
+          const accessToken = await getGcpAccessToken(credentialsJson);
+          const modelToUse = aiSettings.gemini_content_model || 'gemini-pro';
+          const generationConfig = {
+            temperature: library.config.temperature ?? 0.7,
+            topP: library.config.topP ?? 0.95,
+            maxOutputTokens: library.config.maxTokens ?? 8192,
+          };
 
-        const vertexAiUrl = `https://${region}-aiplatform.googleapis.com/v1/projects/${cloudProjectId}/locations/${region}/publishers/google/models/${modelToUse}:generateContent`;
+          const vertexAiUrl = `https://${region}-aiplatform.googleapis.com/v1/projects/${cloudProjectId}/locations/${region}/publishers/google/models/${modelToUse}:generateContent`;
 
-        const vertexRes = await fetch(vertexAiUrl, {
-          method: 'POST',
-          headers: {
-            "Authorization": `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ 
-            contents: [{ role: "user", parts: [{ text: finalPrompt }] }],
-            generationConfig: generationConfig
-          }),
-        });
+          const vertexRes = await fetch(vertexAiUrl, {
+            method: 'POST',
+            headers: {
+              "Authorization": `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ 
+              contents: [{ role: "user", parts: [{ text: finalPrompt }] }],
+              generationConfig: generationConfig
+            }),
+          });
 
-        const vertexData = await vertexRes.json();
-        if (!vertexRes.ok) throw new Error(vertexData?.error?.message || 'Lỗi gọi API Vertex AI.');
+          const vertexData = await vertexRes.json();
+          if (!vertexRes.ok) throw new Error(vertexData?.error?.message || 'Lỗi gọi API Vertex AI.');
 
-        rawContent = vertexData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        responseForLog = vertexData;
-        console.log(`Fallback API call successful for article ${articleId}`);
+          rawContent = vertexData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          responseForLog = vertexData;
+          console.log(`Fallback API call successful for article ${articleId}`);
+        } catch (fallbackError) {
+          let finalErrorMessage = `Lỗi API dự phòng (Vertex AI): ${fallbackError.message}`;
+          if (primaryApiError) {
+              finalErrorMessage = `Lỗi API chính (Custom): ${primaryApiError.message}. ${finalErrorMessage}`;
+          }
+          throw new Error(finalErrorMessage);
+        }
       }
       
       await supabaseAdmin.from('content_ai_logs').insert({ item_id: itemId, creator_id: user.id, prompt: finalPrompt, response: responseForLog });
