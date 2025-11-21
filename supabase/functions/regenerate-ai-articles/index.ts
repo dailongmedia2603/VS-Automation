@@ -233,14 +233,13 @@ serve(async (req) => {
         }
         const { custom_gemini_api_url: apiUrl, custom_gemini_api_key: token } = aiSettings;
         
-        const body = new URLSearchParams();
-        body.append('prompt', finalPrompt);
-        body.append('token', token);
-
         const apiResponse = await fetch(apiUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: body,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: finalPrompt,
+            token: token,
+          }),
         });
 
         const responseText = await apiResponse.text();

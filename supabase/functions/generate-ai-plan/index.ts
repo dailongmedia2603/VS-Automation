@@ -236,6 +236,7 @@ ${subFields}
 
     let rawContent;
     let responseForLog;
+    let primaryApiError: Error | null = null;
 
     try {
       console.log("Attempting to use primary API: Gemini Custom for AI Plan");
@@ -244,14 +245,13 @@ ${subFields}
       }
       const { custom_gemini_api_url: apiUrl, custom_gemini_api_key: token } = aiSettings;
       
-      const body = new URLSearchParams();
-      body.append('prompt', finalPrompt);
-      body.append('token', token);
-
       const apiResponse = await fetch(apiUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: body,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: finalPrompt,
+          token: token,
+        }),
       });
 
       const responseText = await apiResponse.text();
@@ -267,6 +267,7 @@ ${subFields}
       console.log("Primary API call successful for AI Plan.");
 
     } catch (customApiError) {
+      primaryApiError = customApiError;
       console.warn("Primary API (Gemini Custom) failed for AI Plan:", customApiError.message);
       console.log("Attempting to use fallback API: Vertex AI for AI Plan");
 
