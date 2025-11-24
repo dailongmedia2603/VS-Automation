@@ -257,13 +257,15 @@ Cấu trúc của giá trị "newContent" phải như sau:
       }
       const { custom_gemini_api_url: apiUrl, custom_gemini_api_key: token } = aiSettings;
       
-      const apiResponse = await fetch(apiUrl, {
+      const url = new URL(apiUrl);
+      url.searchParams.append('token', token);
+
+      const formData = new FormData();
+      formData.append('prompt', finalPrompt);
+
+      const apiResponse = await fetch(url.toString(), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: finalPrompt,
-          token: token,
-        }),
+        body: formData,
       });
 
       const responseText = await apiResponse.text();
