@@ -18,8 +18,12 @@ serve(async (req) => {
       throw new Error("API URL và API Key là bắt buộc.");
     }
 
+    // Chuẩn hóa input: xóa khoảng trắng thừa, xuống dòng
+    const cleanApiUrl = apiUrl.trim();
+    const cleanApiKey = apiKey.trim();
+
     // Chuẩn hóa URL: đảm bảo không có dấu / ở cuối
-    const baseUrl = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
+    const baseUrl = cleanApiUrl.endsWith('/') ? cleanApiUrl.slice(0, -1) : cleanApiUrl;
     const endpoint = `${baseUrl}/chat/completions`;
 
     console.log(`Testing Troll LLM connection to: ${endpoint} with model: ${model}`);
@@ -28,7 +32,7 @@ serve(async (req) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+        'Authorization': `Bearer ${cleanApiKey}`
       },
       body: JSON.stringify({
         model: model || 'gemini-3-pro-preview',
