@@ -17,15 +17,18 @@ serve(async (req) => {
     if (!apiUrl) throw new Error("Base URL là bắt buộc (Ví dụ: https://chat.trollllm.xyz/v1).");
     if (!apiKey) throw new Error("API Key là bắt buộc.");
 
-    // 1. Chuẩn hóa dữ liệu đầu vào
-    const cleanApiKey = apiKey.trim(); // Loại bỏ khoảng trắng/xuống dòng gây lỗi ByteString
+    // 1. Chuẩn hóa dữ liệu đầu vào (FIX LỖI ByteString)
+    // .trim() sẽ loại bỏ dấu cách, dấu xuống dòng (\n, \r) ở đầu và cuối chuỗi
+    const cleanApiKey = apiKey.trim(); 
     let cleanApiUrl = apiUrl.trim();
+
+    // Loại bỏ dấu / ở cuối URL nếu có để tránh lỗi double slash //
     if (cleanApiUrl.endsWith('/')) {
         cleanApiUrl = cleanApiUrl.slice(0, -1);
     }
 
-    // 2. Xây dựng Endpoint đúng chuẩn
-    // Nếu người dùng nhập Base URL (https://.../v1), ta nối thêm /chat/completions
+    // 2. Xây dựng Endpoint đúng chuẩn OpenAI
+    // Logic: Nếu người dùng nhập Base URL (kết thúc bằng /v1), ta nối thêm /chat/completions
     // Nếu người dùng đã nhập full endpoint, ta giữ nguyên
     let endpoint = cleanApiUrl;
     if (!endpoint.endsWith('/chat/completions')) {
@@ -34,11 +37,11 @@ serve(async (req) => {
 
     console.log(`Testing Troll LLM connection to: ${endpoint} with model: ${model}`);
 
-    // 3. Cấu trúc Body theo chuẩn OpenAI
+    // 3. Cấu trúc Body theo chuẩn OpenAI Chat Completions
     const requestBody = {
       model: model || 'gemini-3-pro-preview',
       messages: [
-        { role: "user", content: "Xin chào, kết nối API có hoạt động ổn định không?" }
+        { role: "user", content: "Xin chào, hãy trả lời ngắn gọn: Kết nối API có hoạt động ổn định không?" }
       ],
       temperature: 0.7
     };
@@ -48,7 +51,7 @@ serve(async (req) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${cleanApiKey}`
+        'Authorization': `Bearer ${cleanApiKey}` // cleanApiKey đảm bảo không có ký tự lạ
       },
       body: JSON.stringify(requestBody)
     });
@@ -65,14 +68,14 @@ serve(async (req) => {
 
     // 5. Xử lý lỗi từ API (4xx, 5xx)
     if (!response.ok) {
-      const errorMsg = data?.error?.message || data?.error || `Lỗi API (${response.status})`;
+      const errorMsg = data?.error?.message || data?.error || `Lỗi HTTP (${response.status})`;
       throw new Error(`Troll LLM Error: ${errorMsg}`);
     }
 
     // 6. Trích xuất dữ liệu phản hồi (Response Extraction)
-    // Cấu trúc: choices[0].message.content
+    // Cấu trúc chuẩn OpenAI: choices[0].message.content
     if (!data.choices || !Array.isArray(data.choices) || data.choices.length === 0) {
-      throw new Error("API trả về thành công nhưng không tìm thấy mảng 'choices'.");
+      throw new Error("API trả về thành công nhưng không tìm thấy mảng 'choices'. Cấu trúc phản hồi không đúng chuẩn OpenAI.");
     }
 
     const firstChoice = data.choices[0];
@@ -96,7 +99,7 @@ serve(async (req) => {
     console.error('Error testing Troll LLM:', error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 400, // Sử dụng 400 để client hiển thị lỗi rõ ràng hơn
+      status: 400, // Sử dụng 400 để client hiển thị lỗi rõ ràng hơn thay vì 500
     });
   }
 })
