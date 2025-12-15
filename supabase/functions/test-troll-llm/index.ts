@@ -17,19 +17,17 @@ serve(async (req) => {
     if (!apiUrl) throw new Error("Base URL là bắt buộc (Ví dụ: https://chat.trollllm.xyz/v1).");
     if (!apiKey) throw new Error("API Key là bắt buộc.");
 
-    // 1. Chuẩn hóa dữ liệu đầu vào (FIX LỖI ByteString)
-    // .trim() sẽ loại bỏ dấu cách, dấu xuống dòng (\n, \r) ở đầu và cuối chuỗi
+    // 1. Chuẩn hóa dữ liệu đầu vào (Quan trọng: trim() để tránh lỗi ByteString)
     const cleanApiKey = apiKey.trim(); 
     let cleanApiUrl = apiUrl.trim();
 
-    // Loại bỏ dấu / ở cuối URL nếu có để tránh lỗi double slash //
+    // Loại bỏ dấu / ở cuối URL nếu có
     if (cleanApiUrl.endsWith('/')) {
         cleanApiUrl = cleanApiUrl.slice(0, -1);
     }
 
     // 2. Xây dựng Endpoint đúng chuẩn OpenAI
-    // Logic: Nếu người dùng nhập Base URL (kết thúc bằng /v1), ta nối thêm /chat/completions
-    // Nếu người dùng đã nhập full endpoint, ta giữ nguyên
+    // Logic: Nếu URL là "https://chat.trollllm.xyz/v1", ta nối thêm "/chat/completions"
     let endpoint = cleanApiUrl;
     if (!endpoint.endsWith('/chat/completions')) {
        endpoint = `${endpoint}/chat/completions`;
@@ -37,13 +35,13 @@ serve(async (req) => {
 
     console.log(`Testing Troll LLM connection to: ${endpoint} with model: ${model}`);
 
-    // 3. Cấu trúc Body theo chuẩn OpenAI Chat Completions
+    // 3. Cấu trúc Body theo chuẩn OpenAI (như mẫu CURL)
     const requestBody = {
-      model: model || 'gemini-3-pro-preview',
+      model: model || 'gemini-3-pro-preview', // Model mặc định là gemini
       messages: [
         { role: "user", content: "Xin chào, hãy trả lời ngắn gọn: Kết nối API có hoạt động ổn định không?" }
-      ],
-      temperature: 0.7
+      ]
+      // Có thể thêm max_tokens hoặc temperature nếu cần
     };
 
     // 4. Gửi Request
@@ -51,7 +49,7 @@ serve(async (req) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${cleanApiKey}` // cleanApiKey đảm bảo không có ký tự lạ
+        'Authorization': `Bearer ${cleanApiKey}`
       },
       body: JSON.stringify(requestBody)
     });
@@ -63,24 +61,23 @@ serve(async (req) => {
       data = JSON.parse(responseText);
     } catch (e) {
       console.error("Failed to parse JSON response:", responseText);
-      throw new Error(`API trả về định dạng không hợp lệ (không phải JSON): ${responseText.substring(0, 100)}...`);
+      throw new Error(`API trả về định dạng không hợp lệ: ${responseText.substring(0, 100)}...`);
     }
 
-    // 5. Xử lý lỗi từ API (4xx, 5xx)
+    // 5. Xử lý lỗi HTTP
     if (!response.ok) {
       const errorMsg = data?.error?.message || data?.error || `Lỗi HTTP (${response.status})`;
       throw new Error(`Troll LLM Error: ${errorMsg}`);
     }
 
-    // 6. Trích xuất dữ liệu phản hồi (Response Extraction)
-    // Cấu trúc chuẩn OpenAI: choices[0].message.content
+    // 6. Trích xuất dữ liệu phản hồi (Chuẩn OpenAI: choices[0].message.content)
     if (!data.choices || !Array.isArray(data.choices) || data.choices.length === 0) {
-      throw new Error("API trả về thành công nhưng không tìm thấy mảng 'choices'. Cấu trúc phản hồi không đúng chuẩn OpenAI.");
+      throw new Error("API trả về thành công nhưng không tìm thấy mảng 'choices'.");
     }
 
     const firstChoice = data.choices[0];
     if (!firstChoice.message || !firstChoice.message.content) {
-      throw new Error("API trả về thành công nhưng không tìm thấy nội dung tin nhắn (choices[0].message.content).");
+      throw new Error("API trả về thành công nhưng không tìm thấy nội dung tin nhắn.");
     }
 
     const replyContent = firstChoice.message.content;
@@ -89,7 +86,7 @@ serve(async (req) => {
       success: true, 
       message: "Kết nối thành công!", 
       reply: replyContent,
-      data: data // Trả về full data để debug nếu cần
+      data: data // Trả về full data để debug
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
@@ -99,7 +96,7 @@ serve(async (req) => {
     console.error('Error testing Troll LLM:', error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 400, // Sử dụng 400 để client hiển thị lỗi rõ ràng hơn thay vì 500
+      status: 400,
     });
   }
 })
