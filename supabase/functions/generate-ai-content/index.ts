@@ -317,18 +317,13 @@ serve(async (req) => {
       }
       const { custom_gemini_api_url: apiUrl, custom_gemini_api_key: token } = aiSettings;
       
-      const url = new URL(apiUrl);
-      url.searchParams.append('token', token);
-
-      const formData = new FormData();
-      formData.append('prompt', finalPrompt);
-
-      const apiResponse = await fetch(url.toString(), {
+      const apiResponse = await fetch(apiUrl, {
         method: 'POST',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        },
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: finalPrompt,
+          token: token,
+        }),
       });
 
       const responseText = await apiResponse.text();

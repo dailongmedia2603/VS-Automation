@@ -17,18 +17,16 @@ serve(async (req) => {
       throw new Error("API URL and Token are required.");
     }
 
-    const url = new URL(apiUrl);
-    url.searchParams.append('token', token);
+    const body = new URLSearchParams();
+    body.append('prompt', 'Trịnh Trần Phương Tuấn là ai?');
+    body.append('token', token);
 
-    const formData = new FormData();
-    formData.append('prompt', 'Trịnh Trần Phương Tuấn là ai?');
-
-    const response = await fetch(url.toString(), {
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: formData,
+      body: body,
     });
 
     const responseText = await response.text();
