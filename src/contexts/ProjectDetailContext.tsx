@@ -277,14 +277,14 @@ export const ProjectDetailContent = () => {
     setIsSavingNewItem(false);
   };
 
-  const renderItemList = (itemList: ProjectItem[], icon: React.ElementType) => {
+  const renderItemList = (itemList: ProjectItem[], _icon: React.ElementType) => {
     if (itemList.length === 0) {
       return <div className="text-center py-4 text-xs text-muted-foreground">Chưa có mục nào.</div>;
     }
     return (
       <div className="space-y-1">
         {itemList.map(item => {
-          const Icon = icon;
+          // Removed unused Icon variable
           const isSelected = (selectedView as ProjectItem)?.id === item.id;
           return (
             <div
@@ -297,7 +297,6 @@ export const ProjectDetailContent = () => {
               onClick={() => editingItemId !== item.id && handleSelectView(item)}
             >
               <div className="flex items-center gap-2 flex-1 overflow-hidden">
-                {/* <Icon className={cn("h-4 w-4 flex-shrink-0", isSelected ? "text-blue-600" : "text-slate-400")} /> */}
                 {editingItemId === item.id ? (
                   <div className="flex-1 flex items-center gap-1">
                     <Input 
@@ -418,7 +417,7 @@ export const ProjectDetailContent = () => {
             <div className="h-full p-6 overflow-y-auto">
                 {selectedView === 'documents' ? (
                     <ProjectDocumentsManager projectId={project.id.toString()} />
-                ) : typeof selectedView === 'object' ? (
+                ) : (selectedView && typeof selectedView === 'object') ? (
                     selectedView.type === 'article' ? (
                         <ArticleGenerationDetail project={project} item={selectedView} promptLibraries={promptLibraries} onSave={handleItemUpdate} />
                     ) : (
