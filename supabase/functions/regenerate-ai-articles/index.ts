@@ -1,67 +1,10 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
-import { create } from "https://deno.land/x/djwt@v2.8/mod.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-async function getGcpAccessToken(credentialsJson: string) {
-  const credentials = JSON.parse(credentialsJson);
-  const privateKeyPem = credentials.private_key;
-  const clientEmail = credentials.client_email;
-
-  const pemHeader = "-----BEGIN PRIVATE KEY-----";
-  const pemFooter = "-----END PRIVATE KEY-----";
-  
-  const pemContents = privateKeyPem
-    .replace(pemHeader, '')
-    .replace(pemFooter, '')
-    .replace(/\\n/g, '')
-    .replace(/\s/g, '');
-
-  const binaryDer = atob(pemContents);
-  const keyBuffer = new Uint8Array(binaryDer.length).map((_, i) => binaryDer.charCodeAt(i)).buffer;
-
-  const privateKey = await crypto.subtle.importKey(
-    "pkcs8",
-    keyBuffer,
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    true,
-    ["sign"]
-  );
-
-  const now = Math.floor(Date.now() / 1000);
-  const jwt = await create(
-    { alg: "RS256", typ: "JWT" },
-    {
-      iss: clientEmail,
-      sub: clientEmail,
-      aud: "https://oauth2.googleapis.com/token",
-      iat: now,
-      exp: now + 3600,
-      scope: "https://www.googleapis.com/auth/cloud-platform",
-    },
-    privateKey
-  );
-
-  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-      assertion: jwt,
-    }),
-  });
-
-  const tokenData = await tokenRes.json();
-  if (!tokenRes.ok) {
-    throw new Error(`Failed to get access token: ${tokenData.error_description || 'Unknown error'}`);
-  }
-
-  return tokenData.access_token;
 }
 
 const formatMapping: Record<string, string> = {
@@ -185,14 +128,21 @@ serve(async (req) => {
     const { libraryId } = config;
     if (!libraryId) throw new Error("Config is missing libraryId.");
 
+    // Fetch Troll LLM Settings
     const { data: aiSettings, error: settingsError } = await supabaseAdmin
       .from('ai_settings')
-      .select('custom_gemini_api_url, custom_gemini_api_key, gemini_content_model')
+      .select('troll_llm_api_url, troll_llm_api_key, troll_llm_model_id')
       .eq('id', 1)
       .single();
 
     if (settingsError) {
-      throw new Error("Chưa cấu hình AI trong trang Cài đặt.");
+      throw new Error("Không thể tải cấu hình AI.");
+    }
+
+    const { troll_llm_api_url, troll_llm_api_key, troll_llm_model_id } = aiSettings || {};
+
+    if (!troll_llm_api_url || !troll_llm_api_key) {
+      throw new Error("Chưa cấu hình API Troll LLM trong trang Cài đặt.");
     }
 
     const { data: library, error: libraryError } = await supabaseAdmin.from('prompt_libraries').select('config').eq('id', libraryId).single();
@@ -216,6 +166,11 @@ serve(async (req) => {
 
     const basePrompt = buildBasePrompt(library.config, documentContext);
 
+    // --- Troll LLM API Prep ---
+    let apiUrl = troll_llm_api_url.trim();
+    if (apiUrl.endsWith('/')) apiUrl = apiUrl.slice(0, -1);
+    if (!apiUrl.endsWith('/chat/completions')) apiUrl += '/chat/completions';
+
     const regenerationPromises = articleIdsToRegenerate.map(async (articleId: string) => {
       const originalArticle = existingArticles.find((a: any) => a.id === articleId);
       if (!originalArticle) return null;
@@ -224,83 +179,48 @@ serve(async (req) => {
       
       let rawContent;
       let responseForLog;
-      let primaryApiError = null;
 
       try {
-        console.log(`Attempting to use primary API for article ${articleId}`);
-        if (!aiSettings.custom_gemini_api_url || !aiSettings.custom_gemini_api_key) {
-          throw new Error("API Gemini Custom chưa được cấu hình.");
-        }
-        const { custom_gemini_api_url: apiUrl, custom_gemini_api_key: token } = aiSettings;
-        
+        console.log(`Calling Troll LLM API for article ${articleId}`);
         const apiResponse = await fetch(apiUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${troll_llm_api_key}`
+          },
           body: JSON.stringify({
-            prompt: finalPrompt,
-            token: token,
-          }),
+            model: troll_llm_model_id || 'gemini-3-pro-preview',
+            messages: [{ role: 'user', content: finalPrompt }],
+            temperature: library.config.temperature ?? 0.7,
+            top_p: library.config.topP ?? 0.95,
+            max_tokens: library.config.maxTokens ?? 8192
+          })
         });
 
         const responseText = await apiResponse.text();
-        if (!apiResponse.ok) throw new Error(`Lỗi API Gemini Custom: ${responseText}`);
-        
-        const responseData = JSON.parse(responseText);
-        if (!responseData.success || typeof responseData.answer === 'undefined') {
-          throw new Error(`API trả về lỗi hoặc định dạng không mong đợi: ${responseData.message || responseText}`);
-        }
-
-        rawContent = responseData.answer;
-        responseForLog = responseData;
-        console.log(`Primary API call successful for article ${articleId}`);
-
-      } catch (customApiError) {
-        primaryApiError = customApiError;
-        console.warn(`Primary API failed for article ${articleId}:`, customApiError.message);
-        console.log(`Attempting to use fallback API for article ${articleId}`);
+        let responseData;
 
         try {
-          const credentialsJson = Deno.env.get("GOOGLE_CREDENTIALS_JSON\n\n");
-          if (!credentialsJson) throw new Error("Cả API Custom và Vertex AI đều không được cấu hình.");
-
-          const credentials = JSON.parse(credentialsJson);
-          const cloudProjectId = credentials.project_id;
-          const region = "us-central1";
-          const accessToken = await getGcpAccessToken(credentialsJson);
-          const modelToUse = aiSettings.gemini_content_model || 'gemini-pro';
-          const generationConfig = {
-            temperature: library.config.temperature ?? 0.7,
-            topP: library.config.topP ?? 0.95,
-            maxOutputTokens: library.config.maxTokens ?? 8192,
-          };
-
-          const vertexAiUrl = `https://${region}-aiplatform.googleapis.com/v1/projects/${cloudProjectId}/locations/${region}/publishers/google/models/${modelToUse}:generateContent`;
-
-          const vertexRes = await fetch(vertexAiUrl, {
-            method: 'POST',
-            headers: {
-              "Authorization": `Bearer ${accessToken}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ 
-              contents: [{ role: "user", parts: [{ text: finalPrompt }] }],
-              generationConfig: generationConfig
-            }),
-          });
-
-          const vertexData = await vertexRes.json();
-          if (!vertexRes.ok) throw new Error(vertexData?.error?.message || 'Lỗi gọi API Vertex AI.');
-
-          rawContent = vertexData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          responseForLog = vertexData;
-          console.log(`Fallback API call successful for article ${articleId}`);
-        } catch (fallbackError) {
-          let finalErrorMessage = `Lỗi API dự phòng (Vertex AI): ${fallbackError.message}`;
-          if (primaryApiError) {
-              finalErrorMessage = `Lỗi API chính (Custom): ${primaryApiError.message}. ${finalErrorMessage}`;
-          }
-          throw new Error(finalErrorMessage);
+          responseData = JSON.parse(responseText);
+        } catch (e) {
+          throw new Error(`API trả về định dạng không hợp lệ: ${responseText.substring(0, 100)}...`);
         }
+
+        if (!apiResponse.ok) {
+          const errorMsg = responseData?.error?.message || responseData?.error || `Lỗi HTTP (${apiResponse.status})`;
+          throw new Error(`Troll LLM Error: ${errorMsg}`);
+        }
+
+        if (!responseData.choices || !Array.isArray(responseData.choices) || responseData.choices.length === 0) {
+          throw new Error("API trả về thành công nhưng không tìm thấy nội dung phản hồi.");
+        }
+
+        rawContent = responseData.choices[0].message?.content || '';
+        responseForLog = responseData;
+        console.log(`Troll LLM API call successful for article ${articleId}`);
+
+      } catch (error) {
+        throw new Error(`Lỗi tái tạo bài viết: ${error.message}`);
       }
       
       await supabaseAdmin.from('content_ai_logs').insert({ item_id: itemId, creator_id: user.id, prompt: finalPrompt, response: responseForLog });
