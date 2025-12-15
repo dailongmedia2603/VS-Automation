@@ -24,6 +24,7 @@ import { ProjectDocumentsManager } from '@/components/content-ai/ProjectDocument
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type Project = {
   id: number;
@@ -101,6 +102,11 @@ export const ProjectDetailProvider = ({ projectId, children }: { projectId: stri
       setItems(itemsData || []);
       setPromptLibraries(librariesData || []);
 
+      // Set default selected view to first item if available
+      if (itemsData && itemsData.length > 0 && !selectedView) {
+        setSelectedView(itemsData[0]);
+      }
+
     } catch (error: any) {
       showError("Không thể tải dữ liệu dự án: " + error.message);
     } finally {
@@ -133,7 +139,7 @@ export const ProjectDetailProvider = ({ projectId, children }: { projectId: stri
         showError("Cập nhật tên thất bại: " + error.message);
     } else {
         showSuccess("Đã cập nhật tên!");
-        fetchProjectData();
+        fetchProjectData(true);
     }
     setEditingItemId(null);
   };
@@ -150,10 +156,12 @@ export const ProjectDetailProvider = ({ projectId, children }: { projectId: stri
           showError("Xóa thất bại: " + error.message);
       } else {
           showSuccess("Đã xóa mục thành công!");
+          // If deleted item was selected, select the first available item or clear selection
           if (selectedView && typeof selectedView === 'object' && selectedView.id === itemToDelete.id) {
-              setSelectedView(null);
+              const remainingItems = items.filter(i => i.id !== itemToDelete.id);
+              setSelectedView(remainingItems.length > 0 ? remainingItems[0] : null);
           }
-          fetchProjectData();
+          fetchProjectData(true);
       }
       setIsDeleteDialogOpen(false);
       setItemToDelete(null);
@@ -254,7 +262,7 @@ export const ProjectDetailContent = () => {
       showSuccess("Đã tạo mục mới!");
       setIsAddDialogOpen(false);
       setNewItemName('');
-      fetchProjectData();
+      fetchProjectData(true);
       if (data) {
         handleSelectView(data as ProjectItem);
       }
@@ -298,65 +306,79 @@ export const ProjectDetailContent = () => {
           <Button onClick={() => setIsAddDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700"><PlusCircle className="mr-2 h-4 w-4" />Thêm mục</Button>
         </div>
 
-        <ResizablePanelGroup direction="horizontal" className="flex-1 rounded-2xl border bg-white shadow-sm overflow-hidden">
-          <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
-            <div className="flex flex-col h-full p-4 overflow-y-auto">
-              <Button
-                variant="ghost"
-                onClick={() => handleSelectView('documents')}
-                className={cn(
-                  "w-full justify-start p-2 text-left font-semibold",
-                  selectedView === 'documents' && 'bg-slate-100'
-                )}
-              >
-                <FileText className="mr-2 h-4 w-4" />
-                Tài liệu
-              </Button>
-              <div className="mt-4">
-                <h3 className="px-2 text-xs font-semibold text-muted-foreground uppercase">Nội dung</h3>
-                <div className="mt-2 space-y-1">
-                  {items.map(item => (
-                    <div
-                      key={item.id}
-                      className={cn(
-                        "group w-full text-left p-2 rounded-md text-sm flex items-center justify-between",
-                        editingItemId !== item.id && "cursor-pointer",
-                        (selectedView as ProjectItem)?.id === item.id && editingItemId !== item.id ? "bg-blue-100 text-blue-700 font-semibold hover:bg-blue-100" : "hover:bg-slate-100"
-                      )}
-                    >
-                      <div className="flex items-center gap-2 flex-1" onClick={() => editingItemId !== item.id && handleSelectView(item)}>
-                        {item.type === 'article' ? <FileText className="h-4 w-4" /> : <MessageSquare className="h-4 w-4" />}
-                        {editingItemId === item.id ? (
-                          <div className="flex-1 flex items-center gap-1">
-                            <Input value={editingName} onChange={(e) => setEditingName(e.target.value)} onBlur={handleSaveName} onKeyDown={(e) => e.key === 'Enter' && handleSaveName()} className="h-7 text-sm" />
-                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleSaveName}><Check className="h-4 w-4" /></Button>
+        <Tabs defaultValue="content" className="flex-1 flex flex-col min-h-0">
+          <TabsList className="mb-4 self-start bg-transparent p-0">
+            <TabsTrigger value="content" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Nội dung</TabsTrigger>
+            <TabsTrigger value="documents" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Tài liệu</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="content" className="flex-1 min-h-0 mt-0">
+            <ResizablePanelGroup direction="horizontal" className="flex-1 rounded-2xl border bg-white shadow-sm overflow-hidden h-full">
+              <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
+                <div className="flex flex-col h-full p-4 overflow-y-auto">
+                  <div>
+                    <h3 className="px-2 text-xs font-semibold text-muted-foreground uppercase">Danh sách mục</h3>
+                    <div className="mt-2 space-y-1">
+                      {items.length > 0 ? (
+                        items.map(item => (
+                          <div
+                            key={item.id}
+                            className={cn(
+                              "group w-full text-left p-2 rounded-md text-sm flex items-center justify-between",
+                              editingItemId !== item.id && "cursor-pointer",
+                              (selectedView as ProjectItem)?.id === item.id && editingItemId !== item.id ? "bg-blue-100 text-blue-700 font-semibold hover:bg-blue-100" : "hover:bg-slate-100"
+                            )}
+                          >
+                            <div className="flex items-center gap-2 flex-1 overflow-hidden" onClick={() => editingItemId !== item.id && handleSelectView(item)}>
+                              {item.type === 'article' ? <FileText className="h-4 w-4 flex-shrink-0" /> : <MessageSquare className="h-4 w-4 flex-shrink-0" />}
+                              {editingItemId === item.id ? (
+                                <div className="flex-1 flex items-center gap-1">
+                                  <Input value={editingName} onChange={(e) => setEditingName(e.target.value)} onBlur={handleSaveName} onKeyDown={(e) => e.key === 'Enter' && handleSaveName()} className="h-7 text-sm" autoFocus />
+                                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleSaveName}><Check className="h-4 w-4" /></Button>
+                                </div>
+                              ) : (
+                                <span className="truncate">{item.name}</span>
+                              )}
+                            </div>
+                            {editingItemId !== item.id && (
+                              <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setEditingItemId(item.id); setEditingName(item.name); }}><Edit className="h-3 w-3" /></Button>
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteItem(item); }}><Trash2 className="h-3 w-3" /></Button>
+                              </div>
+                            )}
                           </div>
-                        ) : (
-                          <span className="truncate">{item.name}</span>
-                        )}
-                      </div>
-                      {editingItemId !== item.id && (
-                        <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setEditingItemId(item.id); setEditingName(item.name); }}><Edit className="h-3 w-3" /></Button>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteItem(item); }}><Trash2 className="h-3 w-3" /></Button>
+                        ))
+                      ) : (
+                        <div className="text-center py-8 text-muted-foreground text-sm">
+                          Chưa có mục nào.
+                          <br />
+                          Bấm "Thêm mục" để bắt đầu.
                         </div>
                       )}
                     </div>
-                  ))}
+                  </div>
                 </div>
-              </div>
-            </div>
-          </ResizablePanel>
-          <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={75}>
-            <div className="h-full p-6 overflow-y-auto bg-slate-50">
-              {selectedView === 'documents' && <ProjectDocumentsManager projectId={project.id.toString()} />}
-              {typeof selectedView === 'object' && selectedView?.type === 'article' && <ArticleGenerationDetail project={project} item={selectedView} promptLibraries={promptLibraries} onSave={handleItemUpdate} />}
-              {typeof selectedView === 'object' && selectedView?.type === 'comment' && <CommentGenerationDetail project={project} item={selectedView} promptLibraries={promptLibraries} onSave={handleItemUpdate} />}
-              {!selectedView && <div className="text-center text-slate-500"><p className="font-semibold text-lg">Chọn một mục để xem chi tiết</p></div>}
-            </div>
-          </ResizablePanel>
-        </ResizablePanelGroup>
+              </ResizablePanel>
+              <ResizableHandle withHandle />
+              <ResizablePanel defaultSize={75}>
+                <div className="h-full p-6 overflow-y-auto bg-slate-50">
+                  {typeof selectedView === 'object' && selectedView?.type === 'article' && <ArticleGenerationDetail project={project} item={selectedView} promptLibraries={promptLibraries} onSave={handleItemUpdate} />}
+                  {typeof selectedView === 'object' && selectedView?.type === 'comment' && <CommentGenerationDetail project={project} item={selectedView} promptLibraries={promptLibraries} onSave={handleItemUpdate} />}
+                  {!selectedView && (
+                    <div className="flex flex-col items-center justify-center h-full text-slate-500">
+                      <p className="font-semibold text-lg">Chọn một mục để xem chi tiết</p>
+                      <p className="text-sm">Hoặc tạo mục mới nếu chưa có.</p>
+                    </div>
+                  )}
+                </div>
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          </TabsContent>
+
+          <TabsContent value="documents" className="flex-1 min-h-0 mt-0">
+             <ProjectDocumentsManager projectId={project.id.toString()} />
+          </TabsContent>
+        </Tabs>
       </main>
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent>
@@ -367,7 +389,7 @@ export const ProjectDetailContent = () => {
           <div className="py-4 space-y-4">
             <div className="space-y-2">
               <Label htmlFor="item-name">Tên mục</Label>
-              <Input id="item-name" value={newItemName} onChange={e => setNewItemName(e.target.value)} />
+              <Input id="item-name" value={newItemName} onChange={e => setNewItemName(e.target.value)} placeholder="VD: Bài viết giới thiệu sản phẩm" onKeyDown={(e) => e.key === 'Enter' && handleCreateItem()} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="item-type">Loại mục</Label>
