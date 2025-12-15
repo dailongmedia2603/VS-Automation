@@ -21,6 +21,7 @@ import { FacebookApiReference } from "@/components/FacebookApiReference";
 import TelegramSettings from "@/components/settings/TelegramSettings";
 import VertexAiSettings from "@/components/settings/VertexAiSettings";
 import GeminiCustomSettings from "@/components/settings/GeminiCustomSettings";
+import TrollLlmSettings from "@/components/settings/TrollLlmSettings";
 
 const Settings = () => {
   // AI API Settings state
@@ -265,10 +266,11 @@ const Settings = () => {
     <main className="flex-1 space-y-6 p-6 sm:p-8 overflow-y-auto">
       <h2 className="text-3xl font-bold tracking-tight">Cài đặt chung</h2>
       <Tabs defaultValue="api-facebook">
-        <TabsList className="flex justify-start items-center gap-1 p-0 bg-transparent">
+        <TabsList className="flex justify-start items-center gap-1 p-0 bg-transparent flex-wrap">
           <TabsTrigger value="api-ai" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Cài đặt API AI</TabsTrigger>
           <TabsTrigger value="vertex-ai" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Gemini Vertex AI</TabsTrigger>
           <TabsTrigger value="gemini-custom" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">API Gemini Custom</TabsTrigger>
+          <TabsTrigger value="troll-llm" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">API Troll LLM</TabsTrigger>
           <TabsTrigger value="integrations" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Tích hợp</TabsTrigger>
           <TabsTrigger value="api-facebook" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">API Facebook Graph</TabsTrigger>
           <TabsTrigger value="telegram" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Telegram</TabsTrigger>
@@ -350,6 +352,9 @@ const Settings = () => {
         </TabsContent>
         <TabsContent value="gemini-custom" className="mt-4">
           <GeminiCustomSettings />
+        </TabsContent>
+        <TabsContent value="troll-llm" className="mt-4">
+          <TrollLlmSettings />
         </TabsContent>
         <TabsContent value="integrations" className="mt-4">
           <Card className="shadow-sm rounded-2xl bg-white">
