@@ -15,7 +15,7 @@ import { Link } from 'react-router-dom';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { FileText, MessageSquare, PlusCircle, Edit, Trash2, Check, ArrowLeft, Loader2 } from 'lucide-react';
+import { FileText, MessageSquare, PlusCircle, Edit, Trash2, Check, ArrowLeft, Loader2, BookOpen, UploadCloud } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { ArticleGenerationDetail } from '@/components/content-ai/ArticleGenerationDetail';
@@ -24,7 +24,7 @@ import { ProjectDocumentsManager } from '@/components/content-ai/ProjectDocument
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 type Project = {
   id: number;
@@ -102,9 +102,13 @@ export const ProjectDetailProvider = ({ projectId, children }: { projectId: stri
       setItems(itemsData || []);
       setPromptLibraries(librariesData || []);
 
-      // Set default selected view to first item if available
-      if (itemsData && itemsData.length > 0 && !selectedView) {
-        setSelectedView(itemsData[0]);
+      // Set default selected view to first article if available, otherwise first item
+      if (!isBackgroundRefresh && itemsData && itemsData.length > 0 && !selectedView) {
+        const firstArticle = itemsData.find(i => i.type === 'article');
+        setSelectedView(firstArticle || itemsData[0]);
+      } else if (!isBackgroundRefresh && (!itemsData || itemsData.length === 0) && !selectedView) {
+        // Fallback to documents if no items
+        setSelectedView('documents');
       }
 
     } catch (error: any) {
@@ -159,7 +163,7 @@ export const ProjectDetailProvider = ({ projectId, children }: { projectId: stri
           // If deleted item was selected, select the first available item or clear selection
           if (selectedView && typeof selectedView === 'object' && selectedView.id === itemToDelete.id) {
               const remainingItems = items.filter(i => i.id !== itemToDelete.id);
-              setSelectedView(remainingItems.length > 0 ? remainingItems[0] : null);
+              setSelectedView(remainingItems.length > 0 ? remainingItems[0] : 'documents');
           }
           fetchProjectData(true);
       }
@@ -243,6 +247,9 @@ export const ProjectDetailContent = () => {
   const [newItemType, setNewItemType] = useState<'article' | 'comment'>('article');
   const [isSavingNewItem, setIsSavingNewItem] = useState(false);
 
+  const articleItems = items.filter(i => i.type === 'article');
+  const commentItems = items.filter(i => i.type === 'comment');
+
   const handleCreateItem = async () => {
     if (!newItemName.trim() || !project) return;
     setIsSavingNewItem(true);
@@ -268,6 +275,57 @@ export const ProjectDetailContent = () => {
       }
     }
     setIsSavingNewItem(false);
+  };
+
+  const renderItemList = (itemList: ProjectItem[], icon: React.ElementType) => {
+    if (itemList.length === 0) {
+      return <div className="text-center py-4 text-xs text-muted-foreground">Chưa có mục nào.</div>;
+    }
+    return (
+      <div className="space-y-1">
+        {itemList.map(item => {
+          const Icon = icon;
+          const isSelected = (selectedView as ProjectItem)?.id === item.id;
+          return (
+            <div
+              key={item.id}
+              className={cn(
+                "group w-full text-left px-3 py-2 rounded-md text-sm flex items-center justify-between transition-colors",
+                editingItemId !== item.id && "cursor-pointer",
+                isSelected && editingItemId !== item.id ? "bg-blue-100 text-blue-700 font-medium" : "hover:bg-slate-100 text-slate-700"
+              )}
+              onClick={() => editingItemId !== item.id && handleSelectView(item)}
+            >
+              <div className="flex items-center gap-2 flex-1 overflow-hidden">
+                {/* <Icon className={cn("h-4 w-4 flex-shrink-0", isSelected ? "text-blue-600" : "text-slate-400")} /> */}
+                {editingItemId === item.id ? (
+                  <div className="flex-1 flex items-center gap-1">
+                    <Input 
+                        value={editingName} 
+                        onChange={(e) => setEditingName(e.target.value)} 
+                        onBlur={handleSaveName} 
+                        onKeyDown={(e) => e.key === 'Enter' && handleSaveName()} 
+                        className="h-7 text-sm" 
+                        autoFocus 
+                        onClick={(e) => e.stopPropagation()}
+                    />
+                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleSaveName(); }}><Check className="h-4 w-4" /></Button>
+                  </div>
+                ) : (
+                  <span className="truncate">{item.name}</span>
+                )}
+              </div>
+              {editingItemId !== item.id && (
+                <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setEditingItemId(item.id); setEditingName(item.name); }}><Edit className="h-3 w-3" /></Button>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteItem(item); }}><Trash2 className="h-3 w-3" /></Button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
   };
 
   if (isLoading) {
@@ -300,86 +358,86 @@ export const ProjectDetailContent = () => {
       <main className="flex-1 flex flex-col p-6 sm:p-8 bg-slate-50 min-h-0">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
-            <Link to="/content-ai"><Button variant="outline" size="icon"><ArrowLeft className="h-4 w-4" /></Button></Link>
+            <Link to="/content-ai"><Button variant="outline" size="icon" className="h-10 w-10 rounded-full bg-white border-slate-200 shadow-sm"><ArrowLeft className="h-5 w-5" /></Button></Link>
             <h1 className="text-3xl font-bold tracking-tight text-slate-900">{project.name}</h1>
           </div>
-          <Button onClick={() => setIsAddDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700"><PlusCircle className="mr-2 h-4 w-4" />Thêm mục</Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" className="bg-white border-slate-200 shadow-sm">
+                <UploadCloud className="mr-2 h-4 w-4" />
+                Import
+            </Button>
+            <Button onClick={() => setIsAddDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700 shadow-md">
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Thêm Post
+            </Button>
+          </div>
         </div>
 
-        <Tabs defaultValue="content" className="flex-1 flex flex-col min-h-0">
-          <TabsList className="mb-4 self-start bg-transparent p-0">
-            <TabsTrigger value="content" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Nội dung</TabsTrigger>
-            <TabsTrigger value="documents" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Tài liệu</TabsTrigger>
-          </TabsList>
+        <ResizablePanelGroup direction="horizontal" className="flex-1 rounded-2xl border bg-white shadow-sm overflow-hidden h-full">
+            <ResizablePanel defaultSize={20} minSize={15} maxSize={30} className="bg-white flex flex-col">
+            <div className="flex flex-col h-full py-4 overflow-y-auto">
+                <div 
+                    className={cn(
+                        "flex items-center gap-3 px-6 py-3 cursor-pointer text-sm font-medium transition-colors mb-2",
+                        selectedView === 'documents' ? "text-blue-700 bg-blue-50 border-r-2 border-blue-600" : "text-slate-600 hover:bg-slate-50"
+                    )}
+                    onClick={() => handleSelectView('documents')}
+                >
+                    <BookOpen className="h-4 w-4" />
+                    Tài liệu
+                </div>
 
-          <TabsContent value="content" className="flex-1 min-h-0 mt-0">
-            <ResizablePanelGroup direction="horizontal" className="flex-1 rounded-2xl border bg-white shadow-sm overflow-hidden h-full">
-              <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
-                <div className="flex flex-col h-full p-4 overflow-y-auto">
-                  <div>
-                    <h3 className="px-2 text-xs font-semibold text-muted-foreground uppercase">Danh sách mục</h3>
-                    <div className="mt-2 space-y-1">
-                      {items.length > 0 ? (
-                        items.map(item => (
-                          <div
-                            key={item.id}
-                            className={cn(
-                              "group w-full text-left p-2 rounded-md text-sm flex items-center justify-between",
-                              editingItemId !== item.id && "cursor-pointer",
-                              (selectedView as ProjectItem)?.id === item.id && editingItemId !== item.id ? "bg-blue-100 text-blue-700 font-semibold hover:bg-blue-100" : "hover:bg-slate-100"
-                            )}
-                          >
-                            <div className="flex items-center gap-2 flex-1 overflow-hidden" onClick={() => editingItemId !== item.id && handleSelectView(item)}>
-                              {item.type === 'article' ? <FileText className="h-4 w-4 flex-shrink-0" /> : <MessageSquare className="h-4 w-4 flex-shrink-0" />}
-                              {editingItemId === item.id ? (
-                                <div className="flex-1 flex items-center gap-1">
-                                  <Input value={editingName} onChange={(e) => setEditingName(e.target.value)} onBlur={handleSaveName} onKeyDown={(e) => e.key === 'Enter' && handleSaveName()} className="h-7 text-sm" autoFocus />
-                                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleSaveName}><Check className="h-4 w-4" /></Button>
-                                </div>
-                              ) : (
-                                <span className="truncate">{item.name}</span>
-                              )}
+                <Accordion type="multiple" defaultValue={['articles', 'comments']} className="w-full">
+                    <AccordionItem value="articles" className="border-b-0">
+                        <AccordionTrigger className="px-6 py-2 hover:no-underline text-sm font-semibold text-slate-800">
+                            <div className="flex items-center gap-2">
+                                <FileText className="h-4 w-4 text-blue-600" />
+                                <span>Viết post ({articleItems.length})</span>
                             </div>
-                            {editingItemId !== item.id && (
-                              <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setEditingItemId(item.id); setEditingName(item.name); }}><Edit className="h-3 w-3" /></Button>
-                                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteItem(item); }}><Trash2 className="h-3 w-3" /></Button>
-                              </div>
-                            )}
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-center py-8 text-muted-foreground text-sm">
-                          Chưa có mục nào.
-                          <br />
-                          Bấm "Thêm mục" để bắt đầu.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </ResizablePanel>
-              <ResizableHandle withHandle />
-              <ResizablePanel defaultSize={75}>
-                <div className="h-full p-6 overflow-y-auto bg-slate-50">
-                  {typeof selectedView === 'object' && selectedView?.type === 'article' && <ArticleGenerationDetail project={project} item={selectedView} promptLibraries={promptLibraries} onSave={handleItemUpdate} />}
-                  {typeof selectedView === 'object' && selectedView?.type === 'comment' && <CommentGenerationDetail project={project} item={selectedView} promptLibraries={promptLibraries} onSave={handleItemUpdate} />}
-                  {!selectedView && (
+                        </AccordionTrigger>
+                        <AccordionContent className="px-3 pb-2">
+                            {renderItemList(articleItems, FileText)}
+                        </AccordionContent>
+                    </AccordionItem>
+                    <AccordionItem value="comments" className="border-b-0">
+                        <AccordionTrigger className="px-6 py-2 hover:no-underline text-sm font-semibold text-slate-800">
+                            <div className="flex items-center gap-2">
+                                <MessageSquare className="h-4 w-4 text-green-600" />
+                                <span>Viết comment ({commentItems.length})</span>
+                            </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="px-3 pb-2">
+                            {renderItemList(commentItems, MessageSquare)}
+                        </AccordionContent>
+                    </AccordionItem>
+                </Accordion>
+            </div>
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={80} className="bg-slate-50">
+            <div className="h-full p-6 overflow-y-auto">
+                {selectedView === 'documents' ? (
+                    <ProjectDocumentsManager projectId={project.id.toString()} />
+                ) : typeof selectedView === 'object' ? (
+                    selectedView.type === 'article' ? (
+                        <ArticleGenerationDetail project={project} item={selectedView} promptLibraries={promptLibraries} onSave={handleItemUpdate} />
+                    ) : (
+                        <CommentGenerationDetail project={project} item={selectedView} promptLibraries={promptLibraries} onSave={handleItemUpdate} />
+                    )
+                ) : (
                     <div className="flex flex-col items-center justify-center h-full text-slate-500">
-                      <p className="font-semibold text-lg">Chọn một mục để xem chi tiết</p>
-                      <p className="text-sm">Hoặc tạo mục mới nếu chưa có.</p>
+                        <div className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center mb-4">
+                            <FileText className="h-8 w-8 text-slate-400" />
+                        </div>
+                        <p className="font-semibold text-lg text-slate-700">Chưa chọn nội dung</p>
+                        <p className="text-sm">Vui lòng chọn một mục từ danh sách bên trái để xem chi tiết.</p>
                     </div>
-                  )}
-                </div>
-              </ResizablePanel>
-            </ResizablePanelGroup>
-          </TabsContent>
-
-          <TabsContent value="documents" className="flex-1 min-h-0 mt-0">
-             <ProjectDocumentsManager projectId={project.id.toString()} />
-          </TabsContent>
-        </Tabs>
+                )}
+            </div>
+            </ResizablePanel>
+        </ResizablePanelGroup>
       </main>
+      
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent>
           <DialogHeader>
