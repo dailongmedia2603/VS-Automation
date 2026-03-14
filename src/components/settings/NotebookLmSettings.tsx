@@ -153,29 +153,29 @@ const NotebookLmSettings = () => {
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="flex gap-3 items-end">
-                        <div className="flex-1 space-y-1.5">
-                            <Label htmlFor="nlm-apikey">API Key</Label>
+                    <div className="space-y-2">
+                        <Label htmlFor="nlm-apikey">API Key</Label>
+                        <div className="flex gap-3">
                             <Input
                                 id="nlm-apikey"
                                 type="password"
                                 value={apiKey}
                                 onChange={(e) => setApiKey(e.target.value)}
                                 placeholder="nlm_xxxxxxxxxxxxxxxxxxxxxxxx"
-                                className="font-mono bg-slate-100 border-none rounded-lg"
+                                className="font-mono bg-slate-100 border-none rounded-lg flex-1"
                             />
-                            <p className="text-xs text-muted-foreground">
-                                Dùng để xác thực tất cả API calls tới server NotebookLM (<code>X-API-Key</code> header).
-                            </p>
+                            <Button
+                                onClick={handleSaveApiKey}
+                                disabled={isSavingApiKey}
+                                className="bg-blue-600 hover:bg-blue-700 rounded-lg shrink-0"
+                            >
+                                {isSavingApiKey ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                                Lưu API Key
+                            </Button>
                         </div>
-                        <Button
-                            onClick={handleSaveApiKey}
-                            disabled={isSavingApiKey}
-                            className="bg-blue-600 hover:bg-blue-700 rounded-lg shrink-0"
-                        >
-                            {isSavingApiKey ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                            Lưu API Key
-                        </Button>
+                        <p className="text-xs text-muted-foreground">
+                            Dùng để xác thực tất cả API calls tới server NotebookLM (<code>X-API-Key</code> header).
+                        </p>
                     </div>
                 </CardContent>
             </Card>
