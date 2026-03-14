@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { aiPlanService, AiPlanDocument } from '@/api/aiPlan';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,7 +11,6 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PlusCircle, Search, Trash2, Loader2, Edit, FileText, User, Lightbulb, MoreHorizontal } from 'lucide-react';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
-import { type User as SupabaseUser } from '@supabase/supabase-js';
 import { useAuth } from '@/contexts/AuthContext';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -28,10 +27,9 @@ type Document = {
   example_customer_message: string | null;
   example_agent_reply: string | null;
   creator_name: string | null;
-  embedding: number[] | string | null;
 };
 
-const DocumentDialog = ({ isOpen, onOpenChange, onSave, document, user }: { isOpen: boolean, onOpenChange: (open: boolean) => void, onSave: (doc: Partial<Document>) => void, document: Partial<Document> | null, user: SupabaseUser | null }) => {
+const DocumentDialog = ({ isOpen, onOpenChange, onSave, document, userEmail }: { isOpen: boolean, onOpenChange: (open: boolean) => void, onSave: (doc: Partial<Document>) => void, document: Partial<Document> | null, userEmail: string | undefined }) => {
   const [currentDoc, setCurrentDoc] = useState<Partial<Document>>({});
   const [isSaving, setIsSaving] = useState(false);
 
@@ -49,7 +47,7 @@ const DocumentDialog = ({ isOpen, onOpenChange, onSave, document, user }: { isOp
       return;
     }
     setIsSaving(true);
-    await onSave({ ...currentDoc, creator_name: currentDoc.creator_name || user?.email || 'Không rõ' });
+    await onSave({ ...currentDoc, creator_name: currentDoc.creator_name || userEmail || 'Không rõ' });
     setIsSaving(false);
   };
 
@@ -160,13 +158,26 @@ export const AiPlanProjectDocumentsManager = ({ planId }: { planId: string }) =>
 
   const fetchDocuments = useCallback(async () => {
     setIsLoading(true);
-    const { data, error } = await supabase.from('documents').select('*').eq('ai_plan_id', planId).order('created_at', { ascending: false });
-    if (error) {
-      showError("Không thể tải tài liệu: " + error.message);
-    } else {
-      setDocuments(data as Document[]);
+    try {
+      const data = await aiPlanService.getPlanDocuments(Number(planId));
+      // Map API response to component type
+      const mapped = (data || []).map((d: AiPlanDocument) => ({
+        id: d.id,
+        created_at: d.created_at,
+        title: d.name,
+        purpose: null,
+        document_type: null,
+        content: d.content,
+        example_customer_message: null,
+        example_agent_reply: null,
+        creator_name: null,
+      }));
+      setDocuments(mapped);
+    } catch (error: any) {
+      showError("Không thể tải tài liệu: " + (error.message || 'Unknown error'));
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }, [planId]);
 
   useEffect(() => {
@@ -183,18 +194,18 @@ export const AiPlanProjectDocumentsManager = ({ planId }: { planId: string }) =>
   const handleSave = async (doc: Partial<Document>) => {
     const toastId = showLoading("Đang lưu tài liệu...");
     try {
-      const documentToSave = { ...doc, ai_plan_id: planId };
-      
-      // Remove embedding logic
-      const { embedding, ...dataToSave } = documentToSave;
-
-      if (dataToSave.id) {
-        const { error } = await supabase.from('documents').update(dataToSave).eq('id', dataToSave.id);
-        if (error) throw error;
+      if (doc.id) {
+        await aiPlanService.updatePlanDocument(doc.id, {
+          name: doc.title,
+          content: doc.content,
+        });
       } else {
-        const { id, ...insertData } = dataToSave;
-        const { error } = await supabase.from('documents').insert(insertData);
-        if (error) throw error;
+        await aiPlanService.createPlanDocument(Number(planId), {
+          title: doc.title || '',
+          purpose: doc.purpose || undefined,
+          document_type: doc.document_type || undefined,
+          content: doc.content || undefined,
+        });
       }
 
       dismissToast(toastId);
@@ -205,22 +216,27 @@ export const AiPlanProjectDocumentsManager = ({ planId }: { planId: string }) =>
 
     } catch (err: any) {
       dismissToast(toastId);
-      showError(`Lỗi lưu tài liệu: ${err.message}`);
+      showError(`Lỗi lưu tài liệu: ${err.message || 'Unknown error'}`);
     }
   };
 
   const handleDelete = async (ids: number[]) => {
     const toastId = showLoading("Đang xóa...");
-    const { error } = await supabase.from('documents').delete().in('id', ids);
-    dismissToast(toastId);
-    if (error) {
-      showError("Xóa thất bại: " + error.message);
-    } else {
+    try {
+      if (ids.length === 1) {
+        await aiPlanService.deletePlanDocument(ids[0]);
+      } else {
+        await aiPlanService.bulkDeletePlanDocuments(ids);
+      }
+      dismissToast(toastId);
       showSuccess("Đã xóa thành công!");
       setDocuments(prev => prev.filter(d => !ids.includes(d.id)));
       setSelectedIds([]);
       setDocToDelete(null);
       setIsBulkDeleteAlertOpen(false);
+    } catch (error: any) {
+      dismissToast(toastId);
+      showError("Xóa thất bại: " + (error.message || 'Unknown error'));
     }
   };
 
@@ -291,7 +307,7 @@ export const AiPlanProjectDocumentsManager = ({ planId }: { planId: string }) =>
           </div>
         )}
       </div>
-      <DocumentDialog isOpen={isAddEditDialogOpen} onOpenChange={setIsAddEditDialogOpen} onSave={handleSave} document={editingDocument} user={user} />
+      <DocumentDialog isOpen={isAddEditDialogOpen} onOpenChange={setIsAddEditDialogOpen} onSave={handleSave} document={editingDocument} userEmail={user?.email} />
       <DocumentViewDialog isOpen={!!viewingDocument} onOpenChange={() => setViewingDocument(null)} document={viewingDocument} />
       <AlertDialog open={!!docToDelete} onOpenChange={() => setDocToDelete(null)}>
         <AlertDialogContent>

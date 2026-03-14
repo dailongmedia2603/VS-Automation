@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -11,7 +10,7 @@ import { showSuccess, showError } from '@/utils/toast';
 import hexaLogo from "@/assets/images/dailongmedia.png";
 
 const Login = () => {
-  const { session } = useAuth();
+  const { isAuthenticated, login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -20,25 +19,23 @@ const Login = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
-        showError("Vui lòng nhập email và mật khẩu.");
-        return;
+      showError("Vui lòng nhập email và mật khẩu.");
+      return;
     }
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (error) throw error;
+      await login(email, password);
       showSuccess('Đăng nhập thành công!');
     } catch (error: any) {
-      showError(error.error_description || error.message || "Đã xảy ra lỗi đăng nhập.");
+      console.error(error);
+      const message = error.response?.data?.message || error.message || "Đã xảy ra lỗi đăng nhập.";
+      showError(message);
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (session) {
+  if (isAuthenticated) {
     return <Navigate to="/" replace />;
   }
 
@@ -117,7 +114,7 @@ const Login = () => {
                 </Button>
               </div>
             </form>
-            
+
             <p className="text-center text-sm text-gray-600">
               Chưa có tài khoản?{' '}
               <Link to="/register" className="font-medium text-blue-600 hover:text-blue-500">
@@ -132,16 +129,16 @@ const Login = () => {
       </div>
       <div className="hidden lg:flex items-center justify-center bg-blue-600 text-white p-8 relative">
         <div className="text-center z-10 flex flex-col items-center">
-            <img src={hexaLogo} alt="DAILONG MEDIA Logo" className="w-[28rem] h-auto mb-8" style={{ filter: 'brightness(0) invert(1)' }} />
-            <div className="border border-white/20 rounded-2xl p-8 backdrop-blur-sm bg-white/10 max-w-2xl">
-                <p className="text-2xl font-semibold mt-2 leading-tight">Hệ thống Automation AI hỗ trợ triển khai dự án</p>
-            </div>
+          <img src={hexaLogo} alt="DAILONG MEDIA Logo" className="w-[28rem] h-auto mb-8" style={{ filter: 'brightness(0) invert(1)' }} />
+          <div className="border border-white/20 rounded-2xl p-8 backdrop-blur-sm bg-white/10 max-w-2xl">
+            <p className="text-2xl font-semibold mt-2 leading-tight">Hệ thống Automation AI hỗ trợ triển khai dự án</p>
+          </div>
         </div>
         <div className="absolute bottom-8 left-0 right-0 flex justify-center space-x-8 text-sm text-blue-200">
-            <a href="#" className="hover:text-white">Marketplace</a>
-            <a href="#" className="hover:text-white">License</a>
-            <a href="#" className="hover:text-white">Terms of Use</a>
-            <a href="#" className="hover:text-white">Blog</a>
+          <a href="#" className="hover:text-white">Marketplace</a>
+          <a href="#" className="hover:text-white">License</a>
+          <a href="#" className="hover:text-white">Terms of Use</a>
+          <a href="#" className="hover:text-white">Blog</a>
         </div>
       </div>
     </div>

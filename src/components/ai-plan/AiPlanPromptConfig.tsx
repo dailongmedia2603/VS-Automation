@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { aiPlanService } from '@/api/aiPlan';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -82,16 +82,10 @@ export const AiPlanPromptConfig = () => {
     const fetchPrompt = async () => {
       setIsLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('ai_plan_prompt_config')
-          .select('prompt_structure')
-          .eq('id', 1)
-          .single();
-        
-        if (error && error.code !== 'PGRST116') throw error;
-        
-        if (data && data.prompt_structure) {
-          const loadedConfig = { ...initialConfig, ...data.prompt_structure };
+        const data = await aiPlanService.getGlobalPromptConfig();
+
+        if (data) {
+          const loadedConfig = { ...initialConfig, ...data };
           setConfig(loadedConfig);
           setOutputInstruction(loadedConfig.output_instruction || DEFAULT_OUTPUT_INSTRUCTION);
           setSafetyInstruction(loadedConfig.safety_instruction || DEFAULT_SAFETY_INSTRUCTION);
@@ -100,41 +94,25 @@ export const AiPlanPromptConfig = () => {
           setSafetyInstruction(DEFAULT_SAFETY_INSTRUCTION);
         }
       } catch (error: any) {
-        showError("Không thể tải prompt: " + error.message);
+        // Config may not exist yet
+        setOutputInstruction(DEFAULT_OUTPUT_INSTRUCTION);
+        setSafetyInstruction(DEFAULT_SAFETY_INSTRUCTION);
       } finally {
         setIsLoading(false);
       }
     };
     fetchPrompt();
 
+    // Preview data could also be fetched from API if needed
     const fetchPreviewData = async () => {
-        try {
-            const templatePromise = supabase
-                .from('ai_plan_templates')
-                .select('structure')
-                .eq('id', 1) // Default template
-                .single();
-            
-            const documentsPromise = supabase
-                .from('documents')
-                .select('title, content')
-                .is('project_id', null)
-                .limit(3); // Limit for preview
-
-            const [{ data: templateData, error: templateError }, { data: documentsData, error: documentsError }] = await Promise.all([templatePromise, documentsPromise]);
-
-            if (templateError) console.error("Error fetching template for preview:", templateError);
-            else if (templateData?.structure) {
-                setTemplateInputFields((templateData.structure as any).input_fields || []);
-            }
-
-            if (documentsError) console.error("Error fetching documents for preview:", documentsError);
-            else {
-                setGlobalDocuments(documentsData || []);
-            }
-        } catch (error) {
-            console.error("Failed to fetch data for prompt preview:", error);
+      try {
+        const templates = await aiPlanService.getTemplates();
+        if (templates && templates.length > 0 && templates[0].content) {
+          setTemplateInputFields((templates[0].content as any).input_fields || []);
         }
+      } catch {
+        console.log("Could not fetch template data for preview");
+      }
     };
     fetchPreviewData();
   }, []);
@@ -143,14 +121,10 @@ export const AiPlanPromptConfig = () => {
     setIsSaving(true);
     try {
       const configToSave = { ...config, output_instruction: outputInstruction, safety_instruction: safetyInstruction };
-      const { error } = await supabase
-        .from('ai_plan_prompt_config')
-        .upsert({ id: 1, prompt_structure: configToSave, updated_at: new Date().toISOString() });
-      
-      if (error) throw error;
+      await aiPlanService.updateGlobalPromptConfig(configToSave);
       showSuccess("Đã lưu prompt thành công!");
     } catch (error: any) {
-      showError("Lưu thất bại: " + error.message);
+      showError("Lưu thất bại: " + (error.message || 'Unknown error'));
     } finally {
       setIsSaving(false);
     }
@@ -186,7 +160,7 @@ export const AiPlanPromptConfig = () => {
       const end = textarea.selectionEnd;
       const text = textarea.value;
       const newText = `${text.substring(0, start)}{{${placeholder}}}${text.substring(end)}`;
-      
+
       const blockId = textarea.dataset.id;
       if (blockId) {
         updateBlock(blockId, 'content', newText);
@@ -218,24 +192,24 @@ export const AiPlanPromptConfig = () => {
     let prompt = `### CHỈ THỊ AN TOÀN\n\n${safetyInstruction}\n\n---\n\n` + config.blocks.map(block => `### ${block.title.toUpperCase()}\n\n${block.content}`).join('\n\n---\n\n');
 
     const inputDescriptions = templateInputFields
-        .map(field => `*   **${field.label}:** (Giá trị người dùng nhập)\n    *   *Mô tả/Hướng dẫn cho AI:* ${field.description || 'Không có.'}`)
-        .join('\n');
+      .map(field => `*   **${field.label}:** (Giá trị người dùng nhập)\n    *   *Mô tả/Hướng dẫn cho AI:* ${field.description || 'Không có.'}`)
+      .join('\n');
     prompt = prompt.replace(/{{thong_tin_dau_vao}}/g, inputDescriptions || '(Không có thông tin đầu vào.)');
 
     const documentContext = globalDocuments.length > 0
-        ? globalDocuments.map(doc => `--- TÀI LIỆU: ${doc.title} ---\n${doc.content}`).join('\n\n')
-        : '(Không có tài liệu tham khảo)';
+      ? globalDocuments.map(doc => `--- TÀI LIỆU: ${doc.title} ---\n${doc.content}`).join('\n\n')
+      : '(Không có tài liệu tham khảo)';
     prompt = prompt.replace(/{{tai_lieu}}/g, documentContext);
 
     if (config.useCoT) {
-        let cotPrompt = "Let's think step by step.";
-        if (config.cotFactors && config.cotFactors.length > 0) {
-            const factorsText = config.cotFactors
-                .map(factor => `- ${factor.value}`)
-                .join('\n');
-            cotPrompt += "\n\nHere are the key factors to consider in your thinking process:\n" + factorsText;
-        }
-        prompt += `\n\n---\n\n${cotPrompt}`;
+      let cotPrompt = "Let's think step by step.";
+      if (config.cotFactors && config.cotFactors.length > 0) {
+        const factorsText = config.cotFactors
+          .map(factor => `- ${factor.value}`)
+          .join('\n');
+        cotPrompt += "\n\nHere are the key factors to consider in your thinking process:\n" + factorsText;
+      }
+      prompt += `\n\n---\n\n${cotPrompt}`;
     }
 
     const finalOutputInstruction = outputInstruction.replace(/{{json_structure}}/g, '(Cấu trúc JSON động sẽ được chèn vào đây)');
@@ -263,10 +237,10 @@ export const AiPlanPromptConfig = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Textarea 
-                value={safetyInstruction} 
-                onChange={e => setSafetyInstruction(e.target.value)} 
-                className="min-h-[120px] font-mono text-xs bg-green-50/50 border-green-200" 
+              <Textarea
+                value={safetyInstruction}
+                onChange={e => setSafetyInstruction(e.target.value)}
+                className="min-h-[120px] font-mono text-xs bg-green-50/50 border-green-200"
               />
             </CardContent>
           </Card>

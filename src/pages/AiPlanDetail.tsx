@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { aiPlanService, AiPlan } from '@/api/tools';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Sparkles, Loader2, FileText, Share, Settings, PencilLine, Download } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,17 +18,6 @@ import { Input } from '@/components/ui/input';
 import * as XLSX from 'xlsx';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AiPlanProjectDocumentsManager } from '@/components/ai-plan/AiPlanProjectDocumentsManager';
-
-type Plan = {
-  id: number;
-  name: string;
-  config: any;
-  plan_data: any;
-  is_public: boolean;
-  public_id: string | null;
-  template_id: number | null;
-  slug: string | null;
-};
 
 type Log = {
   id: number;
@@ -45,17 +35,46 @@ type OutputStructure = {
   sub_fields?: { id: string; label: string; type: 'text' | 'textarea' }[];
 }[];
 
-type TemplateStructure = {
-  output_fields: OutputStructure;
-  input_fields: any[];
-};
-
 const AiPlanDetail = () => {
   const { planId } = useParams();
-  const [plan, setPlan] = useState<Plan | null>(null);
-  const [outputStructure, setOutputStructure] = useState<OutputStructure | null>(null);
-  const [inputStructure, setInputStructure] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
+
+  // React Query - data loads instantly from cache
+  const { data: plan, isLoading: isLoadingPlan, refetch: refetchPlan } = useQuery({
+    queryKey: ['ai-plan', planId],
+    queryFn: () => aiPlanService.getPlan(Number(planId)),
+    enabled: !!planId,
+  });
+
+  const templateId = (plan as any)?.template_id || 1;
+
+  const { data: template, isLoading: isLoadingTemplate } = useQuery({
+    queryKey: ['ai-plan-template', templateId],
+    queryFn: () => aiPlanService.getTemplate(templateId),
+    enabled: !!plan,
+  });
+
+  const isLoading = isLoadingPlan || isLoadingTemplate;
+
+  // Derived state from template
+  const outputStructure = useMemo<OutputStructure | null>(() => {
+    if (!template?.structure) return null;
+    if (typeof template.structure === 'object' && !Array.isArray(template.structure)) {
+      return template.structure.output_fields || [];
+    }
+    return template.structure as OutputStructure || [];
+  }, [template]);
+
+  const inputStructure = useMemo<any[]>(() => {
+    if (!template?.structure) return [];
+    if (typeof template.structure === 'object' && !Array.isArray(template.structure)) {
+      return template.structure.input_fields || [];
+    }
+    return [];
+  }, [template]);
+
+  // Local state
+  const [localPlan, setLocalPlan] = useState<AiPlan | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLogOpen, setIsLogOpen] = useState(false);
@@ -67,130 +86,89 @@ const AiPlanDetail = () => {
   const [feedbackText, setFeedbackText] = useState('');
   const [isInputStructureDialogOpen, setIsInputStructureDialogOpen] = useState(false);
 
-  useEffect(() => {
-    const fetchPlan = async () => {
-      if (!planId) return;
-      setIsLoading(true);
-      try {
-        let { data, error } = await supabase
-          .from('ai_plans')
-          .select('*')
-          .eq('id', planId)
-          .single();
-        if (error) throw error;
+  // Use localPlan for editing, fall back to server plan
+  const currentPlan = localPlan || plan;
 
-        if (!data.template_id) {
-          const { data: updatedPlan, error: updateError } = await supabase
-            .from('ai_plans')
-            .update({ template_id: 1 })
-            .eq('id', planId)
-            .select('*')
-            .single();
-          if (updateError) throw updateError;
-          data = updatedPlan;
-        }
-        
-        setPlan(data);
+  // Mutations
+  const updatePlanMutation = useMutation({
+    mutationFn: (data: Partial<AiPlan>) => aiPlanService.updatePlan(Number(planId), data),
+    onSuccess: (updatedPlan) => {
+      setLocalPlan(null);
+      queryClient.setQueryData(['ai-plan', planId], updatedPlan);
+    },
+  });
 
-        const templateId = data.template_id;
-        const { data: templateData, error: templateError } = await supabase
-          .from('ai_plan_templates')
-          .select('structure')
-          .eq('id', templateId)
-          .single();
-        
-        if (templateError) throw templateError;
-        if (!templateData) throw new Error(`Template with ID ${templateId} not found.`);
+  const generatePlanMutation = useMutation({
+    mutationFn: () => aiPlanService.generatePlan(Number(planId)),
+    onSuccess: () => {
+      refetchPlan();
+    },
+  });
 
-        if (templateData.structure && typeof templateData.structure === 'object' && !Array.isArray(templateData.structure)) {
-          const structure = templateData.structure as TemplateStructure;
-          setOutputStructure(structure.output_fields || []);
-          setInputStructure(structure.input_fields || []);
-        } else {
-          setOutputStructure((templateData.structure as OutputStructure) || []);
-          setInputStructure([]);
-        }
+  const regenerateSectionMutation = useMutation({
+    mutationFn: (data: { sectionId: string; feedback: string; itemToRegenerate?: any }) =>
+      aiPlanService.regenerateSection(Number(planId), data),
+    onSuccess: (updatedPlan) => {
+      queryClient.setQueryData(['ai-plan', planId], updatedPlan);
+      setRegenSection(null);
+      setFeedbackText('');
+    },
+  });
 
-      } catch (error: any) {
-        showError("Không thể tải kế hoạch: " + error.message);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchPlan();
-  }, [planId]);
+  const updateTemplateMutation = useMutation({
+    mutationFn: ({ templateId, data }: { templateId: number; data: { structure?: any } }) =>
+      aiPlanService.updateTemplate(templateId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ai-plan-template', templateId] });
+    },
+  });
 
   const fetchLogs = async () => {
     if (!planId) return;
     setIsLoadingLogs(true);
-    const { data, error } = await supabase
-        .from('ai_plan_logs')
-        .select('*')
-        .eq('plan_id', planId)
-        .order('created_at', { ascending: false });
-    
-    if (error) {
-        showError("Không thể tải lịch sử log: " + error.message);
-    } else {
-        setLogs(data || []);
+    try {
+      const logsData = await aiPlanService.getLogs(Number(planId));
+      setLogs(logsData);
+    } catch (error: any) {
+      showError("Không thể tải lịch sử log: " + error.message);
     }
     setIsLoadingLogs(false);
   };
 
   const handleOpenLogDialog = () => {
-      fetchLogs();
-      setIsLogOpen(true);
+    fetchLogs();
+    setIsLogOpen(true);
   };
 
   const handleUpdateConfig = async (newConfig: any) => {
-    if (!plan) return;
+    if (!currentPlan) return;
     setIsSaving(true);
-    const { error } = await supabase
-      .from('ai_plans')
-      .update({ config: newConfig, updated_at: new Date().toISOString() })
-      .eq('id', plan.id);
-    
-    if (error) {
-      showError("Lưu cấu hình thất bại: " + error.message);
-      throw error;
-    } else {
+    try {
+      await updatePlanMutation.mutateAsync({ config: newConfig });
       showSuccess("Đã lưu cấu hình!");
-      setPlan(prev => prev ? { ...prev, config: newConfig } : null);
+    } catch (error: any) {
+      showError("Lưu cấu hình thất bại: " + error.message);
     }
     setIsSaving(false);
   };
 
   const handleGeneratePlan = async () => {
-    if (!plan) return;
+    if (!currentPlan) return;
     setIsGenerating(true);
     const toastId = showLoading("AI đang xây dựng kế hoạch...");
     try {
       // First, ensure the latest config is saved
-      await handleUpdateConfig(plan.config);
-
-      const { data, error } = await supabase.functions.invoke('generate-ai-plan', {
-        body: { planId: plan.id }
-      });
-
-      if (error) {
-        let errorMessage = error.message;
-        if (error.context && typeof error.context.json === 'function') {
-          try {
-            const errorBody = await error.context.json();
-            if (errorBody.error) {
-              errorMessage = errorBody.error;
-            }
-          } catch (e) {
-            // Ignore JSON parsing error
-          }
-        }
-        throw new Error(errorMessage);
+      if (localPlan?.config) {
+        await updatePlanMutation.mutateAsync({ config: localPlan.config });
       }
-      if (data.error) throw new Error(data.error);
 
-      setPlan(data);
+      const result = await generatePlanMutation.mutateAsync();
       dismissToast(toastId);
-      showSuccess("AI đã tạo kế hoạch thành công!");
+      if ((result as any).error) {
+        showError(`Tạo kế hoạch thất bại: ${(result as any).error}`);
+      } else {
+        showSuccess("AI đã tạo kế hoạch thành công!");
+      }
     } catch (err: any) {
       dismissToast(toastId);
       showError(`Tạo kế hoạch thất bại: ${err.message}`);
@@ -200,7 +178,7 @@ const AiPlanDetail = () => {
   };
 
   const handleExportExcel = () => {
-    if (!plan || !plan.plan_data || !outputStructure) {
+    if (!currentPlan || !currentPlan.plan_data || !outputStructure) {
       showError("Không có dữ liệu kế hoạch để xuất.");
       return;
     }
@@ -209,49 +187,37 @@ const AiPlanDetail = () => {
       const workbook = XLSX.utils.book_new();
       const mainSheetData: { 'Mục': string; 'Nội dung': any }[] = [];
 
-      // Iterate through the defined structure to maintain order
       outputStructure.forEach(section => {
-        const sectionData = plan.plan_data[section.id];
-        
-        // Skip if there's no data for this section
+        const sectionData = currentPlan.plan_data?.[section.id];
+
         if (sectionData === null || typeof sectionData === 'undefined') {
           return;
         }
 
-        // Handle complex array data by creating separate sheets
         if (Array.isArray(sectionData) && sectionData.length > 0 && typeof sectionData[0] === 'object' && sectionData[0] !== null) {
-          // Sanitize sheet name
           const sheetName = section.label.replace(/[\/\\?*\[\]]/g, '').substring(0, 31);
           const worksheet = XLSX.utils.json_to_sheet(sectionData);
           XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
-        } 
-        // Handle simple arrays (of strings/numbers)
-        else if (Array.isArray(sectionData)) {
-            mainSheetData.push({
-                'Mục': section.label,
-                'Nội dung': sectionData.join('\n'),
-            });
-        }
-        // Handle simple values (string, number, boolean)
-        else if (typeof sectionData !== 'object') {
+        } else if (Array.isArray(sectionData)) {
+          mainSheetData.push({
+            'Mục': section.label,
+            'Nội dung': sectionData.join('\n'),
+          });
+        } else if (typeof sectionData !== 'object') {
           mainSheetData.push({
             'Mục': section.label,
             'Nội dung': String(sectionData),
           });
-        } 
-        // Handle simple objects by stringifying them
-        else if (typeof sectionData === 'object' && sectionData !== null) {
-            mainSheetData.push({
-                'Mục': section.label,
-                'Nội dung': JSON.stringify(sectionData, null, 2),
-            });
+        } else if (typeof sectionData === 'object' && sectionData !== null) {
+          mainSheetData.push({
+            'Mục': section.label,
+            'Nội dung': JSON.stringify(sectionData, null, 2),
+          });
         }
       });
 
-      // Create the main summary sheet if it has data
       if (mainSheetData.length > 0) {
         const mainWorksheet = XLSX.utils.json_to_sheet(mainSheetData);
-        // Set column widths for better readability
         mainWorksheet['!cols'] = [{ wch: 30 }, { wch: 80 }];
         XLSX.utils.book_append_sheet(workbook, mainWorksheet, "Tổng quan kế hoạch");
       }
@@ -261,17 +227,15 @@ const AiPlanDetail = () => {
         return;
       }
 
-      // Ensure "Tổng quan kế hoạch" is the first sheet if it exists
       if (workbook.SheetNames.includes("Tổng quan kế hoạch")) {
         const overviewIndex = workbook.SheetNames.indexOf("Tổng quan kế hoạch");
         if (overviewIndex > 0) {
-          // Move sheet to the beginning
           const sheetName = workbook.SheetNames.splice(overviewIndex, 1)[0];
           workbook.SheetNames.unshift(sheetName);
         }
       }
 
-      XLSX.writeFile(workbook, `${plan.name || 'ke-hoach-ai'}.xlsx`);
+      XLSX.writeFile(workbook, `${currentPlan.name || 'ke-hoach-ai'}.xlsx`);
       showSuccess("Đã xuất file Excel thành công!");
     } catch (error) {
       console.error("Export to Excel failed:", error);
@@ -279,73 +243,45 @@ const AiPlanDetail = () => {
     }
   };
 
-  const handlePlanUpdate = (updates: Partial<Plan>) => {
-    setPlan(prev => prev ? { ...prev, ...updates } : null);
+  const handlePlanUpdate = (updates: Partial<AiPlan>) => {
+    if (plan) {
+      queryClient.setQueryData(['ai-plan', planId], { ...plan, ...updates });
+    }
   };
 
   const handleUpdateSection = async (sectionId: string, newContent: any) => {
-    if (!plan) return;
-    
+    if (!currentPlan) return;
+
     const newPlanData = {
-      ...plan.plan_data,
+      ...currentPlan.plan_data,
       [sectionId]: newContent,
     };
-  
+
     setIsSaving(true);
-    const { data, error } = await supabase
-      .from('ai_plans')
-      .update({ plan_data: newPlanData, updated_at: new Date().toISOString() })
-      .eq('id', plan.id)
-      .select()
-      .single();
-    
-    if (error) {
-      showError("Lưu thay đổi thất bại: " + error.message);
-    } else {
+    try {
+      await updatePlanMutation.mutateAsync({ plan_data: newPlanData });
       showSuccess("Đã lưu thay đổi!");
-      setPlan(data);
       setEditingSectionId(null);
+    } catch (error: any) {
+      showError("Lưu thay đổi thất bại: " + error.message);
     }
     setIsSaving(false);
   };
 
   const handleRegenerateSection = async () => {
-    if (!plan || !regenSection || !feedbackText.trim()) return;
-  
+    if (!currentPlan || !regenSection || !feedbackText.trim()) return;
+
     setIsGenerating(true);
     const toastId = showLoading(`AI đang tạo lại mục "${regenSection.label}"...`);
-  
+
     try {
-      const { data, error } = await supabase.functions.invoke('regenerate-ai-plan-section', {
-        body: {
-          planId: plan.id,
-          sectionId: regenSection.id,
-          feedback: feedbackText,
-          itemToRegenerate: regenSection.item,
-        }
+      await regenerateSectionMutation.mutateAsync({
+        sectionId: regenSection.id,
+        feedback: feedbackText,
+        itemToRegenerate: regenSection.item,
       });
-  
-      if (error) {
-        let errorMessage = error.message;
-        if (error.context && typeof error.context.json === 'function') {
-          try {
-            const errorBody = await error.context.json();
-            if (errorBody.error) {
-              errorMessage = errorBody.error;
-            }
-          } catch (e) {
-            // Ignore JSON parsing error
-          }
-        }
-        throw new Error(errorMessage);
-      }
-      if (data.error) throw new Error(data.error);
-  
-      setPlan(data);
       dismissToast(toastId);
       showSuccess("AI đã tạo lại nội dung thành công!");
-      setRegenSection(null);
-      setFeedbackText('');
     } catch (err: any) {
       dismissToast(toastId);
       showError(`Tạo lại thất bại: ${err.message}`);
@@ -355,41 +291,32 @@ const AiPlanDetail = () => {
   };
 
   const handleSaveInputStructure = async (newInputFields: any[]) => {
-    if (!plan || !plan.template_id) return;
+    if (!plan || !(plan as any).template_id) return;
 
-    const { data: templateData, error: templateError } = await supabase
-        .from('ai_plan_templates')
-        .select('structure')
-        .eq('id', plan.template_id)
-        .single();
-    
-    if (templateError) throw templateError;
-
-    const currentStructure = templateData.structure || {};
+    const planTemplateId = (plan as any).template_id;
+    const currentStructure = template?.structure || {};
     const newStructure = {
-        ...currentStructure,
-        input_fields: newInputFields,
+      ...currentStructure,
+      input_fields: newInputFields,
     };
 
-    const { error } = await supabase
-        .from('ai_plan_templates')
-        .update({ structure: newStructure })
-        .eq('id', plan.template_id);
-    
-    if (error) {
-        showError("Lưu cấu trúc thất bại: " + error.message);
-        throw error;
-    } else {
-        showSuccess("Đã cập nhật cấu trúc đầu vào!");
-        setInputStructure(newInputFields);
+    try {
+      await updateTemplateMutation.mutateAsync({
+        templateId: planTemplateId,
+        data: { structure: newStructure },
+      });
+      showSuccess("Đã cập nhật cấu trúc đầu vào!");
+    } catch (error: any) {
+      showError("Lưu cấu trúc thất bại: " + error.message);
     }
   };
 
   const handleConfigDataChange = (key: string, value: string) => {
-    setPlan(prev => {
-        if (!prev) return null;
-        const newConfig = { ...(prev.config || {}), [key]: value };
-        return { ...prev, config: newConfig };
+    setLocalPlan(prev => {
+      const base = prev || currentPlan;
+      if (!base) return null;
+      const newConfig = { ...(base.config || {}), [key]: value };
+      return { ...base, config: newConfig };
     });
   };
 
@@ -397,7 +324,7 @@ const AiPlanDetail = () => {
     return <main className="flex-1 p-6 sm:p-8 bg-slate-50"><Skeleton className="h-full w-full" /></main>;
   }
 
-  if (!plan) {
+  if (!currentPlan) {
     return <main className="flex-1 p-6 sm:p-8 bg-slate-50">Không tìm thấy kế hoạch.</main>;
   }
 
@@ -412,7 +339,7 @@ const AiPlanDetail = () => {
               </Button>
             </Link>
             <div>
-              <h1 className="text-3xl font-bold tracking-tight text-slate-900">{plan.name}</h1>
+              <h1 className="text-3xl font-bold tracking-tight text-slate-900">{currentPlan.name}</h1>
               <p className="text-muted-foreground mt-1">
                 Cung cấp thông tin để AI xây dựng kế hoạch marketing chi tiết cho bạn.
               </p>
@@ -474,12 +401,12 @@ const AiPlanDetail = () => {
                               <CardContent>
                                 {field.type === 'input' ? (
                                   <Input
-                                    value={plan.config?.[field.id] || ''}
+                                    value={currentPlan.config?.[field.id] || ''}
                                     onChange={e => handleConfigDataChange(field.id, e.target.value)}
                                   />
                                 ) : (
                                   <Textarea
-                                    value={plan.config?.[field.id] || ''}
+                                    value={currentPlan.config?.[field.id] || ''}
                                     onChange={e => handleConfigDataChange(field.id, e.target.value)}
                                     className="min-h-[100px]"
                                   />
@@ -488,10 +415,10 @@ const AiPlanDetail = () => {
                             </Card>
                           ))}
                           <div className="flex justify-end mt-4">
-                              <Button onClick={() => handleUpdateConfig(plan.config)} disabled={isSaving}>
-                                  {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                  Lưu thông tin
-                              </Button>
+                            <Button onClick={() => handleUpdateConfig(currentPlan.config)} disabled={isSaving}>
+                              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                              Lưu thông tin
+                            </Button>
                           </div>
                         </div>
                       ) : (
@@ -506,9 +433,9 @@ const AiPlanDetail = () => {
               <ResizableHandle withHandle />
               <ResizablePanel defaultSize={60}>
                 <div className="h-full bg-slate-50 p-6 overflow-y-auto">
-                  <AiPlanContentView 
-                    planData={plan.plan_data} 
-                    planStructure={outputStructure!} 
+                  <AiPlanContentView
+                    planData={currentPlan.plan_data}
+                    planStructure={outputStructure!}
                     isEditable={true}
                     editingSectionId={editingSectionId}
                     setEditingSectionId={setEditingSectionId}
@@ -524,11 +451,11 @@ const AiPlanDetail = () => {
           </TabsContent>
         </Tabs>
       </main>
-      {plan && (
+      {currentPlan && (
         <SharePlanDialog
           isOpen={isShareDialogOpen}
           onOpenChange={setIsShareDialogOpen}
-          plan={plan}
+          plan={currentPlan}
           onPlanUpdate={handlePlanUpdate}
         />
       )}

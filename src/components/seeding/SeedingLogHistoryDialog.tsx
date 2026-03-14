@@ -3,22 +3,13 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Skeleton } from '@/components/ui/skeleton';
-import { supabase } from '@/integrations/supabase/client';
+import { seedingService, SeedingCheckLog } from '@/api/seeding';
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { showError } from "@/utils/toast";
-
-type Log = {
-  id: number;
-  created_at: string;
-  request_url: string | null;
-  raw_response: any;
-  status: 'success' | 'error';
-  error_message: string | null;
-};
 
 interface SeedingLogHistoryDialogProps {
   isOpen: boolean;
@@ -27,25 +18,21 @@ interface SeedingLogHistoryDialogProps {
 }
 
 export const SeedingLogHistoryDialog = ({ isOpen, onOpenChange, postId }: SeedingLogHistoryDialogProps) => {
-  const [logs, setLogs] = useState<Log[]>([]);
+  const [logs, setLogs] = useState<SeedingCheckLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (isOpen) {
       const fetchLogs = async () => {
         setIsLoading(true);
-        const { data, error } = await supabase
-          .from('logs_check_seeding_cmt_tu_dong')
-          .select('*')
-          .eq('post_id', postId)
-          .order('created_at', { ascending: false });
-        
-        if (error) {
-          showError("Không thể tải lịch sử: " + error.message);
-        } else {
+        try {
+          const data = await seedingService.getCheckLogs(postId);
           setLogs(data || []);
+        } catch (error: any) {
+          showError("Không thể tải lịch sử: " + (error.message || 'Unknown error'));
+        } finally {
+          setIsLoading(false);
         }
-        setIsLoading(false);
       };
       fetchLogs();
     }

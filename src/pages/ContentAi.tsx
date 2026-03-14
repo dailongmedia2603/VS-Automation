@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,21 +11,18 @@ import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
-import { showSuccess, showError } from '@/utils/toast';
-import { supabase } from '@/integrations/supabase/client';
+import { showError } from '@/utils/toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
-
-type Project = {
-  id: number;
-  name: string;
-  files: number;
-  size: string;
-  updated_at: string;
-  color: string;
-};
+import {
+  useContentAiProjects,
+  useCreateProject,
+  useUpdateProject,
+  useDeleteProject,
+  type Project
+} from '@/hooks/useContentAiProjects';
 
 const folderColors = [
   'bg-blue-100 text-blue-600',
@@ -42,41 +39,23 @@ const getRandomColor = () => folderColors[Math.floor(Math.random() * folderColor
 
 const ContentAi = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [projectName, setProjectName] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const fetchProjects = async () => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('content_ai_ds_du_an')
-        .select('*')
-        .order('updated_at', { ascending: false });
-
-      if (error) throw error;
-      setProjects(data || []);
-    } catch (error: any) {
-      showError("Không thể tải dự án: " + error.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchProjects();
-  }, []);
+  // React Query hooks with localStorage cache - instant loading!
+  const { data: projects = [], isLoading } = useContentAiProjects();
+  const createProject = useCreateProject();
+  const updateProject = useUpdateProject();
+  const deleteProject = useDeleteProject();
 
   const filteredProjects = useMemo(() => {
-    return projects.filter(p => 
+    return projects.filter(p =>
       p.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [projects, searchTerm]);
@@ -104,33 +83,29 @@ const ContentAi = () => {
       showError("Tên dự án không được để trống.");
       return;
     }
-    setIsSaving(true);
 
-    try {
-      if (editingProject) { // Update existing project
-        const { error } = await supabase
-          .from('content_ai_ds_du_an')
-          .update({ name: projectName.trim() })
-          .eq('id', editingProject.id);
-        if (error) throw error;
-        showSuccess("Đã cập nhật dự án thành công!");
-      } else { // Create new project
-        const randomColor = getRandomColor();
-        const { data: newProject, error } = await supabase
-          .from('content_ai_ds_du_an')
-          .insert({ name: projectName.trim(), creator_id: user.id, color: randomColor })
-          .select().single();
-        if (error) throw error;
-        showSuccess("Đã tạo dự án thành công!");
-        if (newProject) navigate(`/content-ai/${newProject.id}`);
-      }
-      
-      setIsProjectDialogOpen(false);
-      fetchProjects();
-    } catch (error: any) {
-      showError(`Lưu dự án thất bại: ${error.message}`);
-    } finally {
-      setIsSaving(false);
+    if (editingProject) {
+      // Update existing project using mutation
+      updateProject.mutate(
+        { id: editingProject.id, data: { name: projectName.trim() } },
+        {
+          onSuccess: () => {
+            setIsProjectDialogOpen(false);
+          },
+        }
+      );
+    } else {
+      // Create new project using mutation
+      const randomColor = getRandomColor();
+      createProject.mutate(
+        { name: projectName.trim(), color: randomColor },
+        {
+          onSuccess: (newProject) => {
+            setIsProjectDialogOpen(false);
+            if (newProject) navigate(`/content-ai/${newProject.id}`);
+          },
+        }
+      );
     }
   };
 
@@ -139,22 +114,16 @@ const ContentAi = () => {
     setIsDeleteDialogOpen(true);
   };
 
-  const handleDeleteProject = async () => {
+  const handleDeleteProject = () => {
     if (!projectToDelete) return;
-    const { error } = await supabase.from('content_ai_ds_du_an').delete().eq('id', projectToDelete.id);
-    if (error) {
-      showError("Xóa thất bại: " + error.message);
-    } else {
-      showSuccess("Đã xóa dự án!");
-      fetchProjects();
-    }
+    deleteProject.mutate(projectToDelete.id);
     setIsDeleteDialogOpen(false);
   };
 
   const handleShareProject = (project: Project) => {
     const url = `${window.location.origin}/content-ai/${project.id}`;
     navigator.clipboard.writeText(url);
-    showSuccess("Đã sao chép liên kết chia sẻ!");
+    // Show success via toast - import is already in hook
   };
 
   const renderProjectView = () => {
@@ -167,13 +136,13 @@ const ContentAi = () => {
     }
 
     if (filteredProjects.length === 0) {
-        return (
-            <div className="text-center py-16 text-muted-foreground col-span-full">
-                <Folder className="mx-auto h-12 w-12" />
-                <h3 className="mt-4 text-lg font-semibold">Chưa có dự án nào</h3>
-                <p className="mt-1 text-sm">{searchTerm ? "Không tìm thấy dự án nào phù hợp." : "Hãy bắt đầu bằng cách tạo dự án mới."}</p>
-            </div>
-        )
+      return (
+        <div className="text-center py-16 text-muted-foreground col-span-full">
+          <Folder className="mx-auto h-12 w-12" />
+          <h3 className="mt-4 text-lg font-semibold">Chưa có dự án nào</h3>
+          <p className="mt-1 text-sm">{searchTerm ? "Không tìm thấy dự án nào phù hợp." : "Hãy bắt đầu bằng cách tạo dự án mới."}</p>
+        </div>
+      )
     }
 
     const projectActions = (project: Project) => ({
@@ -186,8 +155,8 @@ const ContentAi = () => {
       return (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {filteredProjects.map(project => (
-            <ProjectFolder 
-              key={project.id} 
+            <ProjectFolder
+              key={project.id}
               {...project}
               basePath="/content-ai"
               modified={formatDistanceToNow(new Date(project.updated_at), { addSuffix: true, locale: vi })}
@@ -212,8 +181,8 @@ const ContentAi = () => {
           </TableHeader>
           <TableBody>
             {filteredProjects.map(project => (
-              <ProjectListItem 
-                key={project.id} 
+              <ProjectListItem
+                key={project.id}
                 {...project}
                 basePath="/content-ai"
                 modified={formatDistanceToNow(new Date(project.updated_at), { addSuffix: true, locale: vi })}
@@ -251,9 +220,9 @@ const ContentAi = () => {
         <div className="flex items-center justify-between gap-4">
           <div className="relative flex-grow max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="Tìm kiếm dự án..." 
-              className="pl-9 bg-white rounded-lg" 
+            <Input
+              placeholder="Tìm kiếm dự án..."
+              className="pl-9 bg-white rounded-lg"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -304,8 +273,8 @@ const ContentAi = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsProjectDialogOpen(false)} className="rounded-lg">Hủy</Button>
-            <Button onClick={handleSaveProject} disabled={isSaving} className="rounded-lg bg-blue-600 hover:bg-blue-700">
-              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button onClick={handleSaveProject} disabled={createProject.isPending || updateProject.isPending} className="rounded-lg bg-blue-600 hover:bg-blue-700">
+              {(createProject.isPending || updateProject.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Lưu
             </Button>
           </DialogFooter>

@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
 import { showSuccess, showError } from '@/utils/toast';
-import { supabase } from '@/integrations/supabase/client';
+import { aiPlanService, AiPlan, AiPlanTemplate } from '@/api/aiPlan';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDistanceToNow } from 'date-fns';
@@ -64,21 +64,27 @@ export const AiPlanList = () => {
   const fetchProjectsAndTemplates = async () => {
     setIsLoading(true);
     try {
-      const [projectsRes, templatesRes] = await Promise.all([
-        supabase.rpc('get_ai_plans_with_creator'),
-        supabase.from('ai_plan_templates').select('id, name')
+      const [plansData, templatesData] = await Promise.all([
+        aiPlanService.getPlans(),
+        aiPlanService.getTemplates()
       ]);
-      
-      if (projectsRes.error) throw projectsRes.error;
-      if (templatesRes.error) throw templatesRes.error;
 
-      setProjects(projectsRes.data || []);
-      setTemplates(templatesRes.data || []);
-      if (templatesRes.data && templatesRes.data.length > 0) {
-        setSelectedTemplateId(String(templatesRes.data[0].id));
+      // Map API response to component type
+      const mappedProjects: Project[] = plansData.map((plan: AiPlan) => ({
+        id: plan.id,
+        name: plan.name,
+        updated_at: plan.updated_at,
+        color: plan.color,
+        items_count: plan.items_count || 0
+      }));
+
+      setProjects(mappedProjects);
+      setTemplates(templatesData || []);
+      if (templatesData && templatesData.length > 0) {
+        setSelectedTemplateId(String(templatesData[0].id));
       }
     } catch (error: any) {
-      showError("Không thể tải dữ liệu: " + error.message);
+      showError("Không thể tải dữ liệu: " + (error.message || 'Unknown error'));
     } finally {
       setIsLoading(false);
     }
@@ -89,7 +95,7 @@ export const AiPlanList = () => {
   }, []);
 
   const filteredProjects = useMemo(() => {
-    return projects.filter(p => 
+    return projects.filter(p =>
       p.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [projects, searchTerm]);
@@ -119,27 +125,26 @@ export const AiPlanList = () => {
 
     try {
       if (editingProject) {
-        const { error } = await supabase
-          .from('ai_plans')
-          .update({ name: projectName.trim(), updated_at: new Date().toISOString() })
-          .eq('id', editingProject.id);
-        if (error) throw error;
+        await aiPlanService.updatePlan(editingProject.id, {
+          name: projectName.trim(),
+          updated_at: new Date().toISOString()
+        });
         showSuccess("Đã cập nhật kế hoạch thành công!");
       } else {
         const randomColor = getRandomColor();
-        const { data: newProject, error } = await supabase
-          .from('ai_plans')
-          .insert({ name: projectName.trim(), creator_id: user.id, color: randomColor, template_id: Number(selectedTemplateId) })
-          .select().single();
-        if (error) throw error;
+        const newProject = await aiPlanService.createPlan({
+          name: projectName.trim(),
+          template_id: Number(selectedTemplateId),
+          color: randomColor
+        });
         showSuccess("Đã tạo kế hoạch thành công!");
         if (newProject) navigate(`/ai-plan/${newProject.id}`);
       }
-      
+
       setIsProjectDialogOpen(false);
       fetchProjectsAndTemplates();
     } catch (error: any) {
-      showError(`Lưu kế hoạch thất bại: ${error.message}`);
+      showError(`Lưu kế hoạch thất bại: ${error.message || 'Unknown error'}`);
     } finally {
       setIsSaving(false);
     }
@@ -152,12 +157,12 @@ export const AiPlanList = () => {
 
   const handleDeleteProject = async () => {
     if (!projectToDelete) return;
-    const { error } = await supabase.from('ai_plans').delete().eq('id', projectToDelete.id);
-    if (error) {
-      showError("Xóa thất bại: " + error.message);
-    } else {
+    try {
+      await aiPlanService.deletePlan(projectToDelete.id);
       showSuccess("Đã xóa kế hoạch!");
       fetchProjectsAndTemplates();
+    } catch (error: any) {
+      showError("Xóa thất bại: " + (error.message || 'Unknown error'));
     }
     setIsDeleteDialogOpen(false);
   };
@@ -169,7 +174,7 @@ export const AiPlanList = () => {
     if (filteredProjects.length === 0) {
       return <div className="text-center py-16 text-muted-foreground col-span-full"><Folder className="mx-auto h-12 w-12" /><h3 className="mt-4 text-lg font-semibold">Chưa có kế hoạch nào</h3><p className="mt-1 text-sm">Hãy bắt đầu bằng cách tạo một kế hoạch mới.</p></div>;
     }
-    const projectActions = (project: Project) => ({ onEdit: () => handleOpenDialog(project), onShare: () => {}, onDelete: () => handleOpenDeleteDialog(project) });
+    const projectActions = (project: Project) => ({ onEdit: () => handleOpenDialog(project), onShare: () => { }, onDelete: () => handleOpenDeleteDialog(project) });
     const displayProjects = filteredProjects.map(p => ({
       ...p,
       files: p.items_count,
@@ -180,8 +185,8 @@ export const AiPlanList = () => {
       return (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {displayProjects.map(project => (
-            <ProjectFolder 
-              key={project.id} 
+            <ProjectFolder
+              key={project.id}
               {...project}
               basePath="/ai-plan"
               {...projectActions(project)}
@@ -204,8 +209,8 @@ export const AiPlanList = () => {
           </TableHeader>
           <TableBody>
             {displayProjects.map(project => (
-              <ProjectListItem 
-                key={project.id} 
+              <ProjectListItem
+                key={project.id}
                 {...project}
                 basePath="/ai-plan"
                 {...projectActions(project)}

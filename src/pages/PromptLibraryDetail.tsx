@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
+import { usePromptLibrary, useUpdatePromptLibrary } from '@/hooks/useLibraries';
 import { TrainingForm, TrainingConfig, initialConfig } from '@/components/TrainingForm';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -9,68 +8,38 @@ import { Loader2, ArrowLeft } from 'lucide-react';
 
 const PromptLibraryDetail = () => {
   const { libraryId } = useParams<{ libraryId: string }>();
-  const [libraryName, setLibraryName] = useState('');
-  const [config, setConfig] = useState<TrainingConfig>(initialConfig);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    const fetchPromptLibrary = async () => {
-      if (!libraryId) return;
-      setIsLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('prompt_libraries')
-          .select('name, config')
-          .eq('id', libraryId)
-          .single();
+  // React Query - data loads instantly from cache
+  const { data: library, isLoading } = usePromptLibrary(Number(libraryId));
+  const updateLibrary = useUpdatePromptLibrary();
 
-        if (error) throw error;
+  // Initialize config from library data
+  const initialConfigFromLibrary = useMemo(() => {
+    if (!library?.config) return initialConfig;
+    const loadedConfig = { ...initialConfig, ...library.config };
+    // If the saved value is invalid (too high), reset it to the new safe default.
+    if (loadedConfig.maxTokens > 8192) {
+      loadedConfig.maxTokens = 8192;
+    }
+    return loadedConfig;
+  }, [library]);
 
-        setLibraryName(data.name);
-        if (data.config && typeof data.config === 'object') {
-          const loadedConfig = { ...initialConfig, ...data.config };
-          // If the saved value is invalid (too high), reset it to the new safe default.
-          if (loadedConfig.maxTokens > 8192) {
-            loadedConfig.maxTokens = 8192;
-          }
-          setConfig(loadedConfig);
-        } else {
-          setConfig(initialConfig);
-        }
-      } catch (error: any) {
-        showError("Không thể tải dữ liệu thư viện: " + error.message);
-      } finally {
-        setIsLoading(false);
+  const [config, setConfig] = useState<TrainingConfig>(initialConfigFromLibrary);
+
+  // Update config when library loads
+  useMemo(() => {
+    if (library?.config) {
+      const loadedConfig = { ...initialConfig, ...library.config };
+      if (loadedConfig.maxTokens > 8192) {
+        loadedConfig.maxTokens = 8192;
       }
-    };
-    fetchPromptLibrary();
-  }, [libraryId]);
+      setConfig(loadedConfig);
+    }
+  }, [library]);
 
   const handleSave = async () => {
     if (!libraryId) return;
-    setIsSaving(true);
-    const toastId = showLoading("Đang lưu cấu hình...");
-
-    try {
-        const { data, error } = await supabase
-            .from('prompt_libraries')
-            .update({ config: config, updated_at: new Date().toISOString() })
-            .eq('id', libraryId)
-            .select()
-            .single();
-
-        if (error) throw error;
-        if (!data) throw new Error("Không thể cập nhật thư viện. Có thể bạn không có quyền chỉnh sửa hoặc thư viện không tồn tại.");
-
-        dismissToast(toastId);
-        showSuccess("Đã lưu thay đổi thành công!");
-    } catch (error: any) {
-        dismissToast(toastId);
-        showError(`Lưu cấu hình thất bại: ${error.message}`);
-    } finally {
-        setIsSaving(false);
-    }
+    await updateLibrary.mutateAsync({ id: Number(libraryId), data: { config } });
   };
 
   if (isLoading) {
@@ -88,6 +57,14 @@ const PromptLibraryDetail = () => {
     );
   }
 
+  if (!library) {
+    return (
+      <main className="flex-1 p-6 sm:p-8 bg-slate-50">
+        <h1 className="text-3xl font-bold">Không tìm thấy thư viện</h1>
+      </main>
+    );
+  }
+
   return (
     <main className="flex-1 space-y-8 p-6 sm:p-8 bg-slate-50 overflow-y-auto">
       <div className="flex items-center gap-4">
@@ -97,7 +74,7 @@ const PromptLibraryDetail = () => {
           </Button>
         </Link>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">{libraryName}</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">{library.name}</h1>
           <p className="text-muted-foreground mt-1">
             Cấu hình chi tiết cho thư viện prompt này.
           </p>
@@ -107,9 +84,9 @@ const PromptLibraryDetail = () => {
         config={config}
         setConfig={setConfig}
       />
-       <div className="flex justify-end pt-8 gap-3">
-        <Button onClick={handleSave} disabled={isSaving} size="lg" className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold">
-          {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+      <div className="flex justify-end pt-8 gap-3">
+        <Button onClick={handleSave} disabled={updateLibrary.isPending} size="lg" className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold">
+          {updateLibrary.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Lưu thay đổi
         </Button>
       </div>

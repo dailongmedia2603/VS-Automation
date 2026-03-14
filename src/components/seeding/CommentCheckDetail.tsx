@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { seedingService, SeedingCheckLog } from '@/api/seeding';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -52,7 +52,7 @@ interface CommentCheckDetailProps {
   onCheckComplete: () => void;
 }
 
-export const CommentCheckDetail = ({ 
+export const CommentCheckDetail = ({
   project,
   post,
   onCheckComplete
@@ -66,7 +66,7 @@ export const CommentCheckDetail = ({
   const [log, setLog] = useState<ErrorLog | null>(null);
   const [isLogOpen, setIsLogOpen] = useState(false);
   const [isHistoryLogOpen, setIsHistoryLogOpen] = useState(false);
-  
+
   const [isAddCommentDialogOpen, setIsAddCommentDialogOpen] = useState(false);
   const [newCommentsText, setNewCommentsText] = useState('');
   const [isSavingComments, setIsSavingComments] = useState(false);
@@ -80,18 +80,14 @@ export const CommentCheckDetail = ({
 
   const fetchComments = async () => {
     setIsLoading(true);
-    const { data, error } = await supabase
-      .from('seeding_comments')
-      .select('*')
-      .eq('post_id', post.id)
-      .order('created_at', { ascending: true });
-
-    if (error) {
-      showError("Không thể tải danh sách comment: " + error.message);
-    } else {
+    try {
+      const data = await seedingService.getComments(post.id);
       setComments(data || []);
+    } catch (error: any) {
+      showError("Không thể tải danh sách comment: " + (error.message || 'Unknown error'));
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   useEffect(() => {
@@ -109,60 +105,38 @@ export const CommentCheckDetail = ({
     setCheckResult(null);
     setLog(null);
     let toastId;
-    let logToSave: any = { post_id: post.id, type: 'comment_check' };
 
     try {
-      // Step 1: Fetch raw data
-      toastId = showLoading("Bước 1/3: Đang lấy dữ liệu thô từ API...");
-      const { data: fetchData, error: fetchError } = await supabase.functions.invoke('get-fb-comments', {
-        body: { fbPostId: post.links }
-      });
-      logToSave.request_url = fetchData?.requestUrl;
-      try { logToSave.raw_response = fetchData?.rawResponse ? JSON.parse(fetchData.rawResponse) : null; } catch (e) { logToSave.raw_response = { error: "Failed to parse raw response", content: fetchData.rawResponse }; }
-      if (fetchError || fetchData.error) {
-        throw { step: 'Lấy dữ liệu', error: fetchError || fetchData };
-      }
-      setLog({ step: 'Lấy dữ liệu thành công', errorMessage: 'Không có lỗi', requestUrl: fetchData.requestUrl, rawResponse: fetchData.rawResponse });
-
-      // Step 2: Process and store data
-      dismissToast(toastId);
-      toastId = showLoading("Bước 2/3: Đang xử lý và lưu trữ dữ liệu...");
-      const { data: processData, error: processError } = await supabase.functions.invoke('process-and-store-comments', {
-        body: { rawResponse: fetchData.rawResponse, internalPostId: post.id }
-      });
-      if (processError || processData.error) {
-        throw { step: 'Xử lý dữ liệu', error: processError || processData };
-      }
-
-      // Step 3: Compare and update
-      dismissToast(toastId);
-      toastId = showLoading("Bước 3/3: Đang so sánh và cập nhật trạng thái...");
-      const { data: compareResult, error: compareError } = await supabase.functions.invoke('compare-and-update-comments', {
-        body: { postId: post.id }
-      });
-      if (compareError || compareResult.error) {
-        throw { step: 'So sánh dữ liệu', error: compareError || compareResult };
-      }
+      toastId = showLoading("Đang kiểm tra bình luận...");
+      const result = await seedingService.runCommentCheck(post.id, post.links);
 
       dismissToast(toastId);
-      setCheckResult(compareResult);
-      showSuccess(`Kiểm tra hoàn tất! Tìm thấy ${compareResult.found}/${compareResult.total} bình luận.`);
-      
-      logToSave.status = 'success';
-      await supabase.from('logs_check_seeding_cmt_tu_dong').insert(logToSave);
 
-      onCheckComplete(); // Notify parent to refetch all data
-      fetchComments(); // Refresh comments list
+      if (!result.success) {
+        throw { message: result.error || 'Đã xảy ra lỗi không xác định.' };
+      }
+
+      setCheckResult({
+        found: result.found,
+        notFound: result.notFound,
+        total: result.total
+      });
+      setLog({
+        step: 'Kiểm tra hoàn tất',
+        errorMessage: 'Không có lỗi',
+        requestUrl: result.requestUrl,
+        rawResponse: result.rawResponse
+      });
+      showSuccess(`Kiểm tra hoàn tất! Tìm thấy ${result.found}/${result.total} bình luận.`);
+
+      onCheckComplete();
+      fetchComments();
 
     } catch (e: any) {
       if (toastId) dismissToast(toastId);
-      const errorMessage = e.error?.message || 'Đã xảy ra lỗi không xác định.';
-      setLog(prev => ({ ...prev, step: e.step || 'Không xác định', errorMessage: errorMessage }));
-      showError(`Kiểm tra thất bại ở bước: ${e.step}.`);
-      
-      logToSave.status = 'error';
-      logToSave.error_message = errorMessage;
-      await supabase.from('logs_check_seeding_cmt_tu_dong').insert(logToSave);
+      const errorMessage = e.message || 'Đã xảy ra lỗi không xác định.';
+      setLog(prev => ({ ...prev, step: 'Không xác định', errorMessage: errorMessage }));
+      showError(`Kiểm tra thất bại: ${errorMessage}`);
     } finally {
       setIsChecking(false);
     }
@@ -170,37 +144,33 @@ export const CommentCheckDetail = ({
 
   const handleSaveNewComments = async () => {
     if (!newCommentsText.trim()) {
-        showError("Vui lòng nhập ít nhất một comment.");
-        return;
+      showError("Vui lòng nhập ít nhất một comment.");
+      return;
     }
     setIsSavingComments(true);
 
-    const commentsToInsert = newCommentsText
-        .split('\n')
-        .map(line => line.trim())
-        .filter(line => line !== '')
-        .map(content => ({
-            post_id: post.id,
-            content: content,
-        }));
+    const contents = newCommentsText
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line !== '');
 
-    if (commentsToInsert.length === 0) {
-        showError("Không có comment hợp lệ để thêm.");
-        setIsSavingComments(false);
-        return;
+    if (contents.length === 0) {
+      showError("Không có comment hợp lệ để thêm.");
+      setIsSavingComments(false);
+      return;
     }
 
-    const { error } = await supabase.from('seeding_comments').insert(commentsToInsert);
-
-    if (error) {
-        showError("Thêm comment thất bại: " + error.message);
-    } else {
-        showSuccess(`Đã thêm thành công ${commentsToInsert.length} comment!`);
-        setIsAddCommentDialogOpen(false);
-        setNewCommentsText('');
-        fetchComments(); // Refresh the list
+    try {
+      await seedingService.bulkCreateComments(post.id, contents);
+      showSuccess(`Đã thêm thành công ${contents.length} comment!`);
+      setIsAddCommentDialogOpen(false);
+      setNewCommentsText('');
+      fetchComments();
+    } catch (error: any) {
+      showError("Thêm comment thất bại: " + (error.message || 'Unknown error'));
+    } finally {
+      setIsSavingComments(false);
     }
-    setIsSavingComments(false);
   };
 
   const handleOpenEditDialog = (comment: Comment) => {
@@ -210,58 +180,52 @@ export const CommentCheckDetail = ({
   };
 
   const handleUpdateComment = async () => {
-      if (!editingComment || !editedContent.trim()) {
-          showError("Nội dung comment không được để trống.");
-          return;
-      }
-      const toastId = showLoading("Đang cập nhật...");
-      const { error } = await supabase
-          .from('seeding_comments')
-          .update({ content: editedContent.trim() })
-          .eq('id', editingComment.id);
-      
+    if (!editingComment || !editedContent.trim()) {
+      showError("Nội dung comment không được để trống.");
+      return;
+    }
+    const toastId = showLoading("Đang cập nhật...");
+    try {
+      await seedingService.updateComment(editingComment.id, editedContent.trim());
       dismissToast(toastId);
-      if (error) {
-          showError("Cập nhật thất bại: " + error.message);
-      } else {
-          showSuccess("Đã cập nhật comment!");
-          setIsEditCommentDialogOpen(false);
-          fetchComments();
-      }
+      showSuccess("Đã cập nhật comment!");
+      setIsEditCommentDialogOpen(false);
+      fetchComments();
+    } catch (error: any) {
+      dismissToast(toastId);
+      showError("Cập nhật thất bại: " + (error.message || 'Unknown error'));
+    }
   };
 
   const handleOpenDeleteAlert = (comment: Comment) => {
-      setCommentToDelete(comment);
-      setIsDeleteAlertOpen(true);
+    setCommentToDelete(comment);
+    setIsDeleteAlertOpen(true);
   };
 
   const handleDeleteComment = async () => {
-      if (!commentToDelete) return;
-      const toastId = showLoading("Đang xóa...");
-      const { error } = await supabase
-          .from('seeding_comments')
-          .delete()
-          .eq('id', commentToDelete.id);
-
+    if (!commentToDelete) return;
+    const toastId = showLoading("Đang xóa...");
+    try {
+      await seedingService.deleteComment(commentToDelete.id);
       dismissToast(toastId);
-      if (error) {
-          showError("Xóa thất bại: " + error.message);
-      } else {
-          showSuccess("Đã xóa comment!");
-          setIsDeleteAlertOpen(false);
-          fetchComments();
-      }
+      showSuccess("Đã xóa comment!");
+      setIsDeleteAlertOpen(false);
+      fetchComments();
+    } catch (error: any) {
+      dismissToast(toastId);
+      showError("Xóa thất bại: " + (error.message || 'Unknown error'));
+    }
   };
 
   const handleExportExcel = () => {
     const dataToExport = filteredComments.map(comment => ({
-        'Dự án': project.name,
-        'Loại': post.type === 'comment_check' ? 'Check Comment' : 'Check Duyệt Post',
-        'Content Comment': comment.content,
-        'Account': comment.account_name || 'N/A',
-        'Link Account': comment.account_id ? `https://www.facebook.com/${comment.account_id}` : 'N/A',
-        'Link Comment': comment.comment_link || 'N/A',
-        'Thời gian Comment': comment.commented_at ? new Date(comment.commented_at).toLocaleString('vi-VN') : 'N/A'
+      'Dự án': project.name,
+      'Loại': post.type === 'comment_check' ? 'Check Comment' : 'Check Duyệt Post',
+      'Content Comment': comment.content,
+      'Account': comment.account_name || 'N/A',
+      'Link Account': comment.account_id ? `https://www.facebook.com/${comment.account_id}` : 'N/A',
+      'Link Comment': comment.comment_link || 'N/A',
+      'Thời gian Comment': comment.commented_at ? new Date(comment.commented_at).toLocaleString('vi-VN') : 'N/A'
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
@@ -286,17 +250,17 @@ export const CommentCheckDetail = ({
       <Card className="w-full h-full shadow-none border-none flex flex-col">
         <CardHeader>
           <div className="flex justify-between items-center">
-              <h2 className="text-lg font-semibold text-slate-800">{post.name}</h2>
-              <a href={postUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800" title="Mở bài viết gốc">
-                  <LinkIcon className="h-4 w-4" />
-              </a>
+            <h2 className="text-lg font-semibold text-slate-800">{post.name}</h2>
+            <a href={postUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800" title="Mở bài viết gốc">
+              <LinkIcon className="h-4 w-4" />
+            </a>
           </div>
           {post.links && (
-              <div className="mt-2 p-3 bg-blue-50 rounded-md text-slate-900 font-mono text-xs flex items-center gap-2">
-                  <Code className="h-4 w-4 flex-shrink-0 text-slate-600" />
-                  <span className="font-bold text-green-600">ID</span>
-                  <span className="text-slate-700 break-all">{post.links}</span>
-              </div>
+            <div className="mt-2 p-3 bg-blue-50 rounded-md text-slate-900 font-mono text-xs flex items-center gap-2">
+              <Code className="h-4 w-4 flex-shrink-0 text-slate-600" />
+              <span className="font-bold text-green-600">ID</span>
+              <span className="text-slate-700 break-all">{post.links}</span>
+            </div>
           )}
         </CardHeader>
         <CardContent className="flex-1 flex flex-col">
@@ -327,14 +291,14 @@ export const CommentCheckDetail = ({
                     </div>
                   )}
                   {log && (
-                      <Button 
-                          variant={log.errorMessage !== 'Không có lỗi' ? 'destructive' : 'outline'} 
-                          size="sm" 
-                          onClick={() => setIsLogOpen(true)}
-                      >
-                          <FileText className="mr-2 h-4 w-4" />
-                          {log.errorMessage !== 'Không có lỗi' ? 'Xem Log Lỗi' : 'Xem Log API'}
-                      </Button>
+                    <Button
+                      variant={log.errorMessage !== 'Không có lỗi' ? 'destructive' : 'outline'}
+                      size="sm"
+                      onClick={() => setIsLogOpen(true)}
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      {log.errorMessage !== 'Không có lỗi' ? 'Xem Log Lỗi' : 'Xem Log API'}
+                    </Button>
                   )}
                   <Button onClick={() => setIsHistoryLogOpen(true)} variant="outline" size="sm">
                     <FileText className="mr-2 h-4 w-4" />
@@ -406,8 +370,8 @@ export const CommentCheckDetail = ({
                         <TableCell>
                           <Badge className={cn(
                             'pointer-events-none',
-                            comment.status === 'visible' ? 'bg-green-100 text-green-800 border-green-200' : 
-                            hasDisappeared ? 'bg-red-200 text-red-800 border-red-300' : 'bg-amber-100 text-amber-800 border-amber-200'
+                            comment.status === 'visible' ? 'bg-green-100 text-green-800 border-green-200' :
+                              hasDisappeared ? 'bg-red-200 text-red-800 border-red-300' : 'bg-amber-100 text-amber-800 border-amber-200'
                           )}>
                             {comment.status === 'visible' ? 'Đã hiện' : 'Chưa hiện'}
                           </Badge>
@@ -425,7 +389,7 @@ export const CommentCheckDetail = ({
                               )}
                             </div>
                             <div className="flex items-center gap-1.5">
-                              <strong>Link:</strong> 
+                              <strong>Link:</strong>
                               {comment.comment_link ? (
                                 <a href={comment.comment_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700" title={comment.comment_link}>
                                   <LinkIcon className="h-3.5 w-3.5" />
@@ -474,59 +438,59 @@ export const CommentCheckDetail = ({
       <SeedingLogHistoryDialog isOpen={isHistoryLogOpen} onOpenChange={setIsHistoryLogOpen} postId={post.id} />
       <Dialog open={isAddCommentDialogOpen} onOpenChange={setIsAddCommentDialogOpen}>
         <DialogContent>
-            <DialogHeader>
-                <DialogTitle>Thêm comment mới</DialogTitle>
-                <DialogDescription>
-                    Nhập danh sách các comment, mỗi comment trên một dòng.
-                </DialogDescription>
-            </DialogHeader>
-            <div className="py-4">
-                <Textarea
-                    placeholder="Comment 1..."
-                    value={newCommentsText}
-                    onChange={(e) => setNewCommentsText(e.target.value)}
-                    className="min-h-[200px]"
-                />
-            </div>
-            <DialogFooter>
-                <Button variant="outline" onClick={() => setIsAddCommentDialogOpen(false)}>Hủy</Button>
-                <Button onClick={handleSaveNewComments} disabled={isSavingComments}>
-                    {isSavingComments && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Lưu
-                </Button>
-            </DialogFooter>
+          <DialogHeader>
+            <DialogTitle>Thêm comment mới</DialogTitle>
+            <DialogDescription>
+              Nhập danh sách các comment, mỗi comment trên một dòng.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Textarea
+              placeholder="Comment 1..."
+              value={newCommentsText}
+              onChange={(e) => setNewCommentsText(e.target.value)}
+              className="min-h-[200px]"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddCommentDialogOpen(false)}>Hủy</Button>
+            <Button onClick={handleSaveNewComments} disabled={isSavingComments}>
+              {isSavingComments && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Lưu
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
       <Dialog open={isEditCommentDialogOpen} onOpenChange={setIsEditCommentDialogOpen}>
         <DialogContent>
-            <DialogHeader>
-                <DialogTitle>Sửa comment</DialogTitle>
-            </DialogHeader>
-            <div className="py-4">
-                <Textarea
-                    value={editedContent}
-                    onChange={(e) => setEditedContent(e.target.value)}
-                    className="min-h-[100px]"
-                />
-            </div>
-            <DialogFooter>
-                <Button variant="outline" onClick={() => setIsEditCommentDialogOpen(false)}>Hủy</Button>
-                <Button onClick={handleUpdateComment}>Lưu thay đổi</Button>
-            </DialogFooter>
+          <DialogHeader>
+            <DialogTitle>Sửa comment</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <Textarea
+              value={editedContent}
+              onChange={(e) => setEditedContent(e.target.value)}
+              className="min-h-[100px]"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditCommentDialogOpen(false)}>Hủy</Button>
+            <Button onClick={handleUpdateComment}>Lưu thay đổi</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
       <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
         <AlertDialogContent>
-            <AlertDialogHeader>
-                <AlertDialogTitle>Bạn có chắc chắn muốn xóa?</AlertDialogTitle>
-                <AlertDialogDescription>
-                    Hành động này không thể hoàn tác. Comment sẽ bị xóa vĩnh viễn.
-                </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogCancel onClick={() => setCommentToDelete(null)}>Hủy</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDeleteComment} className="bg-red-600 hover:bg-red-700">Xóa</AlertDialogAction>
-            </AlertDialogFooter>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Bạn có chắc chắn muốn xóa?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Hành động này không thể hoàn tác. Comment sẽ bị xóa vĩnh viễn.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setCommentToDelete(null)}>Hủy</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteComment} className="bg-red-600 hover:bg-red-700">Xóa</AlertDialogAction>
+          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </>

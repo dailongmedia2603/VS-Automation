@@ -1,4 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
+import { usePostScanProjects, useCreatePostScanProject, useUpdatePostScanProject, useDeletePostScanProject } from '@/hooks/useTools';
+import { PostScanProject } from '@/api/tools';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -10,22 +12,10 @@ import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
-import { showSuccess, showError } from '@/utils/toast';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { showError } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
-
-type Project = {
-  id: number;
-  name: string;
-  created_at: string;
-  creator_id: string;
-  creator_name: string | null;
-  creator_email: string | null;
-  results_count: number;
-};
 
 type DisplayProject = {
   id: number;
@@ -36,46 +26,31 @@ type DisplayProject = {
 };
 
 const CheckPostScan = () => {
+  // React Query - data loads instantly from cache
+  const { data: projects = [], isLoading } = usePostScanProjects();
+  const createProject = useCreatePostScanProject();
+  const updateProject = useUpdatePostScanProject();
+  const deleteProject = useDeletePostScanProject();
+
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false);
-  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [editingProject, setEditingProject] = useState<PostScanProject | null>(null);
   const [projectName, setProjectName] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+  const [projectToDelete, setProjectToDelete] = useState<PostScanProject | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const { user } = useAuth();
-
-  const fetchProjects = async () => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase.rpc('get_post_scan_projects_with_creator');
-      if (error) throw error;
-      setProjects(data || []);
-    } catch (error: any) {
-      showError("Không thể tải dự án: " + error.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchProjects();
-  }, []);
 
   const filteredProjects = useMemo(() => {
-    return projects.filter(p => 
+    return projects.filter((p: PostScanProject) =>
       p.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [projects, searchTerm]);
 
   const displayProjects: DisplayProject[] = useMemo(() => {
-    return filteredProjects.map(p => ({
+    return filteredProjects.map((p: PostScanProject) => ({
       id: p.id,
       name: p.name,
-      files: p.results_count,
+      files: p.results_count || 0,
       modified: formatDistanceToNow(new Date(p.created_at), { addSuffix: true, locale: vi }),
       color: 'bg-green-100 text-green-600',
     }));
@@ -87,58 +62,41 @@ const CheckPostScan = () => {
     ];
   }, [projects]);
 
-  const handleOpenDialog = (project: Project | null = null) => {
+  const handleOpenDialog = (project: PostScanProject | null = null) => {
     setEditingProject(project);
     setProjectName(project ? project.name : '');
     setIsProjectDialogOpen(true);
   };
 
   const handleSaveProject = async () => {
-    if (!projectName.trim() || !user) {
+    if (!projectName.trim()) {
       showError("Tên dự án không được để trống.");
       return;
     }
-    setIsSaving(true);
     try {
       if (editingProject) {
-        const { error } = await supabase
-          .from('post_scan_projects')
-          .update({ name: projectName.trim() })
-          .eq('id', editingProject.id);
-        if (error) throw error;
-        showSuccess("Đã cập nhật dự án thành công!");
+        await updateProject.mutateAsync({ id: editingProject.id, data: { name: projectName.trim() } });
       } else {
-        const { error } = await supabase
-          .from('post_scan_projects')
-          .insert({ name: projectName.trim(), creator_id: user.id });
-        if (error) throw error;
-        showSuccess("Đã tạo dự án thành công!");
+        await createProject.mutateAsync({ name: projectName.trim() });
       }
       setIsProjectDialogOpen(false);
-      fetchProjects();
-    } catch (error: any) {
-      showError(`Lưu dự án thất bại: ${error.message}`);
-    } finally {
-      setIsSaving(false);
+    } catch {
+      // Error handled by mutation
     }
   };
 
-  const handleOpenDeleteDialog = (project: Project) => {
+  const handleOpenDeleteDialog = (project: PostScanProject) => {
     setProjectToDelete(project);
     setIsDeleteDialogOpen(true);
   };
 
   const handleDeleteProject = async () => {
     if (!projectToDelete) return;
-    const { error } = await supabase.from('post_scan_projects').delete().eq('id', projectToDelete.id);
-    if (error) {
-      showError("Xóa thất bại: " + error.message);
-    } else {
-      showSuccess("Đã xóa dự án!");
-      fetchProjects();
-    }
+    await deleteProject.mutateAsync(projectToDelete.id);
     setIsDeleteDialogOpen(false);
   };
+
+  const isSaving = createProject.isPending || updateProject.isPending;
 
   const renderProjectView = () => {
     if (isLoading) {
@@ -150,16 +108,16 @@ const CheckPostScan = () => {
     }
 
     if (displayProjects.length === 0) {
-        return (
-            <div className="text-center py-16 text-muted-foreground col-span-full">
-                <Folder className="mx-auto h-12 w-12" />
-                <h3 className="mt-4 text-lg font-semibold">Chưa có dự án nào</h3>
-                <p className="mt-1 text-sm">Hãy bắt đầu bằng cách tạo dự án mới.</p>
-            </div>
-        )
+      return (
+        <div className="text-center py-16 text-muted-foreground col-span-full">
+          <Folder className="mx-auto h-12 w-12" />
+          <h3 className="mt-4 text-lg font-semibold">Chưa có dự án nào</h3>
+          <p className="mt-1 text-sm">Hãy bắt đầu bằng cách tạo dự án mới.</p>
+        </div>
+      )
     }
 
-    const projectActions = (project: Project) => ({
+    const projectActions = (project: PostScanProject) => ({
       onEdit: () => handleOpenDialog(project),
       onShare: () => { /* Not implemented for this tool */ },
       onDelete: () => handleOpenDeleteDialog(project),
@@ -169,8 +127,8 @@ const CheckPostScan = () => {
       return (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {displayProjects.map((project, index) => (
-            <ProjectFolder 
-              key={project.id} 
+            <ProjectFolder
+              key={project.id}
               {...project}
               basePath="/tools/check-post-scan"
               {...projectActions(filteredProjects[index])}
@@ -193,8 +151,8 @@ const CheckPostScan = () => {
           </TableHeader>
           <TableBody>
             {displayProjects.map((project, index) => (
-              <ProjectListItem 
-                key={project.id} 
+              <ProjectListItem
+                key={project.id}
                 {...project}
                 basePath="/tools/check-post-scan"
                 {...projectActions(filteredProjects[index])}

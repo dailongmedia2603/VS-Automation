@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { aiPlanService } from '@/api/aiPlan';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -29,19 +29,18 @@ export const AiPlanPublicPageSetup = () => {
   useEffect(() => {
     const fetchSettings = async () => {
       setIsLoading(true);
-      const { data, error } = await supabase
-        .from('public_page_settings')
-        .select('*')
-        .eq('id', 1)
-        .single();
-      
-      if (error && error.code !== 'PGRST116') {
-        showError("Không thể tải cài đặt: " + error.message);
-      } else if (data) {
-        setSettings(data);
-        setLogoPreview(data.logo_url);
+      try {
+        const data = await aiPlanService.getGlobalPublicPageSettings();
+        if (data) {
+          setSettings(data);
+          setLogoPreview(data.logo_url);
+        }
+      } catch (error: any) {
+        // Settings may not exist yet, which is fine
+        console.log("No existing settings found, using defaults");
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
     fetchSettings();
   }, []);
@@ -77,7 +76,7 @@ export const AiPlanPublicPageSetup = () => {
           canvas.height = height;
           const ctx = canvas.getContext('2d');
           ctx?.drawImage(img, 0, 0, width, height);
-          
+
           canvas.toBlob((blob) => {
             if (blob) {
               const resizedFile = new File([blob], file.name, {
@@ -109,36 +108,22 @@ export const AiPlanPublicPageSetup = () => {
       let logoUrl = settings.logo_url;
 
       if (logoFile) {
-        const filePath = `public/${Date.now()}-${logoFile.name}`;
-        const { error: uploadError } = await supabase.storage
-          .from('public_logos')
-          .upload(filePath, logoFile, { upsert: true });
-        
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('public_logos')
-          .getPublicUrl(filePath);
-        logoUrl = publicUrl;
+        const result = await aiPlanService.uploadGlobalLogo(logoFile);
+        logoUrl = result.url;
       }
 
-      const { error } = await supabase
-        .from('public_page_settings')
-        .upsert({
-          id: 1,
-          company_name: settings.company_name,
-          description: settings.description,
-          logo_url: logoUrl,
-          logo_width: settings.logo_width,
-          logo_height: settings.logo_height,
-          updated_at: new Date().toISOString(),
-        });
+      await aiPlanService.updateGlobalPublicPageSettings({
+        company_name: settings.company_name,
+        description: settings.description,
+        logo_url: logoUrl,
+        logo_width: settings.logo_width,
+        logo_height: settings.logo_height,
+      });
 
-      if (error) throw error;
       showSuccess("Đã lưu cài đặt thành công!");
       setLogoFile(null);
     } catch (error: any) {
-      showError("Lưu thất bại: " + error.message);
+      showError("Lưu thất bại: " + (error.message || 'Unknown error'));
     } finally {
       setIsSaving(false);
     }

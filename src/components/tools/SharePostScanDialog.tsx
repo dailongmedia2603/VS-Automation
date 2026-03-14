@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { postScanService } from '@/api/tools';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -33,21 +33,13 @@ export const SharePostScanDialog = ({ isOpen, onOpenChange, project, onProjectUp
   const handleTogglePublic = async (checked: boolean) => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('post_scan_projects')
-        .update({ is_public: checked })
-        .eq('id', project.id)
-        .select('is_public, public_id')
-        .single();
-      
-      if (error) throw error;
-
-      setIsPublic(data.is_public);
-      onProjectUpdate(data);
+      const data = await postScanService.updatePublicStatus(project.id, checked);
+      setIsPublic(checked);
+      onProjectUpdate({ is_public: checked, public_id: data.public_id });
       showSuccess(`Dự án đã được ${checked ? 'công khai' : 'đặt riêng tư'}.`);
     } catch (error: any) {
       showError("Cập nhật thất bại: " + error.message);
-      setIsPublic(!checked); // Revert on error
+      setIsPublic(!checked);
     } finally {
       setIsLoading(false);
     }

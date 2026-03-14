@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { settingsService, TelegramConfig } from '@/api/settings';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -9,19 +9,9 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PlusCircle, Edit, Trash2, Loader2, Bot } from 'lucide-react';
 import { showSuccess, showError } from '@/utils/toast';
-import { useAuth } from '@/contexts/AuthContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-type TelegramConfig = {
-  id: number;
-  name: string;
-  bot_token: string;
-  chat_id: string;
-  creator_id: string;
-};
-
 const TelegramSettings = () => {
-  const { user } = useAuth();
   const [configs, setConfigs] = useState<TelegramConfig[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -35,27 +25,22 @@ const TelegramSettings = () => {
 
   const fetchConfigs = async () => {
     setIsLoading(true);
-    const { data, error } = await supabase.from('telegram_configs').select('*').order('created_at');
-    if (error) {
-      showError("Không thể tải cấu hình Telegram: " + error.message);
-    } else {
+    try {
+      const data = await settingsService.getTelegramConfigs();
       setConfigs(data || []);
+    } catch (error: any) {
+      showError("Không thể tải cấu hình Telegram: " + error.message);
     }
     setIsLoading(false);
   };
 
   const fetchNotificationConfig = async () => {
     setIsLoadingNotificationConfig(true);
-    const { data, error } = await supabase
-      .from('n8n_settings')
-      .select('telegram_config_id_for_seeding')
-      .eq('id', 1)
-      .single();
-    
-    if (error && error.code !== 'PGRST116') {
-      showError("Không thể tải cài đặt thông báo: " + error.message);
-    } else if (data) {
-      setNotificationConfigId(data.telegram_config_id_for_seeding?.toString());
+    try {
+      const data = await settingsService.getN8nSettings();
+      setNotificationConfigId(data?.telegram_config_id_for_seeding?.toString());
+    } catch (error: any) {
+      // Ignore error if settings not found
     }
     setIsLoadingNotificationConfig(false);
   };
@@ -78,17 +63,18 @@ const TelegramSettings = () => {
     setIsSaving(true);
     try {
       if (editingConfig.id) {
-        const { error } = await supabase
-          .from('telegram_configs')
-          .update({ name: editingConfig.name, bot_token: editingConfig.bot_token, chat_id: editingConfig.chat_id })
-          .eq('id', editingConfig.id);
-        if (error) throw error;
+        await settingsService.updateTelegramConfig(editingConfig.id, {
+          name: editingConfig.name,
+          bot_token: editingConfig.bot_token,
+          chat_id: editingConfig.chat_id
+        });
         showSuccess("Đã cập nhật cấu hình!");
       } else {
-        const { error } = await supabase
-          .from('telegram_configs')
-          .insert({ name: editingConfig.name, bot_token: editingConfig.bot_token, chat_id: editingConfig.chat_id, creator_id: user?.id });
-        if (error) throw error;
+        await settingsService.createTelegramConfig({
+          name: editingConfig.name,
+          bot_token: editingConfig.bot_token,
+          chat_id: editingConfig.chat_id
+        });
         showSuccess("Đã thêm cấu hình mới!");
       }
       setIsDialogOpen(false);
@@ -102,12 +88,12 @@ const TelegramSettings = () => {
 
   const handleDelete = async () => {
     if (!configToDelete) return;
-    const { error } = await supabase.from('telegram_configs').delete().eq('id', configToDelete.id);
-    if (error) {
-      showError("Xóa thất bại: " + error.message);
-    } else {
+    try {
+      await settingsService.deleteTelegramConfig(configToDelete.id);
       showSuccess("Đã xóa cấu hình!");
       fetchConfigs();
+    } catch (error: any) {
+      showError("Xóa thất bại: " + error.message);
     }
     setConfigToDelete(null);
   };
@@ -119,15 +105,12 @@ const TelegramSettings = () => {
     }
     setIsTesting(true);
     try {
-      const { data, error } = await supabase.functions.invoke('test-telegram-api', {
-        body: { bot_token: editingConfig.bot_token }
-      });
-      if (error) {
-        const errorBody = await error.context.json();
-        throw new Error(errorBody.error || error.message);
+      const result = await settingsService.testTelegramConnection(editingConfig.bot_token);
+      if (result.success) {
+        showSuccess(result.message);
+      } else {
+        throw new Error(result.message);
       }
-      if (data.error) throw new Error(data.error);
-      showSuccess(data.message);
     } catch (err: any) {
       showError(`Kiểm tra thất bại: ${err.message}`);
     } finally {
@@ -137,14 +120,13 @@ const TelegramSettings = () => {
 
   const handleSaveNotificationConfig = async () => {
     setIsSavingNotificationConfig(true);
-    const { error } = await supabase
-      .from('n8n_settings')
-      .upsert({ id: 1, telegram_config_id_for_seeding: notificationConfigId ? Number(notificationConfigId) : null });
-    
-    if (error) {
-      showError("Lưu cài đặt thông báo thất bại: " + error.message);
-    } else {
+    try {
+      await settingsService.updateN8nSettings({
+        telegram_config_id_for_seeding: notificationConfigId ? Number(notificationConfigId) : null
+      });
       showSuccess("Đã lưu cài đặt thông báo!");
+    } catch (error: any) {
+      showError("Lưu cài đặt thông báo thất bại: " + error.message);
     }
     setIsSavingNotificationConfig(false);
   };

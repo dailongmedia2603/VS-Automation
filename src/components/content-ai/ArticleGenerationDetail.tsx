@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { contentAiService, libraryService } from '@/api/contentAi';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -58,6 +58,8 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
   const [isBulkDeleteAlertOpen, setIsBulkDeleteAlertOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isLibraryDialogOpen, setIsLibraryDialogOpen] = useState(false);
+  const [feedbacks, setFeedbacks] = useState<Record<string, string>>({});
+  const [configAccordionValue, setConfigAccordionValue] = useState("item-1");
   const [articlesToRegenerate, setArticlesToRegenerate] = useState<string[]>([]);
   const [highlightedIds, setHighlightedIds] = useState<string[]>([]);
 
@@ -65,11 +67,22 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
   const [structures, setStructures] = useState<ArticleStructure[]>([]);
   const [projectDocuments, setProjectDocuments] = useState<Document[]>([]);
 
+  const [isCheckFeedbackLoading, setIsCheckFeedbackLoading] = useState(false);
+  const [checkFeedbackResult, setCheckFeedbackResult] = useState<string | null>(null);
+  const [isCheckFeedbackDialogOpen, setIsCheckFeedbackDialogOpen] = useState(false);
+
   useEffect(() => {
     setCurrentItem(item);
     const itemConfig = item.config || {};
     setConfig(itemConfig);
-    setMandatoryConditions(itemConfig.mandatoryConditions || []);
+    setMandatoryConditions(item.config?.mandatoryConditions || []);
+
+    // Load Feedbacks
+    contentAiService.getItemFeedbacks(item.id).then(fbs => {
+      const map: Record<string, string> = {};
+      fbs.forEach(f => map[f.content_id] = f.feedback);
+      setFeedbacks(map);
+    });
     try {
       const parsedContent = JSON.parse(item.content || '[]');
       setResults(Array.isArray(parsedContent) ? parsedContent : []);
@@ -78,63 +91,80 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
     }
   }, [item]);
 
+  // Polling for generation status
   useEffect(() => {
-    const channel = supabase
-      .channel(`content_ai_item_${item.id}`)
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'content_ai_items',
-        filter: `id=eq.${item.id}`
-      }, (payload) => {
-        const updatedItem = payload.new as ProjectItem;
-        if (updatedItem.generation_status === 'idle' && currentItem.generation_status === 'generating') {
-          showSuccess("AI đã tạo xong nội dung!");
-        } else if (updatedItem.generation_status === 'failed' && currentItem.generation_status === 'generating') {
-          showError(`Tạo nội dung thất bại: ${updatedItem.generation_error || 'Lỗi không xác định'}`);
+    let interval: NodeJS.Timeout;
+
+    if (currentItem.generation_status === 'generating') {
+      interval = setInterval(async () => {
+        try {
+          const updatedItem = await contentAiService.getItem(item.id);
+
+          if (updatedItem.generation_status !== 'generating') {
+            if (updatedItem.generation_status === 'failed') {
+              showError(`Tạo nội dung thất bại: ${updatedItem.generation_error || 'Lỗi không xác định'}`);
+            } else {
+              showSuccess("AI đã tạo xong nội dung!");
+              // Highlight newly generated items
+              try {
+                const newContent = JSON.parse(updatedItem.content || '[]');
+                const oldContent = JSON.parse(item.content || '[]');
+                const newIds = newContent.filter((nc: any) => !oldContent.some((oc: any) => oc.id === nc.id)).map((nc: any) => nc.id);
+                setHighlightedIds(newIds);
+              } catch (e) {
+                console.error('Error highlighting new items', e);
+              }
+            }
+          }
+
+          setCurrentItem(updatedItem as ProjectItem);
+          onSave(updatedItem as ProjectItem);
+        } catch (error) {
+          console.error("Polling error", error);
         }
-        setCurrentItem(updatedItem);
-        onSave(updatedItem);
-      })
-      .subscribe();
+      }, 3000);
+    }
 
     return () => {
-      supabase.removeChannel(channel);
+      if (interval) clearInterval(interval);
     };
-  }, [item.id, onSave, currentItem.generation_status]);
+  }, [currentItem.generation_status, item.id, onSave]);
 
   useEffect(() => {
     const fetchLogs = async () => {
-        setIsLoadingLogs(true);
-        const { data, error } = await supabase.from('content_ai_logs').select('*').eq('item_id', item.id).order('created_at', { ascending: false });
-        if (error) showError("Không thể tải lịch sử log: " + error.message);
-        else setLogs(data || []);
+      setIsLoadingLogs(true);
+      try {
+        const data = await contentAiService.getLogs(item.id);
+        setLogs(data || []);
+      } catch (error: any) {
+        showError("Không thể tải lịch sử log: " + (error.response?.data?.message || 'Unknown error'));
+      } finally {
         setIsLoadingLogs(false);
+      }
     };
     fetchLogs();
 
     const fetchStructureData = async () => {
-      const libPromise = supabase.from('article_structure_libraries').select('id, name');
-      const structPromise = supabase.from('article_structures').select('*');
-      const [{ data: libData, error: libError }, { data: structData, error: structError }] = await Promise.all([libPromise, structPromise]);
-      
-      if (libError || structError) {
-          showError("Lỗi tải dữ liệu cấu trúc bài viết.");
-      } else {
-          setStructureLibraries(libData || []);
-          setStructures(structData || []);
+      try {
+        const [libData, structData] = await Promise.all([
+          libraryService.getStructureLibraries(),
+          libraryService.getStructureItems()
+        ]);
+        setStructureLibraries(libData || []);
+        setStructures(structData || []);
+      } catch (error) {
+        showError("Lỗi tải dữ liệu cấu trúc bài viết.");
       }
     };
     fetchStructureData();
 
     const fetchProjectDocuments = async () => {
       if (!project?.id) return;
-      const { data, error } = await supabase
-        .from('documents')
-        .select('id, title')
-        .eq('project_id', project.id);
-      if (!error) {
+      try {
+        const data = await contentAiService.getDocuments(project.id);
         setProjectDocuments(data || []);
+      } catch (error) {
+        console.error("Error fetching documents", error);
       }
     };
     fetchProjectDocuments();
@@ -156,20 +186,16 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
 
   const handleSaveConfig = async (updatedConfig: any) => {
     setIsSaving(true);
-    const { data, error } = await supabase
-      .from('content_ai_items')
-      .update({ config: updatedConfig, updated_at: new Date().toISOString() })
-      .eq('id', item.id)
-      .select()
-      .single();
-
-    if (error) {
-      showError("Lưu cấu hình thất bại: " + error.message);
-    } else if (data) {
+    try {
+      const updatedItem = await contentAiService.updateItem(item.id, { config: updatedConfig });
       showSuccess("Đã lưu cấu hình thành công!");
-      onSave(data as ProjectItem);
+      onSave(updatedItem as ProjectItem);
+      setConfigAccordionValue(""); // Auto-collapse on success
+    } catch (error: any) {
+      showError("Lưu cấu hình thất bại: " + (error.response?.data?.message || error.message));
+    } finally {
+      setIsSaving(false);
     }
-    setIsSaving(false);
   };
 
   const handleSaveConditions = async () => {
@@ -184,30 +210,31 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
 
     try {
       const configToSave = { ...config, mandatoryConditions };
-      const { data: savedItem, error: saveError } = await supabase
-        .from('content_ai_items')
-        .update({ 
-          config: configToSave, 
-          updated_at: new Date().toISOString(),
-          generation_status: 'generating',
-          generation_error: null
-        })
-        .eq('id', item.id)
-        .select()
-        .single();
-
-      if (saveError) throw saveError;
-      onSave(savedItem as ProjectItem);
-      
-      const { error: invokeError } = await supabase.functions.invoke('generate-ai-content', {
-        body: { itemId: item.id }
+      // First update config and status to 'generating'
+      const savedItem = await contentAiService.updateItem(item.id, {
+        config: configToSave,
+        generation_status: 'generating',
+        generation_error: null
       });
-      
-      if (invokeError) throw invokeError;
+
+      onSave(savedItem as ProjectItem);
+      setCurrentItem(savedItem as ProjectItem);
+
+      // Call generate API
+      const result = await contentAiService.generateContent(item.id);
+
+      if (!result.success && result.error) {
+        throw new Error(result.error);
+      }
 
     } catch (err: any) {
       showError(`Không thể bắt đầu tạo nội dung: ${err.message}`);
-      await supabase.from('content_ai_items').update({ generation_status: 'failed', generation_error: err.message }).eq('id', item.id);
+      // Mark as failed locally/remotely
+      try {
+        await contentAiService.updateItem(item.id, { generation_status: 'failed', generation_error: err.message });
+      } catch (e) {
+        console.error("Failed to update status", e);
+      }
     }
   };
 
@@ -222,35 +249,28 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
     }
     setIsFeedbackDialogOpen(false);
     try {
-      const { data: savedItem, error: saveError } = await supabase
-        .from('content_ai_items')
-        .update({ 
-          generation_status: 'generating',
-          generation_error: null
-        })
-        .eq('id', item.id)
-        .select()
-        .single();
-      
-      if (saveError) throw saveError;
-      onSave(savedItem as ProjectItem);
-
-      const { error: invokeError } = await supabase.functions.invoke('regenerate-ai-articles', {
-        body: {
-          itemId: item.id,
-          feedback: feedbackText,
-          articleIdsToRegenerate: articlesToRegenerate,
-        }
+      // Update status first
+      const savedItem = await contentAiService.updateItem(item.id, {
+        generation_status: 'generating',
+        generation_error: null
       });
 
-      if (invokeError) throw invokeError;
+      onSave(savedItem as ProjectItem);
+      setCurrentItem(savedItem as ProjectItem);
+
+      const result = await contentAiService.regenerateContent(item.id, {
+        feedback: feedbackText,
+        content_ids: articlesToRegenerate,
+      });
+
+      if (!result.success && result.error) throw new Error(result.error);
 
       setHighlightedIds(articlesToRegenerate);
       setFeedbackText('');
       setArticlesToRegenerate([]);
     } catch (err: any) {
       showError(`Tạo lại thất bại: ${err.message}`);
-      await supabase.from('content_ai_items').update({ generation_status: 'failed', generation_error: err.message }).eq('id', item.id);
+      await contentAiService.updateItem(item.id, { generation_status: 'failed', generation_error: err.message });
     }
   };
 
@@ -268,17 +288,14 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
 
   const handleClearLogs = async () => {
     const toastId = showLoading("Đang xóa tất cả log...");
-    const { error } = await supabase
-        .from('content_ai_logs')
-        .delete()
-        .eq('item_id', item.id);
-    
-    dismissToast(toastId);
-    if (error) {
-        showError("Xóa log thất bại: " + error.message);
-    } else {
-        showSuccess("Đã xóa toàn bộ lịch sử log!");
-        setLogs([]);
+    try {
+      await contentAiService.deleteLogs(item.id);
+      dismissToast(toastId);
+      showSuccess("Đã xóa toàn bộ lịch sử log!");
+      setLogs([]);
+    } catch (error: any) {
+      dismissToast(toastId);
+      showError("Xóa log thất bại: " + error.message);
     }
   };
 
@@ -301,7 +318,7 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
       .filter(r => selectedIds.includes(r.id))
       .map(r => r.content)
       .join('\n');
-    
+
     navigator.clipboard.writeText(contentToCopy).then(() => {
       showSuccess(`Đã sao chép ${selectedIds.length} bài viết!`);
     }).catch(err => {
@@ -313,14 +330,14 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
     const newResults = results.filter(r => !selectedIds.includes(r.id));
     setResults(newResults);
     setSelectedIds([]);
-    
-    const { error } = await supabase.from('content_ai_items').update({ content: JSON.stringify(newResults), updated_at: new Date().toISOString() }).eq('id', item.id);
-    if (error) {
-      showError("Xóa thất bại: " + error.message);
-      setResults(results);
-    } else {
+
+    try {
+      await contentAiService.updateItem(item.id, { content: JSON.stringify(newResults) });
       showSuccess("Đã xóa thành công!");
       onSave({ ...item, content: JSON.stringify(newResults) });
+    } catch (error: any) {
+      showError("Xóa thất bại: " + (error.response?.data?.message || error.message));
+      setResults(results); // Revert?
     }
     setIsBulkDeleteAlertOpen(false);
   };
@@ -336,14 +353,59 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
     XLSX.writeFile(workbook, `${project.name} - ${item.name} - Articles.xlsx`);
   };
 
-  const handleAddConditionsFromLibrary = (conditionsFromLib: MandatoryCondition[]) => {
+  const handleCheckFeedback = async () => {
+    if (selectedIds.length === 0) {
+      showError("Vui lòng chọn ít nhất một bài viết để kiểm tra.");
+      return;
+    }
+
+    setIsCheckFeedbackLoading(true);
+    try {
+      const result = await contentAiService.checkFeedback(project.id, {
+        item_id: item.id,
+        content_ids: selectedIds
+      });
+
+      if (result.success) {
+        setCheckFeedbackResult(result.analysis);
+        setIsCheckFeedbackDialogOpen(true);
+        if (result.feedbacks) {
+          const map = { ...feedbacks };
+          result.feedbacks.forEach(f => map[f.content_id] = f.feedback);
+          setFeedbacks(map);
+        }
+      }
+    } catch (error: any) {
+      showError("Kiểm tra thất bại: " + (error.response?.data?.message || error.message));
+    } finally {
+      setIsCheckFeedbackLoading(false);
+    }
+  };
+
+  const handleAddConditionsFromLibrary = async (conditionsFromLib: MandatoryCondition[]) => {
     const newConditions = conditionsFromLib.map(c => ({ ...c, id: crypto.randomUUID() }));
-    
+
     const existingContents = new Set(mandatoryConditions.map(c => c.content.trim()));
     const uniqueNewConditions = newConditions.filter(c => !existingContents.has(c.content.trim()));
 
-    setMandatoryConditions(prev => [...prev, ...uniqueNewConditions]);
-    showSuccess(`Đã thêm ${uniqueNewConditions.length} điều kiện từ thư viện.`);
+    if (uniqueNewConditions.length === 0) return;
+
+    const updatedConditions = [...mandatoryConditions, ...uniqueNewConditions];
+    setMandatoryConditions(updatedConditions);
+
+    // Auto-save immediately
+    setIsSavingConditions(true);
+    try {
+      const updatedItem = await contentAiService.updateItem(item.id, {
+        config: { ...config, mandatoryConditions: updatedConditions }
+      });
+      showSuccess(`Đã thêm và lưu ${uniqueNewConditions.length} điều kiện từ thư viện.`);
+      onSave(updatedItem as ProjectItem);
+    } catch (error: any) {
+      showError("Lưu điều kiện thất bại: " + (error.response?.data?.message || error.message));
+    } finally {
+      setIsSavingConditions(false);
+    }
   };
 
   return (
@@ -358,7 +420,7 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
           </Button>
         </div>
       </div>
-      
+
       {currentItem.generation_status === 'failed' && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -369,7 +431,7 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
         </Alert>
       )}
 
-      <Accordion type="single" collapsible defaultValue="item-1" className="w-full">
+      <Accordion type="single" collapsible value={configAccordionValue} onValueChange={setConfigAccordionValue} className="w-full">
         <AccordionItem value="item-1" className="border rounded-2xl bg-blue-50 shadow-sm">
           <AccordionTrigger className="px-6 py-4 text-lg font-semibold hover:no-underline">
             <div className="flex items-center gap-3"><Settings className="h-5 w-5 text-blue-600" /><span>Cấu hình & Tùy chọn</span></div>
@@ -589,6 +651,10 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
               )}
               <Button variant="outline" size="icon" onClick={handleExportExcel}><Download className="h-4 w-4" /></Button>
               <Button variant="outline" size="icon" onClick={() => setIsLogOpen(true)}><FileText className="h-4 w-4" /></Button>
+              <Button variant="outline" onClick={handleCheckFeedback} disabled={isCheckFeedbackLoading || selectedIds.length === 0} className="border-purple-200 text-purple-700 hover:bg-purple-50">
+                {isCheckFeedbackLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
+                Check Feedback
+              </Button>
               <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setIsFeedbackDialogOpen(true)} disabled={currentItem.generation_status === 'generating' || results.length === 0}>
                 <MessageSquarePlus className="mr-2 h-4 w-4" />
                 Feedback & Tạo lại
@@ -599,11 +665,11 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
         <CardContent>
           <div className="border rounded-lg overflow-hidden">
             <Table>
-              <TableHeader><TableRow><TableHead className="w-12"><Checkbox checked={selectedIds.length > 0 && selectedIds.length === filteredResults.length && filteredResults.length > 0} onCheckedChange={(checked) => handleSelectAll(!!checked)} /></TableHead><TableHead>STT</TableHead><TableHead>Nội dung bài viết</TableHead><TableHead>Dạng bài</TableHead><TableHead className="text-right">Thao tác</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead className="w-12"><Checkbox checked={selectedIds.length > 0 && selectedIds.length === filteredResults.length && filteredResults.length > 0} onCheckedChange={(checked) => handleSelectAll(!!checked)} /></TableHead><TableHead>STT</TableHead><TableHead className="w-[40%]">Nội dung bài viết</TableHead><TableHead className="w-[40%] text-purple-700"><ShieldCheck className="h-4 w-4 inline mr-1" />Check Feedback</TableHead><TableHead>Dạng bài</TableHead><TableHead className="text-right">Thao tác</TableHead></TableRow></TableHeader>
               <TableBody>
                 {currentItem.generation_status === 'generating' && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center p-4">
+                    <TableCell colSpan={6} className="text-center p-4">
                       <div className="flex items-center justify-center gap-3 text-slate-500">
                         <Bot className="h-5 w-5 animate-bounce" />
                         <span className="font-medium">AI đang làm việc... Tác vụ đang chạy trong nền.</span>
@@ -615,10 +681,19 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
                   <TableRow key={result.id} className={cn(highlightedIds.includes(result.id) && "bg-green-50 hover:bg-green-100")}>
                     <TableCell><Checkbox checked={selectedIds.includes(result.id)} onCheckedChange={() => handleSelectRow(result.id)} /></TableCell>
                     <TableCell>{index + 1}</TableCell>
-                    <TableCell className="max-w-2xl">
+                    <TableCell className="max-w-xl">
                       <div className="prose prose-sm max-w-none prose-slate">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{result.content}</ReactMarkdown>
                       </div>
+                    </TableCell>
+                    <TableCell className="max-w-xl align-top bg-purple-50/30">
+                      {feedbacks[result.id] ? (
+                        <div className="prose prose-sm max-w-none prose-purple text-xs">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{feedbacks[result.id]}</ReactMarkdown>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground italic">Chưa có feedback</span>
+                      )}
                     </TableCell>
                     <TableCell><Badge variant="outline">{result.type}</Badge></TableCell>
                     <TableCell className="text-right">
@@ -637,7 +712,7 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
                       </DropdownMenu>
                     </TableCell>
                   </TableRow>
-                )) : currentItem.generation_status !== 'generating' && (<TableRow><TableCell colSpan={5} className="text-center h-24">Chưa có kết quả nào.</TableCell></TableRow>)}
+                )) : currentItem.generation_status !== 'generating' && (<TableRow><TableCell colSpan={6} className="text-center h-24">Chưa có kết quả nào.</TableCell></TableRow>)}
               </TableBody>
             </Table>
           </div>
@@ -645,7 +720,7 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
       </Card>
 
       <GenerationLogDialog isOpen={isLogOpen} onOpenChange={setIsLogOpen} logs={logs} isLoading={isLoadingLogs} onClearLogs={handleClearLogs} />
-      
+
       <Dialog open={isFeedbackDialogOpen} onOpenChange={setIsFeedbackDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
@@ -749,11 +824,28 @@ export const ArticleGenerationDetail = ({ project, item, promptLibraries, onSave
         </AlertDialogContent>
       </AlertDialog>
 
-      <ConditionLibraryDialog 
-        isOpen={isLibraryDialogOpen} 
-        onOpenChange={setIsLibraryDialogOpen} 
-        onSelect={handleAddConditionsFromLibrary} 
+      <ConditionLibraryDialog
+        isOpen={isLibraryDialogOpen}
+        onOpenChange={setIsLibraryDialogOpen}
+        onSelect={handleAddConditionsFromLibrary}
       />
+
+      <Dialog open={isCheckFeedbackDialogOpen} onOpenChange={setIsCheckFeedbackDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Kết quả kiểm tra Feedback</DialogTitle>
+            <DialogDescription>Phân tích từ NotebookLM dựa trên tài liệu dự án.</DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto p-4 border rounded-md bg-slate-50">
+            <div className="prose prose-sm max-w-none">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{checkFeedbackResult || ''}</ReactMarkdown>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setIsCheckFeedbackDialogOpen(false)}>Đóng</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

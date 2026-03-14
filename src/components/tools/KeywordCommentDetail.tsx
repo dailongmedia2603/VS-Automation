@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { keywordCheckService } from '@/api/tools';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -16,6 +16,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import * as XLSX from 'xlsx';
+import apiClient from '@/api/client';
 
 type Project = { id: number; name: string; };
 type Post = { id: number; name: string; link: string | null; keywords: string | null; };
@@ -40,7 +41,7 @@ export const KeywordCommentDetail = ({ project, post, onCheckComplete }: Keyword
   const [statusFilter, setStatusFilter] = useState<'all' | 'found' | 'not_found'>('all');
   const [isChecking, setIsChecking] = useState(false);
   const [checkResult, setCheckResult] = useState<CheckResult | null>(null);
-  
+
   const [isAddItemDialogOpen, setIsAddItemDialogOpen] = useState(false);
   const [newItemsText, setNewItemsText] = useState('');
   const [isSavingItems, setIsSavingItems] = useState(false);
@@ -53,9 +54,12 @@ export const KeywordCommentDetail = ({ project, post, onCheckComplete }: Keyword
 
   const fetchItems = async () => {
     setIsLoading(true);
-    const { data, error } = await supabase.from('keyword_check_items').select('*').eq('post_id', post.id).order('created_at', { ascending: true });
-    if (error) showError("Không thể tải danh sách: " + error.message);
-    else setItems(data || []);
+    try {
+      const data = await keywordCheckService.getItems(post.id);
+      setItems(data || []);
+    } catch (error: any) {
+      showError("Không thể tải danh sách: " + error.message);
+    }
     setIsLoading(false);
   };
 
@@ -66,8 +70,9 @@ export const KeywordCommentDetail = ({ project, post, onCheckComplete }: Keyword
     setCheckResult(null);
     const toastId = showLoading("Đang quét nội dung...");
     try {
-      const { data, error } = await supabase.functions.invoke('check-keywords-in-comments', { body: { postId: post.id } });
-      if (error || data.error) throw new Error(error?.message || data?.error);
+      const response = await apiClient.post(`/services/keyword-check/${post.id}`);
+      const data = response.data;
+      if (data.error) throw new Error(data.error);
       setCheckResult(data);
       showSuccess(`Quét hoàn tất! Tìm thấy từ khóa trong ${data.found}/${data.total} bình luận.`);
       fetchItems();
@@ -81,39 +86,44 @@ export const KeywordCommentDetail = ({ project, post, onCheckComplete }: Keyword
   };
 
   const handleSaveNewItems = async () => {
-    const itemsToInsert = newItemsText.split('\n').map(line => line.trim()).filter(line => line).map(content => ({ post_id: post.id, content }));
+    const itemsToInsert = newItemsText.split('\n').map(line => line.trim()).filter(line => line);
     if (itemsToInsert.length === 0) return showError("Vui lòng nhập ít nhất một bình luận.");
     setIsSavingItems(true);
-    const { error } = await supabase.from('keyword_check_items').insert(itemsToInsert);
-    if (error) showError("Thêm bình luận thất bại: " + error.message);
-    else {
+    try {
+      for (const content of itemsToInsert) {
+        await keywordCheckService.createItem(post.id, { content });
+      }
       showSuccess(`Đã thêm thành công ${itemsToInsert.length} bình luận!`);
       setIsAddItemDialogOpen(false);
       setNewItemsText('');
       fetchItems();
+    } catch (error: any) {
+      showError("Thêm bình luận thất bại: " + error.message);
     }
     setIsSavingItems(false);
   };
 
   const handleUpdateItem = async () => {
     if (!editingItem || !editedContent.trim()) return;
-    const { error } = await supabase.from('keyword_check_items').update({ content: editedContent.trim() }).eq('id', editingItem.id);
-    if (error) showError("Cập nhật thất bại: " + error.message);
-    else {
+    try {
+      await keywordCheckService.updateItem(editingItem.id, { content: editedContent.trim() });
       showSuccess("Đã cập nhật bình luận!");
       setEditingItem(null);
       fetchItems();
+    } catch (error: any) {
+      showError("Cập nhật thất bại: " + error.message);
     }
   };
 
   const handleDeleteItem = async () => {
     if (!itemToDelete) return;
-    const { error } = await supabase.from('keyword_check_items').delete().eq('id', itemToDelete.id);
-    if (error) showError("Xóa thất bại: " + error.message);
-    else {
+    try {
+      await keywordCheckService.deleteItem(itemToDelete.id);
       showSuccess("Đã xóa bình luận!");
       setItemToDelete(null);
       fetchItems();
+    } catch (error: any) {
+      showError("Xóa thất bại: " + error.message);
     }
   };
 
@@ -138,7 +148,7 @@ export const KeywordCommentDetail = ({ project, post, onCheckComplete }: Keyword
     showSuccess("Đã xuất file Excel thành công!");
   };
 
-  const filteredItems = useMemo(() => items.filter(item => 
+  const filteredItems = useMemo(() => items.filter(item =>
     (statusFilter === 'all' || item.status === statusFilter) &&
     item.content.toLowerCase().includes(searchTerm.toLowerCase())
   ), [items, searchTerm, statusFilter]);
@@ -146,15 +156,15 @@ export const KeywordCommentDetail = ({ project, post, onCheckComplete }: Keyword
   const keywordStats = useMemo(() => {
     if (!post.keywords) return [];
     const keywords = post.keywords.split('\n').map(k => k.trim()).filter(Boolean);
-    
+
     return keywords.map(keyword => {
-        const normalizedKeyword = normalizeString(keyword);
-        const count = items.filter(item => 
-            item.found_keywords && 
-            Array.isArray(item.found_keywords) &&
-            item.found_keywords.some(foundKw => normalizeString(foundKw) === normalizedKeyword)
-        ).length;
-        return { keyword, count };
+      const normalizedKeyword = normalizeString(keyword);
+      const count = items.filter(item =>
+        item.found_keywords &&
+        Array.isArray(item.found_keywords) &&
+        item.found_keywords.some(foundKw => normalizeString(foundKw) === normalizedKeyword)
+      ).length;
+      return { keyword, count };
     });
   }, [post.keywords, items]);
 
@@ -183,15 +193,15 @@ export const KeywordCommentDetail = ({ project, post, onCheckComplete }: Keyword
           </div>
           <div className="border rounded-lg overflow-auto flex-1"><Table><TableHeader><TableRow><TableHead>STT</TableHead><TableHead>Nội dung comment</TableHead><TableHead>Kết quả</TableHead><TableHead>Từ khoá tìm thấy</TableHead><TableHead className="text-right">Thao tác</TableHead></TableRow></TableHeader>
             <TableBody>
-              {isLoading ? ([...Array(3)].map((_, i) => <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell></TableRow>)) : 
-              filteredItems.length > 0 ? (filteredItems.map((item, index) => <TableRow key={item.id}>
-                <TableCell>{index + 1}</TableCell>
-                <TableCell className="max-w-xs break-words">{item.content}</TableCell>
-                <TableCell><Badge className={cn('pointer-events-none', item.status === 'found' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800')}>{item.status === 'found' ? 'Tìm thấy' : 'Chưa tìm thấy'}</Badge></TableCell>
-                <TableCell>{item.found_keywords?.join(', ')}</TableCell>
-                <TableCell className="text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal /></Button></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuItem onClick={() => { setEditingItem(item); setEditedContent(item.content); }}><Edit className="mr-2 h-4 w-4" />Sửa</DropdownMenuItem><DropdownMenuItem onClick={() => setItemToDelete(item)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell>
-              </TableRow>)) : 
-              (<TableRow><TableCell colSpan={5} className="text-center h-24"><div className="flex flex-col items-center gap-2"><MessageCircle className="h-10 w-10 text-slate-400" /><span className="font-medium">Không có bình luận nào</span><span className="text-xs">Hãy thử thêm comment mới hoặc thay đổi bộ lọc.</span></div></TableCell></TableRow>)}
+              {isLoading ? ([...Array(3)].map((_, i) => <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell></TableRow>)) :
+                filteredItems.length > 0 ? (filteredItems.map((item, index) => <TableRow key={item.id}>
+                  <TableCell>{index + 1}</TableCell>
+                  <TableCell className="max-w-xs break-words">{item.content}</TableCell>
+                  <TableCell><Badge className={cn('pointer-events-none', item.status === 'found' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800')}>{item.status === 'found' ? 'Tìm thấy' : 'Chưa tìm thấy'}</Badge></TableCell>
+                  <TableCell>{item.found_keywords?.join(', ')}</TableCell>
+                  <TableCell className="text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal /></Button></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuItem onClick={() => { setEditingItem(item); setEditedContent(item.content); }}><Edit className="mr-2 h-4 w-4" />Sửa</DropdownMenuItem><DropdownMenuItem onClick={() => setItemToDelete(item)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell>
+                </TableRow>)) :
+                  (<TableRow><TableCell colSpan={5} className="text-center h-24"><div className="flex flex-col items-center gap-2"><MessageCircle className="h-10 w-10 text-slate-400" /><span className="font-medium">Không có bình luận nào</span><span className="text-xs">Hãy thử thêm comment mới hoặc thay đổi bộ lọc.</span></div></TableCell></TableRow>)}
             </TableBody>
           </Table></div>
         </CardContent>

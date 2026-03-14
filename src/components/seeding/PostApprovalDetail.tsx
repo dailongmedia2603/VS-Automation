@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { seedingService, PostApprovalExportRow } from '@/api/seeding';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -48,21 +48,13 @@ interface CheckResult {
   total: number;
 }
 
-type ExportDataRow = {
-  post_content: string;
-  group_id: string;
-  approved_post_link: string | null;
-  account_name: string | null;
-  account_id: string | null;
-};
-
 interface PostApprovalDetailProps {
   project: Project;
   post: Post;
   onCheckComplete: () => void;
 }
 
-export const PostApprovalDetail = ({ 
+export const PostApprovalDetail = ({
   project,
   post,
   onCheckComplete
@@ -89,7 +81,7 @@ export const PostApprovalDetail = ({
 
   const [groupToDelete, setGroupToDelete] = useState<Group | null>(null);
   const [isExporting, setIsExporting] = useState(false);
-  
+
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [datePickerOpen, setDatePickerOpen] = useState(false);
 
@@ -99,18 +91,14 @@ export const PostApprovalDetail = ({
 
   const fetchGroups = async () => {
     setIsLoading(true);
-    const { data, error } = await supabase
-      .from('seeding_groups')
-      .select('*')
-      .eq('post_id', post.id)
-      .order('created_at', { ascending: true });
-
-    if (error) {
-      showError("Không thể tải danh sách group: " + error.message);
-    } else {
+    try {
+      const data = await seedingService.getGroups(post.id);
       setGroups(data || []);
+    } catch (error: any) {
+      showError("Không thể tải danh sách group: " + (error.message || 'Unknown error'));
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   useEffect(() => {
@@ -121,18 +109,15 @@ export const PostApprovalDetail = ({
 
   const handleSaveContent = async () => {
     setIsSavingContent(true);
-    const { error } = await supabase
-      .from('seeding_posts')
-      .update({ content: postContent })
-      .eq('id', post.id);
-    
-    if (error) {
-      showError("Lưu nội dung thất bại: " + error.message);
-    } else {
+    try {
+      await seedingService.updatePostContent(post.id, postContent);
       showSuccess("Đã cập nhật nội dung bài viết!");
-      onCheckComplete(); // Refresh parent data
+      onCheckComplete();
+    } catch (error: any) {
+      showError("Lưu nội dung thất bại: " + (error.message || 'Unknown error'));
+    } finally {
+      setIsSavingContent(false);
     }
-    setIsSavingContent(false);
   };
 
   const handleSaveNewGroups = async () => {
@@ -142,21 +127,17 @@ export const PostApprovalDetail = ({
       return;
     }
     setIsSavingGroups(true);
-    const groupsToInsert = groupIds.map(group_id => ({
-      post_id: post.id,
-      group_id,
-    }));
-
-    const { error } = await supabase.from('seeding_groups').insert(groupsToInsert);
-    if (error) {
-      showError("Thêm group thất bại: " + error.message);
-    } else {
+    try {
+      await seedingService.bulkCreateGroups(post.id, groupIds);
       showSuccess(`Đã thêm thành công ${groupIds.length} group!`);
       setIsAddGroupDialogOpen(false);
       setNewGroupIds('');
       fetchGroups();
+    } catch (error: any) {
+      showError("Thêm group thất bại: " + (error.message || 'Unknown error'));
+    } finally {
+      setIsSavingGroups(false);
     }
-    setIsSavingGroups(false);
   };
 
   const handleUpdateGroup = async () => {
@@ -164,39 +145,31 @@ export const PostApprovalDetail = ({
       showError("ID Group không được để trống.");
       return;
     }
-    const { error } = await supabase
-      .from('seeding_groups')
-      .update({ group_id: editedGroupId.trim() })
-      .eq('id', editingGroup.id);
-    
-    if (error) {
-      showError("Cập nhật thất bại: " + error.message);
-    } else {
+    try {
+      await seedingService.updateGroup(editingGroup.id, editedGroupId.trim());
       showSuccess("Đã cập nhật ID Group!");
       setEditingGroup(null);
       fetchGroups();
+    } catch (error: any) {
+      showError("Cập nhật thất bại: " + (error.message || 'Unknown error'));
     }
   };
 
   const handleDeleteGroup = async () => {
     if (!groupToDelete) return;
-    const { error } = await supabase
-      .from('seeding_groups')
-      .delete()
-      .eq('id', groupToDelete.id);
-    
-    if (error) {
-      showError("Xóa thất bại: " + error.message);
-    } else {
+    try {
+      await seedingService.deleteGroup(groupToDelete.id);
       showSuccess("Đã xóa group!");
       setGroupToDelete(null);
       fetchGroups();
+    } catch (error: any) {
+      showError("Xóa thất bại: " + (error.message || 'Unknown error'));
     }
   };
 
   const generateTimeCheckString = (range: DateRange | undefined): string => {
     if (!range?.from) {
-        return '';
+      return '';
     }
     const since = startOfDay(range.from).toISOString();
     const until = endOfDay(range.to || range.from).toISOString();
@@ -208,47 +181,41 @@ export const PostApprovalDetail = ({
     setCheckResult(null);
     setLog(null);
     let toastId;
-    let logData: Partial<ErrorLog> = {};
     const timeCheckString = generateTimeCheckString(dateRange);
 
     try {
-      toastId = showLoading("Bước 1/3: Đang lấy dữ liệu thô từ API...");
-      const { data: fetchData, error: fetchError } = await supabase.functions.invoke('get-fb-duyetpost', {
-        body: { postId: post.id, timeCheckString }
-      });
-      logData = { requestUrl: fetchData?.requestUrl, rawResponse: fetchData?.rawResponse };
-      if (fetchError || fetchData.error) throw { step: 'Lấy dữ liệu', error: fetchError || fetchData };
+      toastId = showLoading("Đang kiểm tra duyệt bài...");
+      const result = await seedingService.runPostApprovalCheck(post.id, timeCheckString);
 
       dismissToast(toastId);
-      toastId = showLoading("Bước 2/3: Đang xử lý và lưu trữ dữ liệu...");
-      const { data: processData, error: processError } = await supabase.functions.invoke('process-and-store-duyetpost', {
-        body: { allPosts: fetchData.allPosts, internalPostId: post.id }
-      });
-      if (processError || processData.error) throw { step: 'Xử lý dữ liệu', error: processError || processData };
 
-      dismissToast(toastId);
-      toastId = showLoading("Bước 3/3: Đang so sánh và cập nhật trạng thái...");
-      const { data: compareResult, error: compareError } = await supabase.functions.invoke('compare-and-update-duyetpost', {
-        body: { postId: post.id }
-      });
-      if (compareError || compareResult.error) throw { step: 'So sánh dữ liệu', error: compareError || compareResult };
+      if (!result.success) {
+        throw { message: result.error || 'Đã xảy ra lỗi không xác định.' };
+      }
 
-      dismissToast(toastId);
-      setCheckResult(compareResult);
-      setLog({ ...logData, step: 'Kiểm tra hoàn tất', errorMessage: 'Không có lỗi' });
-      showSuccess(`Kiểm tra hoàn tất! Duyệt thành công ${compareResult.approved}/${compareResult.total} group.`);
+      setCheckResult({
+        approved: result.approved,
+        pending: result.pending,
+        total: result.total
+      });
+      setLog({
+        step: 'Kiểm tra hoàn tất',
+        errorMessage: 'Không có lỗi',
+        requestUrl: result.requestUrl,
+        rawResponse: result.rawResponse
+      });
+      showSuccess(`Kiểm tra hoàn tất! Duyệt thành công ${result.approved}/${result.total} group.`);
       onCheckComplete();
       fetchGroups();
 
     } catch (e: any) {
       if (toastId) dismissToast(toastId);
-      const errorMessage = e.error?.message || 'Đã xảy ra lỗi không xác định.';
+      const errorMessage = e.message || 'Đã xảy ra lỗi không xác định.';
       setLog({
-          ...logData,
-          step: e.step || 'Không xác định',
-          errorMessage: errorMessage,
+        step: 'Không xác định',
+        errorMessage: errorMessage,
       });
-      showError(`Kiểm tra thất bại ở bước: ${e.step}.`);
+      showError(`Kiểm tra thất bại: ${errorMessage}`);
     } finally {
       setIsChecking(false);
     }
@@ -258,17 +225,15 @@ export const PostApprovalDetail = ({
     setIsExporting(true);
     const toastId = showLoading("Đang chuẩn bị dữ liệu xuất...");
     try {
-      const { data, error } = await supabase.rpc('get_post_approval_export_data', {
-        p_post_id: post.id
-      });
+      const data = await seedingService.getPostApprovalExportData(post.id);
 
-      if (error) throw error;
       if (!data || data.length === 0) {
+        dismissToast(toastId);
         showError("Không có dữ liệu để xuất.");
         return;
       }
 
-      const dataToExport = data.map((row: ExportDataRow) => ({
+      const dataToExport = data.map((row: PostApprovalExportRow) => ({
         'Nội dung bài viết': row.post_content,
         'ID group': row.group_id,
         'Link bài viết': row.approved_post_link,
@@ -280,12 +245,13 @@ export const PostApprovalDetail = ({
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "ExportData");
       XLSX.writeFile(workbook, `export_${project.name}_${post.name}.xlsx`);
+      dismissToast(toastId);
       showSuccess("Đã xuất file Excel thành công!");
 
     } catch (error: any) {
-      showError("Xuất Excel thất bại: " + error.message);
-    } finally {
       dismissToast(toastId);
+      showError("Xuất Excel thất bại: " + (error.message || 'Unknown error'));
+    } finally {
       setIsExporting(false);
     }
   };
@@ -398,19 +364,19 @@ export const PostApprovalDetail = ({
           <div className="border rounded-lg overflow-auto flex-1">
             <Table><TableHeader className="bg-slate-50"><TableRow><TableHead className="w-[50px]">STT</TableHead><TableHead>Group ID</TableHead><TableHead>Trạng thái</TableHead><TableHead>Link bài viết</TableHead><TableHead className="text-right">Thao tác</TableHead></TableRow></TableHeader>
               <TableBody>
-                {isLoading ? ([...Array(3)].map((_, i) => (<TableRow key={i}><TableCell><Skeleton className="h-5 w-5" /></TableCell><TableCell><Skeleton className="h-5 w-32" /></TableCell><TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell><TableCell><Skeleton className="h-5 w-24" /></TableCell><TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto rounded-md" /></TableCell></TableRow>))) : 
-                filteredGroups.length > 0 ? (filteredGroups.map((group, index) => (<TableRow key={group.id} className="hover:bg-slate-50"><TableCell className="font-medium text-slate-500">{index + 1}</TableCell><TableCell className="font-mono text-slate-700">{group.group_id}</TableCell><TableCell><Badge className={cn('pointer-events-none', group.status === 'approved' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-amber-100 text-amber-800 border-amber-200')}>{group.status === 'approved' ? 'Đã duyệt' : 'Chưa duyệt'}</Badge></TableCell><TableCell>{group.approved_post_link ? (<a href={group.approved_post_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 flex items-center gap-1"><LinkIcon className="h-3.5 w-3.5" />Xem bài viết</a>) : 'N/A'}</TableCell>
-                <TableCell className="text-right">
-                    <DropdownMenu>
+                {isLoading ? ([...Array(3)].map((_, i) => (<TableRow key={i}><TableCell><Skeleton className="h-5 w-5" /></TableCell><TableCell><Skeleton className="h-5 w-32" /></TableCell><TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell><TableCell><Skeleton className="h-5 w-24" /></TableCell><TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto rounded-md" /></TableCell></TableRow>))) :
+                  filteredGroups.length > 0 ? (filteredGroups.map((group, index) => (<TableRow key={group.id} className="hover:bg-slate-50"><TableCell className="font-medium text-slate-500">{index + 1}</TableCell><TableCell className="font-mono text-slate-700">{group.group_id}</TableCell><TableCell><Badge className={cn('pointer-events-none', group.status === 'approved' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-amber-100 text-amber-800 border-amber-200')}>{group.status === 'approved' ? 'Đã duyệt' : 'Chưa duyệt'}</Badge></TableCell><TableCell>{group.approved_post_link ? (<a href={group.approved_post_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 flex items-center gap-1"><LinkIcon className="h-3.5 w-3.5" />Xem bài viết</a>) : 'N/A'}</TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
                         <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => { setEditingGroup(group); setEditedGroupId(group.group_id); }}><Edit className="mr-2 h-4 w-4" />Sửa</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setGroupToDelete(group)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => { setEditingGroup(group); setEditedGroupId(group.group_id); }}><Edit className="mr-2 h-4 w-4" />Sửa</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setGroupToDelete(group)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem>
                         </DropdownMenuContent>
-                    </DropdownMenu>
-                </TableCell>
-                </TableRow>))) : 
-                (<TableRow><TableCell colSpan={5} className="text-center h-48 text-slate-500"><div className="flex flex-col items-center gap-2"><Users className="h-10 w-10 text-slate-400" /><span className="font-medium">Không có group nào</span><span className="text-xs">Thêm group để bắt đầu.</span></div></TableCell></TableRow>)}
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>))) :
+                    (<TableRow><TableCell colSpan={5} className="text-center h-48 text-slate-500"><div className="flex flex-col items-center gap-2"><Users className="h-10 w-10 text-slate-400" /><span className="font-medium">Không có group nào</span><span className="text-xs">Thêm group để bắt đầu.</span></div></TableCell></TableRow>)}
               </TableBody>
             </Table>
           </div>

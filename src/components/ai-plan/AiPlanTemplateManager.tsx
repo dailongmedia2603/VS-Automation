@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { aiPlanService } from '@/api/aiPlan';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -10,7 +10,6 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PlusCircle, Edit, Trash2, Loader2, ArrowUp, ArrowDown } from 'lucide-react';
 import { showSuccess, showError } from '@/utils/toast';
-import { useAuth } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -37,7 +36,6 @@ type StructureField = {
 const iconOptions = ['Target', 'Calendar', 'Package', 'Route', 'Megaphone'];
 
 export const AiPlanTemplateManager = () => {
-  const { user } = useAuth();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -49,11 +47,18 @@ export const AiPlanTemplateManager = () => {
   const fetchTemplates = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.from('ai_plan_templates').select('*').order('created_at', { ascending: false });
-      if (error) throw error;
-      setTemplates(data || []);
+      const data = await aiPlanService.getTemplates();
+      // Map to local type
+      const mapped = data.map(t => ({
+        id: t.id,
+        name: t.name,
+        created_at: t.created_at,
+        updated_at: t.updated_at,
+        structure: t.content
+      }));
+      setTemplates(mapped);
     } catch (error: any) {
-      showError("Không thể tải mẫu: " + error.message);
+      showError("Không thể tải mẫu: " + (error.message || 'Unknown error'));
     } finally {
       setIsLoading(false);
     }
@@ -89,18 +94,22 @@ export const AiPlanTemplateManager = () => {
       };
 
       if (editingTemplate.id) {
-        const { error } = await supabase.from('ai_plan_templates').update({ name: editingTemplate.name, structure: structureToSave, updated_at: new Date().toISOString() }).eq('id', editingTemplate.id);
-        if (error) throw error;
+        await aiPlanService.updateTemplate(editingTemplate.id, {
+          name: editingTemplate.name,
+          content: structureToSave
+        });
         showSuccess("Đã cập nhật mẫu thành công!");
       } else {
-        const { error } = await supabase.from('ai_plan_templates').insert({ name: editingTemplate.name, structure: structureToSave, creator_id: user?.id });
-        if (error) throw error;
+        await aiPlanService.createTemplate({
+          name: editingTemplate.name,
+          content: structureToSave
+        });
         showSuccess("Đã tạo mẫu thành công!");
       }
       setIsDialogOpen(false);
       fetchTemplates();
     } catch (error: any) {
-      showError("Lưu mẫu thất bại: " + error.message);
+      showError("Lưu mẫu thất bại: " + (error.message || 'Unknown error'));
     } finally {
       setIsSaving(false);
     }
@@ -108,11 +117,12 @@ export const AiPlanTemplateManager = () => {
 
   const handleDeleteTemplate = async () => {
     if (!templateToDelete) return;
-    const { error } = await supabase.from('ai_plan_templates').delete().eq('id', templateToDelete.id);
-    if (error) showError("Xóa thất bại: " + error.message);
-    else {
+    try {
+      await aiPlanService.deleteTemplate(templateToDelete.id);
       showSuccess("Đã xóa mẫu!");
       fetchTemplates();
+    } catch (error: any) {
+      showError("Xóa thất bại: " + (error.message || 'Unknown error'));
     }
     setTemplateToDelete(null);
   };
@@ -158,9 +168,9 @@ export const AiPlanTemplateManager = () => {
             <Table>
               <TableHeader><TableRow><TableHead>Tên mẫu</TableHead><TableHead>Ngày tạo</TableHead><TableHead>Cập nhật lần cuối</TableHead><TableHead className="text-right">Hành động</TableHead></TableRow></TableHeader>
               <TableBody>
-                {isLoading ? ([...Array(3)].map((_, i) => (<TableRow key={i}><TableCell><Skeleton className="h-5 w-32" /></TableCell><TableCell><Skeleton className="h-5 w-24" /></TableCell><TableCell><Skeleton className="h-5 w-24" /></TableCell><TableCell className="text-right"><Skeleton className="h-8 w-20" /></TableCell></TableRow>))) : 
-                templates.length > 0 ? (templates.map((template) => (<TableRow key={template.id}><TableCell className="font-medium">{template.name}</TableCell><TableCell>{format(new Date(template.created_at), 'dd/MM/yyyy', { locale: vi })}</TableCell><TableCell>{format(new Date(template.updated_at), 'dd/MM/yyyy HH:mm', { locale: vi })}</TableCell><TableCell className="text-right"><Button variant="ghost" size="icon" onClick={() => handleOpenDialog(template)}><Edit className="h-4 w-4" /></Button><Button variant="ghost" size="icon" onClick={() => setTemplateToDelete(template)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell></TableRow>))) : 
-                (<TableRow><TableCell colSpan={4} className="text-center h-24">Chưa có mẫu nào.</TableCell></TableRow>)}
+                {isLoading ? ([...Array(3)].map((_, i) => (<TableRow key={i}><TableCell><Skeleton className="h-5 w-32" /></TableCell><TableCell><Skeleton className="h-5 w-24" /></TableCell><TableCell><Skeleton className="h-5 w-24" /></TableCell><TableCell className="text-right"><Skeleton className="h-8 w-20" /></TableCell></TableRow>))) :
+                  templates.length > 0 ? (templates.map((template) => (<TableRow key={template.id}><TableCell className="font-medium">{template.name}</TableCell><TableCell>{format(new Date(template.created_at), 'dd/MM/yyyy', { locale: vi })}</TableCell><TableCell>{format(new Date(template.updated_at), 'dd/MM/yyyy HH:mm', { locale: vi })}</TableCell><TableCell className="text-right"><Button variant="ghost" size="icon" onClick={() => handleOpenDialog(template)}><Edit className="h-4 w-4" /></Button><Button variant="ghost" size="icon" onClick={() => setTemplateToDelete(template)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell></TableRow>))) :
+                    (<TableRow><TableCell colSpan={4} className="text-center h-24">Chưa có mẫu nào.</TableCell></TableRow>)}
               </TableBody>
             </Table>
           </div>
@@ -176,7 +186,7 @@ export const AiPlanTemplateManager = () => {
           <div className="py-4 space-y-4">
             <div className="space-y-2">
               <Label htmlFor="template-name">Tên mẫu</Label>
-              <Input id="template-name" value={editingTemplate?.name || ''} onChange={(e) => setEditingTemplate(t => ({...t, name: e.target.value}))} />
+              <Input id="template-name" value={editingTemplate?.name || ''} onChange={(e) => setEditingTemplate(t => ({ ...t, name: e.target.value }))} />
             </div>
             <div className="space-y-2">
               <Label>Các mục trong kế hoạch</Label>

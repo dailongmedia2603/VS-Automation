@@ -1,6 +1,13 @@
-import { createContext, useState, useContext, ReactNode, useEffect, useMemo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { createContext, useState, useContext, ReactNode, useEffect, useMemo, useCallback } from 'react';
+import { settingsService, AllSettings } from '@/api/settings';
 import { showError } from '@/utils/toast';
+import { getAuthToken } from '@/api/client';
+
+// Cache keys
+const CACHE_KEYS = {
+  API_SETTINGS: 'cached_api_settings',
+  ALL_SETTINGS: 'cached_all_settings',
+} as const;
 
 interface ApiSettings {
   apiUrl: string;
@@ -13,56 +20,106 @@ interface ApiSettings {
 interface ApiSettingsContextType {
   settings: ApiSettings;
   setSettings: (settings: ApiSettings) => void;
+  allSettings: AllSettings | null;
   isLoading: boolean;
+  isRefreshing: boolean;
+  refreshSettings: () => Promise<void>;
 }
 
 const ApiSettingsContext = createContext<ApiSettingsContextType | undefined>(undefined);
 
-export const ApiSettingsProvider = ({ children }: { children: ReactNode }) => {
-  const [settings, setSettings] = useState<ApiSettings>({
-    apiUrl: '',
-    apiKey: '',
-    embeddingModelName: 'text-embedding-3-small',
-    geminiScanModel: 'gemini-2.5-flash',
-    geminiContentModel: 'gemini-2.5-pro',
-  });
-  const [isLoading, setIsLoading] = useState(true);
+const DEFAULT_SETTINGS: ApiSettings = {
+  apiUrl: '',
+  apiKey: '',
+  embeddingModelName: 'text-embedding-3-small',
+  geminiScanModel: 'gemini-2.5-flash',
+  geminiContentModel: 'gemini-2.5-pro',
+};
 
-  useEffect(() => {
-    const fetchSettings = async () => {
-      setIsLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('ai_settings')
-          .select('api_url, api_key, embedding_model_name, gemini_scan_model, gemini_content_model')
-          .eq('id', 1)
-          .single();
+// Helper to get cached settings synchronously
+const getCachedSettings = (): { settings: ApiSettings; allSettings: AllSettings | null } => {
+  try {
+    const cachedSettings = localStorage.getItem(CACHE_KEYS.API_SETTINGS);
+    const cachedAllSettings = localStorage.getItem(CACHE_KEYS.ALL_SETTINGS);
 
-        if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
-          throw error;
-        }
-
-        if (data) {
-          const formattedSettings = {
-            apiUrl: data.api_url || '',
-            apiKey: data.api_key || '',
-            embeddingModelName: data.embedding_model_name || 'text-embedding-3-small',
-            geminiScanModel: data.gemini_scan_model || 'gemini-2.5-flash',
-            geminiContentModel: data.gemini_content_model || 'gemini-2.5-pro',
-          };
-          setSettings(formattedSettings);
-        }
-      } catch (error: any) {
-        showError("Không thể tải cấu hình AI: " + error.message);
-      } finally {
-        setIsLoading(false);
-      }
+    return {
+      settings: cachedSettings ? JSON.parse(cachedSettings) : DEFAULT_SETTINGS,
+      allSettings: cachedAllSettings ? JSON.parse(cachedAllSettings) : null,
     };
+  } catch {
+    return { settings: DEFAULT_SETTINGS, allSettings: null };
+  }
+};
 
-    fetchSettings();
+// Helper to cache settings
+const cacheSettings = (settings: ApiSettings, allSettings: AllSettings | null) => {
+  localStorage.setItem(CACHE_KEYS.API_SETTINGS, JSON.stringify(settings));
+  if (allSettings) {
+    localStorage.setItem(CACHE_KEYS.ALL_SETTINGS, JSON.stringify(allSettings));
+  }
+};
+
+export const ApiSettingsProvider = ({ children }: { children: ReactNode }) => {
+  // Initialize from cache synchronously
+  const cached = getCachedSettings();
+  const hasToken = !!getAuthToken();
+
+  const [settings, setSettings] = useState<ApiSettings>(cached.settings);
+  const [allSettings, setAllSettings] = useState<AllSettings | null>(cached.allSettings);
+
+  // isLoading = true only when authenticated and no cached settings
+  const [isLoading, setIsLoading] = useState(hasToken && !cached.allSettings);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const fetchSettings = useCallback(async () => {
+    const token = getAuthToken();
+    if (!token) {
+      setIsLoading(false);
+      return;
+    }
+
+    setIsRefreshing(true);
+    try {
+      const data = await settingsService.getAll();
+      setAllSettings(data);
+
+      if (data.ai_settings) {
+        const ai = data.ai_settings;
+        const newSettings = {
+          apiUrl: ai.troll_llm_api_url || '',
+          apiKey: ai.troll_llm_api_key || '',
+          embeddingModelName: ai.embedding_model_name || 'text-embedding-3-small',
+          geminiScanModel: ai.gemini_scan_model || 'gemini-2.5-flash',
+          geminiContentModel: ai.gemini_content_model || 'gemini-2.5-pro',
+        };
+        setSettings(newSettings);
+        // Cache for next time
+        cacheSettings(newSettings, data);
+      }
+    } catch (error: any) {
+      // Don't show error if not authenticated
+      if (error.response?.status !== 401) {
+        showError("Không thể tải cấu hình AI: " + (error.message || 'Unknown error'));
+      }
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
   }, []);
 
-  const value = useMemo(() => ({ settings, setSettings, isLoading }), [settings, isLoading]);
+  useEffect(() => {
+    // Background refresh - don't block render
+    fetchSettings();
+  }, [fetchSettings]);
+
+  const value = useMemo(() => ({
+    settings,
+    setSettings,
+    allSettings,
+    isLoading,
+    isRefreshing,
+    refreshSettings: fetchSettings,
+  }), [settings, allSettings, isLoading, isRefreshing, fetchSettings]);
 
   return (
     <ApiSettingsContext.Provider value={value}>

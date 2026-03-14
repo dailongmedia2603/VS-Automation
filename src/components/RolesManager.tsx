@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { roleService } from '@/api/users';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -16,9 +16,9 @@ import { usePermissions } from '@/contexts/PermissionContext';
 import { Navigate } from 'react-router-dom';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
-type Role = { id: number; name: string; description: string | null; };
-type Permission = { id: number; action: string; description: string | null; };
-type RolePermission = { role_id: number; permission_id: number; };
+type Role = { id: number; name: string; description?: string | null; permissions?: Permission[] };
+type Permission = { id: number; name: string; description?: string | null; };
+// type RolePermission = { role_id: number; permission_id: number; }; // No longer needed
 
 const featureNameMapping: Record<string, string> = {
   dashboard: 'Dashboard',
@@ -44,7 +44,7 @@ const RolesManager = () => {
   const { isSuperAdmin, isLoading: isLoadingPermissions } = usePermissions();
   const [roles, setRoles] = useState<Role[]>([]);
   const [permissions, setPermissions] = useState<Permission[]>([]);
-  const [rolePermissions, setRolePermissions] = useState<RolePermission[]>([]);
+  // const [rolePermissions, setRolePermissions] = useState<RolePermission[]>([]); // Removed
   const [isLoading, setIsLoading] = useState(true);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -57,19 +57,14 @@ const RolesManager = () => {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [rolesRes, permissionsRes, rolePermissionsRes] = await Promise.all([
-        supabase.from('roles').select('*'),
-        supabase.from('permissions').select('*').order('action'),
-        supabase.from('role_permissions').select('*')
+      const [rolesData, permissionsData] = await Promise.all([
+        roleService.getRoles(),
+        roleService.getPermissions()
       ]);
-      if (rolesRes.error) throw rolesRes.error;
-      if (permissionsRes.error) throw permissionsRes.error;
-      if (rolePermissionsRes.error) throw rolePermissionsRes.error;
-      setRoles(rolesRes.data || []);
-      setPermissions(permissionsRes.data || []);
-      setRolePermissions(rolePermissionsRes.data || []);
+      setRoles(rolesData);
+      setPermissions(permissionsData);
     } catch (error: any) {
-      showError("Không thể tải dữ liệu phân quyền: " + error.message);
+      showError("Không thể tải dữ liệu phân quyền: " + (error.response?.data?.message || error.message));
     } finally {
       setIsLoading(false);
     }
@@ -82,9 +77,7 @@ const RolesManager = () => {
   const handleOpenDialog = (role: Role | null = null) => {
     if (role) {
       setEditingRole(role);
-      const currentPermissions = rolePermissions
-        .filter(rp => rp.role_id === role.id)
-        .map(rp => rp.permission_id);
+      const currentPermissions = role.permissions?.map(p => p.id) || [];
       setSelectedPermissions(new Set(currentPermissions));
     } else {
       setEditingRole({ name: '', description: '' });
@@ -101,7 +94,7 @@ const RolesManager = () => {
       return newSet;
     });
   };
-  
+
   const handleSelectAllForGroup = (groupPermissions: Permission[], checked: boolean) => {
     setSelectedPermissions(prev => {
       const newSet = new Set(prev);
@@ -121,28 +114,28 @@ const RolesManager = () => {
     }
     setIsSaving(true);
     try {
-      let roleId = editingRole.id;
-      if (roleId) { // Update
-        const { error } = await supabase.from('roles').update({ name: editingRole.name, description: editingRole.description }).eq('id', roleId);
-        if (error) throw error;
-      } else { // Create
-        const { data, error } = await supabase.from('roles').insert({ name: editingRole.name, description: editingRole.description }).select().single();
-        if (error) throw error;
-        roleId = data.id;
-      }
+      const permissionNames = Array.from(selectedPermissions)
+        .map(id => permissions.find(p => p.id === id)?.name)
+        .filter(Boolean) as string[];
 
-      await supabase.from('role_permissions').delete().eq('role_id', roleId);
-      const permissionsToInsert = Array.from(selectedPermissions).map(pid => ({ role_id: roleId!, permission_id: pid }));
-      if (permissionsToInsert.length > 0) {
-        const { error: permError } = await supabase.from('role_permissions').insert(permissionsToInsert);
-        if (permError) throw permError;
+      if (editingRole.id) { // Update
+        await roleService.updateRole(editingRole.id, {
+          name: editingRole.name,
+          permissions: permissionNames
+          // description: editingRole.description // API might not support description yet
+        });
+      } else { // Create
+        await roleService.createRole({
+          name: editingRole.name,
+          permissions: permissionNames
+        });
       }
 
       showSuccess("Đã lưu vai trò thành công!");
       setIsDialogOpen(false);
       fetchData();
     } catch (error: any) {
-      showError("Lưu vai trò thất bại: " + error.message);
+      showError("Lưu vai trò thất bại: " + (error.response?.data?.message || error.message));
     } finally {
       setIsSaving(false);
     }
@@ -150,11 +143,12 @@ const RolesManager = () => {
 
   const handleDeleteRole = async () => {
     if (!roleToDelete) return;
-    const { error } = await supabase.from('roles').delete().eq('id', roleToDelete.id);
-    if (error) showError("Xóa thất bại: " + error.message);
-    else {
+    try {
+      await roleService.deleteRole(roleToDelete.id);
       showSuccess("Đã xóa vai trò!");
       fetchData();
+    } catch (error: any) {
+      showError("Xóa thất bại: " + (error.response?.data?.message || error.message));
     }
     setRoleToDelete(null);
   };
@@ -162,26 +156,23 @@ const RolesManager = () => {
   const permissionsByRole = useMemo(() => {
     const map = new Map<number, string[]>();
     roles.forEach(role => {
-      const perms = rolePermissions
-        .filter(rp => rp.role_id === role.id)
-        .map(rp => permissions.find(p => p.id === rp.permission_id)?.action)
-        .filter(Boolean) as string[];
+      const perms = role.permissions?.map(p => p.name) || [];
       map.set(role.id, perms);
     });
     return map;
-  }, [roles, permissions, rolePermissions]);
+  }, [roles]);
 
   const groupedPermissions = useMemo(() => {
     const groups: Record<string, Permission[]> = {};
-    
+
     permissions.forEach(p => {
-        const parts = p.action.split('_');
-        const featureKey = parts.length > 1 ? parts.slice(1).join('_') : 'other';
-        
-        if (!groups[featureKey]) {
-            groups[featureKey] = [];
-        }
-        groups[featureKey].push(p);
+      const parts = p.name.split('_'); // Changed action to name
+      const featureKey = parts.length > 1 ? parts.slice(1).join('_') : 'other';
+
+      if (!groups[featureKey]) {
+        groups[featureKey] = [];
+      }
+      groups[featureKey].push(p);
     });
 
     return Object.entries(groups)
@@ -275,8 +266,8 @@ const RolesManager = () => {
               <Card className="shadow-none border">
                 <CardHeader><CardTitle className="text-lg">Thông tin vai trò</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="space-y-2"><Label htmlFor="role-name">Tên vai trò</Label><Input id="role-name" value={editingRole?.name || ''} onChange={(e) => setEditingRole(r => ({...r, name: e.target.value}))} /></div>
-                  <div className="space-y-2"><Label htmlFor="role-desc">Mô tả</Label><Input id="role-desc" value={editingRole?.description || ''} onChange={(e) => setEditingRole(r => ({...r, description: e.target.value}))} /></div>
+                  <div className="space-y-2"><Label htmlFor="role-name">Tên vai trò</Label><Input id="role-name" value={editingRole?.name || ''} onChange={(e) => setEditingRole(r => ({ ...r, name: e.target.value }))} /></div>
+                  <div className="space-y-2"><Label htmlFor="role-desc">Mô tả</Label><Input id="role-desc" value={editingRole?.description || ''} onChange={(e) => setEditingRole(r => ({ ...r, description: e.target.value }))} /></div>
                 </CardContent>
               </Card>
             </div>
@@ -302,7 +293,7 @@ const RolesManager = () => {
                                 {perms.map(p => (
                                   <div key={p.id} className="flex items-center space-x-2">
                                     <Checkbox id={`perm-${p.id}`} checked={selectedPermissions.has(p.id)} onCheckedChange={(checked) => handlePermissionChange(p.id, !!checked)} />
-                                    <Label htmlFor={`perm-${p.id}`} className="font-normal capitalize text-slate-600 cursor-pointer">{p.action.split('_').join(' ')}</Label>
+                                    <Label htmlFor={`perm-${p.id}`} className="font-normal capitalize text-slate-600 cursor-pointer">{p.name.split('_').join(' ')}</Label>
                                   </div>
                                 ))}
                               </div>

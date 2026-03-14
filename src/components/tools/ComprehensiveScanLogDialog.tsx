@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { supabase } from '@/integrations/supabase/client';
+import { postScanService, PostScanResult } from '@/api/tools';
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -15,12 +15,6 @@ type ScanLog = {
   request_urls: string[];
 };
 
-type ScanResult = {
-  id: number;
-  post_content: string;
-  ai_check_details: { prompt: string; response: any; } | null;
-};
-
 interface ComprehensiveScanLogDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
@@ -30,7 +24,7 @@ interface ComprehensiveScanLogDialogProps {
 
 export const ComprehensiveScanLogDialog = ({ isOpen, onOpenChange, projectId, logs }: ComprehensiveScanLogDialogProps) => {
   const [selectedLog, setSelectedLog] = useState<ScanLog | null>(null);
-  const [associatedAiResults, setAssociatedAiResults] = useState<ScanResult[]>([]);
+  const [associatedAiResults, setAssociatedAiResults] = useState<PostScanResult[]>([]);
   const [isLoadingAiResults, setIsLoadingAiResults] = useState(false);
 
   const handleLogSelect = async (log: ScanLog) => {
@@ -43,19 +37,17 @@ export const ComprehensiveScanLogDialog = ({ isOpen, onOpenChange, projectId, lo
     setAssociatedAiResults([]);
 
     try {
+      // Get results from API and filter by time window
+      const results = await postScanService.getResults(projectId);
       const startTime = new Date(log.created_at);
-      const endTime = new Date(startTime.getTime() + 10 * 60 * 1000); // 10 minute window for safety
+      const endTime = new Date(startTime.getTime() + 10 * 60 * 1000);
 
-      const { data, error } = await supabase
-        .from('post_scan_results')
-        .select('id, post_content, ai_check_details')
-        .eq('project_id', projectId)
-        .gte('scanned_at', startTime.toISOString())
-        .lt('scanned_at', endTime.toISOString());
+      const filtered = results.filter(r => {
+        const scannedAt = new Date(r.scanned_at);
+        return scannedAt >= startTime && scannedAt < endTime && r.ai_check_details;
+      });
 
-      if (error) throw error;
-      
-      setAssociatedAiResults(data.filter(r => r.ai_check_details) || []);
+      setAssociatedAiResults(filtered);
     } catch (error: any) {
       showError("Không thể tải kết quả AI: " + error.message);
     } finally {

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { keywordCheckService } from '@/api/tools';
+import apiClient from '@/api/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -80,7 +81,7 @@ export const ImportKeywordPostsDialog = ({ isOpen, onOpenChange, projectId, onSu
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
-        
+
         if (jsonData.length === 0) {
           throw new Error("File Excel trống hoặc không có dữ liệu.");
         }
@@ -88,7 +89,7 @@ export const ImportKeywordPostsDialog = ({ isOpen, onOpenChange, projectId, onSu
         const firstRow = jsonData[0] || {};
         const headers = Object.keys(firstRow).map(h => h.toLowerCase().trim());
         const requiredFields = ['post_name', 'post_type', 'content', 'keywords'];
-        
+
         if (!requiredFields.every(field => headers.includes(field))) {
           throw new Error("File Excel thiếu các cột bắt buộc: post_name, post_type, content, keywords.");
         }
@@ -125,48 +126,29 @@ export const ImportKeywordPostsDialog = ({ isOpen, onOpenChange, projectId, onSu
     for (let i = 0; i < totalPosts; i++) {
       const row = postsToImport[i];
       try {
-        const postToInsert = {
-          project_id: projectId,
+        // Create post via API
+        const newPost = await keywordCheckService.createPost(Number(projectId), {
           name: row.post_name,
           type: row.post_type,
           link: row.post_type === 'post' ? row.content : null,
           keywords: row.keywords,
-        };
-
-        const { data: newPost, error: postError } = await supabase
-          .from('keyword_check_posts')
-          .insert(postToInsert)
-          .select()
-          .single();
-        if (postError) throw postError;
+        });
 
         if (newPost) {
-          let itemsToInsert = [];
+          // Create items
           if (row.post_type === 'comment') {
-            itemsToInsert = String(row.content)
+            const items = String(row.content)
               .split('\n')
-              .filter(line => line.trim() !== '')
-              .map(content => ({
-                post_id: newPost.id,
-                content: content.trim(),
-              }));
-          } else { // type === 'post'
-            itemsToInsert.push({
-              post_id: newPost.id,
-              content: String(row.content).trim(),
-            });
-          }
-          
-          if (itemsToInsert.length > 0) {
-            const { error: itemsError } = await supabase
-              .from('keyword_check_items')
-              .insert(itemsToInsert);
-            if (itemsError) throw itemsError;
+              .filter(line => line.trim() !== '');
+            for (const content of items) {
+              await keywordCheckService.createItem(newPost.id, { content: content.trim() });
+            }
+          } else {
+            await keywordCheckService.createItem(newPost.id, { content: String(row.content).trim() });
           }
 
-          await supabase.functions.invoke('check-keywords-in-comments', { 
-            body: { postId: newPost.id } 
-          });
+          // Run keyword check
+          await apiClient.post(`/services/keyword-check/${newPost.id}`);
         }
         successCount++;
       } catch (error: any) {
@@ -244,8 +226,8 @@ export const ImportKeywordPostsDialog = ({ isOpen, onOpenChange, projectId, onSu
         </div>
         <DialogFooter className="p-6 bg-white border-t">
           <Button variant="outline" onClick={() => { onOpenChange(false); resetState(); }}>Hủy</Button>
-          <Button 
-            onClick={handleImport} 
+          <Button
+            onClick={handleImport}
             disabled={isParsing || parsedData.length === 0 || isImporting}
             className="bg-blue-600 hover:bg-blue-700"
           >

@@ -5,14 +5,11 @@ import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
+import { useSidebar } from "@/contexts/SidebarContext";
 
 export function AppLayout() {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const { isCollapsed, toggleSidebar } = useSidebar();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  const toggleSidebar = () => {
-    setIsCollapsed(!isCollapsed);
-  };
 
   return (
     <div className="flex h-screen bg-white">
@@ -36,9 +33,9 @@ export function AppLayout() {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="p-0 w-72">
-              <Sidebar 
-                isCollapsed={false} 
-                toggleSidebar={() => {}}
+              <Sidebar
+                isCollapsed={false}
+                toggleSidebar={() => { }}
                 onLinkClick={() => setIsMobileMenuOpen(false)}
                 hideToggleButton={true}
               />

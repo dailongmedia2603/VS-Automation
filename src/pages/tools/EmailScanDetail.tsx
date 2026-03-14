@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { emailScanService, EmailScanResult } from '@/api/tools';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Save, PlayCircle, Loader2, Download, Trash2, Settings, FileText } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,73 +17,74 @@ import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { EmailScanLogDialog } from '@/components/tools/EmailScanLogDialog';
 
-type Project = {
-  id: number;
-  name: string;
-  fb_post_id: string | null;
-  last_scanned_at: string | null;
-};
-
-type ScanResult = {
-  id: number;
-  email: string;
-  comment_content: string;
-  account_name: string | null;
-  account_id: string | null;
-  comment_link: string | null;
-};
-
 const EmailScanDetail = () => {
   const { projectId } = useParams<{ projectId: string }>();
-  const [project, setProject] = useState<Project | null>(null);
-  const [results, setResults] = useState<ScanResult[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
+  const queryClient = useQueryClient();
+
+  // React Query - data loads instantly from cache
+  const { data: project, isLoading: isLoadingProject } = useQuery({
+    queryKey: ['email-scan-project', projectId],
+    queryFn: () => emailScanService.getProject(Number(projectId)),
+    enabled: !!projectId,
+  });
+
+  const { data: results = [], isLoading: isLoadingResults, refetch: refetchResults } = useQuery({
+    queryKey: ['email-scan-results', projectId],
+    queryFn: () => emailScanService.getResults(Number(projectId)),
+    enabled: !!projectId,
+  });
+
+  const isLoading = isLoadingProject || isLoadingResults;
+
   const [selectedResultIds, setSelectedResultIds] = useState<number[]>([]);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [isLogOpen, setIsLogOpen] = useState(false);
+  const [fbPostId, setFbPostId] = useState(project?.fb_post_id || '');
 
-  // Form state
-  const [fbPostId, setFbPostId] = useState('');
-
-  const fetchProjectData = async () => {
-    if (!projectId) return;
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase.from('email_scan_projects').select('*').eq('id', projectId).single();
-      if (error) throw error;
-      setProject(data);
-      setFbPostId(data.fb_post_id || '');
-
-      const { data: resultsData, error: resultsError } = await supabase.from('email_scan_results').select('*').eq('project_id', projectId).order('created_at', { ascending: false });
-      if (resultsError) throw resultsError;
-      setResults(resultsData || []);
-
-    } catch (error: any) {
-      showError("Không thể tải dữ liệu dự án: " + error.message);
-    } finally {
-      setIsLoading(false);
+  // Update fbPostId when project loads
+  useMemo(() => {
+    if (project?.fb_post_id !== undefined) {
+      setFbPostId(project.fb_post_id || '');
     }
-  };
+  }, [project]);
 
-  useEffect(() => {
-    fetchProjectData();
-  }, [projectId]);
+  // Mutations
+  const saveMutation = useMutation({
+    mutationFn: () => emailScanService.saveConfig(Number(projectId), { fb_post_id: fbPostId }),
+    onSuccess: () => {
+      showSuccess("Đã lưu cấu hình thành công!");
+      queryClient.invalidateQueries({ queryKey: ['email-scan-project', projectId] });
+    },
+    onError: (err) => showError("Lưu thất bại: " + (err as Error).message),
+  });
 
-  const handleSave = async () => {
+  const scanMutation = useMutation({
+    mutationFn: () => emailScanService.scanEmails(Number(projectId)),
+    onSuccess: (data) => {
+      if (data.success) {
+        showSuccess(`Quét hoàn tất! Tìm thấy ${data.emails_found || 0} email.`);
+        refetchResults();
+      } else {
+        showError(`Quét thất bại: ${data.error}`);
+      }
+    },
+    onError: (err) => showError(`Quét thất bại: ${(err as Error).message}`),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => emailScanService.deleteMultipleResults(selectedResultIds),
+    onSuccess: () => {
+      showSuccess("Đã xóa thành công!");
+      setSelectedResultIds([]);
+      setIsDeleteAlertOpen(false);
+      refetchResults();
+    },
+    onError: (err) => showError("Xóa thất bại: " + (err as Error).message),
+  });
+
+  const handleSave = () => {
     if (!project) return;
-    setIsSaving(true);
-    const { error } = await supabase
-      .from('email_scan_projects')
-      .update({ fb_post_id: fbPostId })
-      .eq('id', project.id);
-    
-    if (error) showError("Lưu thất bại: " + error.message);
-    else showSuccess("Đã lưu cấu hình thành công!");
-    setIsSaving(false);
+    saveMutation.mutate();
   };
 
   const handleRunScan = async () => {
@@ -90,23 +92,11 @@ const EmailScanDetail = () => {
       showError("Vui lòng nhập ID bài viết Facebook.");
       return;
     }
-    setIsScanning(true);
     const toastId = showLoading("Đang quét bình luận...");
     try {
-      const { data, error } = await supabase.functions.invoke('scan-comments-for-emails', {
-        body: { projectId }
-      });
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
-      
-      dismissToast(toastId);
-      showSuccess(`Quét hoàn tất! Tìm thấy ${data.count} email.`);
-      fetchProjectData(); // Refresh all data
-    } catch (error: any) {
-      if (toastId) dismissToast(toastId);
-      showError(`Quét thất bại: ${error.message}`);
+      await scanMutation.mutateAsync();
     } finally {
-      setIsScanning(false);
+      dismissToast(toastId);
     }
   };
 
@@ -115,8 +105,7 @@ const EmailScanDetail = () => {
       showError("Không có dữ liệu để xuất.");
       return;
     }
-    setIsExporting(true);
-    const dataToExport = results.map(result => ({
+    const dataToExport = results.map((result: EmailScanResult) => ({
       'Email': result.email,
       'Nội dung bình luận': result.comment_content,
       'Tên tài khoản': result.account_name,
@@ -129,30 +118,6 @@ const EmailScanDetail = () => {
     XLSX.utils.book_append_sheet(workbook, worksheet, "Email Scan Results");
     XLSX.writeFile(workbook, `export_emails_${project?.name || 'scan'}.xlsx`);
     showSuccess("Đã xuất file Excel thành công!");
-    setIsExporting(false);
-  };
-
-  const handleDeleteSelected = async () => {
-    setIsDeleting(true);
-    const toastId = showLoading(`Đang xóa ${selectedResultIds.length} email...`);
-    try {
-        const { error } = await supabase
-            .from('email_scan_results')
-            .delete()
-            .in('id', selectedResultIds);
-        
-        if (error) throw error;
-
-        showSuccess("Đã xóa thành công!");
-        setResults(prev => prev.filter((r: ScanResult) => !selectedResultIds.includes(r.id)));
-        setSelectedResultIds([]);
-    } catch (error: any) {
-        showError("Xóa thất bại: " + error.message);
-    } finally {
-        dismissToast(toastId);
-        setIsDeleteAlertOpen(false);
-        setIsDeleting(false);
-    }
   };
 
   if (isLoading) {
@@ -183,8 +148,8 @@ const EmailScanDetail = () => {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={handleSave} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
-            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+          <Button onClick={handleSave} disabled={saveMutation.isPending} className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
+            {saveMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
             Lưu cấu hình
           </Button>
         </div>
@@ -220,12 +185,12 @@ const EmailScanDetail = () => {
                 <FileText className="mr-2 h-4 w-4" />
                 Log
               </Button>
-              <Button variant="outline" className="bg-white" onClick={handleExportExcel} disabled={isExporting}>
-                {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+              <Button variant="outline" className="bg-white" onClick={handleExportExcel}>
+                <Download className="mr-2 h-4 w-4" />
                 Xuất Excel
               </Button>
-              <Button onClick={handleRunScan} disabled={isScanning} className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
-                {isScanning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
+              <Button onClick={handleRunScan} disabled={scanMutation.isPending} className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
+                {scanMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
                 Chạy quét
               </Button>
             </div>
@@ -239,7 +204,7 @@ const EmailScanDetail = () => {
                   <TableHead className="w-12">
                     <Checkbox
                       checked={selectedResultIds.length === results.length && results.length > 0}
-                      onCheckedChange={(checked) => setSelectedResultIds(checked ? results.map(r => r.id) : [])}
+                      onCheckedChange={(checked) => setSelectedResultIds(checked ? results.map((r: EmailScanResult) => r.id) : [])}
                     />
                   </TableHead>
                   <TableHead>Email</TableHead>
@@ -248,7 +213,7 @@ const EmailScanDetail = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {results.length > 0 ? results.map(result => (
+                {results.length > 0 ? results.map((result: EmailScanResult) => (
                   <TableRow key={result.id}>
                     <TableCell>
                       <Checkbox
@@ -271,10 +236,10 @@ const EmailScanDetail = () => {
         </CardContent>
       </Card>
 
-      <EmailScanLogDialog 
-        isOpen={isLogOpen} 
-        onOpenChange={setIsLogOpen} 
-        projectId={project.id} 
+      <EmailScanLogDialog
+        isOpen={isLogOpen}
+        onOpenChange={setIsLogOpen}
+        projectId={project.id}
       />
 
       <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
@@ -287,8 +252,8 @@ const EmailScanDetail = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Hủy</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteSelected} disabled={isDeleting} className="bg-red-600 hover:bg-red-700">
-              {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <AlertDialogAction onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending} className="bg-red-600 hover:bg-red-700">
+              {deleteMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Xóa
             </AlertDialogAction>
           </AlertDialogFooter>

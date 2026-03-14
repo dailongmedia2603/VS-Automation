@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { seedingService } from '@/api/seeding';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -100,7 +100,7 @@ export const ImportPostsDialog = ({ isOpen, onOpenChange, projectId, onSuccess }
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
-        
+
         if (jsonData.length === 0) {
           throw new Error("File Excel trống hoặc không có dữ liệu.");
         }
@@ -108,7 +108,7 @@ export const ImportPostsDialog = ({ isOpen, onOpenChange, projectId, onSuccess }
         const firstRow = jsonData[0] || {};
         const headers = Object.keys(firstRow).map(h => h.toLowerCase().trim());
         const requiredFields = ['post_name', 'post_type', 'id_list'];
-        
+
         if (!requiredFields.every(field => headers.includes(field))) {
           throw new Error(`File Excel thiếu các cột bắt buộc. Cần có: ${requiredFields.join(', ')}.`);
         }
@@ -158,41 +158,31 @@ export const ImportPostsDialog = ({ isOpen, onOpenChange, projectId, onSuccess }
           throw new Error(`Dòng ${i + 2} thiếu tên bài viết.`);
         }
 
-        const { data: newPost, error: postError } = await supabase
-          .from('seeding_posts')
-          .insert({
-            project_id: projectId,
-            name: postData.name,
-            type: postData.type,
-            links: postData.links,
-            content: postData.content,
-            is_active: true,
-            status: 'checking',
-          })
-          .select()
-          .single();
-        if (postError) throw postError;
+        // Create post via API
+        const newPost = await seedingService.createPost(Number(projectId), {
+          name: postData.name,
+          type: postData.type,
+          links: postData.links,
+          content: postData.content,
+          is_active: true,
+          status: 'checking',
+        });
 
         if (newPost) {
           successfulPosts.push(newPost);
+
+          // Add comments if type is comment_check
           if (postData.type === 'comment_check' && postData.comments.length > 0) {
-            const commentsToInsert = postData.comments.map(commentContent => ({
-              post_id: newPost.id,
-              content: commentContent.trim(),
-            }));
-            const { error: commentsError } = await supabase.from('seeding_comments').insert(commentsToInsert);
-            if (commentsError) throw commentsError;
+            for (const commentContent of postData.comments) {
+              await seedingService.createComment(newPost.id, { content: commentContent.trim() });
+            }
           }
 
+          // Add groups if type is post_approval
           if (postData.type === 'post_approval' && postData.links) {
             const groupIds = String(postData.links).split('\n').map(id => id.trim()).filter(id => id);
-            if (groupIds.length > 0) {
-              const groupsToInsert = groupIds.map(groupId => ({
-                post_id: newPost.id,
-                group_id: groupId,
-              }));
-              const { error: groupsError } = await supabase.from('seeding_groups').insert(groupsToInsert);
-              if (groupsError) throw groupsError;
+            for (const groupId of groupIds) {
+              await seedingService.createGroup(newPost.id, { group_id: groupId });
             }
           }
         }
@@ -272,8 +262,8 @@ export const ImportPostsDialog = ({ isOpen, onOpenChange, projectId, onSuccess }
         </div>
         <DialogFooter className="p-6 bg-white border-t">
           <Button variant="outline" onClick={() => { onOpenChange(false); resetState(); }}>Hủy</Button>
-          <Button 
-            onClick={handleImport} 
+          <Button
+            onClick={handleImport}
             disabled={isParsing || parsedData.length === 0 || isImporting}
             className="bg-blue-600 hover:bg-blue-700"
           >

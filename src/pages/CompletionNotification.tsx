@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { useCompletedPosts, useMarkMultipleAsRead, useDeleteMultiplePosts } from '@/hooks/useSeedingProjects';
+import { seedingService, CompletedPost } from '@/api/seeding';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -10,19 +11,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { ArrowLeft, Bell, MessageSquare, FileCheck2, Trash2, Loader2, CheckCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { cn } from '@/lib/utils';
 import { useNotification } from '@/contexts/NotificationContext';
-
-type CompletedPost = {
-  id: number;
-  name: string;
-  type: 'comment_check' | 'post_approval';
-  project_id: number;
-  last_checked_at: string | null;
-  seeding_projects: { name: string } | null;
-  is_notification_seen: boolean;
-};
 
 const NotificationItem = ({ post, onMarkAsSeen, isSelected, onSelect }: { post: CompletedPost, onMarkAsSeen: (postId: number) => void, isSelected: boolean, onSelect: (postId: number) => void }) => {
   const isCommentCheck = post.type === 'comment_check';
@@ -41,9 +31,9 @@ const NotificationItem = ({ post, onMarkAsSeen, isSelected, onSelect }: { post: 
             onCheckedChange={() => onSelect(post.id)}
             className="mt-1"
           />
-          <Link 
-            to={`/check-seeding/${post.project_id}`} 
-            state={{ selectedPostId: post.id }} 
+          <Link
+            to={`/check-seeding/${post.project_id}`}
+            state={{ selectedPostId: post.id }}
             className="flex-1 flex items-start gap-4"
             onClick={() => onMarkAsSeen(post.id)}
           >
@@ -78,75 +68,34 @@ const NotificationItem = ({ post, onMarkAsSeen, isSelected, onSelect }: { post: 
 };
 
 const CompletionNotification = () => {
-  const [notifications, setNotifications] = useState<CompletedPost[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // React Query - data loads instantly from cache
+  const { data: notifications = [], isLoading } = useCompletedPosts();
+  const markMultipleAsRead = useMarkMultipleAsRead();
+  const deleteMultiple = useDeleteMultiplePosts();
+
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isMarkingAsSeen, setIsMarkingAsSeen] = useState(false);
   const { decrementUnreadCount } = useNotification();
 
-  const fetchCompletedPosts = async () => {
-    setIsLoading(true);
-    const { data, error } = await supabase
-      .from('seeding_posts')
-      .select(`
-        id, name, type, project_id, last_checked_at, is_notification_seen,
-        seeding_projects ( name )
-      `)
-      .eq('status', 'completed')
-      .order('last_checked_at', { ascending: false });
-
-    if (error) {
-      showError("Không thể tải thông báo: " + error.message);
-    } else {
-      const formattedData = data?.map(p => ({
-        ...p,
-        seeding_projects: Array.isArray(p.seeding_projects) ? p.seeding_projects[0] || null : p.seeding_projects,
-      })) || [];
-      setNotifications(formattedData as CompletedPost[]);
-    }
-    setIsLoading(false);
-  };
-
-  useEffect(() => {
-    fetchCompletedPosts();
-  }, []);
-
   const handleMarkAsSeen = async (postId: number) => {
-    const notification = notifications.find(n => n.id === postId);
+    const notification = notifications.find((n: CompletedPost) => n.id === postId);
     if (notification && !notification.is_notification_seen) {
       decrementUnreadCount();
-    }
-
-    setNotifications(prev => 
-      prev.map(n => n.id === postId ? { ...n, is_notification_seen: true } : n)
-    );
-
-    const { error } = await supabase
-      .from('seeding_posts')
-      .update({ is_notification_seen: true })
-      .eq('id', postId);
-    
-    if (error) {
-      showError("Không thể đánh dấu đã xem: " + error.message);
-      setNotifications(prev => 
-        prev.map(n => n.id === postId ? { ...n, is_notification_seen: false } : n)
-      );
+      await seedingService.markAsRead(postId);
     }
   };
 
   const handleSelect = (postId: number) => {
-    setSelectedIds(prev => 
-      prev.includes(postId) 
-        ? prev.filter(id => id !== postId) 
+    setSelectedIds(prev =>
+      prev.includes(postId)
+        ? prev.filter(id => id !== postId)
         : [...prev, postId]
     );
   };
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedIds(notifications.map(n => n.id));
+      setSelectedIds(notifications.map((n: CompletedPost) => n.id));
     } else {
       setSelectedIds([]);
     }
@@ -155,57 +104,24 @@ const CompletionNotification = () => {
   const handleMarkSelectedAsSeen = async () => {
     if (selectedIds.length === 0) return;
 
-    setIsMarkingAsSeen(true);
-    const toastId = showLoading(`Đang đánh dấu ${selectedIds.length} thông báo...`);
+    const unreadSelectedCount = notifications.filter((n: CompletedPost) =>
+      selectedIds.includes(n.id) && !n.is_notification_seen
+    ).length;
 
-    const unreadSelectedCount = notifications.filter(n => selectedIds.includes(n.id) && !n.is_notification_seen).length;
+    await markMultipleAsRead.mutateAsync(selectedIds);
 
-    try {
-        const { error } = await supabase
-            .from('seeding_posts')
-            .update({ is_notification_seen: true })
-            .in('id', selectedIds);
-
-        if (error) throw error;
-
-        setNotifications(prev => 
-            prev.map(n => selectedIds.includes(n.id) ? { ...n, is_notification_seen: true } : n)
-        );
-        
-        for (let i = 0; i < unreadSelectedCount; i++) {
-            decrementUnreadCount();
-        }
-
-        setSelectedIds([]);
-        
-        dismissToast(toastId);
-        showSuccess("Đã đánh dấu đã xem thành công!");
-    } catch (error: any) {
-        dismissToast(toastId);
-        showError("Đánh dấu đã xem thất bại: " + error.message);
-    } finally {
-        setIsMarkingAsSeen(false);
+    // Update unread count locally
+    for (let i = 0; i < unreadSelectedCount; i++) {
+      decrementUnreadCount();
     }
+
+    setSelectedIds([]);
   };
 
   const handleDeleteSelected = async () => {
-    setIsDeleting(true);
-    const toastId = showLoading(`Đang xóa ${selectedIds.length} thông báo...`);
-    const { error } = await supabase
-      .from('seeding_posts')
-      .delete()
-      .in('id', selectedIds);
-    
-    dismissToast(toastId);
-    if (error) {
-      showError("Xóa thất bại: " + error.message);
-    } else {
-      showSuccess("Đã xóa thành công!");
-      setNotifications(prev => prev.filter(n => !selectedIds.includes(n.id)));
-      setSelectedIds([]);
-    }
+    await deleteMultiple.mutateAsync(selectedIds);
+    setSelectedIds([]);
     setIsDeleteAlertOpen(false);
-    setIsDeleting(false);
   };
 
   return (
@@ -228,7 +144,7 @@ const CompletionNotification = () => {
         <CardHeader className="p-4 border-b">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Checkbox 
+              <Checkbox
                 id="select-all"
                 checked={selectedIds.length > 0 && selectedIds.length === notifications.length && notifications.length > 0}
                 onCheckedChange={handleSelectAll}
@@ -239,8 +155,13 @@ const CompletionNotification = () => {
             </div>
             {selectedIds.length > 0 && (
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={handleMarkSelectedAsSeen} disabled={isMarkingAsSeen}>
-                  {isMarkingAsSeen ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleMarkSelectedAsSeen}
+                  disabled={markMultipleAsRead.isPending}
+                >
+                  {markMultipleAsRead.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
                   Đánh dấu đã xem
                 </Button>
                 <Button variant="destructive" size="sm" onClick={() => setIsDeleteAlertOpen(true)}>
@@ -258,10 +179,10 @@ const CompletionNotification = () => {
             </div>
           ) : notifications.length > 0 ? (
             <div className="space-y-3">
-              {notifications.map(post => (
-                <NotificationItem 
-                  key={post.id} 
-                  post={post} 
+              {notifications.map((post: CompletedPost) => (
+                <NotificationItem
+                  key={post.id}
+                  post={post}
                   onMarkAsSeen={handleMarkAsSeen}
                   isSelected={selectedIds.includes(post.id)}
                   onSelect={handleSelect}
@@ -287,8 +208,12 @@ const CompletionNotification = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Hủy</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteSelected} disabled={isDeleting} className="bg-red-600 hover:bg-red-700">
-              {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <AlertDialogAction
+              onClick={handleDeleteSelected}
+              disabled={deleteMultiple.isPending}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleteMultiple.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Xóa
             </AlertDialogAction>
           </AlertDialogFooter>

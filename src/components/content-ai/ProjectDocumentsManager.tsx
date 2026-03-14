@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,27 +10,20 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PlusCircle, Search, Trash2, Loader2, Edit, FileText, User, Lightbulb, MoreHorizontal } from 'lucide-react';
 import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
-import { type User as SupabaseUser } from '@supabase/supabase-js';
+import { contentAiService, Document as ApiDocument } from '@/api/contentAi';
 import { useAuth } from '@/contexts/AuthContext';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
-type Document = {
-  id: number;
-  created_at: string;
-  title: string;
-  purpose: string | null;
-  document_type: string | null;
-  content: string | null;
-  example_customer_message: string | null;
-  example_agent_reply: string | null;
-  creator_name: string | null;
-  embedding: number[] | string | null;
+type Document = ApiDocument & {
+  creator_name?: string | null;
+  example_customer_message?: string | null;
+  example_agent_reply?: string | null;
 };
 
-const DocumentDialog = ({ isOpen, onOpenChange, onSave, document, user }: { isOpen: boolean, onOpenChange: (open: boolean) => void, onSave: (doc: Partial<Document>) => void, document: Partial<Document> | null, user: SupabaseUser | null }) => {
+const DocumentDialog = ({ isOpen, onOpenChange, onSave, document, user }: { isOpen: boolean, onOpenChange: (open: boolean) => void, onSave: (doc: Partial<Document>) => void, document: Partial<Document> | null, user: any }) => {
   const [currentDoc, setCurrentDoc] = useState<Partial<Document>>({});
 
   useEffect(() => {
@@ -161,13 +153,14 @@ export const ProjectDocumentsManager = ({ projectId }: { projectId: string }) =>
 
   const fetchDocuments = useCallback(async () => {
     setIsLoading(true);
-    const { data, error } = await supabase.from('documents').select('*').eq('project_id', projectId).order('created_at', { ascending: false });
-    if (error) {
-      showError("Không thể tải tài liệu: " + error.message);
-    } else {
-      setDocuments(data as Document[]);
+    try {
+      const data = await contentAiService.getDocuments(Number(projectId));
+      setDocuments(data);
+    } catch (error: any) {
+      showError("Không thể tải tài liệu: " + (error.response?.data?.message || error.message));
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }, [projectId]);
 
   useEffect(() => {
@@ -184,18 +177,12 @@ export const ProjectDocumentsManager = ({ projectId }: { projectId: string }) =>
   const handleSave = async (doc: Partial<Document>) => {
     const toastId = showLoading("Đang lưu tài liệu...");
     try {
-      const documentToSave = { ...doc, project_id: projectId };
-      
-      // Remove embedding logic
-      const { embedding, ...dataToSave } = documentToSave;
+      const dataToSave = { ...doc };
 
       if (dataToSave.id) {
-        const { error } = await supabase.from('documents').update(dataToSave).eq('id', dataToSave.id);
-        if (error) throw error;
+        await contentAiService.updateDocument(dataToSave.id, dataToSave);
       } else {
-        const { id, ...insertData } = dataToSave;
-        const { error } = await supabase.from('documents').insert(insertData);
-        if (error) throw error;
+        await contentAiService.createDocument(Number(projectId), dataToSave);
       }
 
       dismissToast(toastId);
@@ -206,22 +193,24 @@ export const ProjectDocumentsManager = ({ projectId }: { projectId: string }) =>
 
     } catch (err: any) {
       dismissToast(toastId);
-      showError(`Lỗi lưu tài liệu: ${err.message}`);
+      showError(`Lỗi lưu tài liệu: ${err.response?.data?.message || err.message}`);
     }
   };
 
   const handleDelete = async (ids: number[]) => {
     const toastId = showLoading("Đang xóa...");
-    const { error } = await supabase.from('documents').delete().in('id', ids);
-    dismissToast(toastId);
-    if (error) {
-      showError("Xóa thất bại: " + error.message);
-    } else {
+    try {
+      await Promise.all(ids.map(id => contentAiService.deleteDocument(id)));
+
+      dismissToast(toastId);
       showSuccess("Đã xóa thành công!");
       setDocuments(prev => prev.filter(d => !ids.includes(d.id)));
       setSelectedIds([]);
       setDocToDelete(null);
       setIsBulkDeleteAlertOpen(false);
+    } catch (error: any) {
+      dismissToast(toastId);
+      showError("Xóa thất bại: " + (error.response?.data?.message || error.message));
     }
   };
 

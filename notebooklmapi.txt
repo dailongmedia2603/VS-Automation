@@ -1,0 +1,143 @@
+NotebookLM API Documentation
+Base URL: https://notebooklm.pcdl.io.vn/ Version: 2.0.0
+
+This API allows you to programmatically interact with Google NotebookLM, managing accounts, notebooks, sources, and chat interactions. It handles authentication via cookie management and includes an auto-refresh mechanism to keep sessions alive.
+
+1. Authentication & Account Management
+Manage multiple NotebookLM accounts. You must add an account and ensure it is "active" before calling Notebook operations.
+
+Get Active Account Info
+Endpoint: GET /api/accounts/active/info
+Description: Returns details of the currently selected account.
+Response (Success):
+{
+    "success": true,
+    "account": {
+        "id": "personal",
+        "name": "My Account",
+        "email": "user@gmail.com",
+        "is_active": true
+    }
+}
+List All Accounts
+Endpoint: GET /api/accounts/list
+Description: List all stored accounts.
+Response (Success):
+{
+    "success": true,
+    "accounts": [ ... ]
+}
+Add / Update Account
+Endpoint: POST /api/accounts/add
+Description: Add a new account or update cookies for an existing one.
+Request Body:
+{
+    "account_id": "personal",
+    "name": "Personal Account",
+    "email": "user@email.com",
+    "cookies": "HSID=...; SSID=...; ..." // Full cookie string
+}
+Switch Active Account
+Endpoint: POST /api/accounts/switch
+Description: Switch the server to use a different account for subsequent requests.
+Request Body:
+{
+    "account_id": "personal"
+}
+Quick Import Cookies
+Endpoint: POST /api/auth/quick-import
+Description: Quickly inject a cookie string into the currently active account. Useful for fast setup.
+Request Body:
+{
+    "cookies": "HSID=...; SSID=...; ..."
+}
+2. Notebook Operations
+List Notebooks
+Endpoint: GET /api/notebooks
+Description: Get all notebooks for the active account.
+Response (Success):
+{
+    "success": true,
+    "notebooks": [
+        {
+            "id": "notebook_uuid",
+            "title": "My Notebook"
+        }
+    ]
+}
+Create Notebook
+Endpoint: POST /api/nblm/notebooks
+Description: Create a new notebook.
+Request Body:
+{
+    "title": "New Project"
+}
+Response (Success):
+{
+    "success": true,
+    "notebook_id": "uuid..."
+}
+Delete Notebook
+Endpoint: DELETE /api/nblm/notebooks/{notebook_id}
+Get Notebook Details
+Endpoint: GET /api/nblm/notebooks/{notebook_id}/details
+Description: Get metadata and list of sources for a specific notebook.
+3. Source Management (Add Data)
+Add URL Source
+Endpoint: POST /api/nblm/notebooks/{notebook_id}/sources
+Request Body:
+{
+    "url": "https://example.com/article"
+}
+Add Text / Copied Content
+Endpoint: POST /api/nblm/notebooks/{notebook_id}/sources/text
+Request Body:
+{
+    "title": "Meeting Notes",
+    "content": "Full text content here..."
+}
+Add File (PDF, DOCX, TXT, MD)
+Endpoint: POST /api/nblm/notebooks/{notebook_id}/sources/file
+Content-Type: multipart/form-data
+Request:
+file
+: The binary file object.
+Example (cURL):
+curl -X POST -F "file=@./document.pdf" https://notebooklm.pcdl.io.vn/api/nblm/notebooks/{id}/sources/file
+Response (Success):
+{
+    "success": true,
+    "source": { "id": "...", "title": "document.pdf" }
+}
+Delete Source
+Endpoint: DELETE /api/nblm/notebooks/{notebook_id}/sources/{source_id}
+4. Chat & Interaction
+Chat with Notebook
+Endpoint: POST /api/nblm/notebooks/{notebook_id}/chat
+Description: Send a query to the notebook.
+Request Body:
+{
+    "query": "What are the key points in the documents?",
+    "conversation_id": "optional_conv_id_for_history"
+}
+Response (Success):
+{
+    "success": true,
+    "answer": "The key points are...",
+    "conversation_id": "new_conv_id",
+    "turn_number": 1
+}
+5. Studio / Artifact Generation
+Generate Audio Overview
+Endpoint: POST /api/nblm/notebooks/{notebook_id}/artifacts/audio
+Request Body:
+{
+    "instructions": "Focus on the financial aspects." // Optional
+}
+Generate Report (Briefing, FAQ, etc.)
+Endpoint: POST /api/nblm/notebooks/{notebook_id}/artifacts/report
+Request Body:
+{
+    "format_type": "briefing_doc", // Options: briefing_doc, study_guide, blog_post, custom
+    "prompt": "Custom topic if using format_type=custom"
+}

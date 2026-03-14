@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import ReactMarkdown from 'react-markdown';
+import { contentAiService } from '@/api/contentAi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -28,10 +29,10 @@ type Project = { id: number; name: string; };
 type ProjectItem = { id: number; name: string; type: 'article' | 'comment'; content: string | null; config: any; generation_status?: 'idle' | 'generating' | 'failed'; generation_error?: string | null; };
 type PromptLibrary = { id: number; name: string; };
 type CommentRatio = { id: string; type: string; percentage: number; content: string; };
-type GeneratedComment = { 
-  id: string; 
-  content: string; 
-  type: string; 
+type GeneratedComment = {
+  id: string;
+  content: string;
+  type: string;
   metConditionIds: string[];
   stt: number;
   person: number;
@@ -42,8 +43,8 @@ type MandatoryCondition = { id: string; content: string; };
 type Document = { id: number; title: string; };
 
 type CommentWithMeta = GeneratedComment & {
-    level: number;
-    children?: CommentWithMeta[];
+  level: number;
+  children?: CommentWithMeta[];
 };
 
 interface CommentGenerationDetailProps {
@@ -61,12 +62,15 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingConditions, setIsSavingConditions] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [configAccordionValue, setConfigAccordionValue] = useState("item-1");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [highlightedIds, setHighlightedIds] = useState<string[]>([]);
+  const [feedbacks, setFeedbacks] = useState<Record<string, string>>({});
   const [isLogOpen, setIsLogOpen] = useState(false);
   const [logs, setLogs] = useState<Log[]>([]);
   const [isLoadingLogs, setIsLoadingLogs] = useState(true);
   const [isBulkDeleteAlertOpen, setIsBulkDeleteAlertOpen] = useState(false);
-  
+
   const [editingComment, setEditingComment] = useState<GeneratedComment | null>(null);
   const [editedContent, setEditedContent] = useState('');
   const [commentToDelete, setCommentToDelete] = useState<GeneratedComment | null>(null);
@@ -77,11 +81,23 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
   const [projectDocuments, setProjectDocuments] = useState<Document[]>([]);
   const [articlesToRegenerate, setArticlesToRegenerate] = useState<string[]>([]);
 
+  const [isCheckFeedbackLoading, setIsCheckFeedbackLoading] = useState(false);
+  const [checkFeedbackResult, setCheckFeedbackResult] = useState<string | null>(null);
+  const [isCheckFeedbackDialogOpen, setIsCheckFeedbackDialogOpen] = useState(false);
+
   useEffect(() => {
     setCurrentItem(item);
     const itemConfig = item.config || {};
     setConfig(itemConfig);
     setMandatoryConditions(itemConfig.mandatoryConditions || []);
+
+    // Load Feedbacks
+    contentAiService.getItemFeedbacks(item.id).then(fbs => {
+      const map: Record<string, string> = {};
+      fbs.forEach(f => map[f.content_id] = f.feedback);
+      setFeedbacks(map);
+    });
+
     try {
       let parsedContent = JSON.parse(item.content || '[]');
       if (Array.isArray(parsedContent)) {
@@ -104,49 +120,66 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
     }
   }, [item]);
 
+  // Polling for generation status
   useEffect(() => {
-    const channel = supabase
-      .channel(`content_ai_item_${item.id}`)
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'content_ai_items',
-        filter: `id=eq.${item.id}`
-      }, (payload) => {
-        const updatedItem = payload.new as ProjectItem;
-        if (updatedItem.generation_status === 'idle' && currentItem.generation_status === 'generating') {
-          showSuccess("AI đã tạo xong nội dung!");
-        } else if (updatedItem.generation_status === 'failed' && currentItem.generation_status === 'generating') {
-          showError(`Tạo nội dung thất bại: ${updatedItem.generation_error || 'Lỗi không xác định'}`);
+    let interval: NodeJS.Timeout;
+
+    if (currentItem.generation_status === 'generating') {
+      interval = setInterval(async () => {
+        try {
+          const updatedItem = await contentAiService.getItem(item.id);
+
+          if (updatedItem.generation_status !== 'generating') {
+            if (updatedItem.generation_status === 'failed') {
+              showError(`Tạo nội dung thất bại: ${updatedItem.generation_error || 'Lỗi không xác định'}`);
+            } else {
+              showSuccess("AI đã tạo xong nội dung!");
+              // Highlight newly generated items
+              try {
+                const newContent = JSON.parse(updatedItem.content || '[]');
+                const oldContent = JSON.parse(item.content || '[]');
+                const newIds = newContent.filter((nc: any) => !oldContent.some((oc: any) => oc.id === nc.id)).map((nc: any) => nc.id);
+                setHighlightedIds(newIds);
+              } catch (e) {
+                console.error('Error highlighting new items', e);
+              }
+            }
+          }
+
+          setCurrentItem(updatedItem as ProjectItem);
+          onSave(updatedItem as ProjectItem);
+        } catch (error) {
+          console.error("Polling error", error);
         }
-        setCurrentItem(updatedItem);
-        onSave(updatedItem);
-      })
-      .subscribe();
+      }, 3000);
+    }
 
     return () => {
-      supabase.removeChannel(channel);
+      if (interval) clearInterval(interval);
     };
-  }, [item.id, onSave, currentItem.generation_status]);
+  }, [currentItem.generation_status, item.id, onSave]);
 
   useEffect(() => {
     const fetchLogs = async () => {
-        setIsLoadingLogs(true);
-        const { data, error } = await supabase.from('content_ai_logs').select('*').eq('item_id', item.id).order('created_at', { ascending: false });
-        if (error) showError("Không thể tải lịch sử log: " + error.message);
-        else setLogs(data || []);
+      setIsLoadingLogs(true);
+      try {
+        const data = await contentAiService.getLogs(item.id);
+        setLogs(data || []);
+      } catch (error: any) {
+        showError("Không thể tải lịch sử log: " + (error.response?.data?.message || 'Unknown error'));
+      } finally {
         setIsLoadingLogs(false);
+      }
     };
     fetchLogs();
 
     const fetchProjectDocuments = async () => {
       if (!project?.id) return;
-      const { data, error } = await supabase
-        .from('documents')
-        .select('id, title')
-        .eq('project_id', project.id);
-      if (!error) {
+      try {
+        const data = await contentAiService.getDocuments(project.id);
         setProjectDocuments(data || []);
+      } catch (error) {
+        console.error("Error fetching documents");
       }
     };
     fetchProjectDocuments();
@@ -179,20 +212,16 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
 
   const handleSaveConfig = async (updatedConfig: any) => {
     setIsSaving(true);
-    const { data, error } = await supabase
-      .from('content_ai_items')
-      .update({ config: updatedConfig, updated_at: new Date().toISOString() })
-      .eq('id', item.id)
-      .select()
-      .single();
-
-    if (error) {
-      showError("Lưu cấu hình thất bại: " + error.message);
-    } else if (data) {
+    try {
+      const updatedItem = await contentAiService.updateItem(item.id, { config: updatedConfig });
       showSuccess("Đã lưu cấu hình thành công!");
-      onSave(data as ProjectItem);
+      onSave(updatedItem as ProjectItem);
+      setConfigAccordionValue(""); // Auto-collapse
+    } catch (error: any) {
+      showError("Lưu cấu hình thất bại: " + (error.response?.data?.message || error.message));
+    } finally {
+      setIsSaving(false);
     }
-    setIsSaving(false);
   };
 
   const handleSaveConditions = async () => {
@@ -207,30 +236,23 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
 
     try {
       const configToSave = { ...config, mandatoryConditions };
-      const { data: savedItem, error: saveError } = await supabase
-        .from('content_ai_items')
-        .update({ 
-          config: configToSave, 
-          updated_at: new Date().toISOString(),
-          generation_status: 'generating',
-          generation_error: null
-        })
-        .eq('id', item.id)
-        .select()
-        .single();
-      
-      if (saveError) throw saveError;
-      onSave(savedItem as ProjectItem);
-      
-      const { error: invokeError } = await supabase.functions.invoke('generate-ai-content', {
-        body: { itemId: item.id }
+      // First update config and status
+      const savedItem = await contentAiService.updateItem(item.id, {
+        config: configToSave,
+        generation_status: 'generating',
+        generation_error: null
       });
-      
-      if (invokeError) throw invokeError;
+
+      onSave(savedItem as ProjectItem);
+      setCurrentItem(savedItem as ProjectItem);
+
+      const result = await contentAiService.generateContent(item.id);
+
+      if (!result.success && result.error) throw new Error(result.error);
 
     } catch (err: any) {
       showError(`Không thể bắt đầu tạo nội dung: ${err.message}`);
-      await supabase.from('content_ai_items').update({ generation_status: 'failed', generation_error: err.message }).eq('id', item.id);
+      await contentAiService.updateItem(item.id, { generation_status: 'failed', generation_error: err.message });
     }
   };
 
@@ -241,32 +263,26 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
     }
     setIsFeedbackDialogOpen(false);
     try {
-      const { data: savedItem, error: saveError } = await supabase
-        .from('content_ai_items')
-        .update({ 
-          generation_status: 'generating',
-          generation_error: null
-        })
-        .eq('id', item.id)
-        .select()
-        .single();
-
-      if (saveError) throw saveError;
-      onSave(savedItem as ProjectItem);
-
-      const { error: invokeError } = await supabase.functions.invoke('regenerate-ai-comments', {
-        body: {
-          itemId: item.id,
-          feedback: feedbackText,
-        }
+      // Update status first
+      const savedItem = await contentAiService.updateItem(item.id, {
+        generation_status: 'generating',
+        generation_error: null
       });
 
-      if (invokeError) throw invokeError;
+      onSave(savedItem as ProjectItem);
+      setCurrentItem(savedItem as ProjectItem);
+
+      const result = await contentAiService.regenerateContent(item.id, {
+        feedback: feedbackText,
+        content_ids: articlesToRegenerate.length > 0 ? articlesToRegenerate : results.map(r => r.id), // If none selected, default to ALL? Or require selection? User "Chọn bài viết" implies selection. Let's send selected.
+      });
+
+      if (!result.success && result.error) throw new Error(result.error);
 
       setFeedbackText('');
     } catch (err: any) {
       showError(`Tạo lại thất bại: ${err.message}`);
-      await supabase.from('content_ai_items').update({ generation_status: 'failed', generation_error: err.message }).eq('id', item.id);
+      await contentAiService.updateItem(item.id, { generation_status: 'failed', generation_error: err.message });
     }
   };
 
@@ -282,24 +298,24 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
     const rootComments: CommentWithMeta[] = [];
 
     commentsWithMeta.forEach(comment => {
-        if (comment.reply_to && commentMap.has(comment.reply_to)) {
-            const parent = commentMap.get(comment.reply_to)!;
-            if (!parent.children) {
-                parent.children = [];
-            }
-            parent.children.push(comment);
-        } else {
-            rootComments.push(comment);
+      if (comment.reply_to && commentMap.has(comment.reply_to)) {
+        const parent = commentMap.get(comment.reply_to)!;
+        if (!parent.children) {
+          parent.children = [];
         }
+        parent.children.push(comment);
+      } else {
+        rootComments.push(comment);
+      }
     });
 
     const finalResults: (CommentWithMeta & { level: number })[] = [];
     const flatten = (comment: CommentWithMeta, level: number) => {
-        finalResults.push({ ...comment, level });
-        if (comment.children) {
-            comment.children.sort((a, b) => a.stt - b.stt);
-            comment.children.forEach((child) => flatten(child, level + 1));
-        }
+      finalResults.push({ ...comment, level });
+      if (comment.children) {
+        comment.children.sort((a, b) => a.stt - b.stt);
+        comment.children.forEach((child) => flatten(child, level + 1));
+      }
     };
 
     rootComments.sort((a, b) => a.stt - b.stt).forEach(comment => flatten(comment, 0));
@@ -322,12 +338,12 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
 
   const handleBulkCopy = () => {
     if (selectedIds.length === 0) return;
-    
+
     const contentToCopy = threadedResults
       .filter(r => selectedIds.includes(r.id))
       .map(r => {
         let line = '';
-        
+
         if (r.level > 0) {
           line += '\t'.repeat(r.level);
         }
@@ -343,11 +359,11 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
         }
 
         line += r.content;
-        
+
         return line;
       })
       .join('\n');
-    
+
     navigator.clipboard.writeText(contentToCopy).then(() => {
       showSuccess(`Đã sao chép ${selectedIds.length} bình luận!`);
     }).catch(err => {
@@ -359,14 +375,14 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
     const newResults = results.filter(r => !selectedIds.includes(r.id));
     setResults(newResults);
     setSelectedIds([]);
-    
-    const { error } = await supabase.from('content_ai_items').update({ content: JSON.stringify(newResults), updated_at: new Date().toISOString() }).eq('id', item.id);
-    if (error) {
-      showError("Xóa thất bại: " + error.message);
-      setResults(results);
-    } else {
+
+    try {
+      await contentAiService.updateItem(item.id, { content: JSON.stringify(newResults) });
       showSuccess("Đã xóa thành công!");
       onSave({ ...item, content: JSON.stringify(newResults) });
+    } catch (error: any) {
+      showError("Xóa thất bại: " + (error.response?.data?.message || error.message));
+      setResults(results);
     }
     setIsBulkDeleteAlertOpen(false);
   };
@@ -376,12 +392,12 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
       const total = mandatoryConditions.length;
       const met = r.metConditionIds?.length ?? total;
       const conditionDisplay = total > 0 ? (met === total ? 'Đạt' : `${met}/${total}`) : 'N/A';
-      return { 
+      return {
         'STT': r.stt,
         'Người': r.person,
         'Nội dung Comment': `${' '.repeat(r.level * 4)}${r.content}`,
-        'Loại comment': r.type, 
-        'Điều kiện': conditionDisplay 
+        'Loại comment': r.type,
+        'Điều kiện': conditionDisplay
       };
     });
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
@@ -411,17 +427,17 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
     if (!editingComment) return;
 
     const newResults = results.map(r => r.id === editingComment.id ? { ...r, content: editedContent } : r);
-    
+
     setResults(newResults);
     setEditingComment(null);
 
-    const { error } = await supabase.from('content_ai_items').update({ content: JSON.stringify(newResults) }).eq('id', item.id);
-    if (error) {
-      showError("Cập nhật thất bại: " + error.message);
-      setResults(results); // Revert on error
-    } else {
+    try {
+      await contentAiService.updateItem(item.id, { content: JSON.stringify(newResults) });
       showSuccess("Đã cập nhật bình luận!");
       onSave({ ...item, content: JSON.stringify(newResults) });
+    } catch (error: any) {
+      showError("Cập nhật thất bại: " + (error.response?.data?.message || error.message));
+      setResults(results);
     }
   };
 
@@ -432,40 +448,84 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
     setResults(newResults);
     setCommentToDelete(null);
 
-    const { error } = await supabase.from('content_ai_items').update({ content: JSON.stringify(newResults) }).eq('id', item.id);
-    if (error) {
-      showError("Xóa thất bại: " + error.message);
-      setResults(results);
-    } else {
+    try {
+      await contentAiService.updateItem(item.id, { content: JSON.stringify(newResults) });
       showSuccess("Đã xóa bình luận!");
       onSave({ ...item, content: JSON.stringify(newResults) });
+    } catch (error: any) {
+      showError("Xóa thất bại: " + (error.response?.data?.message || error.message));
+      setResults(results);
     }
   };
 
   const handleClearLogs = async () => {
     const toastId = showLoading("Đang xóa tất cả log...");
-    const { error } = await supabase
-        .from('content_ai_logs')
-        .delete()
-        .eq('item_id', item.id);
-    
-    dismissToast(toastId);
-    if (error) {
-        showError("Xóa log thất bại: " + error.message);
-    } else {
-        showSuccess("Đã xóa toàn bộ lịch sử log!");
-        setLogs([]);
+    try {
+      await contentAiService.deleteLogs(item.id);
+      dismissToast(toastId);
+      showSuccess("Đã xóa toàn bộ lịch sử log!");
+      setLogs([]);
+    } catch (error: any) {
+      dismissToast(toastId);
+      showError("Xóa log thất bại: " + error.message);
     }
   };
 
-  const handleAddConditionsFromLibrary = (conditionsFromLib: MandatoryCondition[]) => {
+  const handleAddConditionsFromLibrary = async (conditionsFromLib: MandatoryCondition[]) => {
     const newConditions = conditionsFromLib.map(c => ({ ...c, id: crypto.randomUUID() }));
-    
+
     const existingContents = new Set(mandatoryConditions.map(c => c.content.trim()));
     const uniqueNewConditions = newConditions.filter(c => !existingContents.has(c.content.trim()));
 
-    setMandatoryConditions(prev => [...prev, ...uniqueNewConditions]);
-    showSuccess(`Đã thêm ${uniqueNewConditions.length} điều kiện từ thư viện.`);
+    if (uniqueNewConditions.length === 0) return;
+
+    const updatedConditions = [...mandatoryConditions, ...uniqueNewConditions];
+    setMandatoryConditions(updatedConditions);
+
+    // Auto-save immediately
+    setIsSavingConditions(true);
+    try {
+      const updatedItem = await contentAiService.updateItem(item.id, {
+        config: { ...config, mandatoryConditions: updatedConditions }
+      });
+      showSuccess(`Đã thêm và lưu ${uniqueNewConditions.length} điều kiện từ thư viện.`);
+      onSave(updatedItem as ProjectItem);
+    } catch (error: any) {
+      showError("Lưu điều kiện thất bại: " + (error.response?.data?.message || error.message));
+    } finally {
+      setIsSavingConditions(false);
+    }
+  };
+
+  const handleCheckFeedback = async () => {
+    if (selectedIds.length === 0) {
+      showError("Vui lòng chọn ít nhất một nội dung để kiểm tra.");
+      return;
+    }
+
+    setIsCheckFeedbackLoading(true);
+    try {
+      const result = await contentAiService.checkFeedback(project.id, {
+        item_id: item.id,
+        content_ids: selectedIds
+      });
+      if (result.success) {
+        setCheckFeedbackResult(result.analysis);
+        setIsCheckFeedbackDialogOpen(true);
+        if (result.feedbacks) {
+          const map = { ...feedbacks };
+          result.feedbacks.forEach(f => map[f.content_id] = f.feedback);
+          setFeedbacks(map);
+        }
+      } else {
+        showError("Không nhận được kết quả phân tích.");
+      }
+    } catch (error: any) {
+      console.error(error);
+      showError("Kiểm tra feedback thất bại: " + (error.response?.data?.message || error.message));
+    } finally {
+      setIsCheckFeedbackLoading(false);
+    }
   };
 
   return (
@@ -480,7 +540,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
           </Button>
         </div>
       </div>
-      
+
       {currentItem.generation_status === 'failed' && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -491,7 +551,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
         </Alert>
       )}
 
-      <Accordion type="single" collapsible defaultValue="item-1" className="w-full">
+      <Accordion type="single" collapsible value={configAccordionValue} onValueChange={setConfigAccordionValue} className="w-full">
         <AccordionItem value="item-1" className="border rounded-2xl bg-blue-50 shadow-sm">
           <AccordionTrigger className="px-6 py-4 text-lg font-semibold hover:no-underline">
             <div className="flex items-center gap-3"><Settings className="h-5 w-5 text-blue-600" /><span>Cấu hình & Tùy chọn</span></div>
@@ -626,7 +686,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    { (config.ratios || []).map((ratio: CommentRatio) => (
+                    {(config.ratios || []).map((ratio: CommentRatio) => (
                       <div key={ratio.id} className="p-3 border rounded-lg bg-slate-50/50 space-y-2">
                         <div className="flex items-center gap-2">
                           <Input placeholder="Loại comment" value={ratio.type} onChange={(e) => handleRatioChange(ratio.id, 'type', e.target.value)} className="flex-1 bg-white" />
@@ -638,7 +698,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                         </div>
                         <Input placeholder={`Nội dung định hướng cho loại "${ratio.type || '...'}"`} value={ratio.content} onChange={(e) => handleRatioChange(ratio.id, 'content', e.target.value)} className="bg-white" />
                       </div>
-                    )) }
+                    ))}
                     <div className="flex items-center justify-between pt-2">
                       <Button variant="outline" size="sm" onClick={handleAddRatio} className="border-dashed"><PlusCircle className="h-4 w-4 mr-2" />Thêm tỉ lệ</Button>
                       {totalPercentage > 100 && (<p className="text-sm text-destructive font-medium">Tổng tỉ lệ vượt quá 100%!</p>)}
@@ -718,7 +778,6 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="outline" size="icon" onClick={handleExportExcel}>
-                    <Download className="h-4 w-4" />
                     <span className="sr-only">Xuất Excel</span>
                   </Button>
                 </TooltipTrigger>
@@ -726,6 +785,15 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                   <p>Xuất Excel</p>
                 </TooltipContent>
               </Tooltip>
+              <Button
+                variant="outline"
+                className="text-purple-600 border-purple-200 hover:bg-purple-50"
+                onClick={handleCheckFeedback}
+                disabled={isCheckFeedbackLoading || selectedIds.length === 0}
+              >
+                {isCheckFeedbackLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
+                Check Feedback
+              </Button>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="outline" size="icon" onClick={() => setIsLogOpen(true)}>
@@ -747,11 +815,11 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
         <CardContent>
           <div className="border rounded-lg overflow-hidden">
             <Table>
-              <TableHeader><TableRow><TableHead className="w-12"><Checkbox checked={selectedIds.length > 0 && selectedIds.length === filteredResults.length && filteredResults.length > 0} onCheckedChange={(checked) => handleSelectAll(!!checked)} /></TableHead><TableHead>STT</TableHead><TableHead>Người</TableHead><TableHead>Nội dung comment</TableHead><TableHead>Loại comment</TableHead><TableHead>Điều kiện</TableHead><TableHead className="text-right">Thao tác</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead className="w-12"><Checkbox checked={selectedIds.length > 0 && selectedIds.length === filteredResults.length && filteredResults.length > 0} onCheckedChange={(checked) => handleSelectAll(!!checked)} /></TableHead><TableHead>STT</TableHead><TableHead>Người</TableHead><TableHead>Nội dung comment</TableHead><TableHead className="w-[30%] text-purple-700"><ShieldCheck className="h-4 w-4 inline mr-1" />Check Feedback</TableHead><TableHead>Loại comment</TableHead><TableHead>Điều kiện</TableHead><TableHead className="text-right">Thao tác</TableHead></TableRow></TableHeader>
               <TableBody>
                 {currentItem.generation_status === 'generating' && (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center p-4">
+                    <TableCell colSpan={8} className="text-center p-4">
                       <div className="flex items-center justify-center gap-3 text-slate-500">
                         <Bot className="h-5 w-5 animate-bounce" />
                         <span className="font-medium">AI đang làm việc... Tác vụ đang chạy trong nền.</span>
@@ -765,7 +833,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                   const allConditionsMet = totalConditions > 0 && metCount === totalConditions;
 
                   return (
-                    <TableRow key={result.id}>
+                    <TableRow key={result.id} className={highlightedIds.includes(result.id) ? "bg-green-50" : ""}>
                       <TableCell><Checkbox checked={selectedIds.includes(result.id)} onCheckedChange={() => handleSelectRow(result.id)} /></TableCell>
                       <TableCell>{result.stt}</TableCell>
                       <TableCell>
@@ -788,6 +856,15 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                           )}
                           <span>{result.content}</span>
                         </div>
+                      </TableCell>
+                      <TableCell className="max-w-md break-words align-top bg-purple-50/30">
+                        {feedbacks[result.id] ? (
+                          <div className="prose prose-sm max-w-none prose-purple text-xs">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{feedbacks[result.id]}</ReactMarkdown>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground italic">Chưa có feedback</span>
+                        )}
                       </TableCell>
                       <TableCell><Badge variant="outline">{result.type}</Badge></TableCell>
                       <TableCell>
@@ -831,7 +908,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
                       </TableCell>
                     </TableRow>
                   )
-                }) : currentItem.generation_status !== 'generating' && (<TableRow><TableCell colSpan={7} className="text-center h-24">Chưa có kết quả nào.</TableCell></TableRow>)}
+                }) : currentItem.generation_status !== 'generating' && (<TableRow><TableCell colSpan={8} className="text-center h-24">Chưa có kết quả nào.</TableCell></TableRow>)}
               </TableBody>
             </Table>
           </div>
@@ -839,7 +916,7 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
       </Card>
 
       <GenerationLogDialog isOpen={isLogOpen} onOpenChange={setIsLogOpen} logs={logs} isLoading={isLoadingLogs} onClearLogs={handleClearLogs} />
-      
+
       <AlertDialog open={isBulkDeleteAlertOpen} onOpenChange={setIsBulkDeleteAlertOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -857,36 +934,36 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
 
       <Dialog open={!!editingComment} onOpenChange={(isOpen) => !isOpen && setEditingComment(null)}>
         <DialogContent>
-            <DialogHeader>
-                <DialogTitle>Sửa bình luận</DialogTitle>
-            </DialogHeader>
-            <div className="py-4">
-                <Textarea 
-                    value={editedContent} 
-                    onChange={(e) => setEditedContent(e.target.value)} 
-                    className="min-h-[120px]"
-                />
-            </div>
-            <DialogFooter>
-                <Button variant="outline" onClick={() => setEditingComment(null)}>Hủy</Button>
-                <Button onClick={handleUpdateComment}>Lưu</Button>
-            </DialogFooter>
+          <DialogHeader>
+            <DialogTitle>Sửa bình luận</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <Textarea
+              value={editedContent}
+              onChange={(e) => setEditedContent(e.target.value)}
+              className="min-h-[120px]"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingComment(null)}>Hủy</Button>
+            <Button onClick={handleUpdateComment}>Lưu</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <AlertDialog open={!!commentToDelete} onOpenChange={(isOpen) => !isOpen && setCommentToDelete(null)}>
-          <AlertDialogContent>
-              <AlertDialogHeader>
-                  <AlertDialogTitle>Bạn có chắc chắn muốn xóa?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                      Hành động này sẽ xóa vĩnh viễn bình luận: "{commentToDelete?.content}"
-                  </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                  <AlertDialogCancel>Hủy</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleConfirmDeleteComment} className="bg-red-600 hover:bg-red-700">Xóa</AlertDialogAction>
-              </AlertDialogFooter>
-          </AlertDialogContent>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Bạn có chắc chắn muốn xóa?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Hành động này sẽ xóa vĩnh viễn bình luận: "{commentToDelete?.content}"
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Hủy</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDeleteComment} className="bg-red-600 hover:bg-red-700">Xóa</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
       </AlertDialog>
 
       <Dialog open={isFeedbackDialogOpen} onOpenChange={setIsFeedbackDialogOpen}>
@@ -979,11 +1056,33 @@ export const CommentGenerationDetail = ({ project, item, promptLibraries, onSave
         </DialogContent>
       </Dialog>
 
-      <ConditionLibraryDialog 
-        isOpen={isLibraryDialogOpen} 
-        onOpenChange={setIsLibraryDialogOpen} 
-        onSelect={handleAddConditionsFromLibrary} 
+      <ConditionLibraryDialog
+        isOpen={isLibraryDialogOpen}
+        onOpenChange={setIsLibraryDialogOpen}
+        onSelect={handleAddConditionsFromLibrary}
       />
+
+      <Dialog open={isCheckFeedbackDialogOpen} onOpenChange={setIsCheckFeedbackDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-purple-600" />
+              Kết quả kiểm tra Feedback
+            </DialogTitle>
+            <DialogDescription>
+              So sánh nội dung đã chọn với các tài liệu feedback trong NotebookLM.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto pr-2">
+            <div className="prose prose-sm max-w-none text-slate-700">
+              <ReactMarkdown>{checkFeedbackResult || ''}</ReactMarkdown>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setIsCheckFeedbackDialogOpen(false)}>Đóng</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

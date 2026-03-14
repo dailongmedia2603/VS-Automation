@@ -1,6 +1,7 @@
-import { useEffect, useState, useRef } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { useKeywordCheckProject, useKeywordCheckPosts, useUpdateKeywordCheckPost, useDeleteKeywordCheckPost, useDeleteMultipleKeywordCheckPosts, useCreateKeywordCheckPostWithItems } from '@/hooks/useTools';
+import { keywordCheckService, KeywordCheckPost } from '@/api/tools';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -19,11 +20,6 @@ import { KeywordPostDetail } from '@/components/tools/KeywordPostDetail';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ImportKeywordPostsDialog } from '@/components/tools/ImportKeywordPostsDialog';
 
-type Project = {
-  id: number;
-  name: string;
-};
-
 type Post = {
   id: number;
   name: string;
@@ -36,85 +32,72 @@ type Post = {
 const initialNewPostState = {
   name: '',
   type: 'comment' as 'comment' | 'post',
-  link: '', // This will hold comments for 'comment' type, and post content for 'post' type
+  link: '',
   keywords: '',
 };
 
 const CheckKeywordCommentDetail = () => {
   const { projectId } = useParams<{ projectId: string }>();
-  const [project, setProject] = useState<Project | null>(null);
-  const [commentPosts, setCommentPosts] = useState<Post[]>([]);
-  const [postPosts, setPostPosts] = useState<Post[]>([]);
-  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
 
+  // React Query - data loads instantly from cache
+  const { data: project, isLoading: isLoadingProject } = useKeywordCheckProject(Number(projectId));
+  const { data: postsData = [], isLoading: isLoadingPosts, refetch: refetchPosts } = useKeywordCheckPosts(Number(projectId));
+
+  const updatePost = useUpdateKeywordCheckPost();
+  const deletePost = useDeleteKeywordCheckPost();
+  const deleteMultiplePosts = useDeleteMultipleKeywordCheckPosts();
+  const createPostWithItems = useCreateKeywordCheckPostWithItems(Number(projectId));
+
+  const isLoading = isLoadingProject || isLoadingPosts;
+
+  // Transform posts to local format
+  const posts: Post[] = useMemo(() => {
+    return postsData.map((p: KeywordCheckPost) => ({
+      id: p.id,
+      name: p.fb_post_url || `Post #${p.id}`,
+      link: p.fb_post_url,
+      status: p.status === 'completed' ? 'completed' : 'pending',
+      type: 'comment' as const, // Default type since KeywordCheckPost doesn't have type
+      keywords: p.keywords,
+    }));
+  }, [postsData]);
+
+  const commentPosts = useMemo(() => posts.filter(p => p.type === 'comment'), [posts]);
+  const postPosts = useMemo(() => posts.filter(p => p.type === 'post'), [posts]);
+
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [editingPostId, setEditingPostId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState('');
-  
+
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [postToDelete, setPostToDelete] = useState<Post | null>(null);
-  
+
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newPostData, setNewPostData] = useState(initialNewPostState);
-  const [isSaving, setIsSaving] = useState(false);
 
   const [selectedPostIds, setSelectedPostIds] = useState<number[]>([]);
   const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
 
-  const fetchProjectData = async (isInitialLoad = false) => {
-    if (!projectId) return;
-    if (isInitialLoad) setIsLoading(true);
-    try {
-      const { data: projectData, error: projectError } = await supabase
-        .from('keyword_check_projects').select('id, name').eq('id', projectId).single();
-      if (projectError) throw projectError;
-      setProject(projectData);
-
-      const { data: postsData, error: postsError } = await supabase
-        .from('keyword_check_posts').select('*').eq('project_id', projectId).order('created_at', { ascending: true });
-      if (postsError) throw postsError;
-      
-      const allPosts = postsData || [];
-      setCommentPosts(allPosts.filter(p => p.type === 'comment'));
-      setPostPosts(allPosts.filter(p => p.type === 'post'));
-
-      if (selectedPost) {
-        const updatedSelectedPost = allPosts.find(p => p.id === selectedPost.id);
-        if (updatedSelectedPost) setSelectedPost(updatedSelectedPost);
-        else setSelectedPost(allPosts[0] || null);
-      } else if (allPosts.length > 0) {
-        setSelectedPost(allPosts[0]);
-      }
-
-    } catch (error: any) {
-      showError("Không thể tải chi tiết dự án: " + error.message);
-    } finally {
-      if (isInitialLoad) setIsLoading(false);
-    }
-  };
-
+  // Auto-select first post when data loads
   useEffect(() => {
-    fetchProjectData(true);
-  }, [projectId]);
+    if (posts.length > 0 && !selectedPost) {
+      setSelectedPost(posts[0]);
+    }
+  }, [posts, selectedPost]);
 
   const handleSaveName = async () => {
     if (!editingPostId) return;
-    const { error } = await supabase.from('keyword_check_posts').update({ name: editingName.trim() }).eq('id', editingPostId);
-    if (error) showError("Cập nhật tên thất bại: " + error.message);
-    else fetchProjectData();
+    await updatePost.mutateAsync({ postId: editingPostId, data: { name: editingName.trim() } });
+    refetchPosts();
     setEditingPostId(null);
   };
 
   const handleConfirmDelete = async () => {
     if (!postToDelete) return;
-    const { error } = await supabase.from('keyword_check_posts').delete().eq('id', postToDelete.id);
-    if (error) showError("Xóa post thất bại: " + error.message);
-    else {
-      showSuccess("Đã xóa post thành công!");
-      if (selectedPost?.id === postToDelete.id) setSelectedPost(null);
-      fetchProjectData();
-    }
+    await deletePost.mutateAsync(postToDelete.id);
+    if (selectedPost?.id === postToDelete.id) setSelectedPost(null);
+    refetchPosts();
     setIsDeleteDialogOpen(false);
   };
 
@@ -128,82 +111,47 @@ const CheckKeywordCommentDetail = () => {
       return;
     }
 
-    setIsSaving(true);
-    let toastId = showLoading("Đang tạo post...");
+    const items = newPostData.type === 'comment'
+      ? newPostData.link.split('\n').filter(line => line.trim() !== '').map(line => line.trim())
+      : [newPostData.link.trim()];
 
     try {
-      const postToInsert = {
-        project_id: projectId,
+      const newPost = await createPostWithItems.mutateAsync({
         name: newPostData.name,
         type: newPostData.type,
-        link: newPostData.type === 'post' ? newPostData.link : null,
         keywords: newPostData.keywords,
-      };
-
-      const { data: newPost, error: postError } = await supabase
-        .from('keyword_check_posts')
-        .insert(postToInsert)
-        .select()
-        .single();
-
-      if (postError) throw postError;
-
-      let itemsToInsert = [];
-      if (newPostData.type === 'comment') {
-        itemsToInsert = newPostData.link
-          .split('\n')
-          .filter(line => line.trim() !== '')
-          .map(content => ({
-            post_id: newPost.id,
-            content: content.trim(),
-          }));
-      } else { // type === 'post'
-        itemsToInsert.push({
-          post_id: newPost.id,
-          content: newPostData.link.trim(),
-        });
-      }
-      
-      if (itemsToInsert.length > 0) {
-        const { error: itemsError } = await supabase
-          .from('keyword_check_items')
-          .insert(itemsToInsert);
-        if (itemsError) throw itemsError;
-      }
-      
-      dismissToast(toastId);
-      showSuccess("Đã thêm post thành công! Bắt đầu quét tự động...");
-      
-      const checkToastId = showLoading("Đang quét tự động...");
-      const { data: checkData, error: checkError } = await supabase.functions.invoke('check-keywords-in-comments', { 
-        body: { postId: newPost.id } 
+        items,
       });
-      dismissToast(checkToastId);
 
-      if (checkError || (checkData && checkData.error)) {
-          showError(`Quét tự động thất bại: ${checkError?.message || checkData?.error}`);
-      } else {
-          showSuccess(`Quét tự động hoàn tất! Tìm thấy ${checkData.found}/${checkData.total} từ khóa.`);
+      // Auto-check keywords after creation
+      const checkToastId = showLoading("Đang quét tự động...");
+      try {
+        const checkResult = await keywordCheckService.checkKeywords(newPost.id);
+        dismissToast(checkToastId);
+        if (checkResult.success) {
+          showSuccess(`Quét tự động hoàn tất! Tìm thấy ${checkResult.matched_count || 0} từ khóa.`);
+        } else {
+          showError(`Quét tự động thất bại: ${checkResult.error}`);
+        }
+      } catch (e: any) {
+        dismissToast(checkToastId);
+        showError(`Quét tự động thất bại: ${e.message}`);
       }
 
       setIsAddDialogOpen(false);
       setNewPostData(initialNewPostState);
-      await fetchProjectData();
-      setSelectedPost(newPost as Post);
+      refetchPosts();
 
-    } catch (error: any) {
-      if (toastId) dismissToast(toastId);
-      showError("Thêm post thất bại: " + error.message);
-    } finally {
-      setIsSaving(false);
+    } catch {
+      // Error handled by mutation
     }
   };
 
   const handleToggleSelectPost = (postId: number) => {
-    setSelectedPostIds(prev => 
-        prev.includes(postId) 
-            ? prev.filter(id => id !== postId) 
-            : [...prev, postId]
+    setSelectedPostIds(prev =>
+      prev.includes(postId)
+        ? prev.filter(id => id !== postId)
+        : [...prev, postId]
     );
   };
 
@@ -219,25 +167,18 @@ const CheckKeywordCommentDetail = () => {
 
   const handleConfirmBulkDelete = async () => {
     if (selectedPostIds.length === 0) return;
-    const toastId = showLoading(`Đang xóa ${selectedPostIds.length} post...`);
-    const { error } = await supabase.from('keyword_check_posts').delete().in('id', selectedPostIds);
-    dismissToast(toastId);
-    if (error) {
-        showError("Xóa hàng loạt thất bại: " + error.message);
-    } else {
-        showSuccess("Đã xóa thành công!");
-        if (selectedPost && selectedPostIds.includes(selectedPost.id)) {
-            setSelectedPost(null);
-        }
-        setSelectedPostIds([]);
-        fetchProjectData();
+    await deleteMultiplePosts.mutateAsync(selectedPostIds);
+    if (selectedPost && selectedPostIds.includes(selectedPost.id)) {
+      setSelectedPost(null);
     }
+    setSelectedPostIds([]);
+    refetchPosts();
     setIsBulkDeleteDialogOpen(false);
   };
 
   const PostList = ({ posts, onSelectPost }: { posts: Post[], onSelectPost: (post: Post) => void }) => {
     const inputRef = useRef<HTMLInputElement>(null);
-    useEffect(() => { if (editingPostId && inputRef.current) inputRef.current.focus(); }, [editingPostId]);
+    useEffect(() => { if (editingPostId && inputRef.current) inputRef.current.focus(); }, []);
 
     return (
       <div className="flex flex-col gap-1 pl-2">
@@ -249,8 +190,8 @@ const CheckKeywordCommentDetail = () => {
               className={cn(
                 "group w-full text-left p-2 rounded-md text-sm flex items-center justify-between",
                 editingPostId !== post.id && "cursor-pointer",
-                post.status === 'completed' ? "bg-green-50 text-green-800 hover:bg-green-100" : 
-                selectedPost?.id === post.id && editingPostId !== post.id ? "bg-blue-100 text-blue-700 font-semibold hover:bg-blue-100" : "hover:bg-slate-100"
+                post.status === 'completed' ? "bg-green-50 text-green-800 hover:bg-green-100" :
+                  selectedPost?.id === post.id && editingPostId !== post.id ? "bg-blue-100 text-blue-700 font-semibold hover:bg-blue-100" : "hover:bg-slate-100"
               )}
             >
               <div className="flex items-center gap-2 flex-1" onClick={() => editingPostId !== post.id && onSelectPost(post)}>
@@ -258,10 +199,7 @@ const CheckKeywordCommentDetail = () => {
                   checked={isSelected}
                   onCheckedChange={() => handleToggleSelectPost(post.id)}
                   onClick={(e) => e.stopPropagation()}
-                  className={cn(
-                    "transition-opacity",
-                    isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                  )}
+                  className={cn("transition-opacity", isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100")}
                 />
                 {editingPostId === post.id ? (
                   <div className="flex-1 flex items-center gap-1">
@@ -290,6 +228,8 @@ const CheckKeywordCommentDetail = () => {
       </div>
     );
   };
+
+  const isSaving = createPostWithItems.isPending;
 
   if (isLoading) return <main className="flex-1 p-6 sm:p-8 bg-slate-50"><Skeleton className="h-full w-full" /></main>;
   if (!project) return <main className="flex-1 p-6 sm:p-8 bg-slate-50"><h1>Không tìm thấy dự án</h1></main>;
@@ -353,9 +293,9 @@ const CheckKeywordCommentDetail = () => {
         <ResizablePanel defaultSize={80}>
           <div className={cn("h-full p-6", selectedPost ? "overflow-y-auto" : "flex items-center justify-center")}>
             {selectedPost && project ? (
-              selectedPost.type === 'comment' ? 
-                <KeywordCommentDetail key={selectedPost.id} project={project} post={selectedPost} onCheckComplete={fetchProjectData} /> :
-                <KeywordPostDetail key={selectedPost.id} project={project} post={selectedPost} onCheckComplete={fetchProjectData} />
+              selectedPost.type === 'comment' ?
+                <KeywordCommentDetail key={selectedPost.id} project={project} post={selectedPost} onCheckComplete={() => refetchPosts()} /> :
+                <KeywordPostDetail key={selectedPost.id} project={project} post={selectedPost} onCheckComplete={() => refetchPosts()} />
             ) : (
               <div className="text-center text-slate-500"><p className="font-semibold text-lg">Chọn một mục để xem chi tiết</p></div>
             )}
@@ -363,38 +303,35 @@ const CheckKeywordCommentDetail = () => {
         </ResizablePanel>
       </ResizablePanelGroup>
 
-      <ImportKeywordPostsDialog 
-        isOpen={isImportDialogOpen} 
+      <ImportKeywordPostsDialog
+        isOpen={isImportDialogOpen}
         onOpenChange={setIsImportDialogOpen}
         projectId={projectId!}
-        onSuccess={() => {
-          setIsImportDialogOpen(false);
-          fetchProjectData();
-        }}
+        onSuccess={() => { setIsImportDialogOpen(false); refetchPosts(); }}
       />
 
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Thêm Post Mới</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2"><Label>Tên Post</Label><Input value={newPostData.name} onChange={(e) => setNewPostData(d => ({...d, name: e.target.value}))} /></div>
-            <div className="space-y-2"><Label>Loại</Label><Select value={newPostData.type} onValueChange={(v) => setNewPostData(d => ({...d, type: v as any}))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="comment">Check Keyword Comment</SelectItem><SelectItem value="post">Check Keyword Post</SelectItem></SelectContent></Select></div>
-            
+            <div className="space-y-2"><Label>Tên Post</Label><Input value={newPostData.name} onChange={(e) => setNewPostData(d => ({ ...d, name: e.target.value }))} /></div>
+            <div className="space-y-2"><Label>Loại</Label><Select value={newPostData.type} onValueChange={(v) => setNewPostData(d => ({ ...d, type: v as any }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="comment">Check Keyword Comment</SelectItem><SelectItem value="post">Check Keyword Post</SelectItem></SelectContent></Select></div>
+
             {newPostData.type === 'comment' ? (
               <div className="space-y-2">
                 <Label>Nội dung comment (mỗi comment một dòng)</Label>
-                <Textarea value={newPostData.link} onChange={(e) => setNewPostData(d => ({...d, link: e.target.value}))} className="min-h-[120px]" placeholder="Comment 1..." />
+                <Textarea value={newPostData.link} onChange={(e) => setNewPostData(d => ({ ...d, link: e.target.value }))} className="min-h-[120px]" placeholder="Comment 1..." />
               </div>
             ) : (
               <div className="space-y-2">
                 <Label>Nội dung Post</Label>
-                <Textarea value={newPostData.link} onChange={(e) => setNewPostData(d => ({...d, link: e.target.value}))} className="min-h-[120px]" placeholder="Nhập toàn bộ nội dung bài viết vào đây..." />
+                <Textarea value={newPostData.link} onChange={(e) => setNewPostData(d => ({ ...d, link: e.target.value }))} className="min-h-[120px]" placeholder="Nhập toàn bộ nội dung bài viết vào đây..." />
               </div>
             )}
 
             <div className="space-y-2">
               <Label>Danh sách từ khóa (mỗi từ khóa một dòng)</Label>
-              <Textarea value={newPostData.keywords} onChange={(e) => setNewPostData(d => ({...d, keywords: e.target.value}))} className="min-h-[120px]" placeholder="Từ khóa 1..." />
+              <Textarea value={newPostData.keywords} onChange={(e) => setNewPostData(d => ({ ...d, keywords: e.target.value }))} className="min-h-[120px]" placeholder="Từ khóa 1..." />
             </div>
           </div>
           <DialogFooter>

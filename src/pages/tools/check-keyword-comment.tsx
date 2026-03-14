@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useState, useMemo } from 'react';
+import { useKeywordCheckProjects, useCreateKeywordCheckProject, useUpdateKeywordCheckProject, useDeleteKeywordCheckProject } from '@/hooks/useTools';
+import { KeywordCheckProject } from '@/api/tools';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -10,60 +11,36 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Skeleton } from '@/components/ui/skeleton';
 import { PlusCircle, Search, Trash2, MoreHorizontal, Edit, Loader2 } from 'lucide-react';
-import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
+import { showError, showLoading, dismissToast, showSuccess } from '@/utils/toast';
 import { format } from 'date-fns';
-import { useAuth } from '@/contexts/AuthContext';
 import { Label } from '@/components/ui/label';
 import { Link } from 'react-router-dom';
 
-type Project = {
-  id: number;
-  name: string;
-  created_at: string;
-  creator_id: string;
-  creator_name: string | null;
-  creator_email: string | null;
-};
-
 const CheckKeywordComment = () => {
-  const { user } = useAuth();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // React Query - data loads instantly from cache
+  const { data: projects = [], isLoading } = useKeywordCheckProjects();
+  const createProject = useCreateKeywordCheckProject();
+  const updateProject = useUpdateKeywordCheckProject();
+  const deleteProject = useDeleteKeywordCheckProject();
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  
-  const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
-  const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [projectName, setProjectName] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
 
-  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+  const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<KeywordCheckProject | null>(null);
+  const [projectName, setProjectName] = useState('');
+
+  const [projectToDelete, setProjectToDelete] = useState<KeywordCheckProject | null>(null);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
 
-  const fetchProjects = async () => {
-    setIsLoading(true);
-    const { data, error } = await supabase.rpc('get_keyword_check_projects_with_creator');
-    if (error) {
-      showError("Không thể tải dự án: " + error.message);
-      setProjects([]);
-    } else {
-      setProjects(data as Project[] || []);
-    }
-    setIsLoading(false);
-  };
-
-  useEffect(() => {
-    fetchProjects();
-  }, []);
-
   const filteredProjects = useMemo(() => {
-    return projects.filter(p => 
+    return projects.filter((p: KeywordCheckProject) =>
       p.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [projects, searchTerm]);
 
   const handleSelectAll = (checked: boolean) => {
-    setSelectedIds(checked ? filteredProjects.map(p => p.id) : []);
+    setSelectedIds(checked ? filteredProjects.map((p: KeywordCheckProject) => p.id) : []);
   };
 
   const handleSelectRow = (id: number, checked: boolean) => {
@@ -72,17 +49,12 @@ const CheckKeywordComment = () => {
 
   const handleBulkDelete = async () => {
     const toastId = showLoading('Đang xóa...');
-    const { error } = await supabase.from('keyword_check_projects').delete().in('id', selectedIds);
-    dismissToast(toastId);
-
-    if (error) {
-      showError(`Xóa thất bại: ${error.message}`);
-    } else {
-      showSuccess('Đã xóa thành công!');
+    for (const id of selectedIds) {
+      await deleteProject.mutateAsync(id);
     }
-    
+    dismissToast(toastId);
+    showSuccess('Đã xóa thành công!');
     setSelectedIds([]);
-    fetchProjects();
   };
 
   const handleOpenAddDialog = () => {
@@ -91,7 +63,7 @@ const CheckKeywordComment = () => {
     setIsAddEditDialogOpen(true);
   };
 
-  const handleOpenEditDialog = (project: Project) => {
+  const handleOpenEditDialog = (project: KeywordCheckProject) => {
     setEditingProject(project);
     setProjectName(project.name);
     setIsAddEditDialogOpen(true);
@@ -102,43 +74,32 @@ const CheckKeywordComment = () => {
       showError("Tên dự án không được để trống.");
       return;
     }
-    setIsSaving(true);
-    let error;
-    if (editingProject) {
-      ({ error } = await supabase.from('keyword_check_projects').update({ name: projectName }).eq('id', editingProject.id));
-    } else {
-      ({ error } = await supabase.from('keyword_check_projects').insert({ name: projectName, creator_id: user?.id }));
-    }
 
-    if (error) {
-      showError("Lưu dự án thất bại: " + error.message);
-    } else {
-      showSuccess(`Đã ${editingProject ? 'cập nhật' : 'thêm'} dự án thành công!`);
+    try {
+      if (editingProject) {
+        await updateProject.mutateAsync({ id: editingProject.id, data: { name: projectName } });
+      } else {
+        await createProject.mutateAsync({ name: projectName });
+      }
       setIsAddEditDialogOpen(false);
-      fetchProjects();
+    } catch {
+      // Error handled by mutation
     }
-    setIsSaving(false);
   };
 
-  const handleDeleteProject = (project: Project) => {
+  const handleDeleteProject = (project: KeywordCheckProject) => {
     setProjectToDelete(project);
     setIsDeleteAlertOpen(true);
   };
 
   const confirmDelete = async () => {
     if (!projectToDelete) return;
-    const toastId = showLoading("Đang xóa...");
-    const { error } = await supabase.from('keyword_check_projects').delete().eq('id', projectToDelete.id);
-    dismissToast(toastId);
-    if (error) {
-      showError("Xóa thất bại: " + error.message);
-    } else {
-      showSuccess("Đã xóa dự án thành công!");
-      fetchProjects();
-    }
+    await deleteProject.mutateAsync(projectToDelete.id);
     setIsDeleteAlertOpen(false);
     setProjectToDelete(null);
   };
+
+  const isSaving = createProject.isPending || updateProject.isPending;
 
   return (
     <main className="flex-1 space-y-8 p-6 sm:p-8 bg-slate-50">
@@ -193,7 +154,7 @@ const CheckKeywordComment = () => {
                     </TableRow>
                   ))
                 ) : filteredProjects.length > 0 ? (
-                  filteredProjects.map((project) => (
+                  filteredProjects.map((project: KeywordCheckProject) => (
                     <TableRow key={project.id}>
                       <TableCell><Checkbox checked={selectedIds.includes(project.id)} onCheckedChange={(checked) => handleSelectRow(project.id, !!checked)} /></TableCell>
                       <TableCell className="font-medium">
@@ -202,7 +163,7 @@ const CheckKeywordComment = () => {
                         </Link>
                       </TableCell>
                       <TableCell>{format(new Date(project.created_at), 'dd/MM/yyyy')}</TableCell>
-                      <TableCell>{project.creator_name || project.creator_email || 'Không rõ'}</TableCell>
+                      <TableCell>{project.creator?.name || 'Không rõ'}</TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>

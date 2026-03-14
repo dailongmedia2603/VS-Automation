@@ -17,6 +17,7 @@ import { AppLayout } from "./components/AppLayout";
 import { ApiSettingsProvider } from "@/contexts/ApiSettingsContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { SidebarProvider } from "./contexts/SidebarContext";
 import ContentAi from "./pages/ContentAi";
 import ProjectDetail from "./pages/ProjectDetail";
 import CheckSeeding from "./pages/CheckSeeding";
@@ -28,7 +29,6 @@ import CompletionNotification from "./pages/CompletionNotification";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import CheckPostScan from "@/pages/tools/CheckPostScan";
 import CheckPostScanDetail from "@/pages/tools/CheckPostScanDetail";
-import { PermissionProvider } from "./contexts/PermissionContext";
 import Reports from "./pages/Reports";
 import AiPlan from "./pages/AiPlan";
 import AiPlanDetail from "./pages/AiPlanDetail";
@@ -36,20 +36,27 @@ import PublicAiPlan from "./pages/PublicAiPlan";
 import PublicPostScan from "./pages/PublicPostScan";
 import EmailScan from "./pages/tools/EmailScan";
 import EmailScanDetail from "./pages/tools/EmailScanDetail";
-import ReportScreenshot from "./pages/ReportScreenshot";
-import ReportScreenshotDetail from "./pages/ReportScreenshotDetail";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,      // 5 minutes - data considered fresh
+      gcTime: 30 * 60 * 1000,        // 30 minutes garbage collection
+      refetchOnWindowFocus: false,   // Don't refetch on tab focus
+      retry: 1,                       // Only 1 retry on failure
+    },
+  },
+});
 
 const App = () => (
   <BrowserRouter>
     <AuthProvider>
-      <PermissionProvider>
-        <ApiSettingsProvider>
-          <QueryClientProvider client={queryClient}>
-            <TooltipProvider>
-              <Toaster />
-              <Sonner />
+      <ApiSettingsProvider>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <SidebarProvider>
               <NotificationProvider>
                 <Routes>
                   <Route path="/login" element={<Login />} />
@@ -80,17 +87,15 @@ const App = () => (
                       <Route path="/tools/email-scan/:projectId" element={<EmailScanDetail />} />
                       <Route path="/ai-plan" element={<AiPlan />} />
                       <Route path="/ai-plan/:planId" element={<AiPlanDetail />} />
-                      <Route path="/report-screenshot" element={<ReportScreenshot />} />
-                      <Route path="/report-screenshot/:projectId" element={<ReportScreenshotDetail />} />
                     </Route>
                   </Route>
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </NotificationProvider>
-            </TooltipProvider>
-          </QueryClientProvider>
-        </ApiSettingsProvider>
-      </PermissionProvider>
+            </SidebarProvider>
+          </TooltipProvider>
+        </QueryClientProvider>
+      </ApiSettingsProvider>
     </AuthProvider>
   </BrowserRouter>
 );

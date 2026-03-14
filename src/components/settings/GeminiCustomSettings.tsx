@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { settingsService } from '@/api/settings';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -21,17 +21,12 @@ const GeminiCustomSettings = () => {
   useEffect(() => {
     const fetchSettings = async () => {
       setIsLoading(true);
-      const { data, error } = await supabase
-        .from('ai_settings')
-        .select('custom_gemini_api_url, custom_gemini_api_key')
-        .eq('id', 1)
-        .single();
-      
-      if (error && error.code !== 'PGRST116') {
+      try {
+        const data = await settingsService.getAll();
+        setApiUrl(data.ai_settings?.antigravity_api_url || '');
+        setApiKey(data.ai_settings?.antigravity_api_key || '');
+      } catch (error: any) {
         showError("Không thể tải cài đặt: " + error.message);
-      } else if (data) {
-        setApiUrl(data.custom_gemini_api_url || '');
-        setApiKey(data.custom_gemini_api_key || '');
       }
       setIsLoading(false);
     };
@@ -40,14 +35,14 @@ const GeminiCustomSettings = () => {
 
   const handleSave = async () => {
     setIsSaving(true);
-    const { error } = await supabase
-      .from('ai_settings')
-      .upsert({ id: 1, custom_gemini_api_url: apiUrl, custom_gemini_api_key: apiKey });
-    
-    if (error) {
-      showError("Lưu cài đặt thất bại: " + error.message);
-    } else {
+    try {
+      await settingsService.updateAiSettings({
+        antigravity_api_url: apiUrl,
+        antigravity_api_key: apiKey
+      });
       showSuccess("Đã lưu cài đặt thành công!");
+    } catch (error: any) {
+      showError("Lưu cài đặt thất bại: " + error.message);
     }
     setIsSaving(false);
   };
@@ -57,18 +52,13 @@ const GeminiCustomSettings = () => {
     setTestStatus('testing');
     setTestError(null);
     try {
-      const { data, error } = await supabase.functions.invoke('test-gemini-custom', {
-        body: { apiUrl, token: apiKey }
-      });
-
-      if (error) {
-        const errorBody = await error.context.json();
-        throw new Error(errorBody.error || error.message);
+      const result = await settingsService.testAntigravityConnection(apiUrl, apiKey);
+      if (result.success) {
+        setTestStatus('success');
+        showSuccess(result.message || "Kết nối thành công!");
+      } else {
+        throw new Error(result.message);
       }
-      if (data.error) throw new Error(data.error);
-
-      setTestStatus('success');
-      showSuccess(data.message || "Kết nối thành công!");
     } catch (err: any) {
       setTestStatus('error');
       setTestError(err.message);
@@ -97,9 +87,9 @@ const GeminiCustomSettings = () => {
   return (
     <Card className="shadow-sm rounded-2xl bg-white">
       <CardHeader>
-        <CardTitle>Kết nối API Gemini Custom</CardTitle>
+        <CardTitle>Cấu hình API Antigravity Tool</CardTitle>
         <CardDescription>
-          Cấu hình API Gemini tùy chỉnh của bạn.
+          Cấu hình API Antigravity Tool tùy chỉnh của bạn.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -130,11 +120,11 @@ const GeminiCustomSettings = () => {
 
         <div className="border-t pt-6">
           <div className="flex items-center justify-between">
-              <p className="font-medium">Kiểm tra kết nối</p>
-              {testStatus === "idle" && <Badge variant="outline">Chưa kiểm tra</Badge>}
-              {testStatus === "testing" && <Badge variant="secondary">Đang kiểm tra...</Badge>}
-              {testStatus === "success" && <Badge variant="default" className="bg-green-100 text-green-800">Thành công</Badge>}
-              {testStatus === "error" && <Badge variant="destructive">Thất bại</Badge>}
+            <p className="font-medium">Kiểm tra kết nối</p>
+            {testStatus === "idle" && <Badge variant="outline">Chưa kiểm tra</Badge>}
+            {testStatus === "testing" && <Badge variant="secondary">Đang kiểm tra...</Badge>}
+            {testStatus === "success" && <Badge variant="default" className="bg-green-100 text-green-800">Thành công</Badge>}
+            {testStatus === "error" && <Badge variant="destructive">Thất bại</Badge>}
           </div>
           <Button onClick={handleTestConnection} disabled={isTesting} className="mt-4 rounded-lg">
             {isTesting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

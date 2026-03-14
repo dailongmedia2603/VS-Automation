@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Skeleton } from '@/components/ui/skeleton';
-import { supabase } from '@/integrations/supabase/client';
+import { emailScanService } from '@/api/tools';
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -34,16 +34,11 @@ export const EmailScanLogDialog = ({ isOpen, onOpenChange, projectId }: EmailSca
     if (isOpen) {
       const fetchLogs = async () => {
         setIsLoading(true);
-        const { data, error } = await supabase
-          .from('log_email_scan')
-          .select('*')
-          .eq('project_id', projectId)
-          .order('created_at', { ascending: false });
-        
-        if (error) {
+        try {
+          const data = await emailScanService.getLogs(projectId);
+          setLogs(data);
+        } catch (error: any) {
           showError("Không thể tải lịch sử: " + error.message);
-        } else {
-          setLogs(data || []);
         }
         setIsLoading(false);
       };

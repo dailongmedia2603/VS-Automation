@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { useStructureLibrary, useStructures, useCreateStructure, useUpdateStructure, useDeleteStructure } from '@/hooks/useLibraries';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -12,9 +12,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
-import { useAuth } from '@/contexts/AuthContext';
 
-type Library = { id: number; name: string; };
 type Structure = {
   id: number;
   name: string;
@@ -24,93 +22,83 @@ type Structure = {
 
 const ArticleStructureLibraryDetail = () => {
   const { libraryId } = useParams<{ libraryId: string }>();
-  const { user } = useAuth();
-  const [library, setLibrary] = useState<Library | null>(null);
-  const [structures, setStructures] = useState<Structure[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const libraryIdNum = Number(libraryId);
+
+  // React Query - data loads instantly from cache
+  const { data: library, isLoading: isLoadingLibrary } = useStructureLibrary(libraryIdNum);
+  const { data: structuresData = [], isLoading: isLoadingStructures, refetch: refetchStructures } = useStructures(libraryIdNum);
+
+  const createStructure = useCreateStructure(libraryIdNum);
+  const updateStructure = useUpdateStructure();
+  const deleteStructureMutation = useDeleteStructure(libraryIdNum);
+
+  const isLoading = isLoadingLibrary || isLoadingStructures;
+
+  // Local state for structures to handle inline editing
+  const [structures, setStructures] = useState<Structure[]>(structuresData);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newStructureName, setNewStructureName] = useState('');
   const [structureToDelete, setStructureToDelete] = useState<Structure | null>(null);
   const [editingStructureId, setEditingStructureId] = useState<number | null>(null);
   const [editingStructureName, setEditingStructureName] = useState('');
 
-  useEffect(() => {
-    const fetchLibraryData = async () => {
-      if (!libraryId) return;
-      setIsLoading(true);
-      try {
-        const libPromise = supabase.from('article_structure_libraries').select('id, name').eq('id', libraryId).single();
-        const structuresPromise = supabase.from('article_structures').select('*').eq('library_id', libraryId).order('created_at', { ascending: true });
-        const [{ data: libData, error: libError }, { data: structuresData, error: structuresError }] = await Promise.all([libPromise, structuresPromise]);
-        if (libError) throw libError;
-        if (structuresError) throw structuresError;
-        setLibrary(libData);
-        setStructures(structuresData || []);
-      } catch (error: any) {
-        showError("Không thể tải dữ liệu: " + error.message);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchLibraryData();
-  }, [libraryId]);
+  // Sync structures from query
+  if (structuresData.length > 0 && structures.length === 0) {
+    setStructures(structuresData as Structure[]);
+  }
 
   const handleCreateStructure = async () => {
-    if (!newStructureName.trim() || !libraryId || !user) return;
-    setIsSaving(true);
-    const { data, error } = await supabase
-      .from('article_structures')
-      .insert({ name: newStructureName, library_id: libraryId, creator_id: user.id })
-      .select()
-      .single();
-    if (error) {
-      showError("Tạo cấu trúc thất bại: " + error.message);
-    } else if (data) {
-      setStructures(prev => [...prev, data]);
-      showSuccess("Đã tạo cấu trúc mới!");
+    if (!newStructureName.trim()) return;
+    try {
+      await createStructure.mutateAsync({ name: newStructureName });
+      refetchStructures();
+      setIsCreateDialogOpen(false);
+      setNewStructureName('');
+    } catch {
+      // Error handled by hook
     }
-    setIsSaving(false);
-    setIsCreateDialogOpen(false);
-    setNewStructureName('');
   };
 
   const handleUpdateStructure = async (structure: Structure) => {
-    const { error } = await supabase
-      .from('article_structures')
-      .update({ description: structure.description, structure_content: structure.structure_content })
-      .eq('id', structure.id);
-    if (error) showError("Lưu thất bại: " + error.message);
-    else showSuccess("Đã lưu thay đổi!");
+    try {
+      await updateStructure.mutateAsync({
+        id: structure.id,
+        data: {
+          description: structure.description,
+          structure_content: structure.structure_content
+        }
+      });
+    } catch {
+      // Error handled by hook
+    }
   };
 
   const handleSaveName = async () => {
     if (!editingStructureId || !editingStructureName.trim()) {
-        setEditingStructureId(null);
-        return;
+      setEditingStructureId(null);
+      return;
     }
-    const { error } = await supabase
-        .from('article_structures')
-        .update({ name: editingStructureName.trim() })
-        .eq('id', editingStructureId);
-    
-    if (error) {
-        showError("Cập nhật tên thất bại: " + error.message);
-    } else {
-        showSuccess("Đã cập nhật tên cấu trúc!");
-        setStructures(prev => prev.map(s => s.id === editingStructureId ? { ...s, name: editingStructureName.trim() } : s));
+    try {
+      await updateStructure.mutateAsync({
+        id: editingStructureId,
+        data: { name: editingStructureName.trim() }
+      });
+      setStructures(prev => prev.map(s =>
+        s.id === editingStructureId ? { ...s, name: editingStructureName.trim() } : s
+      ));
+    } catch {
+      // Error handled by hook
     }
     setEditingStructureId(null);
   };
 
   const handleDeleteStructure = async () => {
     if (!structureToDelete) return;
-    const { error } = await supabase.from('article_structures').delete().eq('id', structureToDelete.id);
-    if (error) {
-      showError("Xóa thất bại: " + error.message);
-    } else {
+    try {
+      await deleteStructureMutation.mutateAsync(structureToDelete.id);
       setStructures(prev => prev.filter(s => s.id !== structureToDelete.id));
-      showSuccess("Đã xóa cấu trúc!");
+    } catch {
+      // Error handled by hook
     }
     setStructureToDelete(null);
   };
@@ -120,25 +108,46 @@ const ArticleStructureLibraryDetail = () => {
   };
 
   if (isLoading) {
-    return <main className="flex-1 space-y-8 p-6 sm:p-8 bg-slate-50"><Skeleton className="h-10 w-1/3 rounded-lg" /><Skeleton className="h-96 w-full rounded-2xl mt-8" /></main>;
+    return (
+      <main className="flex-1 space-y-8 p-6 sm:p-8 bg-slate-50">
+        <Skeleton className="h-10 w-1/3 rounded-lg" />
+        <Skeleton className="h-96 w-full rounded-2xl mt-8" />
+      </main>
+    );
   }
 
   if (!library) {
-    return <main className="flex-1 p-6 sm:p-8 bg-slate-50"><h1 className="text-3xl font-bold">Không tìm thấy thư viện</h1></main>;
+    return (
+      <main className="flex-1 p-6 sm:p-8 bg-slate-50">
+        <h1 className="text-3xl font-bold">Không tìm thấy thư viện</h1>
+      </main>
+    );
   }
 
   return (
     <main className="flex-1 space-y-8 p-6 sm:p-8 bg-slate-50 overflow-y-auto">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link to="/training-chatbot"><Button variant="outline" size="icon" className="h-10 w-10 rounded-full bg-white"><ArrowLeft className="h-5 w-5" /></Button></Link>
-          <div><h1 className="text-3xl font-bold tracking-tight text-slate-900">{library.name}</h1><p className="text-muted-foreground mt-1">Quản lý các cấu trúc bài viết cho thư viện này.</p></div>
+          <Link to="/training-chatbot">
+            <Button variant="outline" size="icon" className="h-10 w-10 rounded-full bg-white">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900">{library.name}</h1>
+            <p className="text-muted-foreground mt-1">Quản lý các cấu trúc bài viết cho thư viện này.</p>
+          </div>
         </div>
-        <Button onClick={() => setIsCreateDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg"><PlusCircle className="mr-2 h-4 w-4" />Tạo cấu trúc</Button>
+        <Button onClick={() => setIsCreateDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
+          <PlusCircle className="mr-2 h-4 w-4" />Tạo cấu trúc
+        </Button>
       </div>
 
       <Card className="shadow-sm rounded-2xl bg-white">
-        <CardHeader><CardTitle>Danh sách cấu trúc</CardTitle><CardDescription>Mỗi cấu trúc là một dàn bài mẫu để AI tuân theo.</CardDescription></CardHeader>
+        <CardHeader>
+          <CardTitle>Danh sách cấu trúc</CardTitle>
+          <CardDescription>Mỗi cấu trúc là một dàn bài mẫu để AI tuân theo.</CardDescription>
+        </CardHeader>
         <CardContent>
           {structures.length > 0 ? (
             <Accordion type="multiple" className="w-full space-y-3">
@@ -165,32 +174,80 @@ const ArticleStructureLibraryDetail = () => {
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingStructureId(structure.id); setEditingStructureName(structure.name); }}>
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setStructureToDelete(structure)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setStructureToDelete(structure)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
                       </div>
                     </div>
                   </AccordionTrigger>
                   <AccordionContent className="p-4 border-t bg-white rounded-b-xl">
                     <div className="space-y-4">
-                      <div><Label>Mô tả</Label><Textarea value={structure.description || ''} onChange={e => handleStructureFieldChange(structure.id, 'description', e.target.value)} placeholder="Mô tả ngắn gọn về mục đích của cấu trúc này..." /></div>
-                      <div><Label>Cấu trúc</Label><Textarea value={structure.structure_content || ''} onChange={e => handleStructureFieldChange(structure.id, 'structure_content', e.target.value)} placeholder="VD: Phần 1: Giới thiệu..." className="min-h-[150px]" /></div>
-                      <div className="flex justify-end"><Button size="sm" onClick={() => handleUpdateStructure(structure)}><Save className="mr-2 h-4 w-4" />Lưu</Button></div>
+                      <div>
+                        <Label>Mô tả</Label>
+                        <Textarea
+                          value={structure.description || ''}
+                          onChange={e => handleStructureFieldChange(structure.id, 'description', e.target.value)}
+                          placeholder="Mô tả ngắn gọn về mục đích của cấu trúc này..."
+                        />
+                      </div>
+                      <div>
+                        <Label>Cấu trúc</Label>
+                        <Textarea
+                          value={structure.structure_content || ''}
+                          onChange={e => handleStructureFieldChange(structure.id, 'structure_content', e.target.value)}
+                          placeholder="VD: Phần 1: Giới thiệu..."
+                          className="min-h-[150px]"
+                        />
+                      </div>
+                      <div className="flex justify-end">
+                        <Button size="sm" onClick={() => handleUpdateStructure(structure)} disabled={updateStructure.isPending}>
+                          {updateStructure.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                          <Save className="mr-2 h-4 w-4" />Lưu
+                        </Button>
+                      </div>
                     </div>
                   </AccordionContent>
                 </AccordionItem>
               ))}
             </Accordion>
           ) : (
-            <div className="text-center py-12 text-muted-foreground"><LayoutTemplate className="mx-auto h-12 w-12" /><h3 className="mt-4 text-lg font-semibold">Chưa có cấu trúc nào</h3><p className="mt-1 text-sm">Hãy bắt đầu bằng cách tạo một cấu trúc mới.</p></div>
+            <div className="text-center py-12 text-muted-foreground">
+              <LayoutTemplate className="mx-auto h-12 w-12" />
+              <h3 className="mt-4 text-lg font-semibold">Chưa có cấu trúc nào</h3>
+              <p className="mt-1 text-sm">Hãy bắt đầu bằng cách tạo một cấu trúc mới.</p>
+            </div>
           )}
         </CardContent>
       </Card>
 
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent><DialogHeader><DialogTitle>Tạo cấu trúc mới</DialogTitle></DialogHeader><div className="py-4"><Label htmlFor="structure-name">Tên cấu trúc</Label><Input id="structure-name" value={newStructureName} onChange={e => setNewStructureName(e.target.value)} /></div><DialogFooter><Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Hủy</Button><Button onClick={handleCreateStructure} disabled={isSaving}>{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Tạo</Button></DialogFooter></DialogContent>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Tạo cấu trúc mới</DialogTitle></DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="structure-name">Tên cấu trúc</Label>
+            <Input id="structure-name" value={newStructureName} onChange={e => setNewStructureName(e.target.value)} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Hủy</Button>
+            <Button onClick={handleCreateStructure} disabled={createStructure.isPending}>
+              {createStructure.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Tạo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
       </Dialog>
 
       <AlertDialog open={!!structureToDelete} onOpenChange={() => setStructureToDelete(null)}>
-        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Bạn có chắc chắn?</AlertDialogTitle><AlertDialogDescription>Hành động này sẽ xóa vĩnh viễn cấu trúc "{structureToDelete?.name}".</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Hủy</AlertDialogCancel><AlertDialogAction onClick={handleDeleteStructure} className="bg-red-600 hover:bg-red-700">Xóa</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Bạn có chắc chắn?</AlertDialogTitle>
+            <AlertDialogDescription>Hành động này sẽ xóa vĩnh viễn cấu trúc "{structureToDelete?.name}".</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Hủy</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteStructure} className="bg-red-600 hover:bg-red-700">Xóa</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
       </AlertDialog>
     </main>
   );

@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { postScanService, PostScanProject, PostScanResult, PostScanLog } from '@/api/tools';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Save, PlayCircle, Loader2, Calendar as CalendarIcon, FileText, Download, Trash2, Settings, Share } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,56 +28,39 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { SharePostScanDialog } from '@/components/tools/SharePostScanDialog';
 import { ComprehensiveScanLogDialog } from '@/components/tools/ComprehensiveScanLogDialog';
 
-type Project = {
-  id: number;
-  name: string;
-  created_at: string;
-  keywords: string | null;
-  group_ids: string | null;
-  scan_frequency: string | null;
-  is_active: boolean;
-  is_ai_check_active: boolean;
-  post_scan_ai_prompt: string | null;
-  is_public: boolean;
-  public_id: string | null;
-};
-
-type ScanResult = {
-  id: number;
-  post_content: string;
-  post_link: string;
-  found_keywords: string[];
-  scanned_at: string;
-  group_id: string;
-  ai_check_result: string | null;
-  ai_check_details: { prompt: string; response: any; } | null;
-  post_created_at: string | null;
-};
-
-type ScanLog = {
-  id: number;
-  project_id: number;
-  request_urls: string[];
-  created_at: string;
-};
-
 const CheckPostScanDetail = () => {
   const { projectId } = useParams<{ projectId: string }>();
-  const [project, setProject] = useState<Project | null>(null);
-  const [results, setResults] = useState<ScanResult[]>([]);
-  const [logs, setLogs] = useState<ScanLog[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
+  const queryClient = useQueryClient();
+
+  // React Query - data loads instantly from cache
+  const { data: project, isLoading: isLoadingProject, refetch: refetchProject } = useQuery({
+    queryKey: ['post-scan-project', projectId],
+    queryFn: () => postScanService.getProject(Number(projectId)),
+    enabled: !!projectId,
+  });
+
+  const { data: results = [], isLoading: isLoadingResults, refetch: refetchResults } = useQuery({
+    queryKey: ['post-scan-results', projectId],
+    queryFn: () => postScanService.getResults(Number(projectId)),
+    enabled: !!projectId,
+  });
+
+  const { data: logs = [], refetch: refetchLogs } = useQuery({
+    queryKey: ['post-scan-logs', projectId],
+    queryFn: () => postScanService.getLogs(Number(projectId)),
+    enabled: !!projectId,
+  });
+
+  const isLoading = isLoadingProject || isLoadingResults;
+
+  // UI State
   const [isAiLogOpen, setIsAiLogOpen] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
   const [selectedResultIds, setSelectedResultIds] = useState<number[]>([]);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [isComprehensiveLogOpen, setIsComprehensiveLogOpen] = useState(false);
 
-  // Form state
+  // Form state (initialized from project)
   const [keywords, setKeywords] = useState('');
   const [groupIds, setGroupIds] = useState('');
   const [isActive, setIsActive] = useState(false);
@@ -84,60 +68,84 @@ const CheckPostScanDetail = () => {
   const [aiPrompt, setAiPrompt] = useState('');
   const [frequencyValue, setFrequencyValue] = useState('1');
   const [frequencyUnit, setFrequencyUnit] = useState('day');
-  
-  // State for date pickers
+
+  // Date picker state
   const [scanDateRange, setScanDateRange] = useState<DateRange | undefined>();
   const [filterDateRange, setFilterDateRange] = useState<DateRange | undefined>();
   const [filterDatePickerOpen, setFilterDatePickerOpen] = useState(false);
 
-  const fetchProjectData = async () => {
-    if (!projectId) return;
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase.from('post_scan_projects').select('*').eq('id', projectId).single();
-      if (error) throw error;
-      setProject(data);
-      setKeywords(data.keywords || '');
-      setGroupIds(data.group_ids || '');
-      setIsActive(data.is_active);
-      setIsAiCheckActive(data.is_ai_check_active);
-      setAiPrompt(data.post_scan_ai_prompt || '');
-      const [value, unit] = data.scan_frequency?.split('_') || ['1', 'day'];
+  // Initialize form when project loads
+  useEffect(() => {
+    if (project) {
+      setKeywords(project.keywords || '');
+      setGroupIds(project.group_ids || '');
+      setIsActive(project.is_active);
+      setIsAiCheckActive(project.is_ai_check_active);
+      setAiPrompt(project.post_scan_ai_prompt || '');
+      const [value, unit] = project.scan_frequency?.split('_') || ['1', 'day'];
       setFrequencyValue(value);
       setFrequencyUnit(unit);
-
-      const { data: resultsData, error: resultsError } = await supabase.from('post_scan_results').select('*').eq('project_id', projectId).order('scanned_at', { ascending: false });
-      if (resultsError) throw resultsError;
-      setResults(resultsData || []);
-
-      const { data: logsData, error: logsError } = await supabase.from('log_post_scan').select('*').eq('project_id', projectId).order('created_at', { ascending: false });
-      if (logsError) throw logsError;
-      setLogs(logsData || []);
-
-    } catch (error: any) {
-      showError("Không thể tải dữ liệu dự án: " + error.message);
-    } finally {
-      setIsLoading(false);
     }
-  };
+  }, [project]);
 
-  useEffect(() => {
-    fetchProjectData();
-  }, [projectId]);
+  // Mutations
+  const saveMutation = useMutation({
+    mutationFn: () => postScanService.saveConfig(Number(projectId), {
+      keywords,
+      group_ids: groupIds,
+      is_active: isActive,
+      is_ai_check_active: isAiCheckActive,
+      post_scan_ai_prompt: aiPrompt,
+      scan_frequency: `${frequencyValue}_${frequencyUnit}`
+    }),
+    onSuccess: () => {
+      showSuccess("Đã lưu cấu hình thành công!");
+      queryClient.invalidateQueries({ queryKey: ['post-scan-project', projectId] });
+    },
+    onError: (err) => showError("Lưu thất bại: " + (err as Error).message),
+  });
 
+  const scanMutation = useMutation({
+    mutationFn: (timeCheckString?: string) => postScanService.runComprehensiveScan(Number(projectId), timeCheckString),
+    onSuccess: (data) => {
+      if (data.success) {
+        const filteredCount = data.posts.filter(p => p.ai_check_result !== 'Có').length;
+        showSuccess(`Quét hoàn tất! Tìm thấy ${filteredCount} bài viết mới.`);
+        refetchResults();
+        refetchLogs();
+      } else {
+        showError(`Quét thất bại: ${data.error}`);
+      }
+    },
+    onError: (err) => showError(`Quét thất bại: ${(err as Error).message}`),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => postScanService.deleteMultipleResults(selectedResultIds),
+    onSuccess: () => {
+      showSuccess("Đã xóa thành công!");
+      setSelectedResultIds([]);
+      setIsDeleteAlertOpen(false);
+      refetchResults();
+    },
+    onError: (err) => showError("Xóa thất bại: " + (err as Error).message),
+  });
+
+  // Filtered results
   const filteredResults = useMemo(() => {
-    let tempResults = results.filter(result => result.ai_check_result !== 'Có');
+    let tempResults = results.filter((result: PostScanResult) => result.ai_check_result !== 'Có');
 
     if (filterDateRange?.from) {
       const start = startOfDay(filterDateRange.from);
       const end = filterDateRange.to ? endOfDay(filterDateRange.to) : endOfDay(filterDateRange.from);
-      tempResults = tempResults.filter(result => {
+      tempResults = tempResults.filter((result: PostScanResult) => {
         const resultDate = new Date(result.scanned_at);
         return isWithinInterval(resultDate, { start, end });
       });
     }
 
-    const uniqueResults: ScanResult[] = [];
+    // Deduplicate by content + keywords
+    const uniqueResults: PostScanResult[] = [];
     const seen = new Set<string>();
 
     for (const result of tempResults) {
@@ -153,26 +161,6 @@ const CheckPostScanDetail = () => {
     return uniqueResults;
   }, [results, filterDateRange]);
 
-  const handleSave = async () => {
-    if (!project) return;
-    setIsSaving(true);
-    const { error } = await supabase
-      .from('post_scan_projects')
-      .update({
-        keywords,
-        group_ids: groupIds,
-        is_active: isActive,
-        is_ai_check_active: isAiCheckActive,
-        post_scan_ai_prompt: aiPrompt,
-        scan_frequency: `${frequencyValue}_${frequencyUnit}`
-      })
-      .eq('id', project.id);
-    
-    if (error) showError("Lưu thất bại: " + error.message);
-    else showSuccess("Đã lưu cấu hình thành công!");
-    setIsSaving(false);
-  };
-
   const generateTimeCheckString = (range: DateRange | undefined): string => {
     if (!range?.from) return '';
     const since = startOfDay(range.from).toISOString();
@@ -180,53 +168,18 @@ const CheckPostScanDetail = () => {
     return `&since=${since}&until=${until}`;
   };
 
+  const handleSave = () => {
+    if (!project) return;
+    saveMutation.mutate();
+  };
+
   const handleRunScan = async () => {
-    setIsScanning(true);
-    const totalSteps = isAiCheckActive ? 2 : 1;
-    let toastId;
-
+    const toastId = showLoading(`Đang quét bài viết${isAiCheckActive ? ' + AI check' : ''}...`);
+    const timeCheckString = generateTimeCheckString(scanDateRange);
     try {
-      // Step 1: Scan and filter posts
-      toastId = showLoading(`Bước 1/${totalSteps}: Đang quét bài viết...`);
-      const timeCheckString = generateTimeCheckString(scanDateRange);
-      const { data: scanData, error: scanError } = await supabase.functions.invoke('scan-and-filter-posts', {
-        body: { projectId, timeCheckString }
-      });
-      if (scanError) throw scanError;
-      if (scanData.error) throw new Error(scanData.error);
-      
-      let finalPosts = scanData.posts;
-
-      // Step 2 (Optional): AI Check
-      if (isAiCheckActive && finalPosts.length > 0) {
-        dismissToast(toastId);
-        toastId = showLoading(`Bước 2/2: AI đang check content...`);
-        const { data: aiData, error: aiError } = await supabase.functions.invoke('check-posts-with-ai', {
-          body: { projectId, posts: finalPosts }
-        });
-        if (aiError) throw aiError;
-        if (aiData.error) throw new Error(aiData.error);
-        finalPosts = aiData.posts;
-      }
-
-      // Final Step: Store results
-      const { data: storeData, error: storeError } = await supabase.functions.invoke('store-scan-results', {
-        body: { projectId, posts: finalPosts }
-      });
-      if (storeError) throw storeError;
-      if (storeData.error) throw new Error(storeData.error);
-
-      setResults(storeData);
-      dismissToast(toastId);
-      showSuccess(`Quét hoàn tất! Tìm thấy ${finalPosts.filter((p: any) => p.ai_check_result !== 'Có').length} bài viết mới.`);
-      
-      fetchProjectData();
-
-    } catch (error: any) {
-      if (toastId) dismissToast(toastId);
-      showError(`Quét thất bại: ${error.message}`);
+      await scanMutation.mutateAsync(timeCheckString);
     } finally {
-      setIsScanning(false);
+      dismissToast(toastId);
     }
   };
 
@@ -242,8 +195,7 @@ const CheckPostScanDetail = () => {
       showError("Không có dữ liệu để xuất.");
       return;
     }
-    setIsExporting(true);
-    const dataToExport = filteredResults.map(result => ({
+    const dataToExport = filteredResults.map((result: PostScanResult) => ({
       'ID Group': result.group_id,
       'Từ khóa': result.found_keywords.join(', '),
       'Nội dung bài viết': result.post_content,
@@ -255,30 +207,7 @@ const CheckPostScanDetail = () => {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Scan Results");
     XLSX.writeFile(workbook, `export_${project?.name || 'scan'}.xlsx`);
-    setIsExporting(false);
-  };
-
-  const handleDeleteSelected = async () => {
-    setIsDeleting(true);
-    const toastId = showLoading(`Đang xóa ${selectedResultIds.length} kết quả...`);
-    try {
-        const { error } = await supabase
-            .from('post_scan_results')
-            .delete()
-            .in('id', selectedResultIds);
-        
-        if (error) throw error;
-
-        showSuccess("Đã xóa thành công!");
-        setResults(prev => prev.filter((r: ScanResult) => !selectedResultIds.includes(r.id)));
-        setSelectedResultIds([]);
-    } catch (error: any) {
-        showError("Xóa thất bại: " + error.message);
-    } finally {
-        dismissToast(toastId);
-        setIsDeleteAlertOpen(false);
-        setIsDeleting(false);
-    }
+    showSuccess("Đã xuất file Excel thành công!");
   };
 
   if (isLoading) {
@@ -300,7 +229,7 @@ const CheckPostScanDetail = () => {
     );
   }
 
-  if (!project) return <main className="flex-1 p-6 sm:p-8 bg-slate-50">...</main>;
+  if (!project) return <main className="flex-1 p-6 sm:p-8 bg-slate-50">Không tìm thấy dự án.</main>;
 
   return (
     <main className="flex-1 space-y-6 p-6 sm:p-8 bg-slate-50">
@@ -323,8 +252,8 @@ const CheckPostScanDetail = () => {
             <Share className="mr-2 h-4 w-4" />
             Chia sẻ
           </Button>
-          <Button onClick={handleSave} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
-            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+          <Button onClick={handleSave} disabled={saveMutation.isPending} className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
+            {saveMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
             Lưu thay đổi
           </Button>
         </div>
@@ -384,7 +313,7 @@ const CheckPostScanDetail = () => {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <CardTitle>Kết quả</CardTitle>
+              <CardTitle>Kết quả ({filteredResults.length})</CardTitle>
               {selectedResultIds.length > 0 ? (
                 <Button variant="destructive" size="sm" onClick={() => setIsDeleteAlertOpen(true)}>
                   <Trash2 className="mr-2 h-4 w-4" />
@@ -410,8 +339,8 @@ const CheckPostScanDetail = () => {
               )}
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" className="bg-white" onClick={handleExportExcel} disabled={isExporting}>
-                {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+              <Button variant="outline" className="bg-white" onClick={handleExportExcel}>
+                <Download className="mr-2 h-4 w-4" />
                 Xuất Excel
               </Button>
               <Button variant="outline" className="bg-white" onClick={() => setIsComprehensiveLogOpen(true)}>
@@ -429,8 +358,8 @@ const CheckPostScanDetail = () => {
                   <Calendar initialFocus mode="range" defaultMonth={scanDateRange?.from} selected={scanDateRange} onSelect={setScanDateRange} numberOfMonths={2} />
                 </PopoverContent>
               </Popover>
-              <Button onClick={handleRunScan} disabled={isScanning} className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
-                {isScanning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
+              <Button onClick={handleRunScan} disabled={scanMutation.isPending} className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
+                {scanMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
                 Chạy quét
               </Button>
             </div>
@@ -445,11 +374,11 @@ const CheckPostScanDetail = () => {
                     <Checkbox
                       checked={selectedResultIds.length === filteredResults.length && filteredResults.length > 0}
                       onCheckedChange={(checked) => {
-                          if (checked) {
-                              setSelectedResultIds(filteredResults.map(r => r.id));
-                          } else {
-                              setSelectedResultIds([]);
-                          }
+                        if (checked) {
+                          setSelectedResultIds(filteredResults.map((r: PostScanResult) => r.id));
+                        } else {
+                          setSelectedResultIds([]);
+                        }
                       }}
                     />
                   </TableHead>
@@ -462,17 +391,17 @@ const CheckPostScanDetail = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredResults.length > 0 ? filteredResults.map(result => (
+                {filteredResults.length > 0 ? filteredResults.map((result: PostScanResult) => (
                   <TableRow key={result.id}>
                     <TableCell>
                       <Checkbox
                         checked={selectedResultIds.includes(result.id)}
                         onCheckedChange={() => {
-                            setSelectedResultIds(prev => 
-                                prev.includes(result.id)
-                                    ? prev.filter(id => id !== result.id)
-                                    : [...prev, result.id]
-                            );
+                          setSelectedResultIds(prev =>
+                            prev.includes(result.id)
+                              ? prev.filter(id => id !== result.id)
+                              : [...prev, result.id]
+                          );
                         }}
                       />
                     </TableCell>
@@ -497,10 +426,10 @@ const CheckPostScanDetail = () => {
         logs={logs}
       />
 
-      <AiLogDialog 
-        isOpen={isAiLogOpen} 
-        onOpenChange={setIsAiLogOpen} 
-        logs={results.filter(r => r.ai_check_details)} 
+      <AiLogDialog
+        isOpen={isAiLogOpen}
+        onOpenChange={setIsAiLogOpen}
+        logs={results.filter((r: PostScanResult) => r.ai_check_details)}
       />
 
       <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
@@ -513,19 +442,22 @@ const CheckPostScanDetail = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Hủy</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteSelected} disabled={isDeleting} className="bg-red-600 hover:bg-red-700">
-              {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <AlertDialogAction onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending} className="bg-red-600 hover:bg-red-700">
+              {deleteMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Xóa
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
       {project && (
         <SharePostScanDialog
           isOpen={isShareDialogOpen}
           onOpenChange={setIsShareDialogOpen}
           project={project}
-          onProjectUpdate={(updates) => setProject(p => p ? { ...p, ...updates } : null)}
+          onProjectUpdate={(updates) => {
+            refetchProject();
+          }}
         />
       )}
     </main>

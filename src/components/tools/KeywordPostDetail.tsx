@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { keywordCheckService } from '@/api/tools';
 import { showError, showSuccess, showLoading, dismissToast } from '@/utils/toast';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -17,6 +17,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import * as XLSX from 'xlsx';
+import apiClient from '@/api/client';
 
 type Project = { id: number; name: string; };
 type Post = { id: number; name: string; link: string | null; keywords: string | null; };
@@ -39,13 +40,13 @@ export const KeywordPostDetail = ({ project, post, onCheckComplete }: KeywordPos
   const [isLoading, setIsLoading] = useState(true);
   const [isChecking, setIsChecking] = useState(false);
   const [checkResult, setCheckResult] = useState<CheckResult | null>(null);
-  
+
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [editedContent, setEditedContent] = useState('');
 
   const [itemToDelete, setItemToDelete] = useState<Item | null>(null);
   const [isKeywordListOpen, setIsKeywordListOpen] = useState(false);
-  
+
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'found' | 'not_found'>('all');
 
@@ -56,9 +57,12 @@ export const KeywordPostDetail = ({ project, post, onCheckComplete }: KeywordPos
 
   const fetchItem = async () => {
     setIsLoading(true);
-    const { data, error } = await supabase.from('keyword_check_items').select('*').eq('post_id', post.id).maybeSingle();
-    if (error) showError("Không thể tải nội dung post: " + error.message);
-    else setItem(data);
+    try {
+      const items = await keywordCheckService.getItems(post.id);
+      setItem(items.length > 0 ? items[0] : null);
+    } catch (error: any) {
+      showError("Không thể tải nội dung post: " + error.message);
+    }
     setIsLoading(false);
   };
 
@@ -69,8 +73,9 @@ export const KeywordPostDetail = ({ project, post, onCheckComplete }: KeywordPos
     setCheckResult(null);
     const toastId = showLoading("Đang quét nội dung...");
     try {
-      const { data, error } = await supabase.functions.invoke('check-keywords-in-comments', { body: { postId: post.id } });
-      if (error || data.error) throw new Error(error?.message || data?.error);
+      const response = await apiClient.post(`/services/keyword-check/${post.id}`);
+      const data = response.data;
+      if (data.error) throw new Error(data.error);
       setCheckResult(data);
       showSuccess(`Quét hoàn tất! Tìm thấy ${data.found}/${data.total} từ khóa.`);
       fetchItem();
@@ -85,23 +90,25 @@ export const KeywordPostDetail = ({ project, post, onCheckComplete }: KeywordPos
 
   const handleUpdateItem = async () => {
     if (!editingItem || !editedContent.trim()) return;
-    const { error } = await supabase.from('keyword_check_items').update({ content: editedContent.trim() }).eq('id', editingItem.id);
-    if (error) showError("Cập nhật thất bại: " + error.message);
-    else {
+    try {
+      await keywordCheckService.updateItem(editingItem.id, { content: editedContent.trim() });
       showSuccess("Đã cập nhật nội dung post!");
       setEditingItem(null);
       fetchItem();
+    } catch (error: any) {
+      showError("Cập nhật thất bại: " + error.message);
     }
   };
 
   const handleDeleteItem = async () => {
     if (!itemToDelete) return;
-    const { error } = await supabase.from('keyword_check_items').delete().eq('id', itemToDelete.id);
-    if (error) showError("Xóa thất bại: " + error.message);
-    else {
+    try {
+      await keywordCheckService.deleteItem(itemToDelete.id);
       showSuccess("Đã xóa nội dung post!");
       setItemToDelete(null);
       fetchItem();
+    } catch (error: any) {
+      showError("Xóa thất bại: " + error.message);
     }
   };
 
@@ -115,19 +122,13 @@ export const KeywordPostDetail = ({ project, post, onCheckComplete }: KeywordPos
     setIsSaving(true);
     const toastId = showLoading("Đang cập nhật...");
     try {
-      const postUpdatePromise = supabase
-        .from('keyword_check_posts')
-        .update({ keywords: updatedKeywords })
-        .eq('id', post.id);
-      
-      const itemUpdatePromise = item 
-        ? supabase.from('keyword_check_items').update({ content: updatedContent }).eq('id', item.id)
-        : supabase.from('keyword_check_items').insert({ post_id: post.id, content: updatedContent });
+      await keywordCheckService.updatePost(post.id, { keywords: updatedKeywords });
 
-      const [postResult, itemResult] = await Promise.all([postUpdatePromise, itemUpdatePromise]);
-
-      if (postResult.error) throw postResult.error;
-      if (itemResult.error) throw itemResult.error;
+      if (item) {
+        await keywordCheckService.updateItem(item.id, { content: updatedContent });
+      } else {
+        await keywordCheckService.createItem(post.id, { content: updatedContent });
+      }
 
       dismissToast(toastId);
       showSuccess("Đã cập nhật thành công!");
@@ -166,11 +167,11 @@ export const KeywordPostDetail = ({ project, post, onCheckComplete }: KeywordPos
   const keywordStats = useMemo(() => {
     if (!post.keywords) return [];
     const keywords = post.keywords.split('\n').map(k => k.trim()).filter(Boolean);
-    
+
     return keywords.map(keyword => {
-        const normalizedKeyword = normalizeString(keyword);
-        const count = (item?.found_keywords && Array.isArray(item.found_keywords) && item.found_keywords.some(foundKw => normalizeString(foundKw) === normalizedKeyword)) ? 1 : 0;
-        return { keyword, count };
+      const normalizedKeyword = normalizeString(keyword);
+      const count = (item?.found_keywords && Array.isArray(item.found_keywords) && item.found_keywords.some(foundKw => normalizeString(foundKw) === normalizedKeyword)) ? 1 : 0;
+      return { keyword, count };
     });
   }, [post.keywords, item]);
 
@@ -195,7 +196,7 @@ export const KeywordPostDetail = ({ project, post, onCheckComplete }: KeywordPos
               <Button onClick={handleRunCheck} disabled={isChecking} className="bg-blue-600 hover:bg-blue-700 rounded-lg">{isChecking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}{isChecking ? 'Đang chạy...' : 'Chạy Check'}</Button>
             </div>
           </div></CardContent></Card>
-          
+
           <div className="flex items-center justify-between gap-4 mb-4">
             <div className="relative flex-grow max-w-xs">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -218,14 +219,14 @@ export const KeywordPostDetail = ({ project, post, onCheckComplete }: KeywordPos
 
           <div className="border rounded-lg overflow-auto flex-1"><Table><TableHeader><TableRow><TableHead>Nội dung Post</TableHead><TableHead>Kết quả</TableHead><TableHead>Từ khoá tìm thấy</TableHead><TableHead className="text-right">Thao tác</TableHead></TableRow></TableHeader>
             <TableBody>
-              {isLoading ? (<TableRow><TableCell colSpan={4}><Skeleton className="h-8 w-full" /></TableCell></TableRow>) : 
-              filteredItem ? (<TableRow key={filteredItem.id}>
-                <TableCell className="max-w-md break-words whitespace-pre-wrap">{filteredItem.content}</TableCell>
-                <TableCell><Badge className={cn('pointer-events-none', filteredItem.status === 'found' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800')}>{filteredItem.status === 'found' ? 'Tìm thấy' : 'Chưa tìm thấy'}</Badge></TableCell>
-                <TableCell>{filteredItem.found_keywords?.join(', ')}</TableCell>
-                <TableCell className="text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal /></Button></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuItem onClick={() => { setEditingItem(filteredItem); setEditedContent(filteredItem.content); }}><Edit className="mr-2 h-4 w-4" />Sửa</DropdownMenuItem><DropdownMenuItem onClick={() => setItemToDelete(filteredItem)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell>
-              </TableRow>) : 
-              (<TableRow><TableCell colSpan={4} className="text-center h-24">{item ? 'Không có kết quả phù hợp với bộ lọc.' : 'Không có nội dung nào.'}</TableCell></TableRow>)}
+              {isLoading ? (<TableRow><TableCell colSpan={4}><Skeleton className="h-8 w-full" /></TableCell></TableRow>) :
+                filteredItem ? (<TableRow key={filteredItem.id}>
+                  <TableCell className="max-w-md break-words whitespace-pre-wrap">{filteredItem.content}</TableCell>
+                  <TableCell><Badge className={cn('pointer-events-none', filteredItem.status === 'found' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800')}>{filteredItem.status === 'found' ? 'Tìm thấy' : 'Chưa tìm thấy'}</Badge></TableCell>
+                  <TableCell>{filteredItem.found_keywords?.join(', ')}</TableCell>
+                  <TableCell className="text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal /></Button></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuItem onClick={() => { setEditingItem(filteredItem); setEditedContent(filteredItem.content); }}><Edit className="mr-2 h-4 w-4" />Sửa</DropdownMenuItem><DropdownMenuItem onClick={() => setItemToDelete(filteredItem)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Xóa</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell>
+                </TableRow>) :
+                  (<TableRow><TableCell colSpan={4} className="text-center h-24">{item ? 'Không có kết quả phù hợp với bộ lọc.' : 'Không có nội dung nào.'}</TableCell></TableRow>)}
             </TableBody>
           </Table></div>
         </CardContent>

@@ -1,0 +1,138 @@
+{
+	"info": {
+		"_postman_id": "a1b2c3d4-e5f6-7890-1234-56789abcdef0",
+		"name": "CLIProxyAPI Integration Test",
+		"description": "A Postman collection to simulate 3rd party software calling CLIProxyAPI. Uses the standard OpenAI JSON format.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Chat Completions (Text Only)",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{API_KEY}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					},
+					{
+						"key": "X-Api-Key",
+						"value": "sk_live_PLACEHOLDER_KEY",
+						"type": "text",
+						"description": "API Key from environment"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"model\": \"gpt-5.2\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Bạn là ai?\"\n    }\n  ],\n  \"stream\": false\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{BASE_URL}}/v1/chat/completions",
+					"host": [
+						"{{BASE_URL}}"
+					],
+					"path": [
+						"v1",
+						"chat",
+						"completions"
+					]
+				},
+				"description": "Standard text-only request to /v1/chat/completions"
+			},
+			"response": []
+		},
+		{
+			"name": "Chat Completions (Text & Image Base64)",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "{{API_KEY}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					},
+					{
+						"key": "X-Api-Key",
+						"value": "sk_live_PLACEHOLDER_KEY",
+						"type": "text",
+						"description": "API Key from environment"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"model\": \"gpt-5.2\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": [\n        {\n          \"type\": \"text\",\n          \"text\": \"Mô tả bức ảnh này.\"\n        },\n        {\n          \"type\": \"image_url\",\n          \"image_url\": {\n            \"url\": \"data:image/jpeg;base64,...\" \n          }\n        }\n      ]\n    }\n  ],\n  \"stream\": false\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{BASE_URL}}/v1/chat/completions",
+					"host": [
+						"{{BASE_URL}}"
+					],
+					"path": [
+						"v1",
+						"chat",
+						"completions"
+					]
+				},
+				"description": "Request with image support. Note: You must replace 'data:image/jpeg;base64,...' with an actual Base64 string of the image."
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "BASE_URL",
+			"value": "https://cliproxy.pcdl.io.vn",
+			"type": "string",
+			"description": "The base URL of CLIProxyAPI"
+		},
+		{
+			"key": "API_KEY",
+			"value": "{{X_API_KEY}}",
+			"type": "string",
+			"description": "The API Key configured in CLIProxyAPI"
+		},
+		{
+			"key": "MODEL",
+			"value": "gemini-2.5-flash",
+			"type": "string",
+			"description": "Model ID to test"
+		},
+		{
+			"key": "X_API_KEY",
+			"value": "YOUR_X_API_KEY_HERE",
+			"type": "string",
+			"description": "The X_API_KEY from GitHub Secrets / Environment"
+		}
+	]
+}

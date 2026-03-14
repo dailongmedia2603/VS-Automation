@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { reportsService } from '@/api/contentAi';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -47,21 +47,18 @@ export const AiCostReport = () => {
   useEffect(() => {
     const fetchLogs = async () => {
       setIsLoading(true);
-      const { data, error } = await supabase
-        .from('content_ai_logs')
-        .select('created_at, response')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        // Handle error silently for now
-      } else {
+      try {
+        const data = await reportsService.getCostLogs();
         const processed = data.map(log => ({
           created_at: log.created_at,
           ...calculateCost(log)
         }));
         setLogs(processed);
+      } catch {
+        // Handle error silently for now
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
     fetchLogs();
   }, []);

@@ -10,15 +10,13 @@ import {
   Sparkles,
   CheckCircle,
   Wrench,
-  Camera,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link, useLocation } from "react-router-dom";
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "./ui/button";
-import { supabase } from "@/integrations/supabase/client";
 import hexaLogo from "@/assets/images/dailongmedia.png";
 import { useAuth } from "@/contexts/AuthContext";
 import { showSuccess, showError } from "@/utils/toast";
@@ -36,7 +34,6 @@ const navSections = [
   {
     title: "General",
     items: [
-      { name: "Dashboard", icon: LayoutDashboard, href: "/", permission: "view_dashboard" },
       { name: "Báo cáo", icon: BarChart3, href: "/reports", permission: "view_reports" },
     ],
   },
@@ -51,7 +48,6 @@ const navSections = [
     title: "Seeder",
     items: [
       { name: "Check Seeding", icon: CheckCircle, href: "/check-seeding", permission: "view_check_seeding" },
-      { name: "Chụp ảnh Report", icon: Camera, href: "/report-screenshot", permission: "view_report_screenshot" },
     ],
   },
   {
@@ -64,8 +60,8 @@ const navSections = [
 ];
 
 const bottomNavItems: NavItem[] = [
-    { name: "Nhân sự", icon: Users, href: "/staff", permission: "view_staff" },
-    { name: "Cài đặt chung", icon: Settings, href: "/settings", permission: "view_settings" },
+  { name: "Nhân sự", icon: Users, href: "/staff", permission: "view_staff" },
+  { name: "Cài đặt chung", icon: Settings, href: "/settings", permission: "view_settings" },
 ];
 
 interface SidebarProps {
@@ -86,60 +82,20 @@ export function Sidebar({ className, isCollapsed, toggleSidebar, onLinkClick, hi
   const location = useLocation();
   const { user } = useAuth();
   const { hasPermission } = usePermissions();
-  const [profile, setProfile] = useState<StaffProfile | null>(null);
-  const [loadingProfile, setLoadingProfile] = useState(true);
   useNotification();
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      if (!user) {
-        setProfile(null);
-        setLoadingProfile(false);
-        return;
-      }
+  // Derive profile directly from user - no loading state needed since AuthContext provides cached data instantly
+  const profile: StaffProfile | null = user ? {
+    name: user.name || user.email || 'Người dùng',
+    role: user.roles && user.roles.length > 0 ? user.roles[0].name : 'Thành viên',
+    avatar_url: null
+  } : null;
 
-      setLoadingProfile(true);
-      try {
-        const { data: roleData, error: roleError } = await supabase
-          .from('user_roles')
-          .select('roles(name)')
-          .eq('user_id', user.id)
-          .single();
-
-        if (roleError && roleError.code !== 'PGRST116') {
-          throw roleError;
-        }
-        
-        const { data: { user: refreshedUser } } = await supabase.auth.getUser();
-
-        if (refreshedUser) {
-            const roles = roleData?.roles as any; // Cast to any to handle potential type mismatch
-            const roleName = Array.isArray(roles) ? roles[0]?.name : roles?.name;
-
-            setProfile({
-                name: refreshedUser.user_metadata?.full_name || refreshedUser.email || 'Người dùng',
-                role: roleName || 'Thành viên',
-                avatar_url: refreshedUser.user_metadata?.avatar_url
-            });
-        } else {
-            setProfile(null);
-        }
-
-      } catch (e: any) {
-        console.error('Exception fetching profile', e);
-        setProfile(null);
-      } finally {
-        setLoadingProfile(false);
-      }
-    };
-  
-    fetchProfile();
-  }, [user]);
+  const { logout } = useAuth();
 
   const handleLogout = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      await logout();
       showSuccess("Đăng xuất thành công!");
     } catch (error: any) {
       showError("Đăng xuất thất bại: " + error.message);
@@ -150,7 +106,7 @@ export function Sidebar({ className, isCollapsed, toggleSidebar, onLinkClick, hi
     if (!name) return '...';
     const names = name.trim().split(' ');
     if (names.length > 1 && names[names.length - 1]) {
-        return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
+      return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
     }
     return name.substring(0, 2).toUpperCase();
   };
@@ -219,39 +175,31 @@ export function Sidebar({ className, isCollapsed, toggleSidebar, onLinkClick, hi
       </div>
 
       <div className={cn("flex items-center justify-between rounded-lg bg-white p-2 transition-opacity duration-200 min-h-[60px]", isCollapsed && "opacity-0 hidden")}>
-        {loadingProfile ? (
-            <div className="flex items-center space-x-3 animate-pulse w-full">
-                <div className="h-10 w-10 rounded-full bg-slate-200"></div>
-                <div className="flex-1 space-y-2">
-                    <div className="h-4 w-3/4 bg-slate-200 rounded"></div>
-                    <div className="h-3 w-1/2 bg-slate-200 rounded"></div>
-                </div>
+        {profile ? (
+          <>
+            <div className="flex items-center space-x-3 overflow-hidden">
+              <Avatar className="h-10 w-10 flex-shrink-0">
+                <AvatarImage src={profile.avatar_url || undefined} />
+                <AvatarFallback>{getInitials(profile.name)}</AvatarFallback>
+              </Avatar>
+              <div className="overflow-hidden">
+                <p className="font-semibold text-sm truncate" title={profile.name}>{profile.name}</p>
+                <p className="text-xs text-gray-500 truncate" title={profile.role || 'Thành viên'}>{profile.role || 'Thành viên'}</p>
+              </div>
             </div>
-        ) : profile ? (
-            <>
-                <div className="flex items-center space-x-3 overflow-hidden">
-                    <Avatar className="h-10 w-10 flex-shrink-0">
-                        <AvatarImage src={profile.avatar_url || undefined} />
-                        <AvatarFallback>{getInitials(profile.name)}</AvatarFallback>
-                    </Avatar>
-                    <div className="overflow-hidden">
-                        <p className="font-semibold text-sm truncate" title={profile.name}>{profile.name}</p>
-                        <p className="text-xs text-gray-500 truncate" title={profile.role || 'Thành viên'}>{profile.role || 'Thành viên'}</p>
-                    </div>
-                </div>
-                <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={handleLogout}>
-                  <LogOut className="h-5 w-5 text-gray-500 hover:text-red-500" />
-                </Button>
-            </>
+            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={handleLogout}>
+              <LogOut className="h-5 w-5 text-gray-500 hover:text-red-500" />
+            </Button>
+          </>
         ) : (
-            <div className="flex items-center space-x-3">
-                <Avatar className="h-10 w-10">
-                    <AvatarFallback>??</AvatarFallback>
-                </Avatar>
-                <div>
-                    <p className="font-semibold text-sm">Chưa đăng nhập</p>
-                </div>
+          <div className="flex items-center space-x-3">
+            <Avatar className="h-10 w-10">
+              <AvatarFallback>??</AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="font-semibold text-sm">Chưa đăng nhập</p>
             </div>
+          </div>
         )}
       </div>
 
@@ -263,19 +211,24 @@ export function Sidebar({ className, isCollapsed, toggleSidebar, onLinkClick, hi
             <div key={section.title}>
               {section.title && <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>{section.title}</p>}
               <nav className="flex flex-col space-y-1">
-                  {accessibleItems.map(item => <React.Fragment key={item.href}>{renderLink(item)}</React.Fragment>)}
+                {accessibleItems.map(item => <React.Fragment key={item.href}>{renderLink(item)}</React.Fragment>)}
               </nav>
             </div>
           );
         })}
       </div>
 
-       <div className="mt-auto">
-         <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>CÀI ĐẶT CHUNG</p>
-         <nav className="flex flex-col space-y-1">
-            {bottomNavItems.filter(item => hasPermission(item.permission)).map(item => <React.Fragment key={item.href}>{renderLink(item)}</React.Fragment>)}
-         </nav>
-       </div>
+      <div className="mt-auto">
+        <p className={cn("px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200", isCollapsed && "opacity-0 hidden")}>CÀI ĐẶT CHUNG</p>
+        <nav className="flex flex-col space-y-1">
+          {bottomNavItems.filter(item => hasPermission(item.permission)).map(item => <React.Fragment key={item.href}>{renderLink(item)}</React.Fragment>)}
+        </nav>
+        {!isCollapsed && (
+          <div className="pt-4 px-4 text-xs text-slate-400 text-center">
+            v2026.01.26.06
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,59 +1,51 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { useConditionLibrary, useUpdateConditionLibrary } from '@/hooks/useLibraries';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, PlusCircle, Trash2, Save, Loader2 } from 'lucide-react';
-import { showSuccess, showError } from '@/utils/toast';
 
 type Condition = {
   id: string;
   content: string;
 };
 
-type Library = {
-  id: number;
-  name: string;
-  conditions: Condition[];
-};
-
 const ConditionLibraryDetail = () => {
   const { libraryId } = useParams<{ libraryId: string }>();
-  const [library, setLibrary] = useState<Library | null>(null);
-  const [conditions, setConditions] = useState<Condition[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    const fetchLibrary = async () => {
-      if (!libraryId) return;
-      setIsLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('condition_libraries')
-          .select('id, name, conditions')
-          .eq('id', libraryId)
-          .single();
+  // React Query - data loads instantly from cache
+  const { data: library, isLoading } = useConditionLibrary(Number(libraryId));
+  const updateLibrary = useUpdateConditionLibrary();
 
-        if (error) throw error;
-        
-        setLibrary(data);
-        // Ensure conditions have unique IDs if they don't already
-        const conditionsWithIds = (data.conditions || []).map((cond: any) => 
-          typeof cond === 'string' ? { id: crypto.randomUUID(), content: cond } : { ...cond, id: cond.id || crypto.randomUUID() }
-        );
-        setConditions(conditionsWithIds);
+  // Initialize conditions from library data
+  const initialConditions = useMemo(() => {
+    if (!library) return [];
+    const rawData = library as any;
+    const rawConditions = rawData.conditions || rawData.config?.conditions || [];
+    return rawConditions.map((cond: any) =>
+      typeof cond === 'string'
+        ? { id: crypto.randomUUID(), content: cond }
+        : { ...cond, id: cond.id || crypto.randomUUID() }
+    );
+  }, [library]);
 
-      } catch (error: any) {
-        showError("Không thể tải thư viện: " + error.message);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchLibrary();
-  }, [libraryId]);
+  const [conditions, setConditions] = useState<Condition[]>(initialConditions);
+
+  // Update conditions when library loads
+  useMemo(() => {
+    if (library) {
+      const rawData = library as any;
+      const rawConditions = rawData.conditions || rawData.config?.conditions || [];
+      const conditionsWithIds = rawConditions.map((cond: any) =>
+        typeof cond === 'string'
+          ? { id: crypto.randomUUID(), content: cond }
+          : { ...cond, id: cond.id || crypto.randomUUID() }
+      );
+      setConditions(conditionsWithIds);
+    }
+  }, [library]);
 
   const handleConditionChange = (id: string, content: string) => {
     setConditions(prev => prev.map(c => c.id === id ? { ...c, content } : c));
@@ -69,19 +61,13 @@ const ConditionLibraryDetail = () => {
 
   const handleSave = async () => {
     if (!libraryId) return;
-    setIsSaving(true);
     const conditionsToSave = conditions.filter(c => c.content.trim() !== '');
-    const { error } = await supabase
-      .from('condition_libraries')
-      .update({ conditions: conditionsToSave, updated_at: new Date().toISOString() })
-      .eq('id', libraryId);
+    const currentConfig = (library as any)?.config || {};
 
-    if (error) {
-      showError("Lưu thất bại: " + error.message);
-    } else {
-      showSuccess("Đã lưu các điều kiện thành công!");
-    }
-    setIsSaving(false);
+    await updateLibrary.mutateAsync({
+      id: Number(libraryId),
+      data: { config: { ...currentConfig, conditions: conditionsToSave } }
+    });
   };
 
   if (isLoading) {
@@ -117,8 +103,8 @@ const ConditionLibraryDetail = () => {
             </p>
           </div>
         </div>
-        <Button onClick={handleSave} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
-          {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+        <Button onClick={handleSave} disabled={updateLibrary.isPending} className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
+          {updateLibrary.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
           Lưu thay đổi
         </Button>
       </div>

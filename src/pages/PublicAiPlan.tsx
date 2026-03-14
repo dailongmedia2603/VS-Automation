@@ -1,15 +1,9 @@
-import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
+import { aiPlanService } from '@/api/tools';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AiPlanContentView } from '@/components/ai-plan/AiPlanContentView';
-
-type Plan = {
-  id: number;
-  name: string;
-  plan_data: any;
-  template_id: number | null;
-};
+import apiClient from '@/api/client';
 
 type PublicSettings = {
   company_name: string;
@@ -30,68 +24,35 @@ type PlanStructure = {
 
 const PublicAiPlan = () => {
   const { planSlug } = useParams<{ planSlug: string }>();
-  const [plan, setPlan] = useState<Plan | null>(null);
-  const [publicSettings, setPublicSettings] = useState<PublicSettings | null>(null);
-  const [planStructure, setPlanStructure] = useState<PlanStructure | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchPlan = async () => {
-      if (!planSlug) {
-        setError("Không tìm thấy slug kế hoạch.");
-        setIsLoading(false);
-        return;
-      }
-      setIsLoading(true);
-      try {
-        const planPromise = supabase
-          .from('ai_plans')
-          .select('id, name, plan_data, template_id')
-          .eq('slug', planSlug)
-          .eq('is_public', true)
-          .single();
-        
-        const settingsPromise = supabase
-          .from('public_page_settings')
-          .select('company_name, description, logo_url, logo_width, logo_height')
-          .eq('id', 1)
-          .single();
+  // React Query - data loads instantly from cache
+  const { data: plan, isLoading: isLoadingPlan, error: planError } = useQuery({
+    queryKey: ['public-ai-plan', planSlug],
+    queryFn: () => aiPlanService.getPublic(planSlug!),
+    enabled: !!planSlug,
+  });
 
-        const [{ data: planData, error: planError }, { data: settingsData, error: settingsError }] = await Promise.all([planPromise, settingsPromise]);
-        
-        if (planError) throw planError;
-        if (!planData) throw new Error("Không tìm thấy kế hoạch hoặc kế hoạch không được công khai.");
-        if (settingsError && settingsError.code !== 'PGRST116') throw settingsError;
-        
-        setPlan(planData);
-        setPublicSettings(settingsData);
+  const { data: publicSettings } = useQuery({
+    queryKey: ['public-page-settings'],
+    queryFn: async () => {
+      const response = await apiClient.get('/settings/public-page');
+      return response.data.settings as PublicSettings;
+    },
+  });
 
-        const templateId = planData.template_id || 1;
-        const { data: templateData, error: templateError } = await supabase
-          .from('ai_plan_templates')
-          .select('structure')
-          .eq('id', templateId)
-          .single();
-        
-        if (templateError) throw templateError;
-        if (!templateData) throw new Error(`Template with ID ${templateId} not found.`);
+  const { data: template } = useQuery({
+    queryKey: ['ai-plan-template', plan?.template_id],
+    queryFn: async () => {
+      const templateId = plan?.template_id || 1;
+      const response = await apiClient.get(`/ai-plan/templates/${templateId}`);
+      return response.data.template;
+    },
+    enabled: !!plan,
+  });
 
-        if (templateData.structure && typeof templateData.structure === 'object' && !Array.isArray(templateData.structure)) {
-          const structure = templateData.structure as any;
-          setPlanStructure(structure.output_fields || []);
-        } else {
-          setPlanStructure(templateData.structure as PlanStructure);
-        }
+  const isLoading = isLoadingPlan;
 
-      } catch (error: any) {
-        setError(error.message);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchPlan();
-  }, [planSlug]);
+  const planStructure = template?.structure?.output_fields || template?.structure || [];
 
   if (isLoading) {
     return (
@@ -102,11 +63,11 @@ const PublicAiPlan = () => {
     );
   }
 
-  if (error) {
+  if (planError || !plan) {
     return (
       <div className="flex flex-col items-center justify-center h-screen text-center">
         <h1 className="text-2xl font-bold text-red-600">Lỗi</h1>
-        <p className="mt-2 text-slate-600">{error}</p>
+        <p className="mt-2 text-slate-600">Không tìm thấy kế hoạch hoặc kế hoạch không được công khai.</p>
       </div>
     );
   }
@@ -130,9 +91,9 @@ const PublicAiPlan = () => {
       <div className="max-w-7xl mx-auto">
         <div className="mb-8 text-center bg-blue-600 text-white p-8 rounded-2xl shadow-lg">
           {logoUrl && (
-            <img 
-              src={logoUrl} 
-              alt="Logo" 
+            <img
+              src={logoUrl}
+              alt="Logo"
               className="mx-auto mb-4"
               style={logoStyle}
             />

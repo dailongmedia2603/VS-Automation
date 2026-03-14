@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { aiPlanService } from '@/api/tools';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -34,21 +34,13 @@ export const SharePlanDialog = ({ isOpen, onOpenChange, plan, onPlanUpdate }: Sh
   const handleTogglePublic = async (checked: boolean) => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('ai_plans')
-        .update({ is_public: checked, updated_at: new Date().toISOString() })
-        .eq('id', plan.id)
-        .select('is_public, public_id, slug')
-        .single();
-      
-      if (error) throw error;
-
-      setIsPublic(data.is_public);
-      onPlanUpdate(data);
+      const updatedPlan = await aiPlanService.updatePlan(plan.id, { is_public: checked });
+      setIsPublic(checked);
+      onPlanUpdate({ is_public: checked, slug: updatedPlan.slug });
       showSuccess(`Kế hoạch đã được ${checked ? 'công khai' : 'đặt riêng tư'}.`);
     } catch (error: any) {
       showError("Cập nhật thất bại: " + error.message);
-      setIsPublic(!checked); // Revert on error
+      setIsPublic(!checked);
     } finally {
       setIsLoading(false);
     }

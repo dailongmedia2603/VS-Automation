@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
 import { showSuccess, showError } from '@/utils/toast';
-import { supabase } from '@/integrations/supabase/client';
+import { libraryService, PromptLibrary } from '@/api/contentAi';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDistanceToNow } from 'date-fns';
@@ -20,12 +20,10 @@ import { vi } from 'date-fns/locale';
 import { initialConfig } from '@/components/TrainingForm';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-type Library = {
-  id: number;
-  name: string;
-  updated_at: string;
-  color: string;
+type Library = PromptLibrary & {
   files?: number; // For compatibility with ProjectFolder/ListItem
+  color: string; // Color is now mandatory
+  updated_at: string; // Add updated_at for compatibility
 };
 
 const folderColors = [
@@ -42,7 +40,7 @@ const folderColors = [
 const getRandomColor = () => folderColors[Math.floor(Math.random() * folderColors.length)];
 
 const LibraryManager = ({ type }: { type: 'prompt' | 'condition' | 'structure' }) => {
-  const navigate = useNavigate();
+  // const navigate = useNavigate();
   const { user } = useAuth();
   const [libraries, setLibraries] = useState<Library[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -55,27 +53,69 @@ const LibraryManager = ({ type }: { type: 'prompt' | 'condition' | 'structure' }
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const { tableName, basePath, typeName, icon: Icon, color } = useMemo(() => {
+  /* eslint-disable react-hooks/exhaustive-deps */
+  const { typeName, icon: Icon, color, serviceMethod, createMethod, updateMethod, deleteMethod, basePath } = useMemo(() => {
     switch (type) {
       case 'prompt':
-        return { tableName: 'prompt_libraries', basePath: '/training-chatbot/prompts', typeName: 'Thư viện Prompt', icon: Folder, color: 'bg-blue-500' };
+        return {
+          typeName: 'Thư viện Prompt',
+          icon: Folder,
+          color: 'bg-blue-500',
+          serviceMethod: libraryService.getPromptLibraries,
+          createMethod: libraryService.createPromptLibrary,
+          updateMethod: libraryService.updatePromptLibrary,
+          deleteMethod: libraryService.deletePromptLibrary,
+          basePath: '/training-chatbot/prompts'
+        };
       case 'condition':
-        return { tableName: 'condition_libraries', basePath: '/training-chatbot/conditions', typeName: 'Thư viện Điều kiện', icon: ShieldCheck, color: 'bg-red-500' };
+        return {
+          typeName: 'Thư viện Điều kiện',
+          icon: ShieldCheck,
+          color: 'bg-red-500',
+          serviceMethod: libraryService.getConditionLibraries,
+          createMethod: libraryService.createConditionLibrary,
+          updateMethod: libraryService.updateConditionLibrary,
+          deleteMethod: libraryService.deleteConditionLibrary,
+          basePath: '/training-chatbot/conditions'
+        };
       case 'structure':
-        return { tableName: 'article_structure_libraries', basePath: '/training-chatbot/structures', typeName: 'Thư viện Cấu trúc', icon: FileSignature, color: 'bg-green-500' };
+        return {
+          typeName: 'Thư viện Cấu trúc',
+          icon: FileSignature,
+          color: 'bg-green-500',
+          serviceMethod: libraryService.getStructureLibraries,
+          createMethod: libraryService.createStructureLibrary,
+          updateMethod: libraryService.updateStructureLibrary,
+          deleteMethod: libraryService.deleteStructureLibrary,
+          basePath: '/training-chatbot/structures'
+        };
       default:
-        return { tableName: 'prompt_libraries', basePath: '/training-chatbot/prompts', typeName: 'Thư viện', icon: Folder, color: 'bg-gray-500' };
+        return {
+          typeName: 'Thư viện',
+          icon: Folder,
+          color: 'bg-gray-500',
+          serviceMethod: libraryService.getPromptLibraries,
+          createMethod: libraryService.createPromptLibrary,
+          updateMethod: libraryService.updatePromptLibrary,
+          deleteMethod: libraryService.deletePromptLibrary,
+          basePath: '/training-chatbot/prompts'
+        };
     }
   }, [type]);
 
   const fetchLibraries = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.from(tableName).select('*').order('updated_at', { ascending: false });
-      if (error) throw error;
-      setLibraries(data || []);
+      const data = await serviceMethod();
+      const mappedLibraries = data.map(lib => ({
+        ...lib,
+        color: getRandomColor(),
+        files: 0,
+        updated_at: lib.created_at // Use created_at as updated_at for now
+      }));
+      setLibraries(mappedLibraries);
     } catch (error: any) {
-      showError(`Không thể tải ${typeName}: ${error.message}`);
+      showError(`Không thể tải ${typeName}: ${error.response?.data?.message || error.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -86,7 +126,7 @@ const LibraryManager = ({ type }: { type: 'prompt' | 'condition' | 'structure' }
   }, [type]);
 
   const filteredLibraries = useMemo(() => {
-    return libraries.filter(lib => 
+    return libraries.filter(lib =>
       lib.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [libraries, searchTerm]);
@@ -105,23 +145,19 @@ const LibraryManager = ({ type }: { type: 'prompt' | 'condition' | 'structure' }
     setIsSaving(true);
     try {
       if (editingLibrary) {
-        const { error } = await supabase.from(tableName).update({ name: libraryName.trim(), updated_at: new Date().toISOString() }).eq('id', editingLibrary.id);
-        if (error) throw error;
+        await updateMethod(editingLibrary.id, { name: libraryName.trim() });
         showSuccess(`Đã cập nhật ${typeName} thành công!`);
       } else {
-        const randomColor = getRandomColor();
-        const payload: any = { name: libraryName.trim(), creator_id: user.id, color: randomColor };
+        const payload: any = { name: libraryName.trim() };
         if (type === 'prompt') payload.config = initialConfig;
-        
-        const { data: newLibrary, error } = await supabase.from(tableName).insert(payload).select().single();
-        if (error) throw error;
+
+        await createMethod(payload);
         showSuccess(`Đã tạo ${typeName} thành công!`);
-        if (newLibrary) navigate(`${basePath}/${newLibrary.id}`);
       }
       setIsDialogOpen(false);
       fetchLibraries();
     } catch (error: any) {
-      showError(`Lưu thất bại: ${error.message}`);
+      showError(`Lưu thất bại: ${error.response?.data?.message || error.message}`);
     } finally {
       setIsSaving(false);
     }
@@ -134,12 +170,12 @@ const LibraryManager = ({ type }: { type: 'prompt' | 'condition' | 'structure' }
 
   const handleDeleteLibrary = async () => {
     if (!libraryToDelete) return;
-    const { error } = await supabase.from(tableName).delete().eq('id', libraryToDelete.id);
-    if (error) {
-      showError("Xóa thất bại: " + error.message);
-    } else {
+    try {
+      await deleteMethod(libraryToDelete.id);
       showSuccess("Đã xóa thành công!");
       fetchLibraries();
+    } catch (error: any) {
+      showError("Xóa thất bại: " + (error.response?.data?.message || error.message));
     }
     setIsDeleteDialogOpen(false);
   };
@@ -151,7 +187,7 @@ const LibraryManager = ({ type }: { type: 'prompt' | 'condition' | 'structure' }
     if (filteredLibraries.length === 0) {
       return <div className="text-center py-16 text-muted-foreground col-span-full"><Folder className="mx-auto h-12 w-12" /><h3 className="mt-4 text-lg font-semibold">Chưa có thư viện nào</h3><p className="mt-1 text-sm">Hãy bắt đầu bằng cách tạo một thư viện mới.</p></div>;
     }
-    const libraryActions = (library: Library) => ({ onEdit: () => handleOpenDialog(library), onShare: () => {}, onDelete: () => handleOpenDeleteDialog(library) });
+    const libraryActions = (library: Library) => ({ onEdit: () => handleOpenDialog(library), onShare: () => { }, onDelete: () => handleOpenDeleteDialog(library) });
     if (viewMode === 'grid') {
       return <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">{filteredLibraries.map(lib => <ProjectFolder key={lib.id} {...lib} files={lib.files || 0} basePath={basePath} modified={formatDistanceToNow(new Date(lib.updated_at), { addSuffix: true, locale: vi })} {...libraryActions(lib)} />)}</div>;
     }

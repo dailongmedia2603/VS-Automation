@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useState, useMemo, useRef } from 'react';
+import { useStaffList, useRolesList, useCreateStaff, useUpdateStaff, useDeleteStaff, StaffMember } from '@/hooks/useStaff';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -12,29 +12,22 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PlusCircle, Edit, Trash2, Search, Loader2, Upload } from 'lucide-react';
-import { showSuccess, showError } from '@/utils/toast';
+import { showError } from '@/utils/toast';
 import { cn } from '@/lib/utils';
 import { usePermissions } from '@/contexts/PermissionContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import RolesManager from '@/components/RolesManager';
 
-type StaffMember = {
-  id: string;
-  name: string;
-  role: string;
-  email: string;
-  avatar_url: string | null;
-  status: 'active' | 'inactive';
-  password?: string;
-};
-
-type Role = { id: number; name: string; };
-
 const StaffList = () => {
   const { hasPermission } = usePermissions();
-  const [staffList, setStaffList] = useState<StaffMember[]>([]);
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+
+  // React Query hooks - data loads instantly from cache
+  const { data: staffList = [], isLoading } = useStaffList();
+  const { data: roles = [] } = useRolesList();
+  const createStaff = useCreateStaff();
+  const updateStaff = useUpdateStaff();
+  const deleteStaff = useDeleteStaff();
+
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
@@ -44,30 +37,6 @@ const StaffList = () => {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
-
-  const fetchData = async () => {
-    setIsLoading(true);
-    try {
-      const [staffRes, rolesRes] = await Promise.all([
-        supabase.functions.invoke('list-users'),
-        supabase.from('roles').select('id, name')
-      ]);
-      
-      if (staffRes.error) throw staffRes.error;
-      if (rolesRes.error) throw rolesRes.error;
-
-      setStaffList(staffRes.data as StaffMember[] || []);
-      setRoles(rolesRes.data || []);
-    } catch (error: any) {
-      showError("Không thể tải dữ liệu: " + error.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
 
   const handleAddNew = () => {
     setSelectedStaff({ name: '', role: 'Member', email: '', status: 'active', avatar_url: '', password: '' });
@@ -79,7 +48,7 @@ const StaffList = () => {
   const handleEdit = (staff: StaffMember) => {
     setSelectedStaff(staff);
     setAvatarFile(null);
-    setAvatarPreview(staff.avatar_url);
+    setAvatarPreview(staff.avatar_url ?? null);
     setIsDialogOpen(true);
   };
 
@@ -87,15 +56,10 @@ const StaffList = () => {
     if (!staffToDelete) return;
     setIsSaving(true);
     try {
-      const { error } = await supabase.functions.invoke('delete-user', {
-        body: { userId: staffToDelete.id },
-      });
-      if (error) throw error;
-      showSuccess("Đã xóa nhân sự thành công!");
-      setStaffList(staffList.filter(s => s.id !== staffToDelete.id));
+      await deleteStaff.mutateAsync(Number(staffToDelete.id));
       setIsAlertOpen(false);
     } catch (error: any) {
-      showError("Xóa nhân sự thất bại: " + error.message);
+      // Error handling is done in the hook
     } finally {
       setIsSaving(false);
     }
@@ -117,13 +81,9 @@ const StaffList = () => {
     setIsSaving(true);
 
     try {
-      let avatarUrl = selectedStaff.avatar_url;
+      let avatarUrl = selectedStaff.avatar_url || null;
       if (avatarFile) {
-        const filePath = `public/${Date.now()}-${avatarFile.name}`;
-        const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, avatarFile);
-        if (uploadError) throw uploadError;
-        const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
-        avatarUrl = publicUrl;
+        console.warn("Avatar upload is not yet implemented in the new backend migration.");
       }
 
       if (!selectedStaff.id) {
@@ -132,23 +92,25 @@ const StaffList = () => {
           setIsSaving(false);
           return;
         }
-        const { error } = await supabase.functions.invoke('create-user', {
-          body: { email: selectedStaff.email, password: selectedStaff.password, name: selectedStaff.name, avatar_url: avatarUrl },
+        await createStaff.mutateAsync({
+          name: selectedStaff.name,
+          email: selectedStaff.email,
+          password: selectedStaff.password,
+          role: selectedStaff.role
         });
-        if (error) throw error;
-        showSuccess("Đã thêm nhân sự thành công!");
       } else {
-        const { error } = await supabase.functions.invoke('update-user', {
-          body: { userId: selectedStaff.id, name: selectedStaff.name, avatar_url: avatarUrl, role: selectedStaff.role, status: selectedStaff.status },
+        await updateStaff.mutateAsync({
+          id: Number(selectedStaff.id),
+          data: {
+            name: selectedStaff.name,
+            role: selectedStaff.role,
+          }
         });
-        if (error) throw error;
-        showSuccess("Đã cập nhật thông tin nhân sự!");
       }
-      
+
       setIsDialogOpen(false);
-      fetchData();
     } catch (error: any) {
-      showError("Lưu thông tin thất bại: " + error.message);
+      // Error handling is done in the hooks
     } finally {
       setIsSaving(false);
     }
@@ -186,9 +148,9 @@ const StaffList = () => {
             <Table>
               <TableHeader><TableRow><TableHead>Nhân viên</TableHead><TableHead>Chức vụ</TableHead><TableHead>Trạng thái</TableHead><TableHead className="text-right">Hành động</TableHead></TableRow></TableHeader>
               <TableBody>
-                {isLoading ? ([...Array(5)].map((_, i) => (<TableRow key={i}><TableCell><div className="flex items-center gap-3"><Skeleton className="h-10 w-10 rounded-full" /><div className="space-y-1"><Skeleton className="h-4 w-32" /><Skeleton className="h-3 w-40" /></div></div></TableCell><TableCell><Skeleton className="h-4 w-24" /></TableCell><TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell><TableCell className="text-right"><Skeleton className="h-8 w-20" /></TableCell></TableRow>))) : 
-                filteredStaff.length > 0 ? (filteredStaff.map((staff) => (<TableRow key={staff.id}><TableCell><div className="flex items-center gap-3"><Avatar><AvatarImage src={staff.avatar_url ?? undefined} alt={staff.name} /><AvatarFallback>{staff.name.charAt(0)}</AvatarFallback></Avatar><div><p className="font-medium">{staff.name}</p><p className="text-sm text-muted-foreground">{staff.email}</p></div></div></TableCell><TableCell>{staff.role}</TableCell><TableCell><Badge variant={staff.status === 'active' ? 'default' : 'outline'} className={cn(staff.status === 'active' && 'bg-green-100 text-green-800 border-green-200')}>{staff.status === 'active' ? 'Hoạt động' : 'Tạm nghỉ'}</Badge></TableCell><TableCell className="text-right">{hasPermission('edit_staff') && (<Button variant="ghost" size="icon" onClick={() => handleEdit(staff)}><Edit className="h-4 w-4" /></Button>)}{hasPermission('delete_staff') && (<Button variant="ghost" size="icon" onClick={() => { setStaffToDelete(staff); setIsAlertOpen(true); }}><Trash2 className="h-4 w-4 text-destructive" /></Button>)}</TableCell></TableRow>))) : 
-                (<TableRow><TableCell colSpan={4} className="text-center h-24">Không tìm thấy nhân sự nào.</TableCell></TableRow>)}
+                {isLoading ? ([...Array(5)].map((_, i) => (<TableRow key={i}><TableCell><div className="flex items-center gap-3"><Skeleton className="h-10 w-10 rounded-full" /><div className="space-y-1"><Skeleton className="h-4 w-32" /><Skeleton className="h-3 w-40" /></div></div></TableCell><TableCell><Skeleton className="h-4 w-24" /></TableCell><TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell><TableCell className="text-right"><Skeleton className="h-8 w-20" /></TableCell></TableRow>))) :
+                  filteredStaff.length > 0 ? (filteredStaff.map((staff) => (<TableRow key={staff.id}><TableCell><div className="flex items-center gap-3"><Avatar><AvatarImage src={staff.avatar_url ?? undefined} alt={staff.name} /><AvatarFallback>{staff.name.charAt(0)}</AvatarFallback></Avatar><div><p className="font-medium">{staff.name}</p><p className="text-sm text-muted-foreground">{staff.email}</p></div></div></TableCell><TableCell>{staff.role}</TableCell><TableCell><Badge variant={staff.status === 'active' ? 'default' : 'outline'} className={cn(staff.status === 'active' && 'bg-green-100 text-green-800 border-green-200')}>{staff.status === 'active' ? 'Hoạt động' : 'Tạm nghỉ'}</Badge></TableCell><TableCell className="text-right">{hasPermission('edit_staff') && (<Button variant="ghost" size="icon" onClick={() => handleEdit(staff)}><Edit className="h-4 w-4" /></Button>)}{hasPermission('delete_staff') && (<Button variant="ghost" size="icon" onClick={() => { setStaffToDelete(staff); setIsAlertOpen(true); }}><Trash2 className="h-4 w-4 text-destructive" /></Button>)}</TableCell></TableRow>))) :
+                    (<TableRow><TableCell colSpan={4} className="text-center h-24">Không tìm thấy nhân sự nào.</TableCell></TableRow>)}
               </TableBody>
             </Table>
           </div>

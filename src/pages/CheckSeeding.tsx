@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useState, useMemo } from 'react';
+import { useSeedingProjectsWithStats, useCreateSeedingProject, useUpdateSeedingProject, useDeleteSeedingProject } from '@/hooks/useSeedingProjects';
+import { SeedingProject } from '@/api/seeding';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -12,7 +13,7 @@ import { Pagination, PaginationContent, PaginationItem, PaginationLink, Paginati
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from '@/components/ui/skeleton';
 import { PlusCircle, Search, Archive, Trash2, FolderClock, CheckCircle, ListTodo, ChevronDown, Loader2, ArchiveRestore, MoreHorizontal, Edit, Bell } from 'lucide-react';
-import { showSuccess, showError, showLoading, dismissToast } from '@/utils/toast';
+import { showSuccess, showError } from '@/utils/toast';
 import { format } from 'date-fns';
 import { SeedingStatCard } from '@/components/SeedingStatCard';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -23,50 +24,27 @@ import { Link } from 'react-router-dom';
 import { useNotification } from '@/contexts/NotificationContext';
 
 type ProjectStatus = 'checking' | 'completed' | 'archived';
-type Project = {
-  id: number;
-  name: string;
-  created_at: string;
-  status: ProjectStatus;
-  total_posts: number;
-  checking_posts: number;
-  completed_posts: number;
-  comment_check_count: number;
-  post_approval_count: number;
-};
 
 const CheckSeeding = () => {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // React Query hooks - data loads instantly from cache
+  const { data: projects = [], isLoading } = useSeedingProjectsWithStats();
+  const createProject = useCreateSeedingProject();
+  const updateProject = useUpdateSeedingProject();
+  const deleteProject = useDeleteSeedingProject();
+
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | 'all'>('all');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
   const { unreadCount } = useNotification();
-  
+
   const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
-  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [editingProject, setEditingProject] = useState<SeedingProject | null>(null);
   const [projectName, setProjectName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+  const [projectToDelete, setProjectToDelete] = useState<SeedingProject | null>(null);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
-
-  const fetchProjects = async () => {
-    setIsLoading(true);
-    const { data, error } = await supabase.rpc('get_seeding_projects_with_stats');
-    if (error) {
-      showError("Không thể tải dự án: " + error.message);
-      setProjects([]);
-    } else {
-      setProjects(data as Project[] || []);
-    }
-    setIsLoading(false);
-  };
-
-  useEffect(() => {
-    fetchProjects();
-  }, []);
 
   const filteredProjects = useMemo(() => {
     return projects.filter(p => {
@@ -98,7 +76,7 @@ const CheckSeeding = () => {
     const activeProjects = projects.filter(p => p.status !== 'archived');
     const completedCount = activeProjects.filter(p => p.total_posts > 0 && p.total_posts === p.completed_posts).length;
     const checkingCount = activeProjects.length - completedCount;
-    
+
     return {
       total: activeProjects.length,
       completed: completedCount,
@@ -114,39 +92,11 @@ const CheckSeeding = () => {
     setSelectedIds(prev => checked ? [...prev, id] : prev.filter(i => i !== id));
   };
 
+  // TODO: Bulk actions need backend support - commenting out for now
   const handleBulkAction = async (action: 'archive' | 'delete' | 'restore') => {
-    let toastMessage = '';
-    let query;
-    let successMessage = '';
-
-    switch (action) {
-      case 'archive':
-        toastMessage = 'Đang lưu trữ...';
-        successMessage = 'Đã lưu trữ thành công!';
-        query = supabase.from('seeding_projects').update({ status: 'archived' }).in('id', selectedIds);
-        break;
-      case 'restore':
-        toastMessage = 'Đang khôi phục...';
-        successMessage = 'Đã khôi phục thành công!';
-        query = supabase.from('seeding_projects').update({ status: 'checking' }).in('id', selectedIds);
-        break;
-      case 'delete':
-        toastMessage = 'Đang xóa vĩnh viễn...';
-        successMessage = 'Đã xóa thành công!';
-        query = supabase.from('seeding_projects').delete().in('id', selectedIds);
-        break;
-      default: return;
-    }
-
-    const toastId = showLoading(toastMessage);
-    const { error } = await query;
-    dismissToast(toastId);
-
-    if (error) showError(`Thao tác thất bại: ${error.message}`);
-    else showSuccess(successMessage);
-    
+    showError('Bulk actions not yet implemented in Laravel API');
+    // For now, just clear selection
     setSelectedIds([]);
-    fetchProjects();
   };
 
   const handleOpenAddDialog = () => {
@@ -155,7 +105,7 @@ const CheckSeeding = () => {
     setIsAddEditDialogOpen(true);
   };
 
-  const handleOpenEditDialog = (project: Project) => {
+  const handleOpenEditDialog = (project: SeedingProject) => {
     setEditingProject(project);
     setProjectName(project.name);
     setIsAddEditDialogOpen(true);
@@ -167,41 +117,38 @@ const CheckSeeding = () => {
       return;
     }
     setIsSaving(true);
-    let error;
-    if (editingProject) {
-      ({ error } = await supabase.from('seeding_projects').update({ name: projectName, status: editingProject.status }).eq('id', editingProject.id));
-    } else {
-      ({ error } = await supabase.from('seeding_projects').insert({ name: projectName }));
-    }
-
-    if (error) {
-      showError("Lưu dự án thất bại: " + error.message);
-    } else {
-      showSuccess(`Đã ${editingProject ? 'cập nhật' : 'thêm'} dự án thành công!`);
+    try {
+      if (editingProject) {
+        await updateProject.mutateAsync({ id: editingProject.id, data: { name: projectName } });
+      } else {
+        await createProject.mutateAsync({ name: projectName });
+      }
       setIsAddEditDialogOpen(false);
-      fetchProjects();
+    } catch (error) {
+      // Error handled in hook
+    } finally {
+      setIsSaving(false);
     }
-    setIsSaving(false);
   };
 
-  const handleDeleteProject = (project: Project) => {
+  const handleDeleteProject = (project: SeedingProject) => {
     setProjectToDelete(project);
     setIsDeleteAlertOpen(true);
   };
 
   const confirmDelete = async () => {
     if (!projectToDelete) return;
-    const toastId = showLoading("Đang xóa...");
-    const { error } = await supabase.from('seeding_projects').delete().eq('id', projectToDelete.id);
-    dismissToast(toastId);
-    if (error) {
-      showError("Xóa thất bại: " + error.message);
-    } else {
+    setIsSaving(true);
+    try {
+      await deleteProject.mutateAsync(projectToDelete.id);
       showSuccess("Đã xóa dự án thành công!");
-      fetchProjects();
+    } catch (error) {
+      // Error handled in hook
+    } finally {
+      setIsSaving(false);
+      setIsDeleteAlertOpen(false);
+      setProjectToDelete(null);
     }
-    setIsDeleteAlertOpen(false);
-    setProjectToDelete(null);
   };
 
   return (

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { authService } from '@/api/auth';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,42 +19,28 @@ const Register = () => {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !email || !password) {
-        showError("Vui lòng nhập đầy đủ họ tên, email và mật khẩu.");
-        return;
+      showError("Vui lòng nhập đầy đủ họ tên, email và mật khẩu.");
+      return;
     }
     if (password.length < 8) {
-        showError("Mật khẩu phải có ít nhất 8 ký tự.");
-        return;
+      showError("Mật khẩu phải có ít nhất 8 ký tự.");
+      return;
     }
     setIsLoading(true);
     try {
-      const { error } = await supabase.functions.invoke('create-user', {
-        body: {
-          email,
-          password,
-          name,
-        },
+      await authService.register({
+        name,
+        email,
+        password,
+        password_confirmation: password, // Auto-confirm for now
       });
 
-      if (error) {
-        let errorMessage = error.message;
-        if (error.context && typeof error.context.json === 'function') {
-          try {
-            const errorBody = await error.context.json();
-            if (errorBody.error) {
-              errorMessage = errorBody.error;
-            }
-          } catch (e) {
-            // Bỏ qua lỗi phân tích JSON
-          }
-        }
-        throw new Error(errorMessage);
-      }
-      
       showSuccess('Đăng ký thành công! Vui lòng đăng nhập.');
       navigate('/login');
     } catch (error: any) {
-      showError(error.message || "Đã xảy ra lỗi đăng ký.");
+      console.error(error);
+      const message = error.response?.data?.message || error.message || "Đã xảy ra lỗi đăng ký.";
+      showError(message);
     } finally {
       setIsLoading(false);
     }
@@ -133,7 +119,7 @@ const Register = () => {
                 </Button>
               </div>
             </form>
-            
+
             <p className="text-center text-sm text-gray-600">
               Đã có tài khoản?{' '}
               <Link to="/login" className="font-medium text-blue-600 hover:text-blue-500">
@@ -148,16 +134,16 @@ const Register = () => {
       </div>
       <div className="hidden lg:flex items-center justify-center bg-blue-600 text-white p-8 relative">
         <div className="text-center z-10 flex flex-col items-center">
-            <img src={hexaLogo} alt="DAILONG MEDIA Logo" className="w-[28rem] h-auto mb-8" style={{ filter: 'brightness(0) invert(1)' }} />
-            <div className="border border-white/20 rounded-2xl p-8 backdrop-blur-sm bg-white/10 max-w-2xl">
-                <p className="text-2xl font-semibold mt-2 leading-tight">Hệ thống Automation AI hỗ trợ triển khai dự án</p>
-            </div>
+          <img src={hexaLogo} alt="DAILONG MEDIA Logo" className="w-[28rem] h-auto mb-8" style={{ filter: 'brightness(0) invert(1)' }} />
+          <div className="border border-white/20 rounded-2xl p-8 backdrop-blur-sm bg-white/10 max-w-2xl">
+            <p className="text-2xl font-semibold mt-2 leading-tight">Hệ thống Automation AI hỗ trợ triển khai dự án</p>
+          </div>
         </div>
         <div className="absolute bottom-8 left-0 right-0 flex justify-center space-x-8 text-sm text-blue-200">
-            <a href="#" className="hover:text-white">Marketplace</a>
-            <a href="#" className="hover:text-white">License</a>
-            <a href="#" className="hover:text-white">Terms of Use</a>
-            <a href="#" className="hover:text-white">Blog</a>
+          <a href="#" className="hover:text-white">Marketplace</a>
+          <a href="#" className="hover:text-white">License</a>
+          <a href="#" className="hover:text-white">Terms of Use</a>
+          <a href="#" className="hover:text-white">Blog</a>
         </div>
       </div>
     </div>

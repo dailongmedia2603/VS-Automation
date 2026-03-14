@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
+import { postScanService, PostScanResult } from '@/api/tools';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -16,76 +17,31 @@ import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { showError, showSuccess } from '@/utils/toast';
 
-type Project = {
-  id: number;
-  name: string;
-  keywords: string | null;
-};
-
-type ScanResult = {
-  id: number;
-  post_content: string;
-  post_link: string;
-  found_keywords: string[];
-  scanned_at: string;
-  group_id: string;
-  post_created_at: string | null;
-};
-
 const PublicPostScan = () => {
   const { publicId } = useParams<{ publicId: string }>();
-  const [project, setProject] = useState<Project | null>(null);
-  const [results, setResults] = useState<ScanResult[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [filterDateRange, setFilterDateRange] = useState<DateRange | undefined>();
   const [filterDatePickerOpen, setFilterDatePickerOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
-  useEffect(() => {
-    const fetchPublicData = async () => {
-      if (!publicId) {
-        setError("Không tìm thấy ID dự án.");
-        setIsLoading(false);
-        return;
-      }
+  // React Query - data loads instantly from cache, auto-refresh every 60 seconds
+  const { data: project, isLoading: isLoadingProject, error: projectError } = useQuery({
+    queryKey: ['public-post-scan-project', publicId],
+    queryFn: () => postScanService.getPublic(publicId!),
+    enabled: !!publicId,
+    refetchInterval: 60000,
+  });
 
-      try {
-        const { data: projectData, error: projectError } = await supabase
-          .from('post_scan_projects')
-          .select('id, name, keywords')
-          .eq('public_id', publicId)
-          .eq('is_public', true)
-          .single();
+  const { data: results = [], isLoading: isLoadingResults } = useQuery({
+    queryKey: ['public-post-scan-results', project?.id],
+    queryFn: () => postScanService.getResults(project!.id),
+    enabled: !!project?.id,
+    refetchInterval: 60000,
+  });
 
-        if (projectError || !projectData) {
-          throw new Error("Không tìm thấy dự án hoặc dự án không được công khai.");
-        }
-        setProject(projectData);
-
-        const { data: resultsData, error: resultsError } = await supabase
-          .from('post_scan_results')
-          .select('id, post_content, post_link, found_keywords, scanned_at, group_id, post_created_at')
-          .eq('project_id', projectData.id)
-          .order('post_created_at', { ascending: false });
-
-        if (resultsError) throw resultsError;
-        setResults(resultsData || []);
-
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchPublicData();
-    const interval = setInterval(fetchPublicData, 60000); // Refresh every 60 seconds
-    return () => clearInterval(interval);
-  }, [publicId]);
+  const isLoading = isLoadingProject || isLoadingResults;
 
   const filteredResults = useMemo(() => {
-    let tempResults = results;
+    let tempResults = results as PostScanResult[];
 
     if (filterDateRange?.from) {
       const start = startOfDay(filterDateRange.from);
@@ -96,7 +52,7 @@ const PublicPostScan = () => {
       });
     }
 
-    const uniqueResults: ScanResult[] = [];
+    const uniqueResults: PostScanResult[] = [];
     const seen = new Set<string>();
 
     for (const result of tempResults) {
@@ -151,12 +107,12 @@ const PublicPostScan = () => {
     );
   }
 
-  if (error) {
+  if (projectError || !project) {
     return (
       <div className="flex flex-col items-center justify-center h-screen text-center p-4">
         <AlertTriangle className="h-12 w-12 text-red-500 mb-4" />
         <h1 className="text-xl font-bold text-slate-800">Lỗi truy cập</h1>
-        <p className="text-slate-600 mt-2">{error}</p>
+        <p className="text-slate-600 mt-2">Không tìm thấy dự án hoặc dự án không được công khai.</p>
       </div>
     );
   }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { libraryService } from '@/api/contentAi';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,22 +34,28 @@ export const ConditionLibraryDialog = ({ isOpen, onOpenChange, onSelect }: Condi
     if (isOpen) {
       const fetchLibraries = async () => {
         setIsLoading(true);
-        const { data, error } = await supabase
-          .from('condition_libraries')
-          .select('id, name, conditions');
-        
-        if (error) {
-          showError("Không thể tải thư viện điều kiện: " + error.message);
-        } else {
-          setLibraries(data || []);
+        try {
+          const data = await libraryService.getConditionLibraries();
+          // Map backend response to local Library type
+          // Assuming backend might return conditions in config or direct property. 
+          // If strict type checking fails, we cast to any.
+          const mappedData = data.map((lib: any) => ({
+            id: lib.id,
+            name: lib.name,
+            conditions: lib.conditions || lib.config?.conditions || []
+          }));
+          setLibraries(mappedData);
+        } catch (error: any) {
+          showError("Không thể tải thư viện điều kiện: " + (error.response?.data?.message || 'Unknown error'));
+        } finally {
+          setIsLoading(false);
         }
-        setIsLoading(false);
       };
       fetchLibraries();
     }
   }, [isOpen]);
 
-  const filteredLibraries = libraries.filter(lib => 
+  const filteredLibraries = libraries.filter(lib =>
     lib.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -68,9 +74,9 @@ export const ConditionLibraryDialog = ({ isOpen, onOpenChange, onSelect }: Condi
         <div className="py-4 space-y-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="Tìm kiếm thư viện..." 
-              className="pl-9" 
+            <Input
+              placeholder="Tìm kiếm thư viện..."
+              className="pl-9"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -81,8 +87,8 @@ export const ConditionLibraryDialog = ({ isOpen, onOpenChange, onSelect }: Condi
                 [...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)
               ) : filteredLibraries.length > 0 ? (
                 filteredLibraries.map(lib => (
-                  <button 
-                    key={lib.id} 
+                  <button
+                    key={lib.id}
                     onClick={() => handleSelectLibrary(lib)}
                     className="w-full text-left flex items-center gap-3 p-2 rounded-md hover:bg-slate-100"
                   >
