@@ -5,19 +5,19 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { settingsService, AiApiPriority } from '@/api/settings';
 import { showSuccess, showError } from "@/utils/toast";
-import { Loader2, Save, ChevronUp, ChevronDown, AlertCircle, Layers, Globe } from "lucide-react";
+import { Loader2, Save, ChevronUp, ChevronDown, RefreshCw, Layers, Globe } from "lucide-react";
 
 const AiApiPrioritySettings = () => {
     const [priorities, setPriorities] = useState<AiApiPriority[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+    const [isSyncing, setIsSyncing] = useState(false);
     const [hasChanges, setHasChanges] = useState(false);
 
     const fetchPriorities = async () => {
         setIsLoading(true);
         try {
             const data = await settingsService.getAiApiPriorities();
-            // Sort by priority
             setPriorities([...data].sort((a, b) => a.priority - b.priority));
         } catch (error: any) {
             showError("Không thể tải cấu hình ưu tiên: " + (error.response?.data?.message || error.message));
@@ -29,6 +29,23 @@ const AiApiPrioritySettings = () => {
     useEffect(() => {
         fetchPriorities();
     }, []);
+
+    const handleSync = async () => {
+        setIsSyncing(true);
+        try {
+            const data = await settingsService.syncAiApiPriorities();
+            setPriorities([...data].sort((a, b) => a.priority - b.priority));
+            if (data.length > 0) {
+                showSuccess(`Đã đồng bộ ${data.length} nhà cung cấp API thành công!`);
+            } else {
+                showError("Không tìm thấy nhà cung cấp nào. Hãy cấu hình API Cliproxy hoặc Troll LLM trước.");
+            }
+        } catch (error: any) {
+            showError("Đồng bộ thất bại: " + (error.response?.data?.message || error.message));
+        } finally {
+            setIsSyncing(false);
+        }
+    };
 
     const rebuildPriorities = (list: AiApiPriority[]): AiApiPriority[] =>
         list.map((item, idx) => ({ ...item, priority: idx + 1 }));
@@ -91,21 +108,36 @@ const AiApiPrioritySettings = () => {
                 <div>
                     <CardTitle>Thứ tự ưu tiên API cho Content AI</CardTitle>
                     <CardDescription>
-                        Cấu hình thứ tự luân phiên: khi API ưu tiên cao gặp lỗi, hệ thống tự động chuyển sang API tiếp theo.
+                        Khi API ưu tiên cao gặp lỗi, hệ thống tự động chuyển sang API tiếp theo.
                     </CardDescription>
                 </div>
-                <Button
-                    onClick={handleSave}
-                    disabled={!hasChanges || isSaving}
-                    className="bg-blue-600 hover:bg-blue-700 rounded-lg"
-                >
-                    {isSaving ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                        <Save className="mr-2 h-4 w-4" />
-                    )}
-                    Lưu thứ tự
-                </Button>
+                <div className="flex gap-2">
+                    <Button
+                        variant="outline"
+                        onClick={handleSync}
+                        disabled={isSyncing}
+                        className="rounded-lg"
+                    >
+                        {isSyncing ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                            <RefreshCw className="mr-2 h-4 w-4" />
+                        )}
+                        Đồng bộ nhà cung cấp
+                    </Button>
+                    <Button
+                        onClick={handleSave}
+                        disabled={!hasChanges || isSaving}
+                        className="bg-blue-600 hover:bg-blue-700 rounded-lg"
+                    >
+                        {isSaving ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                            <Save className="mr-2 h-4 w-4" />
+                        )}
+                        Lưu thứ tự
+                    </Button>
+                </div>
             </CardHeader>
             <CardContent>
                 {isLoading ? (
@@ -114,26 +146,33 @@ const AiApiPrioritySettings = () => {
                     </div>
                 ) : priorities.length === 0 ? (
                     <div className="flex flex-col items-center py-10 text-muted-foreground gap-3 border rounded-xl border-dashed">
-                        <AlertCircle className="h-10 w-10 text-amber-400" />
+                        <RefreshCw className="h-10 w-10 text-blue-400" />
                         <p className="font-medium text-center text-sm px-4">
-                            Chưa có cấu hình ưu tiên nào. Hãy thêm nhà cung cấp API ở tab API Cliproxy hoặc API Troll LLM trước, sau đó nhấn <strong>Đồng bộ</strong> để tự động tạo danh sách ưu tiên.
+                            Chưa có cấu hình ưu tiên nào. Nhấn <strong>"Đồng bộ nhà cung cấp"</strong> để tự động tạo danh sách từ
+                            các API đã cấu hình (Cliproxy, Troll LLM).
                         </p>
                         <Button
-                            variant="outline"
-                            className="rounded-lg mt-1"
-                            onClick={fetchPriorities}
+                            variant="default"
+                            className="rounded-lg bg-blue-600 hover:bg-blue-700 mt-1"
+                            onClick={handleSync}
+                            disabled={isSyncing}
                         >
-                            Tải lại
+                            {isSyncing ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                                <RefreshCw className="mr-2 h-4 w-4" />
+                            )}
+                            Đồng bộ ngay
                         </Button>
                     </div>
                 ) : (
                     <div className="space-y-3">
-                        {/* Legend */}
+                        {/* Info banner */}
                         <div className="rounded-lg bg-blue-50 border border-blue-100 p-3 text-xs text-blue-700 flex items-start gap-2">
                             <Layers className="h-4 w-4 shrink-0 mt-0.5" />
                             <span>
-                                Hệ thống sẽ gọi API theo thứ tự ưu tiên từ trên xuống. Nếu API bị lỗi, tự động chuyển sang API tiếp theo.
-                                Tắt switch để bỏ qua API đó trong quá trình luân phiên.
+                                Hệ thống gọi API theo thứ tự ưu tiên từ trên xuống. Nếu API lỗi, tự động chuyển sang API tiếp theo.
+                                Tắt switch để bỏ qua API đó. Nhấn <strong>Đồng bộ</strong> để thêm provider mới vào danh sách.
                             </span>
                         </div>
 
@@ -156,7 +195,7 @@ const AiApiPrioritySettings = () => {
                                         <Badge variant="outline" className="text-xs h-5 px-1.5">
                                             {providerTypeLabel(item.provider_type)}
                                         </Badge>
-                                        {item.priority === 1 && (
+                                        {item.priority === 1 && item.is_enabled && (
                                             <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-0 text-xs h-5 px-1.5">
                                                 Ưu tiên 1
                                             </Badge>

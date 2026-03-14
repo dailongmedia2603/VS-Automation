@@ -164,6 +164,11 @@ export const settingsService = {
         await apiClient.put('/settings/ai-api-priorities', { priorities });
     },
 
+    async syncAiApiPriorities(): Promise<AiApiPriority[]> {
+        const response = await apiClient.post('/settings/ai-api-priorities/sync');
+        return response.data.priorities;
+    },
+
     // ========== TROLL LLM PROVIDERS ==========
     async getTrollLlmProviders(): Promise<TrollLlmProvider[]> {
         const response = await apiClient.get('/settings/troll-llm-providers');
