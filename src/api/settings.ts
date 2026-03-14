@@ -67,6 +67,19 @@ export interface CliproxySettings {
     default_model?: string;
 }
 
+export interface TrollLlmProvider {
+    id: number;
+    name: string;
+    api_url: string;
+    api_key?: string;
+    model_id?: string;
+    is_active: boolean;
+    created_at: string;
+    last_check_status?: 'success' | 'failed' | null;
+    last_checked_at?: string | null;
+    last_check_message?: string | null;
+}
+
 export interface AllSettings {
     ai_settings: AiSettings;
     apifb_settings: ApifbSettings;
@@ -74,6 +87,7 @@ export interface AllSettings {
     notebooklm_settings: NotebookLmSettings;
     notebooklm_accounts?: NotebookLmAccount[];
     cliproxy_settings?: CliproxySettings;
+    troll_llm_providers?: TrollLlmProvider[];
 }
 
 export const settingsService = {
@@ -123,6 +137,31 @@ export const settingsService = {
     async updateCliproxySettings(data: Partial<CliproxySettings>): Promise<CliproxySettings> {
         const response = await apiClient.put('/settings/cliproxy', data);
         return response.data.settings;
+    },
+
+    // ========== TROLL LLM PROVIDERS ==========
+    async getTrollLlmProviders(): Promise<TrollLlmProvider[]> {
+        const response = await apiClient.get('/settings/troll-llm-providers');
+        return response.data.providers;
+    },
+
+    async storeTrollLlmProvider(data: { name: string; api_url: string; api_key: string; model_id?: string }): Promise<TrollLlmProvider> {
+        const response = await apiClient.post('/settings/troll-llm-providers', data);
+        return response.data.provider;
+    },
+
+    async deleteTrollLlmProvider(id: number): Promise<void> {
+        await apiClient.delete(`/settings/troll-llm-providers/${id}`);
+    },
+
+    async setActiveTrollLlmProvider(id: number): Promise<TrollLlmProvider> {
+        const response = await apiClient.post(`/settings/troll-llm-providers/${id}/active`);
+        return response.data.provider;
+    },
+
+    async checkTrollLlmProviderConnection(id: number): Promise<{ success: boolean; message: string; provider: TrollLlmProvider }> {
+        const response = await apiClient.post(`/settings/troll-llm-providers/${id}/check`);
+        return response.data;
     },
 
     // ========== NOTEBOOKLM ACCOUNTS ==========
