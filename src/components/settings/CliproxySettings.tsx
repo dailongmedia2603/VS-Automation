@@ -65,8 +65,9 @@ const CliproxySettings = () => {
       }
     } catch (err: any) {
       setTestStatus('error');
-      setTestError(err.message);
-      showError(`Kiểm tra thất bại: ${err.message}`);
+      const errorMessage = err.response?.data?.message || err.message || "Lỗi không xác định";
+      setTestError(errorMessage);
+      showError(`Kiểm tra thất bại: ${errorMessage}`);
     } finally {
       setIsTesting(false);
     }
