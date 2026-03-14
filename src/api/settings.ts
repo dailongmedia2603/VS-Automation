@@ -80,6 +80,18 @@ export interface TrollLlmProvider {
     last_check_message?: string | null;
 }
 
+export interface AiApiPriority {
+    id: number;
+    provider_type: 'cliproxy' | 'troll_llm_provider';
+    provider_id: number | null;
+    priority: number;
+    is_enabled: boolean;
+    // Enriched fields from backend
+    provider_name?: string;
+    provider_url?: string;
+    provider_model?: string;
+}
+
 export interface AllSettings {
     ai_settings: AiSettings;
     apifb_settings: ApifbSettings;
@@ -88,6 +100,7 @@ export interface AllSettings {
     notebooklm_accounts?: NotebookLmAccount[];
     cliproxy_settings?: CliproxySettings;
     troll_llm_providers?: TrollLlmProvider[];
+    ai_api_priorities?: AiApiPriority[];
 }
 
 export const settingsService = {
@@ -137,6 +150,18 @@ export const settingsService = {
     async updateCliproxySettings(data: Partial<CliproxySettings>): Promise<CliproxySettings> {
         const response = await apiClient.put('/settings/cliproxy', data);
         return response.data.settings;
+    },
+
+    // ========== AI API PRIORITIES ==========
+    async getAiApiPriorities(): Promise<AiApiPriority[]> {
+        const response = await apiClient.get('/settings/ai-api-priorities');
+        return response.data.priorities;
+    },
+
+    async updateAiApiPriorities(
+        priorities: Array<{ provider_type: string; provider_id: number | null; priority: number; is_enabled: boolean }>
+    ): Promise<void> {
+        await apiClient.put('/settings/ai-api-priorities', { priorities });
     },
 
     // ========== TROLL LLM PROVIDERS ==========

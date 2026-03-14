@@ -23,6 +23,7 @@ import GeminiCustomSettings from "@/components/settings/GeminiCustomSettings";
 import TrollLlmSettings from "@/components/settings/TrollLlmSettings";
 import NotebookLmSettings from "@/components/settings/NotebookLmSettings";
 import CliproxySettings from "@/components/settings/CliproxySettings";
+import AiApiPrioritySettings from "@/components/settings/AiApiPrioritySettings";
 
 const Settings = () => {
   // AI API Settings state
@@ -261,6 +262,7 @@ const Settings = () => {
           <TabsTrigger value="cliproxy" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">API Cliproxy</TabsTrigger>
           <TabsTrigger value="api-facebook" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">API Facebook Graph</TabsTrigger>
           <TabsTrigger value="telegram" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Telegram</TabsTrigger>
+          <TabsTrigger value="ai-priority" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Ưu tiên API</TabsTrigger>
         </TabsList>
         <TabsContent value="gemini-custom" className="mt-4">
           <GeminiCustomSettings />
@@ -273,6 +275,9 @@ const Settings = () => {
         </TabsContent>
         <TabsContent value="cliproxy" className="mt-4">
           <CliproxySettings />
+        </TabsContent>
+        <TabsContent value="ai-priority" className="mt-4">
+          <AiApiPrioritySettings />
         </TabsContent>
         <TabsContent value="api-facebook" className="mt-4 space-y-6">
           <Card className="shadow-sm rounded-2xl bg-white">
