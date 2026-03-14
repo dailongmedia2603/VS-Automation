@@ -19,7 +19,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FacebookApiReference } from "@/components/FacebookApiReference";
 import TelegramSettings from "@/components/settings/TelegramSettings";
-import GeminiCustomSettings from "@/components/settings/GeminiCustomSettings";
 import TrollLlmSettings from "@/components/settings/TrollLlmSettings";
 import NotebookLmSettings from "@/components/settings/NotebookLmSettings";
 import CliproxySettings from "@/components/settings/CliproxySettings";
@@ -256,7 +255,6 @@ const Settings = () => {
       <h2 className="text-3xl font-bold tracking-tight">Cài đặt chung</h2>
       <Tabs defaultValue="api-facebook">
         <TabsList className="flex justify-start items-center gap-1 p-0 bg-transparent flex-wrap">
-          <TabsTrigger value="gemini-custom" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">API Antigravity Tool</TabsTrigger>
           <TabsTrigger value="troll-llm" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">API Troll LLM</TabsTrigger>
           <TabsTrigger value="notebooklm" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">API NotebookLM</TabsTrigger>
           <TabsTrigger value="cliproxy" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">API Cliproxy</TabsTrigger>
@@ -264,9 +262,6 @@ const Settings = () => {
           <TabsTrigger value="telegram" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Telegram</TabsTrigger>
           <TabsTrigger value="ai-priority" className="rounded-lg px-4 py-2 text-muted-foreground font-medium data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">Ưu tiên API</TabsTrigger>
         </TabsList>
-        <TabsContent value="gemini-custom" className="mt-4">
-          <GeminiCustomSettings />
-        </TabsContent>
         <TabsContent value="troll-llm" className="mt-4">
           <TrollLlmSettings />
         </TabsContent>

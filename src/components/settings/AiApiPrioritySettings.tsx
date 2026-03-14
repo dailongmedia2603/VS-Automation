@@ -200,6 +200,21 @@ const AiApiPrioritySettings = () => {
                                                 Ưu tiên 1
                                             </Badge>
                                         )}
+                                        {item.priority === 2 && item.is_enabled && (
+                                            <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-0 text-xs h-5 px-1.5">
+                                                Ưu tiên 2
+                                            </Badge>
+                                        )}
+                                        {item.priority === 3 && item.is_enabled && (
+                                            <Badge className="bg-gray-100 text-gray-600 hover:bg-gray-100 border-0 text-xs h-5 px-1.5">
+                                                Ưu tiên 3
+                                            </Badge>
+                                        )}
+                                        {item.priority > 3 && item.is_enabled && (
+                                            <Badge className="bg-gray-100 text-gray-500 hover:bg-gray-100 border-0 text-xs h-5 px-1.5">
+                                                Ưu tiên {item.priority}
+                                            </Badge>
+                                        )}
                                         {!item.is_enabled && (
                                             <Badge className="bg-gray-100 text-gray-500 hover:bg-gray-100 border-0 text-xs h-5 px-1.5">
                                                 Đã tắt
