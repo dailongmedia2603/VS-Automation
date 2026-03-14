@@ -46,11 +46,13 @@ export interface NotebookLmSettings {
     id: number;
     cookies?: string;
     active_account_id?: string;
+    api_key?: string;
 }
 
 export interface NotebookLmAccount {
     id: number;
     name: string;
+    email?: string;
     cookies: string;
     account_id?: string;
     is_active: boolean;
